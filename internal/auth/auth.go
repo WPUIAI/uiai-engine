@@ -3,9 +3,10 @@ package auth
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,14 +49,29 @@ func New(cfg *config.Config) *Authenticator {
 
 func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth on health/status/public info endpoints
+		// Skip auth on health/status/public info endpoints + routes that Bun serves without auth
 		p := r.URL.Path
-		if p == "/" || p == "/api/health" || p == "/api/health/providers" || p == "/api/status" || p == "/health" ||
+		if p == "/" || p == "/health" || p == "/api/status" || p == "/dashboard" ||
+			// Health
+			p == "/api/health" || p == "/api/health/providers" ||
+			// Public info
 			p == "/api/critique/models" || p == "/api/critique/dimensions" ||
 			p == "/api/ui-reverse/models" || p == "/api/ui-reverse/operations" ||
 			p == "/api/copilot/health" || p == "/api/intelligence/health" ||
-			p == "/dashboard" ||
-			(r.Method == "GET" && (p == "/api/extension/rate-limits" || p == "/api/extension/verify")) {
+			// Extension verify + token handled inside handler (Bun returns 400/401 itself)
+			p == "/api/extension/verify" || p == "/api/extension/token" ||
+			// Memory, usage, workflow, training, intelligence — Bun has no global auth
+			strings.HasPrefix(p, "/api/memory/") ||
+			strings.HasPrefix(p, "/api/usage/") ||
+			strings.HasPrefix(p, "/api/workflow/") ||
+			strings.HasPrefix(p, "/api/training/") ||     // Has own service-token auth
+			strings.HasPrefix(p, "/api/intelligence/") {  // Per-handler auth
+			// Try to extract identity if credentials present, but don't block
+			if id, err := a.Authenticate(r); err == nil {
+				ctx := context.WithValue(r.Context(), ctxKey{}, id)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
 			next.ServeHTTP(w, r)
 			return
 		}

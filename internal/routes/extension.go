@@ -100,6 +100,10 @@ func MountExtensionReal(r chi.Router, cfg *config.Config, authenticator *auth.Au
 		if token == "" {
 			token = req.URL.Query().Get("token")
 		}
+		if token == "" {
+			writeJSON(w, 400, map[string]any{"valid": false, "error": "missing token"})
+			return
+		}
 		if v, ok := extTokens.Load(token); ok {
 			et := v.(*extToken)
 			if time.Now().Before(et.ExpiresAt) {

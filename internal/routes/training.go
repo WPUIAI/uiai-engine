@@ -19,11 +19,16 @@ var (
 )
 
 func MountTrainingReal(r chi.Router, cfg *config.Config) {
-	// Service token auth check
+	// Service token auth check — matches Bun behavior:
+	// 503 if no service token configured, 401 if wrong token
 	serviceToken := cfg.WordPress.WebhookSecret
 
 	requireAuth := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, req *http.Request) {
+			if serviceToken == "" {
+				writeJSON(w, 503, map[string]string{"error": "Service not configured"})
+				return
+			}
 			token := req.Header.Get("X-API-Token")
 			if token == "" {
 				auth := req.Header.Get("Authorization")
@@ -31,8 +36,8 @@ func MountTrainingReal(r chi.Router, cfg *config.Config) {
 					token = auth[7:]
 				}
 			}
-			if token == "" || (serviceToken != "" && token != serviceToken) {
-				writeJSON(w, 401, map[string]string{"error": "valid service token required"})
+			if token != serviceToken {
+				writeJSON(w, 401, map[string]string{"error": "Unauthorized - valid service token required"})
 				return
 			}
 			next(w, req)
