@@ -102,19 +102,19 @@ func (e *Engine) mountRoutes() {
 		routes.MountCritiqueReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/ui-reverse", func(r chi.Router) {
-		routes.MountUIReverse(r, e.cfg)
+		routes.MountUIReverseReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/section-detect", func(r chi.Router) {
-		routes.MountSectionDetect(r, e.cfg)
+		routes.MountSectionDetectReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/layout-compare", func(r chi.Router) {
-		routes.MountLayoutCompare(r, e.cfg)
+		routes.MountLayoutCompareReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/style-enhance", func(r chi.Router) {
-		routes.MountStyleEnhance(r, e.cfg)
+		routes.MountStyleEnhanceReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/copilot", func(r chi.Router) {
-		routes.MountCopilot(r, e.cfg)
+		routes.MountCopilotReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 
 	// Supporting endpoints
