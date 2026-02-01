@@ -1,0 +1,26 @@
+[Unit]
+Description=UIAI AI Engine (Go)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wpuiai
+Group=wpuiai
+WorkingDirectory=/home/wpuiai/uiai-engine
+ExecStart=/home/wpuiai/uiai-engine/uiai-engine
+Restart=always
+RestartSec=3
+Environment=HOME=/home/wpuiai
+
+# Resource limits (should use ~50MB vs old 1.5GB)
+MemoryMax=512M
+CPUQuota=200%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=uiai-engine
+
+[Install]
+WantedBy=multi-user.target
