@@ -64,8 +64,10 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			strings.HasPrefix(p, "/api/memory/") ||
 			strings.HasPrefix(p, "/api/usage/") ||
 			strings.HasPrefix(p, "/api/workflow/") ||
-			strings.HasPrefix(p, "/api/training/") ||     // Has own service-token auth
-			strings.HasPrefix(p, "/api/intelligence/") {  // Per-handler auth
+			strings.HasPrefix(p, "/api/training/") ||       // Has own service-token auth
+			strings.HasPrefix(p, "/api/intelligence/") ||  // Per-handler auth
+			strings.HasPrefix(p, "/api/screenshot/") ||    // Health check is public
+			strings.HasPrefix(p, "/api/share/") {          // Share viewing is public
 			// Try to extract identity if credentials present, but don't block
 			if id, err := a.Authenticate(r); err == nil {
 				ctx := context.WithValue(r.Context(), ctxKey{}, id)

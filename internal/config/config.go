@@ -23,10 +23,12 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port         int           `yaml:"port"`
-	Host         string        `yaml:"host"`
-	ReadTimeout  time.Duration `yaml:"read_timeout"`
-	WriteTimeout time.Duration `yaml:"write_timeout"`
+	Port           int           `yaml:"port"`
+	Host           string        `yaml:"host"`
+	ReadTimeout    time.Duration `yaml:"read_timeout"`
+	WriteTimeout   time.Duration `yaml:"write_timeout"`
+	DisableVision  bool          `yaml:"disable_vision"`
+	VisionPoolSize int           `yaml:"vision_pool_size"`
 }
 
 type WordPressConfig struct {

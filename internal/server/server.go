@@ -22,6 +22,7 @@ import (
 	"github.com/philoveracity/uiai-engine/internal/ratelimit"
 	"github.com/philoveracity/uiai-engine/internal/routes"
 	"github.com/philoveracity/uiai-engine/internal/storage"
+	"github.com/philoveracity/uiai-engine/internal/vision"
 )
 
 // Engine is the main server instance.
@@ -34,6 +35,7 @@ type Engine struct {
 	credits *credits.Service
 	limiter *ratelimit.Limiter
 	usage   *storage.UsageStore
+	vision  *vision.Pool
 }
 
 // New creates a new Engine with all routes wired.
@@ -53,6 +55,16 @@ func New(cfg *config.Config) *Engine {
 	limiter := ratelimit.New(cfg)
 	usage := storage.NewUsageStore(cfg.Storage.DataDir, cfg.Storage.UsageFile)
 
+	// Vision pool (Rod/Chromium) — optional, degrades gracefully
+	var visionPool *vision.Pool
+	if !cfg.Server.DisableVision {
+		var err error
+		visionPool, err = vision.NewPool(cfg.Server.VisionPoolSize)
+		if err != nil {
+			log.Printf("[vision] WARNING: Pool init failed: %v (screenshot/share will return 503)", err)
+		}
+	}
+
 	// Auth middleware on all /api/* except health/status
 	r.Use(authenticator.Middleware)
 
@@ -64,6 +76,7 @@ func New(cfg *config.Config) *Engine {
 		credits: creditSvc,
 		limiter: limiter,
 		usage:   usage,
+		vision:  visionPool,
 	}
 
 	e.mountRoutes()
@@ -143,12 +156,12 @@ func (e *Engine) mountRoutes() {
 		routes.MountTrainingReal(r, e.cfg)
 	})
 
-	// Screenshot & Share (absorbs PHP API — Phase A8)
+	// Screenshot & Share (Rod vision pool — Phase A8)
 	r.Route("/api/screenshot", func(r chi.Router) {
-		routes.MountScreenshot(r, e.cfg)
+		routes.MountScreenshotReal(r, e.cfg, e.vision)
 	})
 	r.Route("/api/share", func(r chi.Router) {
-		routes.MountShare(r, e.cfg)
+		routes.MountShareReal(r, e.cfg, e.vision)
 	})
 
 	// Share viewer (public, no /api prefix)
