@@ -1,0 +1,70 @@
+# UIAI Engine Configuration
+server:
+  port: 7456
+  host: "127.0.0.1"
+  read_timeout: 30s
+  write_timeout: 120s  # AI responses can be slow
+
+wordpress:
+  url: "https://wpuiai.com"
+  rest_namespace: "wpuiai-ai-cloud/v1"
+  webhook_secret: "${WEBHOOK_SECRET}"
+  cache_ttl: 300  # 5 minutes
+
+ai:
+  default_model: "claude-sonnet-4-20250514"
+  default_provider: "anthropic"
+  providers:
+    anthropic:
+      api_url: "https://api.anthropic.com/v1/messages"
+      api_version: "2023-06-01"
+    openai:
+      api_url: "https://api.openai.com/v1"
+    openrouter:
+      api_url: "https://openrouter.ai/api/v1"
+      site_url: "https://wpuiai.com"
+      site_name: "WPUIAI AI Cloud"
+    fireworks:
+      api_url: "https://api.fireworks.ai/inference/v1"
+
+vision:
+  pool_size: 3
+  max_pool: 8
+  idle_timeout: 300s
+  screenshot_quality: 65
+  share_dir: "/home/wpuiai/ai-api/shares"
+
+credits:
+  costs:
+    screenshot: 0.5
+    critique: 2.0
+    ui_reverse: 3.0
+    copilot: 1.0
+    coach_visual: 0.5
+    workflow_step: 1.0
+    style_enhance: 2.0
+    layout_compare: 2.0
+    section_detect: 1.0
+
+rate_limits:
+  tiers:
+    free:       { per_hour: 10,   per_day: 100 }
+    starter:    { per_hour: 100,  per_day: 1000 }
+    pro:        { per_hour: 500,  per_day: 5000 }
+    agency:     { per_hour: 2000, per_day: 20000 }
+    enterprise: { per_hour: 5000, per_day: 50000 }
+
+storage:
+  data_dir: "/home/wpuiai/uiai-engine/data"
+  usage_file: "usage.json"
+
+logging:
+  level: "info"
+  file: "/var/log/uiai/engine.log"
+
+cors:
+  origins:
+    - "https://wpuiai.com"
+    - "https://ai.wpuiai.com"
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  headers: ["Content-Type", "X-API-Key", "X-License-Key", "X-Webhook-Secret", "X-Extension-Token", "Authorization"]
