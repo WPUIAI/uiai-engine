@@ -15,15 +15,25 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/philoveracity/uiai-engine/internal/ai"
+	"github.com/philoveracity/uiai-engine/internal/auth"
 	"github.com/philoveracity/uiai-engine/internal/config"
+	"github.com/philoveracity/uiai-engine/internal/credits"
+	"github.com/philoveracity/uiai-engine/internal/ratelimit"
 	"github.com/philoveracity/uiai-engine/internal/routes"
+	"github.com/philoveracity/uiai-engine/internal/storage"
 )
 
 // Engine is the main server instance.
 type Engine struct {
-	cfg    *config.Config
-	router chi.Router
-	server *http.Server
+	cfg     *config.Config
+	router  chi.Router
+	server  *http.Server
+	auth    *auth.Authenticator
+	ai      *ai.Provider
+	credits *credits.Service
+	limiter *ratelimit.Limiter
+	usage   *storage.UsageStore
 }
 
 // New creates a new Engine with all routes wired.
@@ -37,9 +47,23 @@ func New(cfg *config.Config) *Engine {
 	r.Use(requestLogger)
 	r.Use(corsMiddleware(cfg))
 
+	authenticator := auth.New(cfg)
+	aiProvider := ai.NewProvider(cfg)
+	creditSvc := credits.New(cfg)
+	limiter := ratelimit.New(cfg)
+	usage := storage.NewUsageStore(cfg.Storage.DataDir, cfg.Storage.UsageFile)
+
+	// Auth middleware on all /api/* except health/status
+	r.Use(authenticator.Middleware)
+
 	e := &Engine{
-		cfg:    cfg,
-		router: r,
+		cfg:     cfg,
+		router:  r,
+		auth:    authenticator,
+		ai:      aiProvider,
+		credits: creditSvc,
+		limiter: limiter,
+		usage:   usage,
 	}
 
 	e.mountRoutes()
@@ -73,9 +97,9 @@ func (e *Engine) mountRoutes() {
 
 	// -- All /api/* routes below get auth middleware in Phase A2 --
 
-	// AI endpoints (Phase A6)
+	// AI endpoints — critique is real, rest are stubs until implemented
 	r.Route("/api/critique", func(r chi.Router) {
-		routes.MountCritique(r, e.cfg)
+		routes.MountCritiqueReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/ui-reverse", func(r chi.Router) {
 		routes.MountUIReverse(r, e.cfg)
