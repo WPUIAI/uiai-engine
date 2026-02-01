@@ -51,14 +51,18 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool) {
 			return
 		}
 
-		writeJSON(w, 200, map[string]any{
+		resp := map[string]any{
 			"screenshot": base64.StdEncoding.EncodeToString(result.Data),
 			"width":      result.Width,
 			"height":     result.Height,
 			"format":     result.Format,
 			"size":       len(result.Data),
 			"duration":   result.Duration.Milliseconds(),
-		})
+		}
+		if result.DOMReport != "" {
+			resp["dom_report"] = result.DOMReport
+		}
+		writeJSON(w, 200, resp)
 	})
 
 	r.Get("/health", func(w http.ResponseWriter, req *http.Request) {

@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
@@ -32,11 +33,12 @@ type ScreenshotOpts struct {
 }
 
 type ScreenshotResult struct {
-	Data     []byte
-	Width    int
-	Height   int
-	Format   string
-	Duration time.Duration
+	Data      []byte
+	Width     int
+	Height    int
+	Format    string
+	Duration  time.Duration
+	DOMReport string // lightweight DOM summary for Coach
 }
 
 func NewPool(maxPages int) (*Pool, error) {
@@ -179,12 +181,52 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 		return nil, fmt.Errorf("screenshot failed: %w", err)
 	}
 
+	// Extract lightweight DOM summary for Coach vision
+	domReport := ""
+	domJS := `() => {
+		const h = document.querySelectorAll('h1,h2,h3');
+		const headings = Array.from(h).slice(0,20).map(e => e.tagName + ': ' + e.textContent.trim().substring(0,80));
+		const imgs = document.querySelectorAll('img');
+		const imgCount = imgs.length;
+		const missingAlt = Array.from(imgs).filter(i => !i.alt || i.alt === '').length;
+		const links = document.querySelectorAll('a[href]');
+		const buttons = document.querySelectorAll('.wp-block-button,.wp-block-buttons a,button');
+		const sections = document.querySelectorAll('.wp-block-group,.wp-block-cover,.wp-block-columns');
+		return JSON.stringify({
+			title: document.title,
+			headings: headings,
+			images: {total: imgCount, missing_alt: missingAlt},
+			links: links.length,
+			buttons: buttons.length,
+			sections: sections.length,
+			viewport: {width: window.innerWidth, height: window.innerHeight, scrollHeight: document.body.scrollHeight}
+		});
+	}`
+	domResult, domErr := page.Eval(domJS)
+	if domErr != nil {
+		log.Printf("[vision] DOM eval error: %v", domErr)
+	} else if domResult != nil {
+		s := domResult.Value.Str()
+		if s != "" {
+			domReport = s
+		} else {
+			// Try JSON marshaling the value
+			b, merr := json.Marshal(domResult.Value)
+			if merr == nil && len(b) > 4 {
+				domReport = string(b)
+			} else {
+				log.Printf("[vision] DOM value type=%s str=%q marshal=%v", domResult.Type, s, merr)
+			}
+		}
+	}
+
 	return &ScreenshotResult{
-		Data:     data,
-		Width:    width,
-		Height:   height,
-		Format:   string(format),
-		Duration: time.Since(start),
+		Data:      data,
+		Width:     width,
+		Height:    height,
+		Format:    string(format),
+		Duration:  time.Since(start),
+		DOMReport: domReport,
 	}, nil
 }
 
