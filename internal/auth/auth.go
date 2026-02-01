@@ -50,7 +50,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip auth on health/status/public info endpoints
 		p := r.URL.Path
-		if p == "/api/health" || p == "/api/health/providers" || p == "/api/status" || p == "/health" || p == "/" ||
+		if p == "/" || p == "/api/health" || p == "/api/health/providers" || p == "/api/status" || p == "/health" ||
 			p == "/api/critique/models" || p == "/api/critique/dimensions" ||
 			p == "/api/ui-reverse/models" || p == "/api/ui-reverse/operations" ||
 			p == "/api/copilot/health" || p == "/api/intelligence/health" ||

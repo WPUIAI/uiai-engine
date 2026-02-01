@@ -125,16 +125,16 @@ func (e *Engine) mountRoutes() {
 		routes.MountWorkflow(r, e.cfg)
 	})
 	r.Route("/api/usage", func(r chi.Router) {
-		routes.MountUsage(r, e.cfg)
+		routes.MountUsageReal(r, e.cfg, e.usage)
 	})
 	r.Route("/api/extension", func(r chi.Router) {
-		routes.MountExtension(r, e.cfg)
+		routes.MountExtensionReal(r, e.cfg, e.auth)
 	})
 	r.Route("/api/memory", func(r chi.Router) {
-		routes.MountMemory(r, e.cfg)
+		routes.MountMemoryReal(r, e.cfg)
 	})
 	r.Route("/api/admin", func(r chi.Router) {
-		routes.MountAdmin(r, e.cfg)
+		routes.MountAdminReal(r, e.cfg, e.usage)
 	})
 	r.Route("/api/intelligence", func(r chi.Router) {
 		routes.MountIntelligence(r, e.cfg)
