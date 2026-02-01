@@ -119,10 +119,10 @@ func (e *Engine) mountRoutes() {
 
 	// Supporting endpoints
 	r.Route("/api/intake", func(r chi.Router) {
-		routes.MountIntake(r, e.cfg)
+		routes.MountIntakeReal(r, e.cfg, e.ai)
 	})
 	r.Route("/api/workflow", func(r chi.Router) {
-		routes.MountWorkflow(r, e.cfg)
+		routes.MountWorkflowReal(r, e.cfg)
 	})
 	r.Route("/api/usage", func(r chi.Router) {
 		routes.MountUsageReal(r, e.cfg, e.usage)
@@ -137,10 +137,10 @@ func (e *Engine) mountRoutes() {
 		routes.MountAdminReal(r, e.cfg, e.usage)
 	})
 	r.Route("/api/intelligence", func(r chi.Router) {
-		routes.MountIntelligence(r, e.cfg)
+		routes.MountIntelligenceReal(r, e.cfg)
 	})
 	r.Route("/api/training", func(r chi.Router) {
-		routes.MountTraining(r, e.cfg)
+		routes.MountTrainingReal(r, e.cfg)
 	})
 
 	// Screenshot & Share (absorbs PHP API — Phase A8)
