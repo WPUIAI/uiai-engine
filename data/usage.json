@@ -1438,5 +1438,23 @@
     "costUsd": 0.01,
     "status": "success",
     "createdAt": "2026-02-02T22:16:39Z"
+  },
+  {
+    "type": "device_mockup",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.01,
+    "status": "success",
+    "createdAt": "2026-02-02T22:26:33Z"
+  },
+  {
+    "type": "animated_gif",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.015,
+    "status": "success",
+    "createdAt": "2026-02-02T22:26:43Z"
   }
 ]

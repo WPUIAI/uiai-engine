@@ -90,6 +90,25 @@
       "started_at": "2026-02-02T21:10:26.474863373Z",
       "completed_at": "2026-02-02T21:10:26.475052993Z"
     },
+    "6aff6972e4a3ce71": {
+      "id": "6aff6972e4a3ce71",
+      "type": "device_mockup",
+      "status": "complete",
+      "device": "browser-window",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/mockup-browser-window-6aff6972e4a3ce71.png",
+      "credits_charged": 2,
+      "created_at": "2026-02-02T22:26:26.856171547Z",
+      "started_at": "2026-02-02T22:26:26.856564977Z",
+      "completed_at": "2026-02-02T22:26:33.102239144Z"
+    },
     "772046d25666913a": {
       "id": "772046d25666913a",
       "type": "animated_gif",
@@ -145,6 +164,25 @@
       "created_at": "2026-02-02T21:11:31.146373634Z",
       "started_at": "2026-02-02T21:11:31.146679834Z",
       "completed_at": "2026-02-02T21:11:34.11383991Z"
+    },
+    "88c11f7da88c6775": {
+      "id": "88c11f7da88c6775",
+      "type": "animated_gif",
+      "status": "complete",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 400,
+      "height": 300,
+      "frames": 3,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/tour-88c11f7da88c6775.gif",
+      "credits_charged": 3,
+      "created_at": "2026-02-02T22:26:37.418765814Z",
+      "started_at": "2026-02-02T22:26:37.419229323Z",
+      "completed_at": "2026-02-02T22:26:43.399337078Z"
     },
     "8fd7aec1c659015a": {
       "id": "8fd7aec1c659015a",

@@ -1,3 +1,7 @@
-data/media/*.png
-data/media/*.gif
-data/media/*.tmp
+# All generated media (tracked via job store, not git)
+*.png
+*.gif
+*.jpg
+*.mp4
+*.webp
+*.tmp

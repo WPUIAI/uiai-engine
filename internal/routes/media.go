@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/philoveracity/uiai-engine/internal/auth"
 	"github.com/philoveracity/uiai-engine/internal/config"
 	"github.com/philoveracity/uiai-engine/internal/credits"
 	"github.com/philoveracity/uiai-engine/internal/media"
@@ -113,6 +114,12 @@ func (d *mediaDeps) handleProduce(w http.ResponseWriter, r *http.Request) {
 	rand.Read(idBytes)
 	jobID := hex.EncodeToString(idBytes)
 
+	// Extract license from auth context for credit deduction
+	var licenseID int
+	if id := auth.FromContext(r.Context()); id != nil {
+		licenseID = id.LicenseID
+	}
+
 	job := &media.Job{
 		ID:        jobID,
 		Type:      req.Type,
@@ -124,6 +131,7 @@ func (d *mediaDeps) handleProduce(w http.ResponseWriter, r *http.Request) {
 		Frames:    req.Frames,
 		Delay:     req.Delay,
 		Mode:      req.Mode,
+		LicenseID: licenseID,
 		CreatedAt: time.Now().UTC(),
 	}
 
@@ -166,9 +174,19 @@ func (d *mediaDeps) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if job.Error != "" {
 		resp["error"] = job.Error
 	}
+	if job.StartedAt != nil {
+		resp["started_at"] = job.StartedAt
+	}
 	if job.CompletedAt != nil {
 		resp["completed_at"] = job.CompletedAt
-		resp["duration_ms"] = job.CompletedAt.Sub(job.CreatedAt).Milliseconds()
+		if job.StartedAt != nil {
+			resp["duration_ms"] = job.CompletedAt.Sub(*job.StartedAt).Milliseconds()
+		} else {
+			resp["duration_ms"] = job.CompletedAt.Sub(job.CreatedAt).Milliseconds()
+		}
+	}
+	if job.Credits > 0 {
+		resp["credits_charged"] = job.Credits
 	}
 
 	writeJSON(w, 200, resp)
@@ -237,9 +255,17 @@ func (d *mediaDeps) executeJob(job *media.Job) {
 	}
 
 	log.Printf("[media] Job %s complete: %s", job.ID, outputPath)
+
+	// Deduct credits
+	creditCost := d.credits.Cost(string(job.Type))
+	if d.credits != nil && job.LicenseID > 0 && creditCost > 0 {
+		go d.credits.Deduct(job.LicenseID, string(job.Type), fmt.Sprintf("media_job:%s", job.ID))
+	}
+
 	d.jobs.Update(job.ID, func(j *media.Job) {
 		j.Status = media.StatusComplete
 		j.ResultPath = outputPath
+		j.Credits = creditCost
 		j.CompletedAt = &completed
 	})
 
@@ -248,7 +274,7 @@ func (d *mediaDeps) executeJob(job *media.Job) {
 		d.usage.Record(storage.UsageRecord{
 			Type:      string(job.Type),
 			Status:    "success",
-			CostUSD:   0.01, // Minimal cost for local execution
+			CostUSD:   creditCost * 0.005, // ~$0.005 per credit
 			CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		})
 	}
