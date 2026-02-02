@@ -18,6 +18,42 @@
       "started_at": "2026-02-02T21:14:39.439697113Z",
       "completed_at": "2026-02-02T21:14:45.165755086Z"
     },
+    "2ad7f4b4f3e54022": {
+      "id": "2ad7f4b4f3e54022",
+      "type": "device_mockup",
+      "status": "complete",
+      "device": "iphone-15",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/mockup-iphone-15-2ad7f4b4f3e54022.png",
+      "created_at": "2026-02-02T21:17:57.604123286Z",
+      "started_at": "2026-02-02T21:17:57.604456936Z",
+      "completed_at": "2026-02-02T21:18:02.172792632Z"
+    },
+    "5995cf1384204784": {
+      "id": "5995cf1384204784",
+      "type": "device_mockup",
+      "status": "complete",
+      "device": "iphone-15",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/mockup-iphone-15-5995cf1384204784.png",
+      "created_at": "2026-02-02T21:18:45.514346517Z",
+      "started_at": "2026-02-02T21:18:45.514781727Z",
+      "completed_at": "2026-02-02T21:18:51.599794912Z"
+    },
     "68a26947156f4415": {
       "id": "68a26947156f4415",
       "type": "device_mockup",
@@ -35,6 +71,26 @@
       "created_at": "2026-02-02T21:10:26.474624433Z",
       "started_at": "2026-02-02T21:10:26.474863373Z",
       "completed_at": "2026-02-02T21:10:26.475052993Z"
+    },
+    "772046d25666913a": {
+      "id": "772046d25666913a",
+      "type": "animated_gif",
+      "status": "complete",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com",
+        "https://wpuiai.com/features",
+        "https://wpuiai.com/pricing"
+      ],
+      "width": 800,
+      "height": 500,
+      "frames": 6,
+      "delay": 250,
+      "mode": "pages",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/tour-772046d25666913a.gif",
+      "created_at": "2026-02-02T21:16:57.443046827Z",
+      "started_at": "2026-02-02T21:16:57.443449858Z",
+      "completed_at": "2026-02-02T21:17:02.952131054Z"
     },
     "7956f5dd9d288793": {
       "id": "7956f5dd9d288793",
@@ -72,6 +128,24 @@
       "started_at": "2026-02-02T21:11:31.146679834Z",
       "completed_at": "2026-02-02T21:11:34.11383991Z"
     },
+    "b5a33520fef9c164": {
+      "id": "b5a33520fef9c164",
+      "type": "device_mockup",
+      "status": "complete",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/mockup-macbook-pro-b5a33520fef9c164.png",
+      "created_at": "2026-02-02T21:16:30.180305695Z",
+      "started_at": "2026-02-02T21:16:30.180600204Z",
+      "completed_at": "2026-02-02T21:16:35.119043331Z"
+    },
     "d428c702acb99208": {
       "id": "d428c702acb99208",
       "type": "animated_gif",
@@ -89,6 +163,24 @@
       "created_at": "2026-02-02T21:12:24.942997907Z",
       "started_at": "2026-02-02T21:12:24.943240747Z",
       "completed_at": "2026-02-02T21:12:32.453190361Z"
+    },
+    "eaefbc833760ffb8": {
+      "id": "eaefbc833760ffb8",
+      "type": "animated_gif",
+      "status": "complete",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 600,
+      "height": 400,
+      "frames": 5,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/tour-eaefbc833760ffb8.gif",
+      "created_at": "2026-02-02T21:16:41.167037772Z",
+      "started_at": "2026-02-02T21:16:41.167219021Z",
+      "completed_at": "2026-02-02T21:16:51.346412694Z"
     }
   }
 }

@@ -1366,5 +1366,50 @@
     "costUsd": 0.01,
     "status": "success",
     "createdAt": "2026-02-02T21:14:45Z"
+  },
+  {
+    "type": "device_mockup",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.01,
+    "status": "success",
+    "createdAt": "2026-02-02T21:16:35Z"
+  },
+  {
+    "type": "animated_gif",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.01,
+    "status": "success",
+    "createdAt": "2026-02-02T21:16:51Z"
+  },
+  {
+    "type": "animated_gif",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.01,
+    "status": "success",
+    "createdAt": "2026-02-02T21:17:02Z"
+  },
+  {
+    "type": "device_mockup",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.01,
+    "status": "success",
+    "createdAt": "2026-02-02T21:18:02Z"
+  },
+  {
+    "type": "device_mockup",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.01,
+    "status": "success",
+    "createdAt": "2026-02-02T21:18:51Z"
   }
 ]
