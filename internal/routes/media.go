@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -65,6 +66,21 @@ func (d *mediaDeps) handleProduce(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Type == "" {
 		writeJSON(w, 400, map[string]string{"error": "type required (device_mockup, animated_gif)"})
+		return
+	}
+
+	// Validate URLs (SSRF protection)
+	for _, u := range req.URLs {
+		if err := validateMediaURL(u); err != nil {
+			writeJSON(w, 400, map[string]string{"error": fmt.Sprintf("invalid URL %q: %v", u, err)})
+			return
+		}
+	}
+
+	// Validate device against allowlist
+	allowedDevices := map[string]bool{"macbook-pro": true, "iphone-15": true, "browser-window": true}
+	if req.Device != "" && !allowedDevices[req.Device] {
+		writeJSON(w, 400, map[string]string{"error": fmt.Sprintf("invalid device %q", req.Device)})
 		return
 	}
 
@@ -142,6 +158,8 @@ func (d *mediaDeps) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if job.ResultURL != "" {
 		resp["result_url"] = job.ResultURL
 	}
+	// Expose result_path — status endpoint is open (read-only, no auth required)
+	// but the path is only useful on the same server. External callers would use result_url.
 	if job.ResultPath != "" {
 		resp["result_path"] = job.ResultPath
 	}
@@ -164,7 +182,7 @@ func (d *mediaDeps) handleList(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// executeJob runs media production locally.
+// executeJob runs media production locally with a timeout.
 func (d *mediaDeps) executeJob(job *media.Job) {
 	now := time.Now().UTC()
 	d.jobs.Update(job.ID, func(j *media.Job) {
@@ -172,16 +190,39 @@ func (d *mediaDeps) executeJob(job *media.Job) {
 		j.StartedAt = &now
 	})
 
+	timeout := time.Duration(d.cfg.Media.JobTimeout) * time.Second
+	if timeout <= 0 {
+		timeout = 300 * time.Second
+	}
+
+	type result struct {
+		path string
+		err  error
+	}
+	ch := make(chan result, 1)
+
+	go func() {
+		var err error
+		var outputPath string
+		switch job.Type {
+		case media.TypeDeviceMockup:
+			outputPath, err = d.produceMockup(job)
+		case media.TypeAnimatedGIF:
+			outputPath, err = d.produceGIF(job)
+		default:
+			err = fmt.Errorf("unsupported media type: %s", job.Type)
+		}
+		ch <- result{path: outputPath, err: err}
+	}()
+
 	var err error
 	var outputPath string
-
-	switch job.Type {
-	case media.TypeDeviceMockup:
-		outputPath, err = d.produceMockup(job)
-	case media.TypeAnimatedGIF:
-		outputPath, err = d.produceGIF(job)
-	default:
-		err = fmt.Errorf("unsupported media type: %s", job.Type)
+	select {
+	case res := <-ch:
+		outputPath = res.path
+		err = res.err
+	case <-time.After(timeout):
+		err = fmt.Errorf("job timed out after %v", timeout)
 	}
 
 	completed := time.Now().UTC()
@@ -314,6 +355,44 @@ func findNode() string {
 	return "node" // fallback to PATH
 }
 
+// validateMediaURL checks that a URL is safe to screenshot (no SSRF).
+func validateMediaURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("malformed URL")
+	}
+	// Must be https (or http for localhost dev)
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return fmt.Errorf("scheme must be http or https")
+	}
+	// Resolve hostname
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("missing hostname")
+	}
+	// Block well-known internal hostnames
+	blocked := []string{"localhost", "127.0.0.1", "0.0.0.0", "[::]", "[::1]", "metadata.google.internal"}
+	for _, b := range blocked {
+		if host == b {
+			return fmt.Errorf("internal hostname blocked")
+		}
+	}
+	// Resolve and check for private IPs
+	ips, err := net.LookupHost(host)
+	if err == nil {
+		for _, ipStr := range ips {
+			ip := net.ParseIP(ipStr)
+			if ip == nil {
+				continue
+			}
+			if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+				return fmt.Errorf("resolves to private/internal IP %s", ipStr)
+			}
+		}
+	}
+	return nil
+}
+
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
@@ -321,7 +400,4 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-// init strips double quotes from URL params
-func init() {
-	_ = strings.TrimSpace // avoid unused import
-}
+

@@ -36,6 +36,24 @@
       "started_at": "2026-02-02T21:17:57.604456936Z",
       "completed_at": "2026-02-02T21:18:02.172792632Z"
     },
+    "397ee862054a7e6c": {
+      "id": "397ee862054a7e6c",
+      "type": "device_mockup",
+      "status": "complete",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/mockup-macbook-pro-397ee862054a7e6c.png",
+      "created_at": "2026-02-02T22:15:21.121221296Z",
+      "started_at": "2026-02-02T22:15:21.121543107Z",
+      "completed_at": "2026-02-02T22:15:28.69296174Z"
+    },
     "5995cf1384204784": {
       "id": "5995cf1384204784",
       "type": "device_mockup",
@@ -127,6 +145,42 @@
       "created_at": "2026-02-02T21:11:31.146373634Z",
       "started_at": "2026-02-02T21:11:31.146679834Z",
       "completed_at": "2026-02-02T21:11:34.11383991Z"
+    },
+    "8fd7aec1c659015a": {
+      "id": "8fd7aec1c659015a",
+      "type": "device_mockup",
+      "status": "complete",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/mockup-macbook-pro-8fd7aec1c659015a.png",
+      "created_at": "2026-02-02T22:16:35.635539337Z",
+      "started_at": "2026-02-02T22:16:35.635833906Z",
+      "completed_at": "2026-02-02T22:16:39.945379175Z"
+    },
+    "a34a360239e27a21": {
+      "id": "a34a360239e27a21",
+      "type": "device_mockup",
+      "status": "complete",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/mockup-macbook-pro-a34a360239e27a21.png",
+      "created_at": "2026-02-02T22:16:12.324700846Z",
+      "started_at": "2026-02-02T22:16:12.325196116Z",
+      "completed_at": "2026-02-02T22:16:16.742204044Z"
     },
     "b5a33520fef9c164": {
       "id": "b5a33520fef9c164",

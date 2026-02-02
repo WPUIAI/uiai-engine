@@ -67,7 +67,8 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			strings.HasPrefix(p, "/api/training/") ||       // Has own service-token auth
 			strings.HasPrefix(p, "/api/intelligence/") ||  // Per-handler auth
 			p == "/api/screenshot" || strings.HasPrefix(p, "/api/screenshot/") || // Screenshot: internal use (Coach vision, share)
-			strings.HasPrefix(p, "/api/media/") ||         // Media production: internal use
+			p == "/api/media/jobs" ||                       // Media job list: read-only
+			strings.HasPrefix(p, "/api/media/status/") ||  // Media status: read-only poll
 			strings.HasPrefix(p, "/api/share/") {          // Share viewing is public
 			// Try to extract identity if credentials present, but don't block
 			if id, err := a.Authenticate(r); err == nil {
@@ -93,6 +94,10 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 }
 
 func (a *Authenticator) Authenticate(r *http.Request) (*Identity, error) {
+	// Internal service auth via webhook secret (server-to-server)
+	if ws := r.Header.Get("X-Webhook-Secret"); ws != "" && ws == a.cfg.WordPress.WebhookSecret {
+		return &Identity{Tier: "internal", LicenseID: 0}, nil
+	}
 	if lk := r.Header.Get("X-License-Key"); lk != "" {
 		return a.validateLicense(lk)
 	}

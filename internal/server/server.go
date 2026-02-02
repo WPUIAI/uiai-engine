@@ -70,8 +70,18 @@ func New(cfg *config.Config) *Engine {
 	// Auth middleware on all /api/* except health/status
 	r.Use(authenticator.Middleware)
 
-	// Media job store
+	// Media job store + periodic cleanup
 	mediaJobs := media.NewJobStore(cfg.Storage.DataDir)
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			removed := mediaJobs.CleanOld(7 * 24 * time.Hour)
+			if removed > 0 {
+				log.Printf("[media] Cleaned %d old jobs", removed)
+			}
+		}
+	}()
 
 	e := &Engine{
 		cfg:       cfg,
