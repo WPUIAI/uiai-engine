@@ -21,6 +21,7 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool) {
 			Quality  int    `json:"quality"`
 			WaitFor  string `json:"waitFor"`
 			Delay    int    `json:"delay"`
+			Cookies  string `json:"cookies"` // "name=value; name2=value2"
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
@@ -45,6 +46,7 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool) {
 			Quality:  body.Quality,
 			WaitFor:  body.WaitFor,
 			Delay:    body.Delay,
+			Cookies:  body.Cookies,
 		})
 		if err != nil {
 			writeJSON(w, 500, map[string]string{"error": err.Error()})

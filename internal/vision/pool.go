@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +32,7 @@ type ScreenshotOpts struct {
 	Quality  int    // JPEG quality 0-100
 	WaitFor  string // CSS selector to wait for
 	Delay    int    // ms to wait after load
+	Cookies  string // "name=value; name2=value2" — set before navigation
 }
 
 type ScreenshotResult struct {
@@ -138,6 +141,25 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 		Width: width, Height: height, DeviceScaleFactor: 1,
 	}); err != nil {
 		return nil, fmt.Errorf("set viewport failed: %w", err)
+	}
+
+	// Set cookies before navigation (for authenticated screenshots)
+	if opts.Cookies != "" {
+		parsed, _ := url.Parse(opts.URL)
+		domain := parsed.Hostname()
+		for _, c := range strings.Split(opts.Cookies, ";") {
+			c = strings.TrimSpace(c)
+			parts := strings.SplitN(c, "=", 2)
+			if len(parts) == 2 {
+				page.MustSetCookies(&proto.NetworkCookieParam{
+					Name:   strings.TrimSpace(parts[0]),
+					Value:  strings.TrimSpace(parts[1]),
+					Domain: domain,
+					Path:   "/",
+				})
+			}
+		}
+		log.Printf("[vision] Set cookies for domain %s", domain)
 	}
 
 	// Navigate
