@@ -140,7 +140,26 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 	if err := page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
 		Width: width, Height: height, DeviceScaleFactor: 1,
 	}); err != nil {
-		return nil, fmt.Errorf("set viewport failed: %w", err)
+		// FIX #10: Stale page from pool — close it, create fresh one, retry
+		if strings.Contains(err.Error(), "closed") || strings.Contains(err.Error(), "EOF") {
+			log.Printf("[vision] Stale page detected, creating fresh page")
+			page.Close()
+			p.mu.Lock()
+			p.created--
+			p.mu.Unlock()
+
+			page, err = p.getPage()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get fresh page: %w", err)
+			}
+			if err := page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+				Width: width, Height: height, DeviceScaleFactor: 1,
+			}); err != nil {
+				return nil, fmt.Errorf("set viewport failed (retry): %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("set viewport failed: %w", err)
+		}
 	}
 
 	// Set cookies before navigation (for authenticated screenshots)
