@@ -4,13 +4,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/philoveracity/uiai-engine/internal/config"
+	"github.com/philoveracity/uiai-engine/internal/storage"
 	"github.com/philoveracity/uiai-engine/internal/vision"
 )
 
-func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool) {
+func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usage *storage.UsageStore) {
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
 			URL      string `json:"url"`
@@ -51,6 +53,16 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool) {
 		if err != nil {
 			writeJSON(w, 500, map[string]string{"error": err.Error()})
 			return
+		}
+
+		// Record usage
+		if usage != nil {
+			usage.Record(storage.UsageRecord{
+				Type:      "screenshot",
+				Status:    "success",
+				CostUSD:   0.005, // flat per-screenshot cost
+				CreatedAt: time.Now().UTC().Format(time.RFC3339),
+			})
 		}
 
 		resp := map[string]any{

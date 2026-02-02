@@ -158,7 +158,7 @@ func (e *Engine) mountRoutes() {
 
 	// Screenshot & Share (Rod vision pool — Phase A8)
 	r.Route("/api/screenshot", func(r chi.Router) {
-		routes.MountScreenshotReal(r, e.cfg, e.vision)
+		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage)
 	})
 	r.Route("/api/share", func(r chi.Router) {
 		routes.MountShareReal(r, e.cfg, e.vision)
