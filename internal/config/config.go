@@ -20,6 +20,17 @@ type Config struct {
 	Storage    StorageConfig    `yaml:"storage"`
 	Logging    LoggingConfig    `yaml:"logging"`
 	CORS       CORSConfig       `yaml:"cors"`
+	Media      MediaConfig      `yaml:"media"`
+}
+
+type MediaConfig struct {
+	ScriptDir   string `yaml:"script_dir"`
+	GitHubOrg   string `yaml:"github_org"`
+	GitHubRepo  string `yaml:"github_repo"`
+	GitHubToken string `yaml:"github_token"`
+	R2PublicURL string `yaml:"r2_public_url"`
+	R2Bucket    string `yaml:"r2_bucket"`
+	JobTimeout  int    `yaml:"job_timeout"`
 }
 
 type ServerConfig struct {

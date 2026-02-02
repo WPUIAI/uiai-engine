@@ -19,6 +19,7 @@ import (
 	"github.com/philoveracity/uiai-engine/internal/auth"
 	"github.com/philoveracity/uiai-engine/internal/config"
 	"github.com/philoveracity/uiai-engine/internal/credits"
+	"github.com/philoveracity/uiai-engine/internal/media"
 	"github.com/philoveracity/uiai-engine/internal/ratelimit"
 	"github.com/philoveracity/uiai-engine/internal/routes"
 	"github.com/philoveracity/uiai-engine/internal/storage"
@@ -27,15 +28,16 @@ import (
 
 // Engine is the main server instance.
 type Engine struct {
-	cfg     *config.Config
-	router  chi.Router
-	server  *http.Server
-	auth    *auth.Authenticator
-	ai      *ai.Provider
-	credits *credits.Service
-	limiter *ratelimit.Limiter
-	usage   *storage.UsageStore
-	vision  *vision.Pool
+	cfg       *config.Config
+	router    chi.Router
+	server    *http.Server
+	auth      *auth.Authenticator
+	ai        *ai.Provider
+	credits   *credits.Service
+	limiter   *ratelimit.Limiter
+	usage     *storage.UsageStore
+	vision    *vision.Pool
+	mediaJobs *media.JobStore
 }
 
 // New creates a new Engine with all routes wired.
@@ -68,15 +70,19 @@ func New(cfg *config.Config) *Engine {
 	// Auth middleware on all /api/* except health/status
 	r.Use(authenticator.Middleware)
 
+	// Media job store
+	mediaJobs := media.NewJobStore(cfg.Storage.DataDir)
+
 	e := &Engine{
-		cfg:     cfg,
-		router:  r,
-		auth:    authenticator,
-		ai:      aiProvider,
-		credits: creditSvc,
-		limiter: limiter,
-		usage:   usage,
-		vision:  visionPool,
+		cfg:       cfg,
+		router:    r,
+		auth:      authenticator,
+		ai:        aiProvider,
+		credits:   creditSvc,
+		limiter:   limiter,
+		usage:     usage,
+		vision:    visionPool,
+		mediaJobs: mediaJobs,
 	}
 
 	e.mountRoutes()
@@ -156,6 +162,11 @@ func (e *Engine) mountRoutes() {
 		routes.MountTrainingReal(r, e.cfg)
 	})
 
+	// Media production (mockups, GIFs, videos)
+	r.Route("/api/media", func(r chi.Router) {
+		routes.MountMediaReal(r, e.cfg, e.credits, e.limiter, e.usage, e.mediaJobs)
+	})
+
 	// Screenshot & Share (Rod vision pool — Phase A8)
 	r.Route("/api/screenshot", func(r chi.Router) {
 		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage)
@@ -195,6 +206,7 @@ func (e *Engine) handleRoot(w http.ResponseWriter, r *http.Request) {
 			"intelligence":  "/api/intelligence/*",
 			"dashboard":     "/dashboard",
 			"screenshot":    "/api/screenshot",
+			"media":         "/api/media",
 			"share":         "/api/share",
 		},
 	})

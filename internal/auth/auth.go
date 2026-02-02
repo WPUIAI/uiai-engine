@@ -67,6 +67,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			strings.HasPrefix(p, "/api/training/") ||       // Has own service-token auth
 			strings.HasPrefix(p, "/api/intelligence/") ||  // Per-handler auth
 			p == "/api/screenshot" || strings.HasPrefix(p, "/api/screenshot/") || // Screenshot: internal use (Coach vision, share)
+			strings.HasPrefix(p, "/api/media/") ||         // Media production: internal use
 			strings.HasPrefix(p, "/api/share/") {          // Share viewing is public
 			// Try to extract identity if credentials present, but don't block
 			if id, err := a.Authenticate(r); err == nil {

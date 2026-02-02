@@ -1,0 +1,94 @@
+{
+  "jobs": {
+    "20f1f038443fbdd4": {
+      "id": "20f1f038443fbdd4",
+      "type": "device_mockup",
+      "status": "complete",
+      "device": "iphone-15",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/mockup-iphone-15-20f1f038443fbdd4.png",
+      "created_at": "2026-02-02T21:14:39.439393713Z",
+      "started_at": "2026-02-02T21:14:39.439697113Z",
+      "completed_at": "2026-02-02T21:14:45.165755086Z"
+    },
+    "68a26947156f4415": {
+      "id": "68a26947156f4415",
+      "type": "device_mockup",
+      "status": "failed",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "error": "mockup script failed: exec: \"node\": executable file not found in $PATH\nOutput: ",
+      "created_at": "2026-02-02T21:10:26.474624433Z",
+      "started_at": "2026-02-02T21:10:26.474863373Z",
+      "completed_at": "2026-02-02T21:10:26.475052993Z"
+    },
+    "7956f5dd9d288793": {
+      "id": "7956f5dd9d288793",
+      "type": "device_mockup",
+      "status": "complete",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/mockup-macbook-pro-7956f5dd9d288793.png",
+      "created_at": "2026-02-02T21:11:58.27887456Z",
+      "started_at": "2026-02-02T21:11:58.2791425Z",
+      "completed_at": "2026-02-02T21:12:01.811542606Z"
+    },
+    "79bfb711c15b27eb": {
+      "id": "79bfb711c15b27eb",
+      "type": "device_mockup",
+      "status": "failed",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 1280,
+      "height": 800,
+      "frames": 6,
+      "delay": 200,
+      "mode": "scroll",
+      "error": "mockup script failed: exit status 1\nOutput: 📸 Capturing https://wpuiai.com at 1280x800...\nnode:fs:573\n  return binding.open(\n                 ^\n\nError: ENOENT: no such file or directory, open '/home/wpuiai/uiai-engine/data/media/mockup-macbook-pro-79bfb711c15b27eb.png.screenshot.tmp'\n    at Object.openSync (node:fs:573:18)\n    at writeFileSync (node:fs:2393:35)\n    at file:///home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices/generate-mockup.mjs:84:3\n    at process.processTicksAndRejections (node:internal/proces...",
+      "created_at": "2026-02-02T21:11:31.146373634Z",
+      "started_at": "2026-02-02T21:11:31.146679834Z",
+      "completed_at": "2026-02-02T21:11:34.11383991Z"
+    },
+    "d428c702acb99208": {
+      "id": "d428c702acb99208",
+      "type": "animated_gif",
+      "status": "complete",
+      "device": "macbook-pro",
+      "urls": [
+        "https://wpuiai.com"
+      ],
+      "width": 600,
+      "height": 400,
+      "frames": 4,
+      "delay": 200,
+      "mode": "scroll",
+      "result_path": "/home/wpuiai/uiai-engine/data/media/tour-d428c702acb99208.gif",
+      "created_at": "2026-02-02T21:12:24.942997907Z",
+      "started_at": "2026-02-02T21:12:24.943240747Z",
+      "completed_at": "2026-02-02T21:12:32.453190361Z"
+    }
+  }
+}
