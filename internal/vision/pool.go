@@ -134,19 +134,27 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 		height = 800
 	}
 
-	page.MustSetViewport(width, height, 1, false)
+	if err := page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+		Width: width, Height: height, DeviceScaleFactor: 1,
+	}); err != nil {
+		return nil, fmt.Errorf("set viewport failed: %w", err)
+	}
 
 	// Navigate
 	if err := page.Navigate(opts.URL); err != nil {
 		return nil, fmt.Errorf("navigation failed: %w", err)
 	}
 
-	// Wait for page load
-	page.MustWaitLoad()
+	// Wait for page load (with timeout, not Must which panics)
+	if err := page.Timeout(30 * time.Second).WaitLoad(); err != nil {
+		log.Printf("[vision] WaitLoad timeout for %s: %v (continuing)", opts.URL, err)
+	}
 
 	// Wait for specific selector
 	if opts.WaitFor != "" {
-		page.Timeout(5 * time.Second).MustElement(opts.WaitFor)
+		if _, err := page.Timeout(5 * time.Second).Element(opts.WaitFor); err != nil {
+			log.Printf("[vision] WaitFor '%s' timeout: %v (continuing)", opts.WaitFor, err)
+		}
 	}
 
 	// Additional delay
