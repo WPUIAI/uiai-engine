@@ -9754,5 +9754,59 @@
     "costUsd": 0.034593,
     "status": "success",
     "createdAt": "2026-02-08T21:42:59Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T21:43:12Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T21:44:00Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T21:44:33Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T21:45:10Z"
+  },
+  {
+    "type": "critique",
+    "model": "anthropic/claude-sonnet-4",
+    "inputTokens": 1186,
+    "outputTokens": 1931,
+    "costUsd": 0.032523,
+    "status": "success",
+    "createdAt": "2026-02-08T21:52:27Z"
+  },
+  {
+    "type": "critique",
+    "model": "anthropic/claude-sonnet-4",
+    "inputTokens": 1186,
+    "outputTokens": 2052,
+    "costUsd": 0.034338,
+    "status": "success",
+    "createdAt": "2026-02-08T21:53:04Z"
   }
 ]

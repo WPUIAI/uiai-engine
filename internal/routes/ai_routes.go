@@ -124,39 +124,7 @@ func MountUIReverseReal(r chi.Router, cfg *config.Config, aiProv *ai.Provider, c
 	})
 
 	r.Get("/models", func(w http.ResponseWriter, req *http.Request) {
-		// Dynamic model list: include default + known models from each configured provider.
-		models := []map[string]string{}
-		seen := map[string]bool{}
-
-		// Always include the current default model first.
-		defModel := cfg.AI.DefaultModel
-		defProvider := cfg.AI.DefaultProvider
-		if defModel != "" {
-			models = append(models, map[string]string{
-				"id": defModel, "name": defModel, "provider": defProvider, "default": "true",
-			})
-			seen[defModel] = true
-		}
-
-		// Well-known models per provider (static fallback).
-		known := []struct{ id, name, provider string }{
-			{"claude-sonnet-4-20250514", "Claude Sonnet 4", "anthropic"},
-			{"claude-opus-4-20250514", "Claude Opus 4", "anthropic"},
-			{"anthropic/claude-sonnet-4", "Claude Sonnet 4 (OR)", "openrouter"},
-			{"anthropic/claude-opus-4", "Claude Opus 4 (OR)", "openrouter"},
-			{"gpt-4o", "GPT-4o", "openai"},
-			{"gpt-4.1", "GPT-4.1", "openai"},
-		}
-		for _, m := range known {
-			if !seen[m.id] {
-				models = append(models, map[string]string{
-					"id": m.id, "name": m.name, "provider": m.provider,
-				})
-				seen[m.id] = true
-			}
-		}
-
-		writeJSON(w, 200, models)
+		writeJSON(w, 200, aiProv.AvailableModels())
 	})
 
 	r.Get("/operations", func(w http.ResponseWriter, req *http.Request) {

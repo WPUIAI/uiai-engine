@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/philoveracity/uiai-engine/internal/ai"
 	"github.com/philoveracity/uiai-engine/internal/config"
 )
 
 // --- Health (implemented) ---
 
-func MountHealth(r chi.Router, cfg *config.Config) {
+func MountHealth(r chi.Router, cfg *config.Config, aiProv *ai.Provider) {
 	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, 200, map[string]any{
 			"status":    "healthy",
@@ -22,12 +23,17 @@ func MountHealth(r chi.Router, cfg *config.Config) {
 		})
 	})
 	r.Get("/providers", func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(w, 200, map[string]any{
-			"anthropic":  map[string]any{"available": true},
-			"openai":     map[string]any{"available": true},
-			"openrouter": map[string]any{"available": true},
-			"fireworks":  map[string]any{"available": true},
-		})
+		// Build provider availability from WP-managed models.
+		// A provider is "available" if at least one model from it is in the list.
+		providerSet := map[string]bool{}
+		for _, m := range aiProv.AvailableModels() {
+			providerSet[m.Provider] = true
+		}
+		result := map[string]any{}
+		for _, name := range []string{"anthropic", "openai", "openrouter", "fireworks", "kimi", "qwen"} {
+			result[name] = map[string]any{"available": providerSet[name]}
+		}
+		writeJSON(w, 200, result)
 	})
 }
 

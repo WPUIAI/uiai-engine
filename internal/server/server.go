@@ -108,7 +108,7 @@ func (e *Engine) mountRoutes() {
 
 	// Health (no auth)
 	r.Route("/api/health", func(r chi.Router) {
-		routes.MountHealth(r, e.cfg)
+		routes.MountHealth(r, e.cfg, e.ai)
 	})
 
 	// Also respond to /health for PHP API compat

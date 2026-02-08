@@ -14,8 +14,9 @@ wordpress:
   cache_ttl: 300  # 5 minutes
 
 ai:
-  default_model: "claude-sonnet-4-20250514"
-  default_provider: "anthropic"
+  # default_model and default_provider are read from WP admin settings
+  # at runtime via /wp-json/wpuiai-ai-cloud/v1/ai-settings.
+  # Do NOT set them here.
   providers:
     anthropic:
       api_url: "https://api.anthropic.com/v1/messages"

@@ -142,12 +142,9 @@ func (c *Config) applyDefaults() {
 	if c.WordPress.CacheTTL == 0 {
 		c.WordPress.CacheTTL = 300
 	}
-	if c.AI.DefaultModel == "" {
-		c.AI.DefaultModel = "claude-sonnet-4-20250514"
-	}
-	if c.AI.DefaultProvider == "" {
-		c.AI.DefaultProvider = "anthropic"
-	}
+	// No hardcoded fallbacks. Default provider/model comes exclusively
+	// from WP admin settings via the /ai-settings REST endpoint.
+	// If WP settings are empty, AI calls will fail with a clear error.
 	if c.Vision.PoolSize == 0 {
 		c.Vision.PoolSize = 3
 	}

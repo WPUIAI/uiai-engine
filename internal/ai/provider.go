@@ -51,20 +51,45 @@ type aiKeys struct {
 	fetchedAt  time.Time
 }
 
+// ProviderModel describes an available model from WP settings.
+type ProviderModel struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Provider string `json:"provider"`
+	Default  bool   `json:"default,omitempty"`
+}
+
 type Provider struct {
 	cfg       *config.Config
 	keys      aiKeys
 	keysMu    sync.RWMutex
 	keysTTL   time.Duration
 	client    *http.Client
+	models    []ProviderModel // populated from WP settings
+	modelsMu  sync.RWMutex
+}
+
+// AvailableModels returns the model list built from WP settings.
+// Returns empty slice if settings haven't been fetched yet.
+func (p *Provider) AvailableModels() []ProviderModel {
+	p.modelsMu.RLock()
+	defer p.modelsMu.RUnlock()
+	return p.models
 }
 
 func NewProvider(cfg *config.Config) *Provider {
-	return &Provider{
+	prov := &Provider{
 		cfg:     cfg,
 		keysTTL: time.Duration(cfg.WordPress.CacheTTL) * time.Second,
 		client:  &http.Client{Timeout: 120 * time.Second},
 	}
+	// Eagerly fetch settings from WP on startup so default provider/model
+	// are available before the first AI call.
+	if err := prov.ensureKeys(); err != nil {
+		log.Printf("[ai] WARNING: failed to fetch WP settings on startup: %v", err)
+		log.Printf("[ai] AI calls will fail until WP settings are reachable")
+	}
+	return prov
 }
 
 func (p *Provider) Complete(req Request) (*Response, error) {
@@ -84,6 +109,12 @@ func (p *Provider) Complete(req Request) (*Response, error) {
 	if req.Provider == "" {
 		req.Provider = p.cfg.AI.DefaultProvider
 	}
+	if req.Provider == "" {
+		return nil, fmt.Errorf("no AI provider configured — set default_provider in WP Settings → AI Cloud")
+	}
+	if req.Model == "" {
+		return nil, fmt.Errorf("no AI model configured — set default_model in WP Settings → AI Cloud")
+	}
 
 	switch req.Provider {
 	case "anthropic":
@@ -91,7 +122,7 @@ func (p *Provider) Complete(req Request) (*Response, error) {
 	case "openai", "openrouter", "fireworks":
 		return p.openaiComplete(req)
 	default:
-		return nil, fmt.Errorf("unknown provider: %s", req.Provider)
+		return nil, fmt.Errorf("unknown provider %q — configure a supported provider in WP Settings → AI Cloud", req.Provider)
 	}
 }
 
@@ -284,12 +315,14 @@ func (p *Provider) ensureKeys() error {
 	body, _ := io.ReadAll(resp.Body)
 
 	var settings struct {
-		DefaultProvider string `json:"default_provider"`
-		DefaultModel    string `json:"default_model"`
-		Anthropic       struct{ Key string `json:"key"` } `json:"anthropic"`
-		OpenAI          struct{ Key string `json:"key"` } `json:"openai"`
-		OpenRouter      struct{ Key string `json:"key"` } `json:"openrouter"`
-		Fireworks       struct{ Key string `json:"key"` } `json:"fireworks"`
+		DefaultProvider string                        `json:"default_provider"`
+		DefaultModel    string                        `json:"default_model"`
+		Anthropic       struct{ Key, Model string }   `json:"anthropic"`
+		OpenAI          struct{ Key, Model string }   `json:"openai"`
+		OpenRouter      struct{ Key, Model string }   `json:"openrouter"`
+		Fireworks       struct{ Key, Model string }   `json:"fireworks"`
+		Kimi            struct{ Key, Model string }   `json:"kimi"`
+		Qwen            struct{ Key, Model string }   `json:"qwen"`
 	}
 	if err := json.Unmarshal(body, &settings); err != nil {
 		// Fallback to env vars
@@ -306,11 +339,11 @@ func (p *Provider) ensureKeys() error {
 	// Update runtime config with WP-managed defaults (takes precedence over config.yaml).
 	if settings.DefaultProvider != "" {
 		p.cfg.AI.DefaultProvider = settings.DefaultProvider
-		log.Printf("[ai] default provider updated from WP settings: %s", settings.DefaultProvider)
+		log.Printf("[ai] default provider from WP: %s", settings.DefaultProvider)
 	}
 	if settings.DefaultModel != "" {
 		p.cfg.AI.DefaultModel = settings.DefaultModel
-		log.Printf("[ai] default model updated from WP settings: %s", settings.DefaultModel)
+		log.Printf("[ai] default model from WP: %s", settings.DefaultModel)
 	}
 
 	p.keysMu.Lock()
@@ -322,13 +355,51 @@ func (p *Provider) ensureKeys() error {
 		fetchedAt:  time.Now(),
 	}
 	p.keysMu.Unlock()
+
+	// Build available models list from WP settings.
+	// Only include providers that have an API key configured.
+	var models []ProviderModel
+	seen := map[string]bool{}
+
+	// Default model first.
+	dm := p.cfg.AI.DefaultModel
+	dp := p.cfg.AI.DefaultProvider
+	if dm != "" {
+		models = append(models, ProviderModel{ID: dm, Name: dm, Provider: dp, Default: true})
+		seen[dm] = true
+	}
+
+	// Each configured provider: add its model if key is set.
+	type pm struct {
+		provider, key, model string
+	}
+	configured := []pm{
+		{"anthropic", settings.Anthropic.Key, settings.Anthropic.Model},
+		{"openai", settings.OpenAI.Key, settings.OpenAI.Model},
+		{"openrouter", settings.OpenRouter.Key, settings.OpenRouter.Model},
+		{"fireworks", settings.Fireworks.Key, settings.Fireworks.Model},
+		{"kimi", settings.Kimi.Key, settings.Kimi.Model},
+		{"qwen", settings.Qwen.Key, settings.Qwen.Model},
+	}
+	for _, c := range configured {
+		if c.key != "" && c.model != "" && !seen[c.model] {
+			models = append(models, ProviderModel{ID: c.model, Name: c.model, Provider: c.provider})
+			seen[c.model] = true
+		}
+	}
+
+	p.modelsMu.Lock()
+	p.models = models
+	p.modelsMu.Unlock()
+	log.Printf("[ai] loaded %d available models from WP settings", len(models))
+
 	return nil
 }
 
 func calcCost(model string, inTok, outTok int) float64 {
 	costs, ok := modelCosts[model]
 	if !ok {
-		costs = [2]float64{0.000003, 0.000015} // default to sonnet pricing
+		costs = [2]float64{0.000003, 0.000015} // unknown model — estimate at $3/$15 per M tokens
 	}
 	return float64(inTok)*costs[0] + float64(outTok)*costs[1]
 }

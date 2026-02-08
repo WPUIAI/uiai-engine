@@ -334,33 +334,7 @@ func (h *critiqueHandler) getFundamentalsViolations(designTokens map[string]any)
 }
 
 func (h *critiqueHandler) models(w http.ResponseWriter, r *http.Request) {
-	models := []map[string]string{}
-	seen := map[string]bool{}
-
-	// Default model first
-	if dm := h.cfg.AI.DefaultModel; dm != "" {
-		models = append(models, map[string]string{
-			"id": dm, "name": dm, "provider": h.cfg.AI.DefaultProvider, "default": "true",
-		})
-		seen[dm] = true
-	}
-
-	// Known models
-	known := []struct{ id, name, provider string }{
-		{"claude-sonnet-4-20250514", "Claude Sonnet 4", "anthropic"},
-		{"claude-opus-4-20250514", "Claude Opus 4", "anthropic"},
-		{"anthropic/claude-sonnet-4", "Claude Sonnet 4 (OR)", "openrouter"},
-		{"gpt-4o", "GPT-4o", "openai"},
-		{"gpt-4o-mini", "GPT-4o Mini", "openai"},
-	}
-	for _, m := range known {
-		if !seen[m.id] {
-			models = append(models, map[string]string{
-				"id": m.id, "name": m.name, "provider": m.provider,
-			})
-		}
-	}
-	writeJSON(w, 200, models)
+	writeJSON(w, 200, h.ai.AvailableModels())
 }
 
 func (h *critiqueHandler) dimensions(w http.ResponseWriter, r *http.Request) {
