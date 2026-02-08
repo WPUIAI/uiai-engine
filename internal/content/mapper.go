@@ -244,13 +244,45 @@ var PatternAliases = map[string]string{
 }
 
 // ResolvePatternAlias returns the canonical pattern name.
+// Matches exact aliases first, then strips common suffixes.
 func ResolvePatternAlias(pattern string) string {
 	pattern = strings.ToLower(strings.TrimSpace(pattern))
 	pattern = strings.ReplaceAll(pattern, " ", "-")
 
+	// Exact match
 	if canonical, ok := PatternAliases[pattern]; ok {
 		return canonical
 	}
+
+	// Strip common suffixes and try again
+	suffixes := []string{"-section", "-block", "-area", "-wrapper", "-container",
+		"-banner", "-panel", "-widget", "-table", "-list", "-row", "-content",
+		"-grid", "-form", "-card", "-group", "-module", "-layout", "-bar"}
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(pattern, suffix) {
+			base := strings.TrimSuffix(pattern, suffix)
+			if canonical, ok := PatternAliases[base]; ok {
+				return canonical
+			}
+			// Check if base itself is a valid pattern
+			for _, p := range AvailablePatterns() {
+				if base == p {
+					return base
+				}
+			}
+		}
+	}
+
+	// Singular → plural check (e.g., "testimonial" → "testimonials")
+	if canonical, ok := PatternAliases[pattern+"s"]; ok {
+		return canonical
+	}
+	for _, p := range AvailablePatterns() {
+		if pattern+"s" == p {
+			return p
+		}
+	}
+
 	return pattern
 }
 

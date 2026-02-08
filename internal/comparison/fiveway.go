@@ -200,11 +200,15 @@ func CalculateComponentCompliance(html string, referenceComponents []map[string]
 	}
 
 	matched := 0
-	totalTypes := 0
+	totalTypes := len(expectedByType)
 	for t, count := range expectedByType {
-		if d, ok := detected[t]; ok {
-			totalTypes++
-			if d >= count/2 {
+		if d, ok := detected[t]; ok && d > 0 {
+			// Type exists; check if count is close enough (≥50% of expected)
+			threshold := count / 2
+			if threshold < 1 {
+				threshold = 1
+			}
+			if d >= threshold {
 				matched++
 			}
 		}
