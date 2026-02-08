@@ -165,6 +165,9 @@ func (e *Engine) mountRoutes() {
 	r.Route("/api/admin", func(r chi.Router) {
 		routes.MountAdminReal(r, e.cfg, e.usage)
 	})
+	r.Route("/api/reference", func(r chi.Router) {
+		routes.MountReferenceReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
+	})
 	r.Route("/api/intelligence", func(r chi.Router) {
 		routes.MountIntelligenceReal(r, e.cfg)
 	})
