@@ -1,10 +1,12 @@
 package routes
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -14,6 +16,7 @@ import (
 	"github.com/philoveracity/uiai-engine/internal/vision"
 )
 
+// VisionState holds the current page state.
 type VisionState struct {
 	URL      string                 `json:"url"`
 	Title    string                 `json:"title"`
@@ -23,20 +26,41 @@ type VisionState struct {
 	Timing   map[string]int64       `json:"timing,omitempty"`
 }
 
+// lastCapture stores the most recent screenshot for diff comparisons.
+var lastCapture struct {
+	mu   sync.Mutex
+	data []byte
+	url  string
+	ts   time.Time
+}
+
+// MountVisionInteractive registers all vision interactive routes.
 func MountVisionInteractive(r chi.Router, cfg *config.Config, pool *vision.Pool) {
 	if pool == nil {
 		return
 	}
 
+	// Core endpoints
 	r.Get("/state", handleState(pool))
 	r.Post("/capture", handleCapture(pool))
+	r.Post("/look", handleLook(pool))
 	r.Get("/look", handleLook(pool))
 	r.Post("/inject", handleInject(pool))
 	r.Get("/el", handleElement(pool))
+	r.Post("/multi", handleMulti(pool))
 	r.Get("/multi", handleMulti(pool))
 	r.Get("/diff", handleDiff(pool))
 	r.Get("/viewport", handleViewport(pool))
+
+	// Added: analyze, critique, regression
+	r.Get("/analyze", handleAnalyze(pool))
+	r.Post("/critique", handleCritiqueCapture(pool))
+	r.Post("/regression", handleRegression(pool))
 }
+
+// ═══════════════════════════════════════════════════════════
+// CORE ENDPOINTS
+// ═══════════════════════════════════════════════════════════
 
 func handleState(pool *vision.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -47,29 +71,7 @@ func handleState(pool *vision.Pool) http.HandlerFunc {
 		}
 		defer pool.ReleasePage(page)
 
-		// Get current URL and title
-		currentURL, _ := page.Eval(`() => window.location.href`)
-		title, _ := page.Eval(`() => document.title`)
-
-		// Get viewport
-		viewport, _ := page.Eval(`() => ({width: window.innerWidth, height: window.innerHeight, scrollHeight: document.body.scrollHeight})`)
-
-		// Parse viewport
-		viewportMap := make(map[string]int)
-		if vp, ok := viewport.Value.MarshalJSON(); ok == nil {
-			json.Unmarshal(vp, &viewportMap)
-		}
-
-		// Run DOM analysis
-		analysis := runDOMAnalysis(page)
-
-		state := VisionState{
-			URL:      getString(currentURL),
-			Title:    getString(title),
-			Viewport: viewportMap,
-			Analysis: analysis,
-		}
-
+		state := buildState(page)
 		writeJSON(w, 200, state)
 	}
 }
@@ -85,27 +87,21 @@ func handleCapture(pool *vision.Pool) http.HandlerFunc {
 
 		start := time.Now()
 
-		// Take screenshot
-		data, err := page.Screenshot(false, &proto.PageCaptureScreenshot{
-			Format:  proto.PageCaptureScreenshotFormatPng,
-			Quality: gson(85),
-		})
+		data, err := screenshotPNG(page)
 		if err != nil {
 			writeJSON(w, 500, map[string]string{"error": err.Error()})
 			return
 		}
 
-		// Run DOM analysis
 		analysis := runDOMAnalysis(page)
+		storeCapture(data, "")
 
 		result := map[string]interface{}{
-			"screenshot": base64Encode(data),
-			"width":      1280,
-			"height":     800,
+			"screenshot": b64(data),
 			"viewport":   map[string]int{"width": 1280, "height": 800},
 			"analysis":   analysis,
 			"timing": map[string]int64{
-				"capture": time.Since(start).Milliseconds(),
+				"capture_ms": time.Since(start).Milliseconds(),
 			},
 		}
 
@@ -117,11 +113,18 @@ func handleLook(pool *vision.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pageParam := r.URL.Query().Get("page")
 		if pageParam == "" {
+			// Try body for POST
+			var body struct {
+				Page string `json:"page"`
+			}
+			json.NewDecoder(r.Body).Decode(&body)
+			pageParam = body.Page
+		}
+		if pageParam == "" {
 			writeJSON(w, 400, map[string]string{"error": "page param required"})
 			return
 		}
 
-		// Resolve page to URL
 		targetURL := resolvePageURL(pageParam)
 
 		page, err := pool.GetPage()
@@ -133,39 +136,31 @@ func handleLook(pool *vision.Pool) http.HandlerFunc {
 
 		start := time.Now()
 
-		// Navigate
 		if err := page.Navigate(targetURL); err != nil {
 			writeJSON(w, 500, map[string]string{"error": "navigation failed: " + err.Error()})
 			return
 		}
 
-		// Wait for load
 		page.Timeout(30 * time.Second).WaitLoad()
 
-		// Take screenshot
-		data, err := page.Screenshot(false, &proto.PageCaptureScreenshot{
-			Format:  proto.PageCaptureScreenshotFormatPng,
-			Quality: gson(85),
-		})
+		data, err := screenshotPNG(page)
 		if err != nil {
 			writeJSON(w, 500, map[string]string{"error": "screenshot failed: " + err.Error()})
 			return
 		}
 
-		// Get title
-		title, _ := page.Eval(`() => document.title`)
-
-		// Run DOM analysis
+		title := evalStr(page, `() => document.title`)
 		analysis := runDOMAnalysis(page)
+		storeCapture(data, targetURL)
 
 		result := map[string]interface{}{
-			"url":       targetURL,
-			"title":     getString(title),
-			"screenshot": base64Encode(data),
-			"viewport":  map[string]int{"width": 1280, "height": 800},
-			"analysis":  analysis,
+			"url":        targetURL,
+			"title":      title,
+			"screenshot": b64(data),
+			"viewport":   map[string]int{"width": 1280, "height": 800},
+			"analysis":   analysis,
 			"timing": map[string]int64{
-				"look": time.Since(start).Milliseconds(),
+				"look_ms": time.Since(start).Milliseconds(),
 			},
 		}
 
@@ -178,16 +173,12 @@ func handleInject(pool *vision.Pool) http.HandlerFunc {
 		var body struct {
 			CSS string `json:"css"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
-			return
-		}
+		json.NewDecoder(r.Body).Decode(&body)
 
 		css := body.CSS
 		if css == "" {
 			css = r.URL.Query().Get("css")
 		}
-
 		if css == "" {
 			writeJSON(w, 400, map[string]string{"error": "css param required"})
 			return
@@ -202,35 +193,38 @@ func handleInject(pool *vision.Pool) http.HandlerFunc {
 
 		start := time.Now()
 
-		// Inject CSS
-		injectJS := "(css) => { const s = document.createElement('style'); s.textContent = css; s.id = 'wpuiai-injected'; document.head.appendChild(s); return 1; }"
+		// Remove previous injection, inject new CSS
+		injectJS := `(css) => {
+			const old = document.getElementById('wpuiai-injected');
+			if (old) old.remove();
+			const s = document.createElement('style');
+			s.textContent = css;
+			s.id = 'wpuiai-injected';
+			document.head.appendChild(s);
+			return 1;
+		}`
 		_, err = page.Eval(injectJS, css)
 		if err != nil {
 			writeJSON(w, 500, map[string]string{"error": "inject failed: " + err.Error()})
 			return
 		}
 
-		// Small delay for CSS to apply
 		time.Sleep(100 * time.Millisecond)
 
-		// Take screenshot
-		data, err := page.Screenshot(false, &proto.PageCaptureScreenshot{
-			Format:  proto.PageCaptureScreenshotFormatPng,
-			Quality: gson(85),
-		})
+		data, err := screenshotPNG(page)
 		if err != nil {
 			writeJSON(w, 500, map[string]string{"error": "screenshot failed: " + err.Error()})
 			return
 		}
 
-		// Run analysis
 		analysis := runDOMAnalysis(page)
+		storeCapture(data, "")
 
 		result := map[string]interface{}{
 			"injected":   1,
 			"inject_ms":  time.Since(start).Milliseconds(),
-			"screenshot": base64Encode(data),
-			"analysis":  analysis,
+			"screenshot": b64(data),
+			"analysis":   analysis,
 		}
 
 		writeJSON(w, 200, result)
@@ -252,12 +246,41 @@ func handleElement(pool *vision.Pool) http.HandlerFunc {
 		}
 		defer pool.ReleasePage(page)
 
-		// Get element info (simplified - just find the selector)
-		elInfo, _ := page.Eval("() => { const e = document.querySelector('" + sel + "'); if(!e) return null; return {tag: e.tagName, text: e.textContent.substring(0,100)}; }")
+		start := time.Now()
+
+		// Try to find element and take element-level screenshot
+		el, err := page.Element(sel)
+		if err != nil {
+			writeJSON(w, 404, map[string]string{"error": "element not found: " + sel})
+			return
+		}
+
+		// Get element info
+		box, _ := el.Shape()
+		tag := evalStr(page, `(sel) => { const e = document.querySelector(sel); return e ? e.tagName.toLowerCase() : '' }`, sel)
+		text := evalStr(page, `(sel) => { const e = document.querySelector(sel); return e ? e.textContent.substring(0,200).trim() : '' }`, sel)
+
+		// Element screenshot
+		data, err := el.Screenshot(proto.PageCaptureScreenshotFormatPng, 85)
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "element screenshot failed: " + err.Error()})
+			return
+		}
+
+		var bounds interface{}
+		if box != nil && len(box.Quads) > 0 {
+			bounds = box.Quads[0]
+		}
 
 		result := map[string]interface{}{
-			"selector": sel,
-			"element":  getString(elInfo),
+			"selector":   sel,
+			"tag":        tag,
+			"text":       text,
+			"bounds":     bounds,
+			"screenshot": b64(data),
+			"timing": map[string]int64{
+				"element_ms": time.Since(start).Milliseconds(),
+			},
 		}
 
 		writeJSON(w, 200, result)
@@ -273,34 +296,41 @@ func handleMulti(pool *vision.Pool) http.HandlerFunc {
 		}
 		defer pool.ReleasePage(page)
 
-		// Desktop
-		page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: 1440, Height: 900, DeviceScaleFactor: 1})
-		time.Sleep(200 * time.Millisecond)
-		desktopData, _ := page.Screenshot(false, &proto.PageCaptureScreenshot{Format: proto.PageCaptureScreenshotFormatPng, Quality: gson(85)})
+		start := time.Now()
+		viewports := []struct {
+			name   string
+			width  int
+			height int
+		}{
+			{"desktop", 1440, 900},
+			{"tablet", 768, 1024},
+			{"mobile", 375, 812},
+		}
 
-		// Tablet
-		page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: 768, Height: 1024, DeviceScaleFactor: 1})
-		time.Sleep(200 * time.Millisecond)
-		tabletData, _ := page.Screenshot(false, &proto.PageCaptureScreenshot{Format: proto.PageCaptureScreenshotFormatPng, Quality: gson(85)})
+		result := make(map[string]interface{})
+		for _, vp := range viewports {
+			page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+				Width: vp.width, Height: vp.height, DeviceScaleFactor: 1,
+			})
+			time.Sleep(200 * time.Millisecond)
 
-		// Mobile
-		page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: 375, Height: 812, DeviceScaleFactor: 1})
-		time.Sleep(200 * time.Millisecond)
-		mobileData, _ := page.Screenshot(false, &proto.PageCaptureScreenshot{Format: proto.PageCaptureScreenshotFormatPng, Quality: gson(85)})
+			data, _ := screenshotPNG(page)
+			analysis := runDOMAnalysis(page)
 
-		result := map[string]interface{}{
-			"desktop": map[string]interface{}{
-				"screenshot": base64Encode(desktopData),
-				"viewport":   map[string]int{"width": 1440, "height": 900},
-			},
-			"tablet": map[string]interface{}{
-				"screenshot": base64Encode(tabletData),
-				"viewport":  map[string]int{"width": 768, "height": 1024},
-			},
-			"mobile": map[string]interface{}{
-				"screenshot": base64Encode(mobileData),
-				"viewport":  map[string]int{"width": 375, "height": 812},
-			},
+			result[vp.name] = map[string]interface{}{
+				"screenshot": b64(data),
+				"viewport":   map[string]int{"width": vp.width, "height": vp.height},
+				"analysis":   analysis,
+			}
+		}
+
+		// Restore desktop viewport
+		page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+			Width: 1440, Height: 900, DeviceScaleFactor: 1,
+		})
+
+		result["timing"] = map[string]int64{
+			"multi_ms": time.Since(start).Milliseconds(),
 		}
 
 		writeJSON(w, 200, result)
@@ -309,23 +339,68 @@ func handleMulti(pool *vision.Pool) http.HandlerFunc {
 
 func handleDiff(pool *vision.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Simplified: just return that diff requires storing previous state
+		page, err := pool.GetPage()
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "failed to get page"})
+			return
+		}
+		defer pool.ReleasePage(page)
+
+		// Take current screenshot
+		current, err := screenshotPNG(page)
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "screenshot failed: " + err.Error()})
+			return
+		}
+
+		lastCapture.mu.Lock()
+		previous := lastCapture.data
+		prevURL := lastCapture.url
+		prevTS := lastCapture.ts
+		lastCapture.mu.Unlock()
+
+		if previous == nil {
+			storeCapture(current, "")
+			writeJSON(w, 200, map[string]interface{}{
+				"diff_pixels":  0,
+				"has_previous": false,
+				"note":         "No previous capture stored. Current frame saved.",
+			})
+			return
+		}
+
+		// Simple byte-level diff (pixel-accurate diff requires image decoding)
+		diffBytes := 0
+		minLen := len(previous)
+		if len(current) < minLen {
+			minLen = len(current)
+		}
+		for i := 0; i < minLen; i++ {
+			if previous[i] != current[i] {
+				diffBytes++
+			}
+		}
+		diffBytes += abs(len(current) - len(previous))
+
+		// Estimate pixel diff (PNG compressed, so byte diff ≈ pixel diff * compression ratio)
+		estimatedPixels := diffBytes / 4 // rough estimate (RGBA)
+
+		storeCapture(current, "")
+
 		writeJSON(w, 200, map[string]interface{}{
-			"diffPixels":  0,
-			"note":        "diff requires storing previous capture - not yet implemented",
-			"implemented": false,
+			"diff_pixels":  estimatedPixels,
+			"diff_bytes":   diffBytes,
+			"has_previous": true,
+			"previous_url": prevURL,
+			"previous_ts":  prevTS.Format(time.RFC3339),
 		})
 	}
 }
 
 func handleViewport(pool *vision.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		wParam := r.URL.Query().Get("w")
-		hParam := r.URL.Query().Get("h")
-
-		width, _ := strconv.Atoi(wParam)
-		height, _ := strconv.Atoi(hParam)
-
+		width, _ := strconv.Atoi(r.URL.Query().Get("w"))
+		height, _ := strconv.Atoi(r.URL.Query().Get("h"))
 		if width == 0 {
 			width = 1280
 		}
@@ -340,7 +415,9 @@ func handleViewport(pool *vision.Pool) http.HandlerFunc {
 		}
 		defer pool.ReleasePage(page)
 
-		page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: width, Height: height, DeviceScaleFactor: 1})
+		page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+			Width: width, Height: height, DeviceScaleFactor: 1,
+		})
 
 		writeJSON(w, 200, map[string]interface{}{
 			"viewport": map[string]int{"width": width, "height": height},
@@ -348,46 +425,316 @@ func handleViewport(pool *vision.Pool) http.HandlerFunc {
 	}
 }
 
-func base64Encode(data []byte) string {
+// ═══════════════════════════════════════════════════════════
+// NEW ENDPOINTS: analyze, critique, regression
+// ═══════════════════════════════════════════════════════════
+
+// handleAnalyze returns DOM analysis without taking a screenshot.
+func handleAnalyze(pool *vision.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		page, err := pool.GetPage()
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "failed to get page"})
+			return
+		}
+		defer pool.ReleasePage(page)
+
+		url := evalStr(page, `() => window.location.href`)
+		title := evalStr(page, `() => document.title`)
+		analysis := runDOMAnalysis(page)
+
+		// Count issues
+		issueCount := 0
+		for key, val := range analysis {
+			if key == "headings" || key == "links" || key == "buttons" {
+				continue
+			}
+			switch v := val.(type) {
+			case int:
+				issueCount += v
+			case float64:
+				issueCount += int(v)
+			}
+		}
+
+		writeJSON(w, 200, map[string]interface{}{
+			"url":      url,
+			"title":    title,
+			"issues":   issueCount,
+			"analysis": analysis,
+		})
+	}
+}
+
+// handleCritiqueCapture navigates, captures desktop + optional mobile + DOM analysis.
+// POST body: { "page": "url-or-slug", "mobile": true }
+func handleCritiqueCapture(pool *vision.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Page   string `json:"page"`
+			Mobile bool   `json:"mobile"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+
+		if body.Page == "" {
+			body.Page = r.URL.Query().Get("page")
+		}
+		if body.Page == "" {
+			writeJSON(w, 400, map[string]string{"error": "page param required"})
+			return
+		}
+
+		targetURL := resolvePageURL(body.Page)
+
+		page, err := pool.GetPage()
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "failed to get page"})
+			return
+		}
+		defer pool.ReleasePage(page)
+
+		start := time.Now()
+
+		// Navigate (desktop viewport)
+		page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+			Width: 1440, Height: 900, DeviceScaleFactor: 1,
+		})
+		if err := page.Navigate(targetURL); err != nil {
+			writeJSON(w, 500, map[string]string{"error": "navigation failed: " + err.Error()})
+			return
+		}
+		page.Timeout(30 * time.Second).WaitLoad()
+
+		desktopData, err := screenshotPNG(page)
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "desktop screenshot failed: " + err.Error()})
+			return
+		}
+
+		title := evalStr(page, `() => document.title`)
+		analysis := runDOMAnalysis(page)
+		storeCapture(desktopData, targetURL)
+
+		result := map[string]interface{}{
+			"page":  body.Page,
+			"url":   targetURL,
+			"title": title,
+			"desktop": map[string]interface{}{
+				"screenshot": b64(desktopData),
+				"viewport":   map[string]int{"width": 1440, "height": 900},
+			},
+			"analysis": analysis,
+		}
+
+		// Mobile capture if requested
+		if body.Mobile {
+			page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+				Width: 375, Height: 812, DeviceScaleFactor: 2,
+			})
+			time.Sleep(300 * time.Millisecond)
+
+			mobileData, err := screenshotPNG(page)
+			if err == nil {
+				mobileAnalysis := runDOMAnalysis(page)
+				result["mobile"] = map[string]interface{}{
+					"screenshot": b64(mobileData),
+					"viewport":   map[string]int{"width": 375, "height": 812},
+					"analysis":   mobileAnalysis,
+				}
+			}
+
+			// Restore desktop viewport
+			page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+				Width: 1440, Height: 900, DeviceScaleFactor: 1,
+			})
+		}
+
+		// Issue summary
+		issueSummary := map[string]int{}
+		totalIssues := 0
+		for cat, val := range analysis {
+			if cat == "headings" || cat == "links" || cat == "buttons" {
+				continue
+			}
+			switch v := val.(type) {
+			case int:
+				if v > 0 {
+					issueSummary[cat] = v
+					totalIssues += v
+				}
+			case float64:
+				iv := int(v)
+				if iv > 0 {
+					issueSummary[cat] = iv
+					totalIssues += iv
+				}
+			}
+		}
+
+		result["issue_summary"] = issueSummary
+		result["total_issues"] = totalIssues
+		result["elapsed_ms"] = time.Since(start).Milliseconds()
+
+		writeJSON(w, 200, result)
+	}
+}
+
+// handleRegression captures current state and compares to previous.
+// POST body: { "page": "url-or-slug", "threshold": 500 }
+func handleRegression(pool *vision.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Page      string `json:"page"`
+			Threshold int    `json:"threshold"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+
+		if body.Page == "" {
+			body.Page = r.URL.Query().Get("page")
+		}
+		if body.Page == "" {
+			writeJSON(w, 400, map[string]string{"error": "page param required"})
+			return
+		}
+		if body.Threshold == 0 {
+			body.Threshold = 500
+		}
+
+		targetURL := resolvePageURL(body.Page)
+
+		page, err := pool.GetPage()
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "failed to get page"})
+			return
+		}
+		defer pool.ReleasePage(page)
+
+		start := time.Now()
+
+		// Navigate and capture
+		if err := page.Navigate(targetURL); err != nil {
+			writeJSON(w, 500, map[string]string{"error": "navigation failed: " + err.Error()})
+			return
+		}
+		page.Timeout(30 * time.Second).WaitLoad()
+
+		current, err := screenshotPNG(page)
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "screenshot failed: " + err.Error()})
+			return
+		}
+
+		analysis := runDOMAnalysis(page)
+
+		// Compare to previous
+		lastCapture.mu.Lock()
+		previous := lastCapture.data
+		lastCapture.mu.Unlock()
+
+		diffPixels := 0
+		hasPrevious := previous != nil
+
+		if hasPrevious {
+			diffBytes := 0
+			minLen := len(previous)
+			if len(current) < minLen {
+				minLen = len(current)
+			}
+			for i := 0; i < minLen; i++ {
+				if previous[i] != current[i] {
+					diffBytes++
+				}
+			}
+			diffBytes += abs(len(current) - len(previous))
+			diffPixels = diffBytes / 4
+		}
+
+		regression := hasPrevious && diffPixels > body.Threshold
+
+		storeCapture(current, targetURL)
+
+		writeJSON(w, 200, map[string]interface{}{
+			"page":         body.Page,
+			"url":          targetURL,
+			"regression":   regression,
+			"diff_pixels":  diffPixels,
+			"threshold":    body.Threshold,
+			"has_previous": hasPrevious,
+			"analysis":     analysis,
+			"elapsed_ms":   time.Since(start).Milliseconds(),
+		})
+	}
+}
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+
+func b64(data []byte) string {
 	if len(data) == 0 {
 		return ""
 	}
-	return strings.TrimPrefix(encodeBase64(data), "/9j/")
+	return base64.StdEncoding.EncodeToString(data)
 }
 
-func encodeBase64(b []byte) string {
-	const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-	result := make([]byte, 0, len(b)*2)
-	for i := 0; i < len(b); i++ {
-		result = append(result, base64Chars[b[i]>>2])
-		result = append(result, base64Chars[(b[i]&0x03)<<4])
-		if i+1 < len(b) {
-			result = append(result, base64Chars[b[i+1]>>4])
-			result = append(result, base64Chars[(b[i+1]&0x0F)<<2])
-		} else {
-			result = append(result, '=')
-			result = append(result, '=')
-		}
-		i++
+func screenshotPNG(page *rod.Page) ([]byte, error) {
+	q := 85
+	return page.Screenshot(false, &proto.PageCaptureScreenshot{
+		Format:  proto.PageCaptureScreenshotFormatPng,
+		Quality: &q,
+	})
+}
+
+func evalStr(page *rod.Page, js string, args ...interface{}) string {
+	var result *proto.RuntimeRemoteObject
+	var err error
+	if len(args) > 0 {
+		result, err = page.Eval(js, args...)
+	} else {
+		result, err = page.Eval(js)
 	}
-	return string(result)
-}
-
-func getString(v *proto.RuntimeRemoteObject) string {
-	if v == nil {
+	if err != nil || result == nil {
 		return ""
 	}
-	return v.Value.Str()
+	return result.Value.Str()
 }
 
-func gson(v int) *int {
-	return &v
+func buildState(page *rod.Page) VisionState {
+	url := evalStr(page, `() => window.location.href`)
+	title := evalStr(page, `() => document.title`)
+
+	viewportJSON := evalStr(page, `() => JSON.stringify({width: window.innerWidth, height: window.innerHeight, scrollHeight: document.body.scrollHeight})`)
+	viewportMap := make(map[string]int)
+	json.Unmarshal([]byte(viewportJSON), &viewportMap)
+
+	analysis := runDOMAnalysis(page)
+
+	return VisionState{
+		URL:      url,
+		Title:    title,
+		Viewport: viewportMap,
+		Analysis: analysis,
+	}
+}
+
+func storeCapture(data []byte, url string) {
+	lastCapture.mu.Lock()
+	defer lastCapture.mu.Unlock()
+	lastCapture.data = data
+	lastCapture.url = url
+	lastCapture.ts = time.Now()
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func resolvePageURL(page string) string {
-	// Handle special page names
 	pageMap := map[string]string{
-		"wpuiai":           "https://wpuiai.com",
+		"wpuiai":          "https://wpuiai.com",
 		"wpuiai-settings": "https://wpuiai.com/wp-admin/admin.php?page=wpuiai",
 	}
 
@@ -395,25 +742,26 @@ func resolvePageURL(page string) string {
 		return mapped
 	}
 
-	// If it looks like a URL, return as-is
 	if strings.HasPrefix(page, "http://") || strings.HasPrefix(page, "https://") {
 		return page
 	}
 
-	// Assume it's a page on wpuiai.com
 	return "https://wpuiai.com/" + page
 }
 
 func runDOMAnalysis(page *rod.Page) map[string]interface{} {
 	analysis := make(map[string]interface{})
 
-	// Basic DOM checks
 	checks := []struct {
 		name  string
 		check string
 	}{
 		{"brokenImages", `Array.from(document.images).filter(i => !i.complete || i.naturalWidth === 0).length`},
 		{"emptyContainers", `Array.from(document.querySelectorAll('[class*="container"],[class*="section"],[class*="block-"]')).filter(e => e.innerHTML.trim().length < 50).length`},
+		{"links", `document.querySelectorAll('a[href]').length`},
+		{"buttons", `document.querySelectorAll('button,.wp-block-button a').length`},
+		{"images", `document.images.length`},
+		{"forms", `document.forms.length`},
 	}
 
 	for _, check := range checks {
@@ -428,30 +776,28 @@ func runDOMAnalysis(page *rod.Page) map[string]interface{} {
 	}
 
 	// Headings
-	headingsResult, _ := page.Eval(`() => Array.from(document.querySelectorAll('h1,h2,h3')).slice(0, 10).map(e => e.tagName + ': ' + e.textContent.trim().substring(0,80))`)
+	headingsResult, _ := page.Eval(`() => JSON.stringify(Array.from(document.querySelectorAll('h1,h2,h3')).slice(0, 10).map(e => e.tagName + ': ' + e.textContent.trim().substring(0,80)))`)
 	if headingsResult != nil {
 		if s := headingsResult.Value.Str(); s != "" {
-			analysis["headings"] = s
+			var headings []string
+			json.Unmarshal([]byte(s), &headings)
+			analysis["headings"] = headings
 		}
 	}
 
-	// Links
-	linksResult, _ := page.Eval(`() => document.querySelectorAll('a[href]').length`)
-	if linksResult != nil {
-		if n, ok := linksResult.Value.MarshalJSON(); ok == nil {
-			var count int
-			json.Unmarshal(n, &count)
-			analysis["links"] = count
-		}
-	}
-
-	// Buttons
-	buttonsResult, _ := page.Eval(`() => document.querySelectorAll('button,.wp-block-button a').length`)
-	if buttonsResult != nil {
-		if n, ok := buttonsResult.Value.MarshalJSON(); ok == nil {
-			var count int
-			json.Unmarshal(n, &count)
-			analysis["buttons"] = count
+	// Page metrics
+	metricsJS := `() => JSON.stringify({
+		scrollHeight: document.body.scrollHeight,
+		clientHeight: document.documentElement.clientHeight,
+		scrollWidth: document.body.scrollWidth,
+		clientWidth: document.documentElement.clientWidth
+	})`
+	metricsResult, _ := page.Eval(metricsJS)
+	if metricsResult != nil {
+		if s := metricsResult.Value.Str(); s != "" {
+			var metrics map[string]int
+			json.Unmarshal([]byte(s), &metrics)
+			analysis["pageMetrics"] = metrics
 		}
 	}
 
