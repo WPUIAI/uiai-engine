@@ -194,6 +194,20 @@ func (e *Engine) mountRoutes() {
 		routes.MountVisionInteractive(r, e.cfg, e.vision)
 	})
 
+	// Pipeline operations (cloud-capable build steps)
+	r.Route("/api/design-system", func(r chi.Router) {
+		routes.MountDesignSystemRoute(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
+	})
+	r.Route("/api/content-map", func(r chi.Router) {
+		routes.MountContentMapRoute(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
+	})
+	r.Route("/api/block-recipes", func(r chi.Router) {
+		routes.MountBlockRecipesRoute(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
+	})
+	r.Route("/api/comparison", func(r chi.Router) {
+		routes.MountComparisonRoute(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
+	})
+
 	// Data migration API
 	r.Route("/api/migration", func(r chi.Router) {
 		routes.MountMigrationAPI(r, e.cfg)
