@@ -105,6 +105,16 @@ func (p *Pool) getPage() (*rod.Page, error) {
 	return <-p.pages, nil
 }
 
+// GetPage returns a page from the pool (exported for interactive routes)
+func (p *Pool) GetPage() (*rod.Page, error) {
+	return p.getPage()
+}
+
+// ReleasePage returns a page to the pool (exported for interactive routes)
+func (p *Pool) ReleasePage(page *rod.Page) {
+	p.releasePage(page)
+}
+
 func (p *Pool) releasePage(page *rod.Page) {
 	// Navigate to blank to free memory
 	page.Navigate("about:blank")

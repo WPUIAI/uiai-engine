@@ -185,6 +185,11 @@ func (e *Engine) mountRoutes() {
 		routes.MountShareReal(r, e.cfg, e.vision)
 	})
 
+	// Vision Interactive (replaces PHP daemon at port 3011)
+	r.Route("/vision", func(r chi.Router) {
+		routes.MountVisionInteractive(r, e.cfg, e.vision)
+	})
+
 	// Share viewer (public, no /api prefix)
 	r.Get("/v/{token}", routes.HandleShareViewer(e.cfg))
 
