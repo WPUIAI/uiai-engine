@@ -77,7 +77,7 @@ func (h *referenceHandler) analyze(w http.ResponseWriter, r *http.Request) {
 		req.Model = h.cfg.AI.DefaultModel
 	}
 	if req.Provider == "" {
-		req.Provider = "openrouter"
+		req.Provider = h.cfg.AI.DefaultProvider
 	}
 	if req.Pass == "" {
 		req.Pass = "full"

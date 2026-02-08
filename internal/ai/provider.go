@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -283,10 +284,12 @@ func (p *Provider) ensureKeys() error {
 	body, _ := io.ReadAll(resp.Body)
 
 	var settings struct {
-		Anthropic  struct{ Key string `json:"key"` } `json:"anthropic"`
-		OpenAI     struct{ Key string `json:"key"` } `json:"openai"`
-		OpenRouter struct{ Key string `json:"key"` } `json:"openrouter"`
-		Fireworks  struct{ Key string `json:"key"` } `json:"fireworks"`
+		DefaultProvider string `json:"default_provider"`
+		DefaultModel    string `json:"default_model"`
+		Anthropic       struct{ Key string `json:"key"` } `json:"anthropic"`
+		OpenAI          struct{ Key string `json:"key"` } `json:"openai"`
+		OpenRouter      struct{ Key string `json:"key"` } `json:"openrouter"`
+		Fireworks       struct{ Key string `json:"key"` } `json:"fireworks"`
 	}
 	if err := json.Unmarshal(body, &settings); err != nil {
 		// Fallback to env vars
@@ -298,6 +301,16 @@ func (p *Provider) ensureKeys() error {
 		}
 		p.keysMu.Unlock()
 		return nil
+	}
+
+	// Update runtime config with WP-managed defaults (takes precedence over config.yaml).
+	if settings.DefaultProvider != "" {
+		p.cfg.AI.DefaultProvider = settings.DefaultProvider
+		log.Printf("[ai] default provider updated from WP settings: %s", settings.DefaultProvider)
+	}
+	if settings.DefaultModel != "" {
+		p.cfg.AI.DefaultModel = settings.DefaultModel
+		log.Printf("[ai] default model updated from WP settings: %s", settings.DefaultModel)
 	}
 
 	p.keysMu.Lock()
