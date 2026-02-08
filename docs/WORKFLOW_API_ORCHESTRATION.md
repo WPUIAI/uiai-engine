@@ -152,6 +152,31 @@ POST /api/intake
 
 Returns enriched plan with navigation architecture, content suggestions, missing pages.
 
+## Cloud is Opt-In Premium
+
+**Cloud AI is NEVER required.** It's a premium upgrade option.
+
+The user controls cloud via Settings → AI tab:
+1. **Global toggle**: `uiai_use_ai_cloud` — master on/off
+2. **Per-capability**: checkboxes for each AI operation
+3. **Filter**: `wpuiai_cloud_capability_enabled` for programmatic control
+
+If cloud is disabled (or not purchased), ALL AI runs locally with user's own API keys.
+The plugin works fully without any cloud connection.
+
+### Gate Order (is_cloud_available)
+
+```
+1. Capability exists in registry?     → No: local
+2. User opted in? (global toggle)      → No: local
+3. Capability enabled? (per-cap)       → No: local
+4. Circuit breaker open? (degraded)    → Yes: local
+5. API base URL configured?            → No: local
+6. License key present?                → No: local
+7. Cloud provider available?           → No: local
+All pass → try cloud (with graceful degradation to local on failure)
+```
+
 ## Authentication
 
 All endpoints require a valid license key in the `Authorization` header:
