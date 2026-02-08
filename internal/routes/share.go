@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -24,10 +26,64 @@ type shareEntry struct {
 }
 
 var shareStore sync.Map
+var shareDataDir string
 
-func MountShareReal(r chi.Router, _ *config.Config, pool *vision.Pool) {
+// loadShareStore reads persisted shares from disk on startup.
+func loadShareStore(dataDir string) {
+	shareDataDir = filepath.Join(dataDir, "shares")
+	os.MkdirAll(shareDataDir, 0755)
+
+	entries, _ := os.ReadDir(shareDataDir)
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(shareDataDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var entry shareEntry
+		if json.Unmarshal(data, &entry) == nil {
+			if time.Now().Before(entry.ExpiresAt) {
+				shareStore.Store(entry.ID, &entry)
+			} else {
+				os.Remove(filepath.Join(shareDataDir, e.Name()))
+			}
+		}
+	}
+}
+
+func persistShare(entry *shareEntry) {
+	if shareDataDir == "" {
+		return
+	}
+	data, _ := json.MarshalIndent(entry, "", "  ")
+	os.WriteFile(filepath.Join(shareDataDir, entry.ID+".json"), data, 0644)
+}
+
+func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
+	loadShareStore(cfg.Storage.DataDir)
+
+	// List shares
+	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+		var shares []any
+		shareStore.Range(func(_, v any) bool {
+			e := v.(*shareEntry)
+			shares = append(shares, map[string]any{
+				"id": e.ID, "url": e.URL, "title": e.Title,
+				"created_at": e.CreatedAt, "expires_at": e.ExpiresAt,
+				"views": e.Views,
+			})
+			return true
+		})
+		if shares == nil {
+			shares = []any{}
+		}
+		writeJSON(w, 200, map[string]any{"shares": shares, "count": len(shares)})
+	})
+
 	// Create share
-	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
+	r.Post("/create", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
 			URL       string         `json:"url"`
 			Title     string         `json:"title"`
@@ -58,6 +114,7 @@ func MountShareReal(r chi.Router, _ *config.Config, pool *vision.Pool) {
 			ExpiresAt: time.Now().Add(time.Duration(expiresIn) * time.Minute),
 		}
 		shareStore.Store(id, entry)
+		persistShare(entry)
 
 		writeJSON(w, 200, map[string]any{
 			"id":        id,
@@ -102,6 +159,7 @@ func MountShareReal(r chi.Router, _ *config.Config, pool *vision.Pool) {
 			ExpiresAt: time.Now().Add(time.Duration(expiresIn) * time.Minute),
 		}
 		shareStore.Store(id, entry)
+		persistShare(entry)
 
 		writeJSON(w, 200, map[string]any{
 			"id":        id,

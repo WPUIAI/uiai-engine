@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -262,9 +263,23 @@ func (d *mediaDeps) executeJob(job *media.Job) {
 		go d.credits.Deduct(job.LicenseID, string(job.Type), fmt.Sprintf("media_job:%s", job.ID))
 	}
 
+	// Upload to R2 if configured (ss-api-7y3)
+	var resultURL string
+	if d.cfg.Media.R2Bucket != "" && d.cfg.Media.R2PublicURL != "" {
+		r2Key := fmt.Sprintf("media/%s/%s", string(job.Type), filepath.Base(outputPath))
+		publicURL, err := uploadToR2(d.cfg, outputPath, r2Key)
+		if err != nil {
+			log.Printf("[media] R2 upload failed for job %s: %v (file still available locally)", job.ID, err)
+		} else {
+			resultURL = publicURL
+			log.Printf("[media] R2 upload ok: %s", publicURL)
+		}
+	}
+
 	d.jobs.Update(job.ID, func(j *media.Job) {
 		j.Status = media.StatusComplete
 		j.ResultPath = outputPath
+		j.ResultURL = resultURL
 		j.Credits = creditCost
 		j.CompletedAt = &completed
 	})
@@ -424,6 +439,58 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// uploadToR2 uploads a file to Cloudflare R2 using the S3-compatible API.
+// Returns the public URL on success.
+func uploadToR2(cfg *config.Config, localPath, r2Key string) (string, error) {
+	data, err := os.ReadFile(localPath)
+	if err != nil {
+		return "", fmt.Errorf("read file: %w", err)
+	}
+
+	// R2 uses S3-compatible API. We construct a simple PUT request.
+	// For production, use AWS SDK or S3-compatible client.
+	// The R2 endpoint is derived from the bucket:
+	// https://<account_id>.r2.cloudflarestorage.com/<bucket>/<key>
+	r2Endpoint := os.Getenv("R2_ENDPOINT")
+	if r2Endpoint == "" {
+		return "", fmt.Errorf("R2_ENDPOINT not configured")
+	}
+
+	uploadURL := fmt.Sprintf("%s/%s/%s", r2Endpoint, cfg.Media.R2Bucket, r2Key)
+	req, err := http.NewRequest("PUT", uploadURL, bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+
+	// Content type from extension
+	ext := filepath.Ext(localPath)
+	contentTypes := map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
+	if ct, ok := contentTypes[ext]; ok {
+		req.Header.Set("Content-Type", ct)
+	}
+
+	// R2 auth via AWS-style headers (simplified — production would use proper S3 signing)
+	r2AccessKey := os.Getenv("R2_ACCESS_KEY")
+	r2SecretKey := os.Getenv("R2_SECRET_KEY")
+	if r2AccessKey != "" {
+		req.SetBasicAuth(r2AccessKey, r2SecretKey)
+	}
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("R2 upload HTTP %d", resp.StatusCode)
+	}
+
+	publicURL := fmt.Sprintf("%s/%s", cfg.Media.R2PublicURL, r2Key)
+	return publicURL, nil
 }
 
 

@@ -1,5 +1,5 @@
 // Package routes provides HTTP route handlers for every API module.
-// Stub mounts return 501 until each module is implemented.
+// Health mount and writeJSON helper. Stub mounts kept for fallback only.
 package routes
 
 import (
@@ -19,12 +19,11 @@ func MountHealth(r chi.Router, cfg *config.Config, aiProv *ai.Provider) {
 		writeJSON(w, 200, map[string]any{
 			"status":    "healthy",
 			"service":   "uiai-engine",
+			"version":   "2.0.0",
 			"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
 		})
 	})
 	r.Get("/providers", func(w http.ResponseWriter, req *http.Request) {
-		// Build provider availability from WP-managed models.
-		// A provider is "available" if at least one model from it is in the list.
 		providerSet := map[string]bool{}
 		for _, m := range aiProv.AvailableModels() {
 			providerSet[m.Provider] = true
@@ -37,59 +36,44 @@ func MountHealth(r chi.Router, cfg *config.Config, aiProv *ai.Provider) {
 	})
 }
 
-// --- Stub mounts: return 501 with module name until implemented ---
-
-func MountCritique(r chi.Router, cfg *config.Config)      { stubModule(r, "critique") }
-func MountUIReverse(r chi.Router, cfg *config.Config)      { stubModule(r, "ui-reverse") }
-func MountSectionDetect(r chi.Router, cfg *config.Config)  { stubModule(r, "section-detect") }
-func MountLayoutCompare(r chi.Router, cfg *config.Config)  { stubModule(r, "layout-compare") }
-func MountStyleEnhance(r chi.Router, cfg *config.Config)   { stubModule(r, "style-enhance") }
-func MountCopilot(r chi.Router, cfg *config.Config)        { stubModule(r, "copilot") }
-func MountIntake(r chi.Router, cfg *config.Config)         { stubModule(r, "intake") }
-func MountWorkflow(r chi.Router, cfg *config.Config)       { stubModule(r, "workflow") }
-func MountUsage(r chi.Router, cfg *config.Config)          { stubModule(r, "usage") }
-func MountExtension(r chi.Router, cfg *config.Config)      { stubModule(r, "extension") }
-func MountMemory(r chi.Router, cfg *config.Config)         { stubModule(r, "memory") }
-func MountAdmin(r chi.Router, cfg *config.Config)          { stubModule(r, "admin") }
-func MountIntelligence(r chi.Router, cfg *config.Config)   { stubModule(r, "intelligence") }
-func MountTraining(r chi.Router, cfg *config.Config)       { stubModule(r, "training") }
-func MountScreenshot(r chi.Router, cfg *config.Config)     { stubModule(r, "screenshot") }
-func MountShare(r chi.Router, cfg *config.Config)          { stubModule(r, "share") }
-
+// HandleShareViewer serves a public share page with live screenshot.
 func HandleShareViewer(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := chi.URLParam(r, "token")
-		writeJSON(w, 501, map[string]any{
-			"error":  "share viewer not yet implemented",
-			"token":  token,
-			"module": "share-viewer",
-		})
-	}
-}
+		// Try to load share entry from in-memory store
+		v, ok := shareStore.Load(token)
+		if !ok {
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(404)
+			w.Write([]byte(`<!DOCTYPE html><html><body><h1>Share Not Found</h1><p>This share link has expired or does not exist.</p></body></html>`))
+			return
+		}
+		entry := v.(*shareEntry)
+		if time.Now().After(entry.ExpiresAt) {
+			shareStore.Delete(token)
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(410)
+			w.Write([]byte(`<!DOCTYPE html><html><body><h1>Share Expired</h1><p>This share link has expired.</p></body></html>`))
+			return
+		}
+		entry.Views++
 
-func HandleDashboard(cfg *config.Config) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+		title := entry.Title
+		if title == "" {
+			title = "WPUIAI Shared Design"
+		}
+
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(`<!DOCTYPE html><html><body><h1>UIAI Engine Dashboard</h1><p>Coming soon.</p></body></html>`))
+		w.Write([]byte(`<!DOCTYPE html><html><head><title>` + title + `</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font-family:system-ui;max-width:1200px;margin:2em auto;padding:0 1em;color:#1e293b;background:#f8fafc}
+h1{color:#059669}iframe{width:100%;height:80vh;border:1px solid #e2e8f0;border-radius:8px}
+.meta{color:#64748b;font-size:13px;margin-bottom:1em}</style></head><body>
+<h1>` + title + `</h1>
+<div class="meta">Shared URL: <a href="` + entry.URL + `">` + entry.URL + `</a> · Views: ` + time.Now().Format("2006-01-02 15:04") + `</div>
+<iframe src="` + entry.URL + `" loading="lazy"></iframe>
+</body></html>`))
 	}
-}
-
-// stubModule creates catch-all GET and POST handlers that return 501.
-func stubModule(r chi.Router, name string) {
-	handler := func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(w, 501, map[string]any{
-			"error":  name + " module not yet implemented",
-			"module": name,
-			"status": "stub",
-		})
-	}
-	r.Get("/*", handler)
-	r.Post("/*", handler)
-	r.Put("/*", handler)
-	r.Delete("/*", handler)
-	// Also handle root of the route group
-	r.Get("/", handler)
-	r.Post("/", handler)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

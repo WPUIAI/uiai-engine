@@ -163,13 +163,13 @@ func (e *Engine) mountRoutes() {
 		routes.MountMemoryReal(r, e.cfg)
 	})
 	r.Route("/api/admin", func(r chi.Router) {
-		routes.MountAdminReal(r, e.cfg, e.usage)
+		routes.MountAdminReal(r, e.cfg, e.usage, e.limiter, e.auth)
 	})
 	r.Route("/api/reference", func(r chi.Router) {
 		routes.MountReferenceReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/intelligence", func(r chi.Router) {
-		routes.MountIntelligenceReal(r, e.cfg)
+		routes.MountIntelligenceReal(r, e.cfg, e.ai)
 	})
 	r.Route("/api/training", func(r chi.Router) {
 		routes.MountTrainingReal(r, e.cfg)
@@ -183,6 +183,7 @@ func (e *Engine) mountRoutes() {
 	// Screenshot & Share (Rod vision pool — Phase A8)
 	r.Route("/api/screenshot", func(r chi.Router) {
 		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage)
+		routes.MountScreenshotCompare(r, e.cfg, e.vision, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/share", func(r chi.Router) {
 		routes.MountShareReal(r, e.cfg, e.vision)
@@ -192,6 +193,14 @@ func (e *Engine) mountRoutes() {
 	r.Route("/vision", func(r chi.Router) {
 		routes.MountVisionInteractive(r, e.cfg, e.vision)
 	})
+
+	// Data migration API
+	r.Route("/api/migration", func(r chi.Router) {
+		routes.MountMigrationAPI(r, e.cfg)
+	})
+
+	// SSE real-time event stream
+	r.Get("/api/events", routes.MountSSEStream(e.cfg))
 
 	// Share viewer (public, no /api prefix)
 	r.Get("/v/{token}", routes.HandleShareViewer(e.cfg))

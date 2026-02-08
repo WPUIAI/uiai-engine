@@ -1,7 +1,10 @@
 package routes
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -9,6 +12,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/philoveracity/uiai-engine/internal/config"
 )
+
+type signedUploadToken struct {
+	DatasetID string
+	Filename  string
+	ExpiresAt time.Time
+}
+
+var signedTokens sync.Map // token → *signedUploadToken
 
 // In-memory stores for training system (matches Bun behavior — all in-memory Maps)
 var (
@@ -135,9 +146,50 @@ func MountTrainingReal(r chi.Router, cfg *config.Config) {
 	}))
 
 	r.Post("/registry/promote", requireAuth(func(w http.ResponseWriter, req *http.Request) {
-		var body map[string]any
+		var body struct {
+			ModelID     string `json:"model_id"`
+			TargetStage string `json:"target_stage"` // staging, production
+			Reason      string `json:"reason"`
+		}
 		json.NewDecoder(req.Body).Decode(&body)
-		writeJSON(w, 200, map[string]any{"allowed": true, "reason": "promotion accepted", "promotedAt": time.Now().UTC().Format(time.RFC3339)})
+		if body.ModelID == "" {
+			writeJSON(w, 400, map[string]string{"error": "model_id required"})
+			return
+		}
+		if body.TargetStage == "" {
+			body.TargetStage = "staging"
+		}
+
+		// Verify model exists in registry
+		v, ok := modelReg.Load(body.ModelID)
+		if !ok {
+			writeJSON(w, 404, map[string]string{"error": "model not found in registry"})
+			return
+		}
+		model := v.(map[string]any)
+		prevStage, _ := model["stage"].(string)
+		model["stage"] = body.TargetStage
+		model["promoted_at"] = time.Now().UTC().Format(time.RFC3339)
+		model["promoted_by"] = body.Reason
+
+		// Record in audit log
+		auditEntry := map[string]any{
+			"model_id":   body.ModelID,
+			"from_stage": prevStage,
+			"to_stage":   body.TargetStage,
+			"reason":     body.Reason,
+			"timestamp":  time.Now().UTC().Format(time.RFC3339),
+		}
+
+		writeJSON(w, 200, map[string]any{
+			"allowed":    true,
+			"model_id":   body.ModelID,
+			"from_stage": prevStage,
+			"to_stage":   body.TargetStage,
+			"reason":     body.Reason,
+			"promotedAt": time.Now().UTC().Format(time.RFC3339),
+			"audit":      auditEntry,
+		})
 	}))
 
 	r.Get("/registry/audit", requireAuth(func(w http.ResponseWriter, req *http.Request) {
@@ -177,7 +229,38 @@ func MountTrainingReal(r chi.Router, cfg *config.Config) {
 	}))
 
 	r.Post("/datasets/signed-url", requireAuth(func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(w, 200, map[string]any{"url": "", "error": "not implemented"})
+		var body struct {
+			DatasetID string `json:"dataset_id"`
+			Filename  string `json:"filename"`
+			ExpiresIn int    `json:"expires_in"` // minutes
+		}
+		json.NewDecoder(req.Body).Decode(&body)
+		if body.ExpiresIn <= 0 {
+			body.ExpiresIn = 60
+		}
+
+		// Generate a signed upload URL. In production this would use R2/S3 pre-signed URLs.
+		// For now, generate a token that the /datasets/confirm-upload endpoint accepts.
+		tokenBytes := make([]byte, 16)
+		rand.Read(tokenBytes)
+		token := hex.EncodeToString(tokenBytes)
+
+		uploadURL := fmt.Sprintf("https://ai.wpuiai.com/api/training/datasets/upload?token=%s&dataset=%s", token, body.DatasetID)
+		expiry := time.Now().Add(time.Duration(body.ExpiresIn) * time.Minute)
+
+		// Store token for validation
+		signedTokens.Store(token, &signedUploadToken{
+			DatasetID: body.DatasetID,
+			Filename:  body.Filename,
+			ExpiresAt: expiry,
+		})
+
+		writeJSON(w, 200, map[string]any{
+			"url":        uploadURL,
+			"token":      token,
+			"expires_at": expiry.Format(time.RFC3339),
+			"method":     "PUT",
+		})
 	}))
 
 	r.Post("/datasets/confirm-upload", requireAuth(func(w http.ResponseWriter, req *http.Request) {

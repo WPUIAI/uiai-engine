@@ -9808,5 +9808,320 @@
     "costUsd": 0.034338,
     "status": "success",
     "createdAt": "2026-02-08T21:53:04Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T21:57:00Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T21:57:38Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:00:46Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:35:45Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:36:12Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:37:10Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:37:50Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:38:29Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:40:20Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:41:21Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:48:20Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:48:28Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:48:36Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:48:44Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:48:52Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:49:03Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:49:21Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:49:31Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:49:41Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:49:52Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:50:01Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T22:50:18Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:02:13Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:02:45Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:04:14Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:04:34Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:04:43Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:04:52Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:05:01Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:05:10Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:07:39Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:07:48Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:07:57Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:08:05Z"
+  },
+  {
+    "type": "screenshot",
+    "model": "",
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.005,
+    "status": "success",
+    "createdAt": "2026-02-08T23:09:33Z"
   }
 ]

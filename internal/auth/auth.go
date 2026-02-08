@@ -192,8 +192,50 @@ func (a *Authenticator) validateAPIKey(key string) (*Identity, error) {
 }
 
 func (a *Authenticator) validateExtToken(token string) (*Identity, error) {
-	// TODO: JWT validation (Phase A9)
-	return nil, fmt.Errorf("extension token auth not yet implemented")
+	cacheKey := "ext:" + token
+	if v, ok := a.cache.Load(cacheKey); ok {
+		cr := v.(*cachedResult)
+		if time.Now().Before(cr.expiry) {
+			return cr.identity, cr.err
+		}
+		a.cache.Delete(cacheKey)
+	}
+
+	// Validate against the extension token endpoint on the Go engine itself.
+	// Extension tokens are issued by /api/extension/token and stored in extTokens
+	// (routes/extension.go). We validate by checking the in-memory store via
+	// the verify endpoint path, but since we're in the same process, we
+	// directly call the token store. For cross-process, this would be a JWT.
+	url := fmt.Sprintf("http://127.0.0.1:%d/api/extension/verify", a.cfg.Server.Port)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("X-Extension-Token", token)
+
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("extension token validation failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var data struct {
+		Valid   bool     `json:"valid"`
+		UserID  string   `json:"userId"`
+		Scope   []string `json:"scope"`
+		Error   string   `json:"error"`
+	}
+	json.NewDecoder(resp.Body).Decode(&data)
+	if !data.Valid {
+		e := fmt.Errorf("invalid extension token: %s", data.Error)
+		a.cache.Store(cacheKey, &cachedResult{nil, e, time.Now().Add(30 * time.Second)})
+		return nil, e
+	}
+
+	id := &Identity{
+		Tier:   "pro", // extension tokens are always at least pro tier
+		UserID: data.UserID,
+	}
+	a.cache.Store(cacheKey, &cachedResult{id, nil, time.Now().Add(5 * time.Minute)})
+	return id, nil
 }
 
 func (a *Authenticator) cleanLoop() {

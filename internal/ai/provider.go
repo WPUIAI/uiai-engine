@@ -33,14 +33,37 @@ type Request struct {
 }
 
 var modelCosts = map[string][2]float64{
-	"claude-sonnet-4-20250514":                             {0.000003, 0.000015},
-	"claude-opus-4-20250514":                               {0.000015, 0.000075},
-	"gpt-4o":                                               {0.0000025, 0.00001},
-	"gpt-4o-mini":                                          {0.00000015, 0.0000006},
-	"accounts/fireworks/models/llama-v3p1-405b-instruct":   {0.000003, 0.000003},
-	"accounts/fireworks/models/llama-v3p1-70b-instruct":    {0.0000009, 0.0000009},
-	"accounts/fireworks/models/llama-v3p1-8b-instruct":     {0.0000002, 0.0000002},
-	"accounts/fireworks/models/qwen2p5-72b-instruct":       {0.0000009, 0.0000009},
+	// Anthropic
+	"claude-sonnet-4-20250514":  {0.000003, 0.000015},
+	"claude-opus-4-20250514":    {0.000015, 0.000075},
+	"claude-3-5-sonnet-20241022": {0.000003, 0.000015},
+	// OpenAI
+	"gpt-4o":      {0.0000025, 0.00001},
+	"gpt-4o-mini": {0.00000015, 0.0000006},
+	"gpt-4-turbo": {0.00001, 0.00003},
+	"gpt-4-vision-preview": {0.00001, 0.00003}, // GPT-4 Vision
+	"o1":          {0.000015, 0.00006},
+	"o1-mini":     {0.000003, 0.000012},
+	// OpenRouter passthrough — costs come from OpenRouter pricing
+	"anthropic/claude-sonnet-4": {0.000003, 0.000015},
+	"anthropic/claude-opus-4":   {0.000015, 0.000075},
+	"google/gemini-2.0-flash":   {0.0000001, 0.0000004},
+	"meta-llama/llama-3.1-405b": {0.000003, 0.000003},
+	// Fireworks
+	"accounts/fireworks/models/llama-v3p1-405b-instruct": {0.000003, 0.000003},
+	"accounts/fireworks/models/llama-v3p1-70b-instruct":  {0.0000009, 0.0000009},
+	"accounts/fireworks/models/llama-v3p1-8b-instruct":   {0.0000002, 0.0000002},
+	"accounts/fireworks/models/qwen2p5-72b-instruct":     {0.0000009, 0.0000009},
+	// Kimi (Moonshot)
+	"moonshot-v1-128k": {0.00006, 0.00006},
+	"moonshot-v1-32k":  {0.000024, 0.000024},
+	"moonshot-v1-8k":   {0.000012, 0.000012},
+	// Qwen (Alibaba DashScope)
+	"qwen-max":       {0.000016, 0.000016},
+	"qwen-plus":      {0.000004, 0.000012},
+	"qwen-turbo":     {0.000002, 0.000006},
+	"qwen-vl-max":    {0.00001, 0.00001},
+	"qwen-vl-plus":   {0.000008, 0.000008},
 }
 
 type aiKeys struct {
@@ -48,6 +71,8 @@ type aiKeys struct {
 	OpenAI     string
 	OpenRouter string
 	Fireworks  string
+	Kimi       string
+	Qwen       string
 	fetchedAt  time.Time
 }
 
@@ -119,7 +144,7 @@ func (p *Provider) Complete(req Request) (*Response, error) {
 	switch req.Provider {
 	case "anthropic":
 		return p.anthropicComplete(req)
-	case "openai", "openrouter", "fireworks":
+	case "openai", "openrouter", "fireworks", "kimi", "qwen":
 		return p.openaiComplete(req)
 	default:
 		return nil, fmt.Errorf("unknown provider %q — configure a supported provider in WP Settings → AI Cloud", req.Provider)
@@ -210,6 +235,18 @@ func (p *Provider) openaiComplete(req Request) (*Response, error) {
 	case "fireworks":
 		key = p.keys.Fireworks
 		baseURL = p.cfg.AI.Providers["fireworks"].APIURL
+	case "kimi":
+		key = p.keys.Kimi
+		baseURL = p.cfg.AI.Providers["kimi"].APIURL
+		if baseURL == "" {
+			baseURL = "https://api.moonshot.cn/v1"
+		}
+	case "qwen":
+		key = p.keys.Qwen
+		baseURL = p.cfg.AI.Providers["qwen"].APIURL
+		if baseURL == "" {
+			baseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+		}
 	default:
 		key = p.keys.OpenAI
 		baseURL = p.cfg.AI.Providers["openai"].APIURL
@@ -324,12 +361,23 @@ func (p *Provider) ensureKeys() error {
 		Kimi            struct{ Key, Model string }   `json:"kimi"`
 		Qwen            struct{ Key, Model string }   `json:"qwen"`
 	}
+	if resp.StatusCode != 200 {
+		log.Printf("[ai] WARNING: WP /ai-settings returned HTTP %d — AI may be degraded", resp.StatusCode)
+		// Don't cache a bad fetch — let it retry next call
+		return fmt.Errorf("WP /ai-settings returned HTTP %d", resp.StatusCode)
+	}
+
 	if err := json.Unmarshal(body, &settings); err != nil {
-		// Fallback to env vars
+		log.Printf("[ai] WARNING: WP /ai-settings returned invalid JSON: %v — falling back to env vars", err)
+		// Fallback to env vars, but log the problem clearly
 		p.keysMu.Lock()
 		p.keys = aiKeys{
 			Anthropic:  envOr("ANTHROPIC_API_KEY", ""),
+			OpenAI:     envOr("OPENAI_API_KEY", ""),
 			OpenRouter: envOr("OPENROUTER_API_KEY", ""),
+			Fireworks:  envOr("FIREWORKS_API_KEY", ""),
+			Kimi:       envOr("KIMI_API_KEY", ""),
+			Qwen:       envOr("QWEN_API_KEY", ""),
 			fetchedAt:  time.Now(),
 		}
 		p.keysMu.Unlock()
@@ -352,6 +400,8 @@ func (p *Provider) ensureKeys() error {
 		OpenAI:     settings.OpenAI.Key,
 		OpenRouter: settings.OpenRouter.Key,
 		Fireworks:  settings.Fireworks.Key,
+		Kimi:       settings.Kimi.Key,
+		Qwen:       settings.Qwen.Key,
 		fetchedAt:  time.Now(),
 	}
 	p.keysMu.Unlock()
