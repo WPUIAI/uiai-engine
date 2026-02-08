@@ -161,21 +161,59 @@ Authorization: Bearer <license_key>
 
 The Go engine validates this against the WordPress license API.
 
-## Error Handling
+## Graceful Degradation (CRITICAL)
 
-1. **5xx from Go engine** → Plugin retries next API base (failover)
-2. **Timeout (>60s)** → Plugin falls back to local
-3. **parse_error in response** → Plugin attempts local JSON repair
-4. **Cloud degraded** → `WPUIAI_Cloud_Status` records failure; after N failures, auto-fallback to local
+**`cloud_first` NEVER means `cloud_only`.** Every cloud call must degrade gracefully.
 
-## Cloud Status Tracking
+### Per-Call Degradation
 
-The `WPUIAI_Cloud_Status` singleton tracks:
-- Last success/failure timestamps
-- Consecutive failure count
-- Circuit breaker state (open/closed/half-open)
+Every `call_*` method in the Capability Router follows this pattern:
 
-When circuit is open, all requests fall back to local without attempting cloud.
+```
+1. is_cloud_available()?
+   → NO (circuit breaker open, no license, not configured)
+     → Skip cloud entirely, go direct to local
+   → YES
+     → Try cloud
+       → Success? Return cloud result (cloud_path=true)
+       → Fail? Record failure, log error, fall through to local
+2. Local execution
+   → Returns result with fallback_from_cloud=true if cloud was attempted
+```
+
+### Circuit Breaker (Cloud_Status)
+
+| State | Behavior | Trigger |
+|-------|----------|---------|
+| **Healthy** | Try cloud first, fall back on failure | Default |
+| **Degraded** | Skip cloud entirely (instant local) | 3+ failures in 10 minutes |
+| **Recovery** | Clear degraded state, resume cloud | 1 successful cloud call |
+
+Timeline during outage:
+```
+Call 1: Try cloud → fail (60s timeout) → local fallback [slow]
+Call 2: Try cloud → fail (60s timeout) → local fallback [slow]
+Call 3: Try cloud → fail → threshold hit → DEGRADED [slow]
+Call 4+: Skip cloud → local immediately [fast, no 60s wait]
+...
+Recovery probe succeeds → HEALTHY → resume cloud
+```
+
+### Error Channels
+
+1. **5xx from Go engine** → `Cloud_API::request()` retries next API base → returns WP_Error
+2. **Timeout (>60s)** → WP_Error → capability router degrades to local
+3. **parse_error in response** → Plugin attempts local JSON repair via `Design_Critic::parse_critique_response()`
+4. **Circuit breaker open** → `is_cloud_available()` returns false → instant local (no network call)
+5. **All paths logged** → `error_log("[WPUIAI] Cloud X failed, falling back to local")`
+
+### Response Tagging
+
+| Field | Meaning |
+|-------|---------|
+| `cloud_path: true` | Cloud AI processed this request |
+| `fallback_from_cloud: true` | Cloud was attempted but failed; local handled it |
+| Neither | Direct local execution (no cloud license or cloud not configured) |
 
 ## Callers
 
