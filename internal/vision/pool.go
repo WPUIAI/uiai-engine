@@ -18,6 +18,9 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 )
 
+// IdleTimeout is how long Chrome sits idle before being killed to free memory.
+const IdleTimeout = 5 * time.Minute
+
 type Pool struct {
 	mu       sync.Mutex
 	browser  *rod.Browser
@@ -29,6 +32,9 @@ type Pool struct {
 	lastSuccess time.Time
 	failCount   int
 	browserPID  int
+	// Lazy launch: Chrome starts on first request, auto-kills after IdleTimeout
+	idleTimer *time.Timer
+	active    int // number of pages currently checked out
 }
 
 type ScreenshotOpts struct {
@@ -64,9 +70,9 @@ func NewPool(maxPages int) (*Pool, error) {
 		lastSuccess: time.Now(),
 	}
 
-	if err := p.launchBrowser(); err != nil {
-		return nil, err
-	}
+	// Lazy launch: Chrome is NOT started here. It starts on first getPage().
+	// This saves ~411MB of RAM when no screenshots are being requested.
+	log.Printf("[vision] Pool initialized: max=%d pages (Chrome starts on first request)", p.maxPages)
 
 	return p, nil
 }
@@ -192,6 +198,25 @@ func (p *Pool) restartBrowser() error {
 }
 
 func (p *Pool) getPage() (*rod.Page, error) {
+	p.mu.Lock()
+
+	// Cancel idle timer — browser is being used
+	if p.idleTimer != nil {
+		p.idleTimer.Stop()
+		p.idleTimer = nil
+	}
+
+	// Lazy launch: start Chrome on first request
+	if p.browser == nil {
+		log.Printf("[vision] Launching Chrome on-demand")
+		if err := p.launchBrowser(); err != nil {
+			p.mu.Unlock()
+			return nil, fmt.Errorf("on-demand launch failed: %w", err)
+		}
+	}
+
+	p.mu.Unlock()
+
 	// Try to get from pool (non-blocking)
 	select {
 	case page := <-p.pages:
@@ -205,6 +230,9 @@ func (p *Pool) getPage() (*rod.Page, error) {
 			p.mu.Unlock()
 			// Fall through to create new
 		} else {
+			p.mu.Lock()
+			p.active++
+			p.mu.Unlock()
 			return page, nil
 		}
 	default:
@@ -239,6 +267,7 @@ func (p *Pool) getPage() (*rod.Page, error) {
 			}
 		}
 		p.created++
+		p.active++
 		return page, nil
 	}
 
@@ -247,6 +276,7 @@ func (p *Pool) getPage() (*rod.Page, error) {
 	select {
 	case page := <-p.pages:
 		p.mu.Lock() // re-acquire for caller's defer
+		p.active++
 		return page, nil
 	case <-time.After(15 * time.Second):
 		p.mu.Lock()
@@ -281,6 +311,8 @@ func (p *Pool) releasePage(page *rod.Page) {
 		page.Close()
 		p.mu.Lock()
 		p.created--
+		p.active--
+		p.scheduleIdleShutdown()
 		p.mu.Unlock()
 		return
 	}
@@ -293,6 +325,48 @@ func (p *Pool) releasePage(page *rod.Page) {
 		p.created--
 		p.mu.Unlock()
 	}
+
+	p.mu.Lock()
+	p.active--
+	p.scheduleIdleShutdown()
+	p.mu.Unlock()
+}
+
+// scheduleIdleShutdown starts or resets the idle timer.
+// Must be called with p.mu held.
+func (p *Pool) scheduleIdleShutdown() {
+	if p.active > 0 || p.browser == nil {
+		return
+	}
+	if p.idleTimer != nil {
+		p.idleTimer.Stop()
+	}
+	p.idleTimer = time.AfterFunc(IdleTimeout, func() {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		if p.active > 0 || p.browser == nil {
+			return
+		}
+		log.Printf("[vision] Chrome idle for %v, shutting down to free memory (PID=%d)", IdleTimeout, p.browserPID)
+		// Drain pages
+		for {
+			select {
+			case pg := <-p.pages:
+				pg.Close()
+			default:
+				goto drained
+			}
+		}
+	drained:
+		p.browser.Close()
+		if p.launcher != nil {
+			p.launcher.Cleanup()
+		}
+		p.browser = nil
+		p.launcher = nil
+		p.created = 0
+		p.browserPID = 0
+	})
 }
 
 func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
@@ -532,11 +606,19 @@ func extractDOMReport(page *rod.Page) string {
 }
 
 func (p *Pool) Close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.idleTimer != nil {
+		p.idleTimer.Stop()
+		p.idleTimer = nil
+	}
 	if p.browser != nil {
 		p.browser.Close()
+		p.browser = nil
 	}
 	if p.launcher != nil {
 		p.launcher.Cleanup()
+		p.launcher = nil
 	}
 	log.Printf("[vision] Pool closed")
 }
@@ -544,12 +626,24 @@ func (p *Pool) Close() {
 func (p *Pool) Stats() map[string]any {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	browserState := "idle-off"
+	if p.browser != nil {
+		if p.isBrowserAlive() {
+			browserState = "running"
+		} else {
+			browserState = "dead"
+		}
+	}
+
 	return map[string]any{
 		"max_pages":       p.maxPages,
 		"created_pages":   p.created,
 		"available_pages": len(p.pages),
+		"active_pages":    p.active,
 		"browser_pid":     p.browserPID,
-		"browser_alive":   p.isBrowserAlive(),
+		"browser_alive":   p.browser != nil && p.isBrowserAlive(),
+		"browser_state":   browserState,
 		"last_success":    p.lastSuccess.Format(time.RFC3339),
 		"fail_count":      p.failCount,
 	}
