@@ -27,6 +27,9 @@ import (
 	"github.com/philoveracity/uiai-engine/internal/vision"
 )
 
+// startTime tracks when the engine was created (for /health uptime).
+var startTime = time.Now()
+
 // Engine is the main server instance.
 type Engine struct {
 	cfg       *config.Config
@@ -116,13 +119,14 @@ func (e *Engine) mountRoutes() {
 		routes.MountHealth(r, e.cfg, e.ai)
 	})
 
-	// Also respond to /health for PHP API compat
+	// Also respond to /health for PHP API compat + health monitor
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{
 			"status":      "healthy",
 			"service":     "uiai-engine",
 			"browserless": true,
 			"dev_mode":    false,
+			"uptime":      int(time.Since(startTime).Seconds()),
 		})
 	})
 

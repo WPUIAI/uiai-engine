@@ -53,7 +53,15 @@ type Pool struct {
 	// SSRF: when true, block private/internal IPs in screenshot URLs.
 	// Commercial deployments may set false to allow localhost screenshots.
 	blockPrivateURLs bool
+	// Periodic browser recycle to prevent Chrome memory bloat
+	screenshotCount int64 // atomic: total screenshots taken since last Chrome restart
 }
+
+const (
+	// RecycleAfter: restart Chrome after this many screenshots to prevent memory bloat.
+	// Chrome's renderer process leaks memory over time (~1-5MB per page navigation).
+	RecycleAfter = 200
+)
 
 type ScreenshotOpts struct {
 	URL      string
@@ -357,20 +365,23 @@ func (p *Pool) ReleasePage(page *rod.Page) {
 }
 
 func (p *Pool) releasePage(page *rod.Page) {
+	// Reset page context to a fresh one (the screenshot ctx may be cancelled)
+	cleanPage := page.Context(context.Background())
+
 	// Navigate to blank with a short timeout — don't hang
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		page.Timeout(3 * time.Second).Navigate("about:blank")
+		cleanPage.Timeout(3 * time.Second).Navigate("about:blank")
 	}()
 
 	select {
 	case <-done:
 		// Page reset OK, return to pool
 	case <-time.After(3 * time.Second):
-		// Page is stuck — close it
+		// Page is stuck — close it and discard
 		log.Printf("[vision] Page stuck on release, closing")
-		page.Close()
+		cleanPage.Close()
 		p.mu.Lock()
 		p.created--
 		p.active--
@@ -380,9 +391,9 @@ func (p *Pool) releasePage(page *rod.Page) {
 	}
 
 	select {
-	case p.pages <- page:
+	case p.pages <- cleanPage:
 	default:
-		page.Close()
+		cleanPage.Close()
 		p.mu.Lock()
 		p.created--
 		p.mu.Unlock()
@@ -459,9 +470,20 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 	}
 	ch := make(chan result, 1)
 
+	// timedOut is set when the outer select hits ctx.Done().
+	// The orphaned goroutine checks this to force-close its page.
+	var timedOut int32
+
 	go func() {
 		res, err := p.screenshotInner(ctx, opts)
 		ch <- result{res, err}
+
+		// If the outer caller already timed out, the page was released
+		// inside screenshotInner's defer — but we force-reclaim just in case
+		// the goroutine was stuck and the page is leaked.
+		if atomic.LoadInt32(&timedOut) == 1 {
+			log.Printf("[vision] orphaned goroutine finished for %s after caller timed out", opts.URL)
+		}
 	}()
 
 	select {
@@ -485,10 +507,35 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 			return nil, r.err
 		}
 
+		count := atomic.AddInt64(&p.screenshotCount, 1)
+
 		p.mu.Lock()
 		p.lastSuccess = time.Now()
 		p.failCount = 0
 		p.mu.Unlock()
+
+		// Periodic Chrome recycle to prevent memory bloat
+		if count > 0 && count%RecycleAfter == 0 {
+			log.Printf("[vision] %d screenshots taken, scheduling Chrome recycle", count)
+			go func() {
+				// Wait for active pages to drain
+				for i := 0; i < 30; i++ {
+					p.mu.Lock()
+					active := p.active
+					p.mu.Unlock()
+					if active == 0 {
+						break
+					}
+					time.Sleep(time.Second)
+				}
+				p.mu.Lock()
+				if p.active == 0 {
+					log.Printf("[vision] Recycling Chrome (screenshot count=%d)", count)
+					p.restartBrowser()
+				}
+				p.mu.Unlock()
+			}()
+		}
 
 		// Store in cache (skip if caller used delay — result is time-sensitive)
 		if !opts.NoCache && r.res != nil {
@@ -497,7 +544,9 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 		return r.res, nil
 
 	case <-ctx.Done():
-		// Timeout — the goroutine is stuck. Mark failure.
+		// Timeout — the goroutine may still hold a page.
+		atomic.StoreInt32(&timedOut, 1)
+
 		p.mu.Lock()
 		p.failCount++
 		fc := p.failCount
@@ -559,6 +608,10 @@ func (p *Pool) screenshotInner(ctx context.Context, opts ScreenshotOpts) (*Scree
 		return nil, fmt.Errorf("failed to get page: %w", err)
 	}
 	defer p.releasePage(page)
+
+	// Bind page to our context — all Rod operations will cancel when ctx expires.
+	// This prevents orphaned goroutines holding pages when Screenshot() times out.
+	page = page.Context(ctx)
 
 	// Set viewport
 	width := opts.Width
@@ -775,7 +828,9 @@ func (p *Pool) Stats() map[string]any {
 		"browser_alive":   p.browser != nil && p.isBrowserAlive(),
 		"browser_state":   browserState,
 		"last_success":    p.lastSuccess.Format(time.RFC3339),
-		"fail_count":      p.failCount,
+		"fail_count":        p.failCount,
+		"screenshot_count":  atomic.LoadInt64(&p.screenshotCount),
+		"recycle_every":     RecycleAfter,
 		"queue": map[string]any{
 			"depth":    atomic.LoadInt64(&p.queued),
 			"max":      p.queueMax,
