@@ -71,7 +71,7 @@ func (d *aiDeps) handleVisionAI(w http.ResponseWriter, r *http.Request, opName, 
 	}
 
 	start := time.Now()
-	resp, err := d.ai.Complete(ai.Request{
+	resp, err := d.ai.Complete(r.Context(), ai.Request{
 		Provider:    req.Provider,
 		Model:       req.Model,
 		Prompt:      prompt,
@@ -221,7 +221,7 @@ func MountCopilotReal(r chi.Router, cfg *config.Config, aiProv *ai.Provider, cre
 		}
 
 		start := time.Now()
-		resp, err := d.ai.Complete(ai.Request{
+		resp, err := d.ai.Complete(req.Context(), ai.Request{
 			Provider:    body.Provider,
 			Model:       body.Model,
 			Prompt:      prompt,

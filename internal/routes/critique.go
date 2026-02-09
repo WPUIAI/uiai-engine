@@ -130,7 +130,7 @@ func (h *critiqueHandler) critique(w http.ResponseWriter, r *http.Request) {
 		aiReq.ImageType = req.ImageType
 	}
 
-	resp, err := h.ai.Complete(aiReq)
+	resp, err := h.ai.Complete(r.Context(), aiReq)
 	if err != nil {
 		log.Printf("[critique] AI error: %v", err)
 		writeJSON(w, 502, map[string]string{"error": "AI provider error: " + err.Error()})

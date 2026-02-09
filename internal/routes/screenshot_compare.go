@@ -111,7 +111,7 @@ Return JSON: {
   "summary": ""
 }`, len(img2))
 
-		resp, err := aiProv.Complete(ai.Request{
+		resp, err := aiProv.Complete(req.Context(), ai.Request{
 			Provider:    body.Provider,
 			Model:       body.Model,
 			Prompt:      prompt,

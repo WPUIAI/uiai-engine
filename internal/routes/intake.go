@@ -25,7 +25,7 @@ func MountIntakeReal(r chi.Router, cfg *config.Config, aiProv *ai.Provider) {
 		var body map[string]any
 		json.NewDecoder(req.Body).Decode(&body)
 
-		resp, err := aiProv.Complete(ai.Request{
+		resp, err := aiProv.Complete(req.Context(), ai.Request{
 			Provider: cfg.AI.DefaultProvider,
 			Model:    cfg.AI.DefaultModel,
 			Prompt:   "Analyze this business intake data and provide recommendations for website design. Data: " + toJSON(body),

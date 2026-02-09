@@ -2,6 +2,7 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,9 @@ import (
 
 	"github.com/philoveracity/uiai-engine/internal/config"
 )
+
+// DefaultAITimeout is applied when the caller's context has no deadline.
+const DefaultAITimeout = 60 * time.Second
 
 type Response struct {
 	Content      string  `json:"content"`
@@ -117,7 +121,14 @@ func NewProvider(cfg *config.Config) *Provider {
 	return prov
 }
 
-func (p *Provider) Complete(req Request) (*Response, error) {
+func (p *Provider) Complete(ctx context.Context, req Request) (*Response, error) {
+	// Apply default deadline if caller didn't set one
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, DefaultAITimeout)
+		defer cancel()
+	}
+
 	if err := p.ensureKeys(); err != nil {
 		return nil, fmt.Errorf("fetch AI keys: %w", err)
 	}
@@ -143,15 +154,15 @@ func (p *Provider) Complete(req Request) (*Response, error) {
 
 	switch req.Provider {
 	case "anthropic":
-		return p.anthropicComplete(req)
+		return p.anthropicComplete(ctx, req)
 	case "openai", "openrouter", "fireworks", "kimi", "qwen":
-		return p.openaiComplete(req)
+		return p.openaiComplete(ctx, req)
 	default:
 		return nil, fmt.Errorf("unknown provider %q — configure a supported provider in WP Settings → AI Cloud", req.Provider)
 	}
 }
 
-func (p *Provider) anthropicComplete(req Request) (*Response, error) {
+func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Response, error) {
 	p.keysMu.RLock()
 	key := p.keys.Anthropic
 	p.keysMu.RUnlock()
@@ -185,7 +196,7 @@ func (p *Provider) anthropicComplete(req Request) (*Response, error) {
 	if apiURL == "" {
 		apiURL = "https://api.anthropic.com/v1/messages"
 	}
-	httpReq, _ := http.NewRequest("POST", apiURL, bytes.NewReader(b))
+	httpReq, _ := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(b))
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("x-api-key", key)
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
@@ -225,7 +236,7 @@ func (p *Provider) anthropicComplete(req Request) (*Response, error) {
 	}, nil
 }
 
-func (p *Provider) openaiComplete(req Request) (*Response, error) {
+func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, error) {
 	p.keysMu.RLock()
 	var key, baseURL string
 	switch req.Provider {
@@ -287,7 +298,7 @@ func (p *Provider) openaiComplete(req Request) (*Response, error) {
 	}
 	b, _ := json.Marshal(body)
 
-	httpReq, _ := http.NewRequest("POST", baseURL+"/chat/completions", bytes.NewReader(b))
+	httpReq, _ := http.NewRequestWithContext(ctx, "POST", baseURL+"/chat/completions", bytes.NewReader(b))
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+key)
 	if req.Provider == "openrouter" {

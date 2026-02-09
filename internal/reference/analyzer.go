@@ -13,6 +13,7 @@
 package reference
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -99,8 +100,8 @@ type SpacingResult struct {
 // ═══════════════════════════════════════════════════════════
 
 // AnalyzeReference performs Pass 1: extract page metadata and section inventory.
-func (a *Analyzer) AnalyzeReference(imageBase64, imageType, provider, model string) (*AnalysisResult, error) {
-	resp, err := a.callVision(referenceAnalysisPrompt, imageBase64, imageType, provider, model)
+func (a *Analyzer) AnalyzeReference(ctx context.Context, imageBase64, imageType, provider, model string) (*AnalysisResult, error) {
+	resp, err := a.callVision(ctx, referenceAnalysisPrompt, imageBase64, imageType, provider, model)
 	if err != nil {
 		return nil, fmt.Errorf("pass 1 (analyze_reference): %w", err)
 	}
@@ -156,10 +157,10 @@ func (a *Analyzer) AnalyzeReference(imageBase64, imageType, provider, model stri
 // ═══════════════════════════════════════════════════════════
 
 // ExtractComponents performs Pass 2: extract component inventory.
-func (a *Analyzer) ExtractComponents(imageBase64, imageType, provider, model string, sections []Section) (*ComponentResult, error) {
+func (a *Analyzer) ExtractComponents(ctx context.Context, imageBase64, imageType, provider, model string, sections []Section) (*ComponentResult, error) {
 	prompt := buildComponentPrompt(sections)
 
-	resp, err := a.callVision(prompt, imageBase64, imageType, provider, model)
+	resp, err := a.callVision(ctx, prompt, imageBase64, imageType, provider, model)
 	if err != nil {
 		return nil, fmt.Errorf("pass 2 (extract_components): %w", err)
 	}
@@ -206,8 +207,8 @@ func (a *Analyzer) ExtractComponents(imageBase64, imageType, provider, model str
 // ═══════════════════════════════════════════════════════════
 
 // ExtractTokens performs Pass 3: extract design system tokens.
-func (a *Analyzer) ExtractTokens(imageBase64, imageType, provider, model string) (*TokenResult, error) {
-	resp, err := a.callVision(tokenExtractionPrompt, imageBase64, imageType, provider, model)
+func (a *Analyzer) ExtractTokens(ctx context.Context, imageBase64, imageType, provider, model string) (*TokenResult, error) {
+	resp, err := a.callVision(ctx, tokenExtractionPrompt, imageBase64, imageType, provider, model)
 	if err != nil {
 		return nil, fmt.Errorf("pass 3 (extract_tokens): %w", err)
 	}
@@ -234,10 +235,10 @@ func (a *Analyzer) ExtractTokens(imageBase64, imageType, provider, model string)
 // ═══════════════════════════════════════════════════════════
 
 // ExtractSpacing performs Pass 4: extract spacing system and alignment.
-func (a *Analyzer) ExtractSpacing(imageBase64, imageType, provider, model string, components []Component) (*SpacingResult, error) {
+func (a *Analyzer) ExtractSpacing(ctx context.Context, imageBase64, imageType, provider, model string, components []Component) (*SpacingResult, error) {
 	prompt := buildSpacingPrompt(components)
 
-	resp, err := a.callVision(prompt, imageBase64, imageType, provider, model)
+	resp, err := a.callVision(ctx, prompt, imageBase64, imageType, provider, model)
 	if err != nil {
 		return nil, fmt.Errorf("pass 4 (extract_spacing): %w", err)
 	}
@@ -290,27 +291,27 @@ type FullAnalysis struct {
 }
 
 // AnalyzeFull runs all 4 passes sequentially.
-func (a *Analyzer) AnalyzeFull(imageBase64, imageType, provider, model string) (*FullAnalysis, error) {
+func (a *Analyzer) AnalyzeFull(ctx context.Context, imageBase64, imageType, provider, model string) (*FullAnalysis, error) {
 	// Pass 1
-	analysis, err := a.AnalyzeReference(imageBase64, imageType, provider, model)
+	analysis, err := a.AnalyzeReference(ctx, imageBase64, imageType, provider, model)
 	if err != nil {
 		return nil, err
 	}
 
 	// Pass 2
-	components, err := a.ExtractComponents(imageBase64, imageType, provider, model, analysis.Sections)
+	components, err := a.ExtractComponents(ctx, imageBase64, imageType, provider, model, analysis.Sections)
 	if err != nil {
 		return nil, err
 	}
 
 	// Pass 3
-	tokens, err := a.ExtractTokens(imageBase64, imageType, provider, model)
+	tokens, err := a.ExtractTokens(ctx, imageBase64, imageType, provider, model)
 	if err != nil {
 		return nil, err
 	}
 
 	// Pass 4
-	spacing, err := a.ExtractSpacing(imageBase64, imageType, provider, model, components.Components)
+	spacing, err := a.ExtractSpacing(ctx, imageBase64, imageType, provider, model, components.Components)
 	if err != nil {
 		return nil, err
 	}
@@ -329,8 +330,8 @@ func (a *Analyzer) AnalyzeFull(imageBase64, imageType, provider, model string) (
 // AI CALLER
 // ═══════════════════════════════════════════════════════════
 
-func (a *Analyzer) callVision(prompt, imageBase64, imageType, provider, model string) (*ai.Response, error) {
-	return a.AI.Complete(ai.Request{
+func (a *Analyzer) callVision(ctx context.Context, prompt, imageBase64, imageType, provider, model string) (*ai.Response, error) {
+	return a.AI.Complete(ctx, ai.Request{
 		Provider:    provider,
 		Model:       model,
 		Prompt:      prompt,

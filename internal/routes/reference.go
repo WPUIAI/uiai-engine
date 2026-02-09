@@ -85,9 +85,11 @@ func (h *referenceHandler) analyze(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
+	ctx := r.Context()
+
 	switch req.Pass {
 	case "analyze":
-		result, err := h.analyzer.AnalyzeReference(req.ImageBase64, req.ImageType, req.Provider, req.Model)
+		result, err := h.analyzer.AnalyzeReference(ctx, req.ImageBase64, req.ImageType, req.Provider, req.Model)
 		if err != nil {
 			writeJSON(w, 502, map[string]string{"error": err.Error()})
 			return
@@ -97,7 +99,7 @@ func (h *referenceHandler) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"success": true, "data": result})
 
 	case "components":
-		result, err := h.analyzer.ExtractComponents(req.ImageBase64, req.ImageType, req.Provider, req.Model, req.Sections)
+		result, err := h.analyzer.ExtractComponents(ctx, req.ImageBase64, req.ImageType, req.Provider, req.Model, req.Sections)
 		if err != nil {
 			writeJSON(w, 502, map[string]string{"error": err.Error()})
 			return
@@ -107,7 +109,7 @@ func (h *referenceHandler) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"success": true, "data": result})
 
 	case "tokens":
-		result, err := h.analyzer.ExtractTokens(req.ImageBase64, req.ImageType, req.Provider, req.Model)
+		result, err := h.analyzer.ExtractTokens(ctx, req.ImageBase64, req.ImageType, req.Provider, req.Model)
 		if err != nil {
 			writeJSON(w, 502, map[string]string{"error": err.Error()})
 			return
@@ -117,7 +119,7 @@ func (h *referenceHandler) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"success": true, "data": result})
 
 	case "spacing":
-		result, err := h.analyzer.ExtractSpacing(req.ImageBase64, req.ImageType, req.Provider, req.Model, req.Components)
+		result, err := h.analyzer.ExtractSpacing(ctx, req.ImageBase64, req.ImageType, req.Provider, req.Model, req.Components)
 		if err != nil {
 			writeJSON(w, 502, map[string]string{"error": err.Error()})
 			return
@@ -127,7 +129,7 @@ func (h *referenceHandler) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"success": true, "data": result})
 
 	case "full":
-		result, err := h.analyzer.AnalyzeFull(req.ImageBase64, req.ImageType, req.Provider, req.Model)
+		result, err := h.analyzer.AnalyzeFull(ctx, req.ImageBase64, req.ImageType, req.Provider, req.Model)
 		if err != nil {
 			writeJSON(w, 502, map[string]string{"error": err.Error()})
 			return

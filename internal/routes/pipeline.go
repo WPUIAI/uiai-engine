@@ -63,7 +63,7 @@ func MountDesignSystemRoute(r chi.Router, cfg *config.Config, aiProv *ai.Provide
 Sources: ` + toJSON(body.Sources)
 
 		start := time.Now()
-		resp, err := d.ai.Complete(ai.Request{
+		resp, err := d.ai.Complete(req.Context(), ai.Request{
 			Provider: body.Provider, Model: body.Model,
 			Prompt: prompt, MaxTokens: 4096, Temperature: 0.5,
 		})
@@ -128,7 +128,7 @@ Pages: ` + toJSON(body.Pages) + `
 Blueprint: ` + toJSON(body.Blueprint)
 
 		start := time.Now()
-		resp, err := d.ai.Complete(ai.Request{
+		resp, err := d.ai.Complete(req.Context(), ai.Request{
 			Provider: body.Provider, Model: body.Model,
 			Prompt: prompt, MaxTokens: 8192, Temperature: 0.7,
 		})
@@ -196,7 +196,7 @@ Design System: ` + toJSON(body.DesignSystem) + `
 Content: ` + toJSON(body.ContentMap)
 
 		start := time.Now()
-		resp, err := d.ai.Complete(ai.Request{
+		resp, err := d.ai.Complete(req.Context(), ai.Request{
 			Provider: body.Provider, Model: body.Model,
 			Prompt: prompt, MaxTokens: 8192, Temperature: 0.5,
 		})
@@ -269,7 +269,7 @@ Sections: ` + toJSON(body.ReferenceSections) + `
 Components: ` + toJSON(body.ReferenceComponents)
 
 		start := time.Now()
-		resp, err := d.ai.Complete(ai.Request{
+		resp, err := d.ai.Complete(req.Context(), ai.Request{
 			Provider: body.Provider, Model: body.Model,
 			Prompt: prompt, MaxTokens: 4096, Temperature: 0.3,
 			ImageBase64: body.BuiltImageB64,
