@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -152,14 +153,137 @@ func (p *Provider) Complete(ctx context.Context, req Request) (*Response, error)
 		return nil, fmt.Errorf("no AI model configured — set default_model in WP Settings → AI Cloud")
 	}
 
+	// Try the primary provider first
+	resp, err := p.completeOnce(ctx, req)
+	if err == nil {
+		return resp, nil
+	}
+
+	// Only failover on retryable errors (5xx, 429, timeout, connection)
+	if !isRetryableError(err) {
+		return nil, err
+	}
+
+	// Build failover chain from configured providers (skip the one that just failed)
+	fallbacks := p.buildFallbackChain(req.Provider)
+	if len(fallbacks) == 0 {
+		return nil, err // no fallbacks configured
+	}
+
+	for i, fb := range fallbacks {
+		log.Printf("[ai] %s failed (%v), failing over to %s (attempt %d/%d)",
+			req.Provider, summarizeError(err), fb.provider, i+1, len(fallbacks))
+
+		fbReq := req
+		fbReq.Provider = fb.provider
+		fbReq.Model = fb.model
+
+		// Short backoff between retries
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("failover aborted (context cancelled): %w", ctx.Err())
+		case <-time.After(time.Duration(500*(i+1)) * time.Millisecond):
+		}
+
+		resp, err = p.completeOnce(ctx, fbReq)
+		if err == nil {
+			log.Printf("[ai] failover to %s succeeded (model: %s)", fb.provider, fb.model)
+			return resp, nil
+		}
+		if !isRetryableError(err) {
+			return nil, err
+		}
+	}
+
+	return nil, fmt.Errorf("all providers failed, last error: %w", err)
+}
+
+// completeOnce makes a single attempt to the specified provider.
+func (p *Provider) completeOnce(ctx context.Context, req Request) (*Response, error) {
 	switch req.Provider {
 	case "anthropic":
 		return p.anthropicComplete(ctx, req)
 	case "openai", "openrouter", "fireworks", "kimi", "qwen":
 		return p.openaiComplete(ctx, req)
 	default:
-		return nil, fmt.Errorf("unknown provider %q — configure a supported provider in WP Settings → AI Cloud", req.Provider)
+		return nil, fmt.Errorf("unknown provider %q", req.Provider)
 	}
+}
+
+// fallbackProvider pairs a provider name with its configured model.
+type fallbackProvider struct {
+	provider string
+	model    string
+}
+
+// buildFallbackChain returns providers to try after the primary fails.
+// Only includes providers that have API keys configured.
+func (p *Provider) buildFallbackChain(skipProvider string) []fallbackProvider {
+	p.keysMu.RLock()
+	defer p.keysMu.RUnlock()
+
+	type candidate struct {
+		provider string
+		key      string
+		model    string
+	}
+	// Priority order: openrouter (cheapest routing), anthropic (direct), openai, fireworks
+	all := []candidate{
+		{"openrouter", p.keys.OpenRouter, p.cfg.AI.DefaultModel},
+		{"anthropic", p.keys.Anthropic, "claude-sonnet-4-20250514"},
+		{"openai", p.keys.OpenAI, "gpt-4o"},
+		{"fireworks", p.keys.Fireworks, "accounts/fireworks/models/llama-v3p1-70b-instruct"},
+	}
+
+	var chain []fallbackProvider
+	for _, c := range all {
+		if c.provider == skipProvider || c.key == "" {
+			continue
+		}
+		chain = append(chain, fallbackProvider{provider: c.provider, model: c.model})
+		if len(chain) >= 2 { // max 2 fallbacks
+			break
+		}
+	}
+	return chain
+}
+
+// isRetryableError returns true for errors that warrant trying another provider.
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	// 5xx server errors
+	for _, code := range []string{"500:", "502:", "503:", "504:", "520:", "521:", "522:", "529:"} {
+		if strings.Contains(msg, code) {
+			return true
+		}
+	}
+	// Rate limits
+	if strings.Contains(msg, "429:") || strings.Contains(msg, "rate limit") || strings.Contains(msg, "Rate limit") {
+		return true
+	}
+	// Timeouts and connection errors
+	if strings.Contains(msg, "context deadline exceeded") || strings.Contains(msg, "context canceled") {
+		return true
+	}
+	if strings.Contains(msg, "connection refused") || strings.Contains(msg, "no such host") {
+		return true
+	}
+	if strings.Contains(msg, "EOF") || strings.Contains(msg, "broken pipe") {
+		return true
+	}
+	return false
+}
+
+// summarizeError returns a short version of the error for logging.
+func summarizeError(err error) string {
+	s := err.Error()
+	if len(s) > 80 {
+		return s[:80] + "..."
+	}
+	return s
 }
 
 func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Response, error) {
