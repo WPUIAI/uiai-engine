@@ -35,6 +35,8 @@ type Pool struct {
 	// Lazy launch: Chrome starts on first request, auto-kills after IdleTimeout
 	idleTimer *time.Timer
 	active    int // number of pages currently checked out
+	// Screenshot cache: avoids redundant Chrome renders
+	cache *screenshotCache
 }
 
 type ScreenshotOpts struct {
@@ -48,6 +50,7 @@ type ScreenshotOpts struct {
 	Delay    int    // ms to wait after load
 	Cookies  string // "name=value; name2=value2" — set before navigation
 	Timeout  int    // overall timeout in seconds (default: 30)
+	NoCache  bool   // skip cache, always take fresh screenshot
 }
 
 type ScreenshotResult struct {
@@ -68,11 +71,12 @@ func NewPool(maxPages int) (*Pool, error) {
 		pages:       make(chan *rod.Page, maxPages),
 		maxPages:    maxPages,
 		lastSuccess: time.Now(),
+		cache:       newScreenshotCache(DefaultCacheTTL, DefaultCacheMaxSize),
 	}
 
 	// Lazy launch: Chrome is NOT started here. It starts on first getPage().
 	// This saves ~411MB of RAM when no screenshots are being requested.
-	log.Printf("[vision] Pool initialized: max=%d pages (Chrome starts on first request)", p.maxPages)
+	log.Printf("[vision] Pool initialized: max=%d pages, cache=50MB/5min (Chrome starts on first request)", p.maxPages)
 
 	return p, nil
 }
@@ -370,6 +374,15 @@ func (p *Pool) scheduleIdleShutdown() {
 }
 
 func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
+	// Check cache first (unless NoCache is set or Delay > 0 means caller wants fresh)
+	if !opts.NoCache && opts.Delay == 0 {
+		key := cacheKey(opts)
+		if cached := p.cache.get(key); cached != nil {
+			log.Printf("[vision] cache hit for %s (saved Chrome render)", opts.URL)
+			return cached, nil
+		}
+	}
+
 	// Overall deadline for the entire operation
 	timeout := time.Duration(opts.Timeout) * time.Second
 	if timeout <= 0 {
@@ -412,6 +425,11 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 		p.lastSuccess = time.Now()
 		p.failCount = 0
 		p.mu.Unlock()
+
+		// Store in cache (skip if caller used delay — result is time-sensitive)
+		if !opts.NoCache && r.res != nil {
+			p.cache.put(cacheKey(opts), r.res)
+		}
 		return r.res, nil
 
 	case <-ctx.Done():
@@ -636,7 +654,7 @@ func (p *Pool) Stats() map[string]any {
 		}
 	}
 
-	return map[string]any{
+	stats := map[string]any{
 		"max_pages":       p.maxPages,
 		"created_pages":   p.created,
 		"available_pages": len(p.pages),
@@ -647,6 +665,10 @@ func (p *Pool) Stats() map[string]any {
 		"last_success":    p.lastSuccess.Format(time.RFC3339),
 		"fail_count":      p.failCount,
 	}
+	if p.cache != nil {
+		stats["cache"] = p.cache.stats()
+	}
+	return stats
 }
 
 func gson(v int) *int {
