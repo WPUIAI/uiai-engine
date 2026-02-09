@@ -243,7 +243,7 @@ func (s *Session) Screenshot(format string, quality int) (*SnapResult, error) {
 		f = proto.PageCaptureScreenshotFormatPng
 	}
 	if quality <= 0 {
-		quality = 80
+		quality = 60
 	}
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
@@ -285,7 +285,7 @@ func (s *Session) ScreenshotFull(format string, quality int) (*SnapResult, error
 		f = proto.PageCaptureScreenshotFormatPng
 	}
 	if quality <= 0 {
-		quality = 80
+		quality = 60
 	}
 
 	data, err := s.page.Screenshot(true, &proto.PageCaptureScreenshot{
@@ -326,7 +326,7 @@ func (s *Session) Scroll(deltaX, deltaY int) (*SnapResult, error) {
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if err != nil {
 		return nil, err
@@ -362,7 +362,7 @@ func (s *Session) ScrollTo(x, y int) (*SnapResult, error) {
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if err != nil {
 		return nil, err
@@ -410,7 +410,7 @@ func (s *Session) Click(selector string) (*SnapResult, error) {
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if err != nil {
 		return nil, err
@@ -452,7 +452,7 @@ func (s *Session) Hover(selector string) (*SnapResult, error) {
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if err != nil {
 		return nil, err
@@ -493,7 +493,7 @@ func (s *Session) Type(selector, text string) (*SnapResult, error) {
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if err != nil {
 		return nil, err
@@ -539,7 +539,7 @@ func (s *Session) Eval(js string) (string, *SnapResult, error) {
 
 	data, snapErr := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if snapErr != nil {
 		return jsResult, nil, nil // return JS result even if screenshot fails
@@ -583,7 +583,7 @@ func (s *Session) Navigate(url string) (*SnapResult, error) {
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if err != nil {
 		return nil, err
@@ -625,7 +625,7 @@ func (s *Session) Resize(width, height int) (*SnapResult, error) {
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if err != nil {
 		return nil, err
@@ -669,7 +669,7 @@ func (s *Session) InjectCSS(css string) (*SnapResult, error) {
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if err != nil {
 		return nil, err
@@ -752,7 +752,7 @@ func (s *Session) WaitFor(selector string, timeoutMs int) (*SnapResult, error) {
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(80),
+		Quality: gson(60),
 	})
 	if err != nil {
 		return nil, err
