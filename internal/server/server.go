@@ -41,6 +41,7 @@ type Engine struct {
 	limiter   *ratelimit.Limiter
 	usage     *storage.UsageStore
 	vision    *vision.Pool
+	sessions  *vision.SessionManager
 	mediaJobs *media.JobStore
 }
 
@@ -92,6 +93,12 @@ func New(cfg *config.Config) *Engine {
 		}
 	}()
 
+	// Session manager for persistent browser sessions (LLM tool API)
+	var sessionMgr *vision.SessionManager
+	if visionPool != nil {
+		sessionMgr = vision.NewSessionManager(visionPool)
+	}
+
 	e := &Engine{
 		cfg:       cfg,
 		router:    r,
@@ -101,6 +108,7 @@ func New(cfg *config.Config) *Engine {
 		limiter:   limiter,
 		usage:     usage,
 		vision:    visionPool,
+		sessions:  sessionMgr,
 		mediaJobs: mediaJobs,
 	}
 
@@ -203,6 +211,12 @@ func (e *Engine) mountRoutes() {
 	// Vision Interactive (replaces PHP daemon at port 3011)
 	r.Route("/vision", func(r chi.Router) {
 		routes.MountVisionInteractive(r, e.cfg, e.vision)
+	})
+
+	// Browser Sessions — persistent pages for LLM tool use
+	// Open → interact → screenshot → close (page stays alive between calls)
+	r.Route("/api/session", func(r chi.Router) {
+		routes.MountSessionRoutes(r, e.cfg, e.sessions)
 	})
 
 	// Pipeline operations (cloud-capable build steps)
@@ -309,6 +323,11 @@ func (e *Engine) Run() error {
 		log.Printf("Received %s, shutting down...", sig)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		// Close browser sessions first (returns pages to pool)
+		if e.sessions != nil {
+			log.Printf("Closing browser sessions...")
+			e.sessions.CloseAll()
+		}
 		// Close vision pool (kills Chrome) before server shutdown
 		if e.vision != nil {
 			log.Printf("Closing vision pool...")
