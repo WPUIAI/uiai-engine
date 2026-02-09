@@ -68,6 +68,7 @@ type VisionConfig struct {
 	IdleTimeout       time.Duration `yaml:"idle_timeout"`
 	ScreenshotQuality int           `yaml:"screenshot_quality"`
 	ShareDir          string        `yaml:"share_dir"`
+	AllowPrivateURLs  bool          `yaml:"allow_private_urls"` // disable SSRF private-IP blocking (for local dev/staging)
 }
 
 type CreditsConfig struct {

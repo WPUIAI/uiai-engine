@@ -50,6 +50,9 @@ type Pool struct {
 	queueMax  int
 	queueDone int64 // total requests served from queue (waited > 0s)
 	queueDrop int64 // total requests rejected (queue full or timeout)
+	// SSRF: when true, block private/internal IPs in screenshot URLs.
+	// Commercial deployments may set false to allow localhost screenshots.
+	blockPrivateURLs bool
 }
 
 type ScreenshotOpts struct {
@@ -75,22 +78,37 @@ type ScreenshotResult struct {
 	DOMReport string // lightweight DOM summary for Coach
 }
 
+// PoolConfig controls pool behavior. Zero values use safe defaults.
+type PoolConfig struct {
+	MaxPages         int
+	AllowPrivateURLs bool // when true, disables SSRF private-IP blocking (for local dev/staging)
+}
+
 func NewPool(maxPages int) (*Pool, error) {
-	if maxPages <= 0 {
-		maxPages = 2
+	return NewPoolWithConfig(PoolConfig{MaxPages: maxPages})
+}
+
+func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
+	if cfg.MaxPages <= 0 {
+		cfg.MaxPages = 2
 	}
 
 	p := &Pool{
-		pages:       make(chan *rod.Page, maxPages),
-		maxPages:    maxPages,
-		lastSuccess: time.Now(),
-		cache:       newScreenshotCache(DefaultCacheTTL, DefaultCacheMaxSize),
-		queueMax:    MaxQueueDepth,
+		pages:            make(chan *rod.Page, cfg.MaxPages),
+		maxPages:         cfg.MaxPages,
+		lastSuccess:      time.Now(),
+		cache:            newScreenshotCache(DefaultCacheTTL, DefaultCacheMaxSize),
+		queueMax:         MaxQueueDepth,
+		blockPrivateURLs: !cfg.AllowPrivateURLs,
 	}
 
 	// Lazy launch: Chrome is NOT started here. It starts on first getPage().
 	// This saves ~411MB of RAM when no screenshots are being requested.
-	log.Printf("[vision] Pool initialized: max=%d pages, cache=50MB/5min (Chrome starts on first request)", p.maxPages)
+	ssrfStatus := "ON"
+	if cfg.AllowPrivateURLs {
+		ssrfStatus = "OFF (private URLs allowed)"
+	}
+	log.Printf("[vision] Pool initialized: max=%d pages, cache=50MB/5min, SSRF protection=%s (Chrome starts on first request)", p.maxPages, ssrfStatus)
 
 	return p, nil
 }
@@ -495,14 +513,22 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 	}
 }
 
-// isPrivateURL checks if a URL points to a private/internal IP (SSRF protection).
+// isDangerousScheme blocks non-HTTP schemes unconditionally (file://, ftp://, data://, etc).
+func isDangerousScheme(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return true
+	}
+	return parsed.Scheme != "http" && parsed.Scheme != "https" && parsed.Scheme != ""
+}
+
+// isPrivateURL checks if a URL points to a private/internal IP.
 func isPrivateURL(rawURL string) bool {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return true // block unparseable URLs
+		return true
 	}
 	host := parsed.Hostname()
-	// Block obvious private patterns
 	for _, prefix := range []string{
 		"127.", "10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.",
 		"172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
@@ -513,22 +539,19 @@ func isPrivateURL(rawURL string) bool {
 			return true
 		}
 	}
-	if host == "localhost" || host == "" {
-		return true
-	}
-	// Block file:// and other non-http schemes
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return true
-	}
-	return false
+	return host == "localhost" || host == ""
 }
 
 func (p *Pool) screenshotInner(ctx context.Context, opts ScreenshotOpts) (*ScreenshotResult, error) {
 	start := time.Now()
 
-	// SSRF protection: block private/internal URLs
-	if isPrivateURL(opts.URL) {
-		return nil, fmt.Errorf("URL not allowed: cannot screenshot private/internal addresses")
+	// Always block dangerous schemes (file://, ftp://, data://, etc)
+	if isDangerousScheme(opts.URL) {
+		return nil, fmt.Errorf("URL scheme not allowed: only http:// and https:// are supported")
+	}
+	// SSRF protection: block private/internal URLs (configurable for commercial use)
+	if p.blockPrivateURLs && isPrivateURL(opts.URL) {
+		return nil, fmt.Errorf("URL not allowed: private/internal addresses blocked (set allow_private_urls to enable)")
 	}
 
 	page, err := p.getPage()

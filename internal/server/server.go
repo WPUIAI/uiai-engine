@@ -63,7 +63,10 @@ func New(cfg *config.Config) *Engine {
 	var visionPool *vision.Pool
 	if !cfg.Server.DisableVision {
 		var err error
-		visionPool, err = vision.NewPool(cfg.Server.VisionPoolSize)
+		visionPool, err = vision.NewPoolWithConfig(vision.PoolConfig{
+			MaxPages:         cfg.Server.VisionPoolSize,
+			AllowPrivateURLs: cfg.Vision.AllowPrivateURLs,
+		})
 		if err != nil {
 			log.Printf("[vision] WARNING: Pool init failed: %v (screenshot/share will return 503)", err)
 		}
