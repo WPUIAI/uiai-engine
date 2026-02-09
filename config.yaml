@@ -3,8 +3,8 @@ server:
   port: 7456
   host: "127.0.0.1"
   disable_vision: false
-  vision_pool_size: 4
-  read_timeout: 30s
+  vision_pool_size: 2
+  read_timeout: 60s
   write_timeout: 120s  # AI responses can be slow
 
 wordpress:
@@ -31,8 +31,8 @@ ai:
       api_url: "https://api.fireworks.ai/inference/v1"
 
 vision:
-  pool_size: 3
-  max_pool: 8
+  pool_size: 2
+  max_pool: 4
   idle_timeout: 300s
   screenshot_quality: 65
   share_dir: "/home/wpuiai/ai-api/shares"
