@@ -81,6 +81,15 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `POST` | `/api/session/{id}/resize` | Change viewport + screenshot | **300ms** |
 | `POST` | `/api/session/{id}/css` | Inject CSS + screenshot | **150ms** |
 | `POST` | `/api/session/{id}/wait` | Wait for selector + screenshot | **varies** |
+| `POST` | `/api/session/{id}/fill` | Clear + type (reliable value replace) | **150ms** |
+| `POST` | `/api/session/{id}/select` | Choose dropdown option by value/text | **150ms** |
+| `POST` | `/api/session/{id}/press` | Keyboard key (Enter, Tab, Escape…) | **200-800ms** |
+| `POST` | `/api/session/{id}/back` | Browser history back + screenshot | **1-2s** |
+| `POST` | `/api/session/{id}/forward` | Browser history forward + screenshot | **1-2s** |
+| `POST` | `/api/session/{id}/text` | Get element text content (no screenshot) | **instant** |
+| `POST` | `/api/session/{id}/cookies` | Get/set/clear cookies (no screenshot) | **instant** |
+| `POST` | `/api/session/{id}/auth/save` | Save cookies + localStorage to JSON | **instant** |
+| `POST` | `/api/session/{id}/auth/load` | Restore auth state from saved JSON | **instant** |
 | `GET` | `/api/session/{id}/dom` | DOM structure (legacy, prefer snapshot) | **instant** |
 
 ---
@@ -303,6 +312,99 @@ No screenshot. Returns structured page data for LLM reasoning:
 ```
 
 The `interactive` array lists up to 30 clickable/typeable elements with their CSS selectors — so the LLM knows exactly what it can interact with.
+
+> **Prefer `POST /snapshot`** for LLM agents — it returns an a11y tree with `@ref` selectors that are more reliable than DOM's CSS selectors.
+
+### `POST /api/session/{id}/fill` — Clear + Type
+
+More reliable than `type` for replacing existing input values. Select-all → delete → type.
+
+```json
+{ "selector": "@e5", "text": "new value" }
+```
+
+Accepts CSS selector or `@ref` from snapshot.
+
+### `POST /api/session/{id}/select` — Dropdown Option
+
+```json
+{ "selector": "@e8", "values": ["California"] }
+```
+
+Selects option by visible text or value. Multiple values for multi-select.
+
+### `POST /api/session/{id}/press` — Keyboard Key
+
+```json
+{ "key": "Enter" }
+```
+
+Supported keys: `Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `Space`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Home`, `End`, `PageUp`, `PageDown`.
+
+Waits for DOM stability after keypress (handles form submissions, modal dismissals).
+
+### `POST /api/session/{id}/back` — Browser History Back
+
+No body required. Returns screenshot of previous page.
+
+### `POST /api/session/{id}/forward` — Browser History Forward
+
+No body required. Returns screenshot after navigating forward.
+
+### `POST /api/session/{id}/text` — Get Element Text
+
+```json
+{ "selector": "@e12" }
+```
+
+No screenshot. Returns `{"text": "element text content", "selector": "@e12"}`.
+
+### `POST /api/session/{id}/cookies` — Cookie Management
+
+```json
+// Get all
+{ "action": "get" }
+
+// Get by name
+{ "action": "get", "name": "wp_logged_in" }
+
+// Set
+{ "action": "set", "name": "theme", "value": "dark", "domain": "example.com" }
+
+// Clear all
+{ "action": "clear" }
+
+// Clear by name
+{ "action": "clear", "name": "tracking" }
+```
+
+Returns `{"cookies": [...], "count": N}`.
+
+### `POST /api/session/{id}/auth/save` — Save Auth State
+
+No body. Returns JSON with cookies + localStorage + sessionStorage.
+
+```json
+{
+  "url": "https://example.com",
+  "cookies": [...],
+  "localStorage": { "token": "abc123" },
+  "sessionStorage": { "cart": "{...}" },
+  "savedAt": "2026-02-09T11:08:13Z"
+}
+```
+
+Save to file: `curl -s -X POST .../auth/save -o /tmp/auth-state.json`
+
+### `POST /api/session/{id}/auth/load` — Load Auth State
+
+Body: the JSON from `auth/save`.
+
+```bash
+curl -s -X POST .../auth/load -H "Content-Type: application/json" -d @/tmp/auth-state.json
+```
+
+Returns `{"status": "loaded"}`. Navigate after loading to trigger auth.
 
 ---
 
