@@ -190,6 +190,19 @@ drained:
 		Set("metrics-recording-only").              // metrics without upload
 		Set("no-first-run").                        // skip first-run experience
 		Set("enable-features", "NetworkServiceInProcess2"). // network service in main process (fewer context switches)
+		// Block analytics/tracking at DNS level — zero network overhead
+		Set("host-resolver-rules",
+			"MAP www.google-analytics.com 0.0.0.0, "+
+				"MAP google-analytics.com 0.0.0.0, "+
+				"MAP www.googletagmanager.com 0.0.0.0, "+
+				"MAP googletagmanager.com 0.0.0.0, "+
+				"MAP connect.facebook.net 0.0.0.0, "+
+				"MAP static.hotjar.com 0.0.0.0, "+
+				"MAP us.posthog.com 0.0.0.0, "+
+				"MAP app.posthog.com 0.0.0.0, "+
+				"MAP clarity.ms 0.0.0.0, "+
+				"MAP pagead2.googlesyndication.com 0.0.0.0, "+
+				"MAP www.googleadservices.com 0.0.0.0").
 		// Note: --js-flags=--max-old-space-size was tested but causes Chrome to
 		// spin at 100% CPU during initialization. Removed in favor of feature disabling.
 		// Append to Rod's default disable-features (site-per-process,TranslateUI)
@@ -609,6 +622,16 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 	}
 }
 
+// containsAny checks if s contains any of the substrings.
+func containsAny(s string, subs ...string) bool {
+	for _, sub := range subs {
+		if strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
+}
+
 // isDangerousScheme blocks non-HTTP schemes unconditionally (file://, ftp://, data://, etc).
 func isDangerousScheme(rawURL string) bool {
 	parsed, err := url.Parse(rawURL)
@@ -709,23 +732,41 @@ func (p *Pool) screenshotInner(ctx context.Context, opts ScreenshotOpts) (*Scree
 	}
 
 	// Navigate with timeout — use DOMContentLoaded, NOT full load.
+	t0 := time.Now()
 	navErr := page.Timeout(navTimeout).Navigate(opts.URL)
+	navDur := time.Since(t0)
 	if navErr != nil {
 		return nil, fmt.Errorf("navigation failed: %w", navErr)
 	}
 
-	// Wait for DOM stability — aggressive timing for speed
+	// Freeze animations/transitions before waiting for DOM stability.
+	// This prevents CSS animations from causing perpetual DOM instability.
+	page.Eval(`() => {
+		const s = document.createElement('style');
+		s.id = '__rod_freeze';
+		s.textContent = '*, *::before, *::after { animation-duration: 0s !important; transition-duration: 0s !important; animation-delay: 0s !important; transition-delay: 0s !important; }';
+		document.head.appendChild(s);
+	}`)
+
+	// Wait for DOM stability — faster now that animations are frozen
 	stableTimeout := navTimeout / 3
 	if stableTimeout < 1*time.Second {
 		stableTimeout = 1 * time.Second
 	}
-	if stableTimeout > 4*time.Second {
-		stableTimeout = 4 * time.Second
+	if stableTimeout > 3*time.Second {
+		stableTimeout = 3 * time.Second
 	}
-	waitErr := page.Timeout(stableTimeout).WaitDOMStable(150*time.Millisecond, 0.15)
+	t1 := time.Now()
+	waitErr := page.Timeout(stableTimeout).WaitDOMStable(100*time.Millisecond, 0.2)
+	domDur := time.Since(t1)
+
+	// Remove freeze style before screenshot (so hover states etc work)
+	page.Eval(`() => { const f = document.getElementById('__rod_freeze'); if (f) f.remove(); }`)
+
 	if waitErr != nil {
-		log.Printf("[vision] WaitDOMStable timeout for %s: %v (continuing with screenshot)", opts.URL, waitErr)
+		log.Printf("[vision] WaitDOMStable timeout for %s after %s (continuing)", opts.URL, domDur.Round(time.Millisecond))
 	}
+	log.Printf("[vision] %s: nav=%s dom=%s", opts.URL, navDur.Round(time.Millisecond), domDur.Round(time.Millisecond))
 
 	// Wait for specific selector
 	if opts.WaitFor != "" {
