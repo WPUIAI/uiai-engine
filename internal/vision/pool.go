@@ -3,6 +3,7 @@ package vision
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -20,6 +22,12 @@ import (
 
 // IdleTimeout is how long Chrome sits idle before being killed to free memory.
 const IdleTimeout = 5 * time.Minute
+
+// Queue constants
+const (
+	MaxQueueDepth  = 10               // max waiting requests before 429
+	QueueWaitMax   = 30 * time.Second // max time in queue before 408
+)
 
 type Pool struct {
 	mu       sync.Mutex
@@ -37,6 +45,11 @@ type Pool struct {
 	active    int // number of pages currently checked out
 	// Screenshot cache: avoids redundant Chrome renders
 	cache *screenshotCache
+	// Request queue: graceful degradation under load
+	queued    int64 // atomic: requests currently waiting for a page
+	queueMax  int
+	queueDone int64 // total requests served from queue (waited > 0s)
+	queueDrop int64 // total requests rejected (queue full or timeout)
 }
 
 type ScreenshotOpts struct {
@@ -72,6 +85,7 @@ func NewPool(maxPages int) (*Pool, error) {
 		maxPages:    maxPages,
 		lastSuccess: time.Now(),
 		cache:       newScreenshotCache(DefaultCacheTTL, DefaultCacheMaxSize),
+		queueMax:    MaxQueueDepth,
 	}
 
 	// Lazy launch: Chrome is NOT started here. It starts on first getPage().
@@ -202,6 +216,12 @@ func (p *Pool) restartBrowser() error {
 	return p.launchBrowser()
 }
 
+// ErrQueueFull is returned when the request queue is at capacity.
+var ErrQueueFull = fmt.Errorf("queue full")
+
+// ErrQueueTimeout is returned when a request waited too long in the queue.
+var ErrQueueTimeout = fmt.Errorf("queue timeout")
+
 func (p *Pool) getPage() (*rod.Page, error) {
 	p.mu.Lock()
 
@@ -244,12 +264,12 @@ func (p *Pool) getPage() (*rod.Page, error) {
 	}
 
 	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	// Check browser health before creating page
 	if !p.isBrowserAlive() {
 		log.Printf("[vision] Browser dead, restarting")
 		if err := p.restartBrowser(); err != nil {
+			p.mu.Unlock()
 			return nil, fmt.Errorf("browser restart failed: %w", err)
 		}
 	}
@@ -261,31 +281,50 @@ func (p *Pool) getPage() (*rod.Page, error) {
 			if strings.Contains(err.Error(), "closed") || strings.Contains(err.Error(), "EOF") {
 				log.Printf("[vision] Browser connection lost, restarting")
 				if restartErr := p.restartBrowser(); restartErr != nil {
+					p.mu.Unlock()
 					return nil, fmt.Errorf("browser restart failed: %w", restartErr)
 				}
 				page, err = p.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 				if err != nil {
+					p.mu.Unlock()
 					return nil, fmt.Errorf("page create failed after restart: %w", err)
 				}
 			} else {
+				p.mu.Unlock()
 				return nil, err
 			}
 		}
 		p.created++
 		p.active++
+		p.mu.Unlock()
 		return page, nil
 	}
 
-	// Pool full — wait with timeout
-	p.mu.Unlock() // release lock while waiting
+	// Pool full — check queue depth before waiting
+	depth := atomic.LoadInt64(&p.queued)
+	if int(depth) >= p.queueMax {
+		p.mu.Unlock()
+		atomic.AddInt64(&p.queueDrop, 1)
+		return nil, ErrQueueFull
+	}
+	p.mu.Unlock()
+
+	// Enter queue — wait for a page to be released
+	atomic.AddInt64(&p.queued, 1)
+	log.Printf("[vision] queued request (depth=%d, active=%d, max=%d)", depth+1, p.active, p.maxPages)
+
 	select {
 	case page := <-p.pages:
-		p.mu.Lock() // re-acquire for caller's defer
-		p.active++
-		return page, nil
-	case <-time.After(15 * time.Second):
+		atomic.AddInt64(&p.queued, -1)
+		atomic.AddInt64(&p.queueDone, 1)
 		p.mu.Lock()
-		return nil, fmt.Errorf("pool exhausted: all %d pages busy for 15s", p.maxPages)
+		p.active++
+		p.mu.Unlock()
+		return page, nil
+	case <-time.After(QueueWaitMax):
+		atomic.AddInt64(&p.queued, -1)
+		atomic.AddInt64(&p.queueDrop, 1)
+		return nil, ErrQueueTimeout
 	}
 }
 
@@ -407,17 +446,20 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 	select {
 	case r := <-ch:
 		if r.err != nil {
-			p.mu.Lock()
-			p.failCount++
-			fc := p.failCount
-			p.mu.Unlock()
-
-			// Auto-restart browser after 3 consecutive failures
-			if fc >= 3 {
-				log.Printf("[vision] %d consecutive failures, restarting browser", fc)
+			// Queue errors are not browser failures — don't count them
+			if !errors.Is(r.err, ErrQueueFull) && !errors.Is(r.err, ErrQueueTimeout) {
 				p.mu.Lock()
-				p.restartBrowser()
+				p.failCount++
+				fc := p.failCount
 				p.mu.Unlock()
+
+				// Auto-restart browser after 3 consecutive failures
+				if fc >= 3 {
+					log.Printf("[vision] %d consecutive failures, restarting browser", fc)
+					p.mu.Lock()
+					p.restartBrowser()
+					p.mu.Unlock()
+				}
 			}
 			return nil, r.err
 		}
@@ -665,6 +707,12 @@ func (p *Pool) Stats() map[string]any {
 		"browser_state":   browserState,
 		"last_success":    p.lastSuccess.Format(time.RFC3339),
 		"fail_count":      p.failCount,
+		"queue": map[string]any{
+			"depth":    atomic.LoadInt64(&p.queued),
+			"max":      p.queueMax,
+			"served":   atomic.LoadInt64(&p.queueDone),
+			"rejected": atomic.LoadInt64(&p.queueDrop),
+		},
 	}
 	if p.cache != nil {
 		stats["cache"] = p.cache.stats()

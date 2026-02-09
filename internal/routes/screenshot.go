@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -55,6 +56,15 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usag
 			NoCache:  body.NoCache,
 		})
 		if err != nil {
+			if errors.Is(err, vision.ErrQueueFull) {
+				w.Header().Set("Retry-After", "10")
+				writeJSON(w, 429, map[string]string{"error": "too many requests — screenshot queue full, retry after 10s"})
+				return
+			}
+			if errors.Is(err, vision.ErrQueueTimeout) {
+				writeJSON(w, 408, map[string]string{"error": "request timed out waiting in screenshot queue"})
+				return
+			}
 			writeJSON(w, 500, map[string]string{"error": err.Error()})
 			return
 		}
