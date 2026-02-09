@@ -347,6 +347,185 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			writeJSON(w, 200, snap)
 		})
 
+		// Fill — clear + type (more reliable for replacing values)
+		r.Post("/fill", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector string `json:"selector"`
+				Text     string `json:"text"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector == "" || body.Text == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) and text required"})
+				return
+			}
+			snap, err := sess.Fill(sess.ResolveRef(body.Selector), body.Text)
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, snap)
+		})
+
+		// Select — choose dropdown option by value or text
+		r.Post("/select", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector string   `json:"selector"`
+				Values   []string `json:"values"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector == "" || len(body.Values) == 0 {
+				writeJSON(w, 400, map[string]string{"error": "selector and values required"})
+				return
+			}
+			snap, err := sess.Select(sess.ResolveRef(body.Selector), body.Values)
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, snap)
+		})
+
+		// Press — keyboard key (Enter, Tab, Escape, ArrowDown, etc)
+		r.Post("/press", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Key string `json:"key"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Key == "" {
+				writeJSON(w, 400, map[string]string{"error": "key required (Enter, Tab, Escape, ArrowDown, etc)"})
+				return
+			}
+			snap, err := sess.Press(body.Key)
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, snap)
+		})
+
+		// Back — browser history back
+		r.Post("/back", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			snap, err := sess.Back()
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, snap)
+		})
+
+		// Forward — browser history forward
+		r.Post("/forward", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			snap, err := sess.Forward()
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, snap)
+		})
+
+		// Text — get text content of element (no screenshot)
+		r.Post("/text", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector string `json:"selector"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) required"})
+				return
+			}
+			text, err := sess.TextContent(sess.ResolveRef(body.Selector))
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, map[string]any{"text": text, "selector": body.Selector})
+		})
+
+		// Cookies — get/set/clear
+		r.Post("/cookies", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body vision.CookieAction
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Action == "" {
+				body.Action = "get"
+			}
+			result, err := sess.Cookies(body)
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, result)
+		})
+
+		// Auth — save/load authentication state (cookies + localStorage)
+		r.Post("/auth/save", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			state, err := sess.SaveAuth()
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			w.Write(state)
+		})
+
+		r.Post("/auth/load", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var state json.RawMessage
+			if err := json.NewDecoder(req.Body).Decode(&state); err != nil {
+				writeJSON(w, 400, map[string]string{"error": "invalid JSON body"})
+				return
+			}
+			if err := sess.LoadAuth(state); err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, map[string]string{"status": "loaded"})
+		})
+
 		// Snapshot — accessibility tree with @ref selectors
 		// This is the primary way LLMs should discover page elements.
 		// Returns a text tree + ref map. Use refs in click/type/hover: {"selector": "@e3"}

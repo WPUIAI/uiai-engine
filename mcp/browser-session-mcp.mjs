@@ -144,6 +144,46 @@ async function toolsCall(name, args) {
       body = { interactive: args.interactive, compact: args.compact, max_depth: args.max_depth, selector: args.selector };
       break;
 
+    case "browser_fill":
+      url = `${ENGINE}/api/session/${args.session_id}/fill`;
+      method = "POST";
+      body = { selector: args.selector, text: args.text };
+      break;
+
+    case "browser_select":
+      url = `${ENGINE}/api/session/${args.session_id}/select`;
+      method = "POST";
+      body = { selector: args.selector, values: args.values };
+      break;
+
+    case "browser_press":
+      url = `${ENGINE}/api/session/${args.session_id}/press`;
+      method = "POST";
+      body = { key: args.key };
+      break;
+
+    case "browser_back":
+      url = `${ENGINE}/api/session/${args.session_id}/back`;
+      method = "POST";
+      break;
+
+    case "browser_forward":
+      url = `${ENGINE}/api/session/${args.session_id}/forward`;
+      method = "POST";
+      break;
+
+    case "browser_text":
+      url = `${ENGINE}/api/session/${args.session_id}/text`;
+      method = "POST";
+      body = { selector: args.selector };
+      break;
+
+    case "browser_cookies":
+      url = `${ENGINE}/api/session/${args.session_id}/cookies`;
+      method = "POST";
+      body = { action: args.action, name: args.name, value: args.value, domain: args.domain };
+      break;
+
     case "browser_dom":
       url = `${ENGINE}/api/session/${args.session_id}/dom`;
       method = "GET";

@@ -247,6 +247,93 @@ func openAITools() []map[string]any {
 			},
 		},
 		{
+			"name":        "browser_fill",
+			"description": "Clear an input completely and type new text. More reliable than browser_type for replacing values. Accepts @ref.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref"},
+					"text":       map[string]string{"type": "string", "description": "Text to fill"},
+				},
+				"required": []string{"session_id", "selector", "text"},
+			},
+		},
+		{
+			"name":        "browser_select",
+			"description": "Choose a dropdown option by value or visible text. Accepts @ref for the select element.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref of <select> element"},
+					"values":     map[string]any{"type": "array", "items": map[string]string{"type": "string"}, "description": "Option value(s) or text to select"},
+				},
+				"required": []string{"session_id", "selector", "values"},
+			},
+		},
+		{
+			"name":        "browser_press",
+			"description": "Press a keyboard key: Enter, Tab, Escape, ArrowDown, ArrowUp, Backspace, Delete, Space, Home, End, PageUp, PageDown.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+					"key":        map[string]string{"type": "string", "description": "Key name (Enter, Tab, Escape, etc)"},
+				},
+				"required": []string{"session_id", "key"},
+			},
+		},
+		{
+			"name":        "browser_back",
+			"description": "Navigate browser history back. Returns screenshot of previous page.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+				},
+				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_forward",
+			"description": "Navigate browser history forward. Returns screenshot.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+				},
+				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_text",
+			"description": "Get text content of an element by CSS selector or @ref. Returns text only, no screenshot.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref"},
+				},
+				"required": []string{"session_id", "selector"},
+			},
+		},
+		{
+			"name":        "browser_cookies",
+			"description": "Get, set, or clear browser cookies. Actions: get (list all or by name), set (name+value), clear (all or by name).",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+					"action":     map[string]string{"type": "string", "description": "get, set, or clear (default: get)"},
+					"name":       map[string]string{"type": "string", "description": "Cookie name (for get-by-name, set, clear-by-name)"},
+					"value":      map[string]string{"type": "string", "description": "Cookie value (for set)"},
+					"domain":     map[string]string{"type": "string", "description": "Cookie domain (for set, default: current page domain)"},
+				},
+				"required": []string{"session_id"},
+			},
+		},
+		{
 			"name":        "browser_close",
 			"description": "Close a browser session and free resources. Always call when done browsing.",
 			"parameters": map[string]any{
