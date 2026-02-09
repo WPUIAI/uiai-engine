@@ -601,8 +601,87 @@ Response: screenshot (base64) + metadata + DOM info
 | Resize + check | 1.7s | **300ms** | **6x** |
 | 10 checks on 1 page | 17s | **1.7s + 9×30ms = 2s** | **8.5x** |
 
+## Tool Discovery (Context-Efficient)
+
+Tools are **never auto-loaded** into LLM context. Agents discover on demand:
+
+```bash
+# Minimal: just names + one-line descriptions (~200 tokens for 14 tools)
+curl -s http://localhost:7456/api/tools/search | jq '.tools[]'
+
+# Search: only matching tools returned
+curl -s "http://localhost:7456/api/tools/search?q=click" | jq
+
+# Full definitions when needed:
+curl -s http://localhost:7456/api/tools/openai | jq   # OpenAI format
+curl -s http://localhost:7456/api/tools/mcp | jq      # MCP format
+```
+
+### Pattern: Search → Discover → Call
+
+```
+Agent: "I need to click a button on a page"
+  1. GET /api/tools/search?q=click  → finds browser_click
+  2. Reads browser_click params     → needs session_id + selector
+  3. POST /api/session/{id}/click   → clicks + returns screenshot
+```
+
+Cost: **~200 tokens** for tool discovery vs **~2000** if all 14 definitions were loaded upfront.
+
+## MCP Integration
+
+### Pi (Recommended)
+
+Add to `~/.pi/agent/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "browser": {
+      "command": "node",
+      "args": ["/home/wpuiai/uiai-engine/mcp/browser-session-mcp.mjs"],
+      "lifecycle": "lazy",
+      "idleTimeout": 60
+    }
+  }
+}
+```
+
+Then in pi:
+```
+mcp({ search: "browser" })         → see available browser tools
+mcp({ tool: "browser_open", args: '{"url": "https://example.com"}' })
+mcp({ tool: "browser_screenshot", args: '{"session_id": "abc123"}' })
+mcp({ tool: "browser_close", args: '{"session_id": "abc123"}' })
+```
+
+The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once.
+
+### Claude Desktop
+
+Add to Claude Desktop MCP config:
+```json
+{
+  "mcpServers": {
+    "browser": {
+      "command": "node",
+      "args": ["/path/to/browser-session-mcp.mjs"],
+      "env": { "UIAI_ENGINE_URL": "http://localhost:7456" }
+    }
+  }
+}
+```
+
+### Any MCP Client
+
+The bridge speaks MCP JSON-RPC over stdio:
+- `initialize` → returns server capabilities
+- `tools/list` → fetches tool definitions from Go engine
+- `tools/call` → routes to session HTTP endpoints
+- Screenshots returned as MCP `image` content blocks
+
 ## Port & Auth
 
 - **Port:** 7456 (localhost only, behind Cloudflare tunnel externally)
-- **Auth:** No auth required for localhost calls (auth bypass for `/api/session*`)
+- **Auth:** No auth required for localhost calls (auth bypass for `/api/session*`, `/api/tools*`)
 - **External:** Requires `X-Webhook-Secret` header through Cloudflare tunnel
