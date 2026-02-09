@@ -138,6 +138,12 @@ async function toolsCall(name, args) {
       body = { js: args.js };
       break;
 
+    case "browser_snapshot":
+      url = `${ENGINE}/api/session/${args.session_id}/snapshot`;
+      method = "POST";
+      body = { interactive: args.interactive, compact: args.compact, max_depth: args.max_depth, selector: args.selector };
+      break;
+
     case "browser_dom":
       url = `${ENGINE}/api/session/${args.session_id}/dom`;
       method = "GET";
