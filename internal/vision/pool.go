@@ -21,13 +21,17 @@ import (
 )
 
 // IdleTimeout is how long Chrome sits idle before being killed to free memory.
-const IdleTimeout = 5 * time.Minute
+const IdleTimeout = 10 * time.Minute
 
 // Queue constants
 const (
-	MaxQueueDepth  = 10               // max waiting requests before 429
+	MaxQueueDepth  = 20               // max waiting requests before 429
 	QueueWaitMax   = 30 * time.Second // max time in queue before 408
 )
+
+// WarmPageCount is how many blank pages to pre-create when Chrome launches.
+// These are ready to navigate immediately, eliminating page creation latency (~50ms each).
+const WarmPageCount = 2
 
 type Pool struct {
 	mu       sync.Mutex
@@ -173,6 +177,19 @@ drained:
 		Set("disable-component-update").
 		Set("disable-domain-reliability").
 		Set("disable-crash-reporter").
+		// === JET FUEL: Speed optimizations ===
+		Set("disable-background-networking").       // no background fetches
+		Set("disable-default-apps").                // don't load default apps
+		Set("disable-sync").                        // no account sync
+		Set("disable-backgrounding-occluded-windows"). // render even when "hidden"
+		Set("disable-renderer-backgrounding").      // never throttle renderers
+		Set("disable-ipc-flooding-protection").     // allow rapid IPC (we control the pages)
+		Set("disable-hang-monitor").                // no hang detection overhead
+		Set("disable-prompt-on-repost").            // no repost dialog
+		Set("disable-client-side-phishing-detection"). // no phishing checks
+		Set("metrics-recording-only").              // metrics without upload
+		Set("no-first-run").                        // skip first-run experience
+		Set("enable-features", "NetworkServiceInProcess2"). // network service in main process (fewer context switches)
 		// Note: --js-flags=--max-old-space-size was tested but causes Chrome to
 		// spin at 100% CPU during initialization. Removed in favor of feature disabling.
 		// Append to Rod's default disable-features (site-per-process,TranslateUI)
@@ -183,7 +200,10 @@ drained:
 			"MediaRouter",           // cast/media router useless in headless
 			"Translate",             // translation service
 			"ChromePasswordManager", // password manager
-			"PaintHolding",          // delays first paint
+			"PaintHolding",          // delays first paint — JET FUEL: faster first render
+			"BackForwardCache",      // no BFCache overhead for screenshot pages
+			"AutofillServerCommunication", // no autofill network calls
+			"CalculateNativeWinOcclusion", // Linux: skip Windows occlusion calc
 		)
 
 	if chromePath != "" {
@@ -209,7 +229,22 @@ drained:
 	p.browserPID = l.PID()
 	p.failCount = 0
 
-	log.Printf("[vision] Pool created: max=%d pages, browser PID=%d", p.maxPages, p.browserPID)
+	// Pre-warm pages so first requests don't pay page-creation cost
+	warmCount := WarmPageCount
+	if warmCount > p.maxPages {
+		warmCount = p.maxPages
+	}
+	for i := 0; i < warmCount; i++ {
+		page, err := p.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+		if err != nil {
+			log.Printf("[vision] Pre-warm page %d failed: %v", i, err)
+			break
+		}
+		p.pages <- page
+		p.created++
+	}
+
+	log.Printf("[vision] Browser launched: PID=%d, max=%d pages, pre-warmed=%d", p.browserPID, p.maxPages, warmCount)
 	return nil
 }
 
@@ -271,21 +306,21 @@ func (p *Pool) getPage() (*rod.Page, error) {
 	// Try to get from pool (non-blocking)
 	select {
 	case page := <-p.pages:
-		// Verify page is still alive with a quick eval
-		_, err := page.Timeout(2 * time.Second).Eval(`() => document.readyState`)
-		if err != nil {
-			log.Printf("[vision] Stale page in pool, discarding")
-			page.Close()
-			p.mu.Lock()
-			p.created--
-			p.mu.Unlock()
-			// Fall through to create new
-		} else {
+		// Quick health check — if browser is alive, trust the page.
+		// Full Eval check (2s timeout) is too expensive for hot path.
+		if p.isBrowserAlive() {
 			p.mu.Lock()
 			p.active++
 			p.mu.Unlock()
 			return page, nil
 		}
+		// Browser died — discard page
+		log.Printf("[vision] Browser dead, discarding pooled page")
+		page.Close()
+		p.mu.Lock()
+		p.created--
+		p.mu.Unlock()
+		// Fall through to restart + create new
 	default:
 	}
 
@@ -368,17 +403,27 @@ func (p *Pool) releasePage(page *rod.Page) {
 	// Reset page context to a fresh one (the screenshot ctx may be cancelled)
 	cleanPage := page.Context(context.Background())
 
-	// Navigate to blank with a short timeout — don't hang
-	done := make(chan struct{})
+	// Fast release: navigate to about:blank asynchronously with short timeout.
+	// This clears cookies/state and frees renderer memory for the previous page.
+	done := make(chan bool, 1)
 	go func() {
-		defer close(done)
-		cleanPage.Timeout(3 * time.Second).Navigate("about:blank")
+		err := cleanPage.Timeout(2 * time.Second).Navigate("about:blank")
+		done <- (err == nil)
 	}()
 
 	select {
-	case <-done:
-		// Page reset OK, return to pool
-	case <-time.After(3 * time.Second):
+	case ok := <-done:
+		if !ok {
+			// Navigation failed — page may be in bad state, discard
+			cleanPage.Close()
+			p.mu.Lock()
+			p.created--
+			p.active--
+			p.scheduleIdleShutdown()
+			p.mu.Unlock()
+			return
+		}
+	case <-time.After(2 * time.Second):
 		// Page is stuck — close it and discard
 		log.Printf("[vision] Page stuck on release, closing")
 		cleanPage.Close()
@@ -452,10 +497,10 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 		}
 	}
 
-	// Overall deadline for the entire operation (capped at 60s)
+	// Overall deadline for the entire operation (default 15s, capped at 60s)
 	timeout := time.Duration(opts.Timeout) * time.Second
 	if timeout <= 0 {
-		timeout = 30 * time.Second
+		timeout = 15 * time.Second
 	}
 	if timeout > 60*time.Second {
 		timeout = 60 * time.Second
@@ -552,7 +597,9 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 		fc := p.failCount
 		p.mu.Unlock()
 
-		if fc >= 2 {
+		// Restart aggressively — a timed-out screenshot likely means Chrome
+		// renderer is stuck. Don't make the next customer wait 15s too.
+		if fc >= 1 {
 			log.Printf("[vision] Timeout + %d failures, restarting browser", fc)
 			p.mu.Lock()
 			p.restartBrowser()
@@ -667,12 +714,15 @@ func (p *Pool) screenshotInner(ctx context.Context, opts ScreenshotOpts) (*Scree
 		return nil, fmt.Errorf("navigation failed: %w", navErr)
 	}
 
-	// Wait for DOM stability — cap at half of navTimeout
-	stableTimeout := navTimeout / 2
-	if stableTimeout < 2*time.Second {
-		stableTimeout = 2 * time.Second
+	// Wait for DOM stability — aggressive timing for speed
+	stableTimeout := navTimeout / 3
+	if stableTimeout < 1*time.Second {
+		stableTimeout = 1 * time.Second
 	}
-	waitErr := page.Timeout(stableTimeout).WaitDOMStable(300*time.Millisecond, 0.1)
+	if stableTimeout > 4*time.Second {
+		stableTimeout = 4 * time.Second
+	}
+	waitErr := page.Timeout(stableTimeout).WaitDOMStable(150*time.Millisecond, 0.15)
 	if waitErr != nil {
 		log.Printf("[vision] WaitDOMStable timeout for %s: %v (continuing with screenshot)", opts.URL, waitErr)
 	}
@@ -733,8 +783,11 @@ func (p *Pool) screenshotInner(ctx context.Context, opts ScreenshotOpts) (*Scree
 		return nil, fmt.Errorf("screenshot failed: %w", err)
 	}
 
-	// Extract lightweight DOM summary for Coach vision
-	domReport := extractDOMReport(page)
+	// Extract DOM summary — fast path: skip if context is nearly expired
+	domReport := ""
+	if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > 2*time.Second {
+		domReport = extractDOMReport(page)
+	}
 
 	return &ScreenshotResult{
 		Data:      data,

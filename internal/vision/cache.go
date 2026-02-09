@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	DefaultCacheTTL     = 5 * time.Minute
-	DefaultCacheMaxSize = 50 * 1024 * 1024 // 50MB
+	DefaultCacheTTL     = 10 * time.Minute
+	DefaultCacheMaxSize = 100 * 1024 * 1024 // 100MB — screenshots are worth caching aggressively
 )
 
 type cacheEntry struct {

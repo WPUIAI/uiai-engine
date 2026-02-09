@@ -52,6 +52,7 @@ func New(cfg *config.Config) *Engine {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.Compress(5)) // gzip compression — reduces transfer size for JSON + screenshot data
 	r.Use(maxBodySize(10 * 1024 * 1024)) // 10MB max request body
 	r.Use(requestLogger)
 	r.Use(corsMiddleware(cfg))
