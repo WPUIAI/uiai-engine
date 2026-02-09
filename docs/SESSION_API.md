@@ -17,19 +17,27 @@ SID=$(curl -s -X POST http://localhost:7456/api/session \
   -d '{"url":"https://example.com","width":1280,"height":800}' \
   | jq -r '.session.id')
 
-# 2. See what's on the page (DOM structure)
-curl -s http://localhost:7456/api/session/$SID/dom | jq
+# 2. Snapshot — get accessibility tree with @ref selectors
+curl -s http://localhost:7456/api/session/$SID/snapshot | jq '{tree, stats}'
+# Output:
+#   - link "Learn more" [ref=e1]
+#   - textbox "Search" [ref=e2]
+#   - button "Submit" [ref=e3]
 
-# 3. Screenshot current state (instant — no navigation)
+# 3. Click by @ref (from snapshot)
+curl -s -X POST http://localhost:7456/api/session/$SID/click \
+  -H "Content-Type: application/json" -d '{"selector":"@e1"}'
+
+# 4. Screenshot current state (instant — no navigation)
 curl -s -X POST http://localhost:7456/api/session/$SID/screenshot \
   -H "Content-Type: application/json" -d '{}' \
   | jq '{duration_ms, size, url, title}'
 
-# 4. Scroll down
+# 5. Scroll down
 curl -s -X POST http://localhost:7456/api/session/$SID/scroll \
   -H "Content-Type: application/json" -d '{"deltaY":600}'
 
-# 5. Click a button
+# 6. Click a button (CSS selector also still works)
 curl -s -X POST http://localhost:7456/api/session/$SID/click \
   -H "Content-Type: application/json" -d '{"selector":"button.submit"}'
 
@@ -58,21 +66,22 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `GET` | `/api/session/{id}` | Get session info |
 | `DELETE` | `/api/session/{id}` | Close session, release page |
 
-### Session Actions (all return screenshot)
+### Session Actions (all return screenshot except snapshot/dom)
 
 | Method | Path | Description | Typical Latency |
 |--------|------|-------------|-----------------|
+| `GET/POST` | `/api/session/{id}/snapshot` | **A11y tree with @ref selectors** | **~50ms** |
 | `POST` | `/api/session/{id}/screenshot` | Re-snap current state | **30ms** |
 | `POST` | `/api/session/{id}/scroll` | Scroll + screenshot | **150ms** |
-| `POST` | `/api/session/{id}/click` | Click element + screenshot | **300ms** |
-| `POST` | `/api/session/{id}/hover` | Hover element + screenshot | **200ms** |
-| `POST` | `/api/session/{id}/type` | Type into input + screenshot | **150ms** |
+| `POST` | `/api/session/{id}/click` | Click element (CSS or @ref) + screenshot | **300ms** |
+| `POST` | `/api/session/{id}/hover` | Hover element (CSS or @ref) + screenshot | **200ms** |
+| `POST` | `/api/session/{id}/type` | Type into input (CSS or @ref) + screenshot | **150ms** |
 | `POST` | `/api/session/{id}/eval` | Run JS + screenshot | **150ms** |
 | `POST` | `/api/session/{id}/navigate` | Go to new URL + screenshot | **1-2s** |
 | `POST` | `/api/session/{id}/resize` | Change viewport + screenshot | **300ms** |
 | `POST` | `/api/session/{id}/css` | Inject CSS + screenshot | **150ms** |
 | `POST` | `/api/session/{id}/wait` | Wait for selector + screenshot | **varies** |
-| `GET` | `/api/session/{id}/dom` | DOM structure (no screenshot) | **instant** |
+| `GET` | `/api/session/{id}/dom` | DOM structure (legacy, prefer snapshot) | **instant** |
 
 ---
 
@@ -101,6 +110,61 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
   "duration_ms": 1200
 }
 ```
+
+### `GET/POST /api/session/{id}/snapshot` — Accessibility Tree with @refs
+
+**The recommended way for LLMs to discover page elements.** Returns a text tree with `@ref` IDs that can be used in click/type/hover actions.
+
+```json
+// POST body (all optional)
+{
+  "interactive": true,   // only buttons, links, inputs (default: false)
+  "compact": true,       // remove empty structural nodes (default: false)
+  "max_depth": 5,        // limit tree depth (default: unlimited)
+  "selector": "#main"    // scope to CSS selector (default: "body")
+}
+```
+
+`GET` variant always returns interactive+compact snapshot.
+
+**Response:**
+```json
+{
+  "tree": "  - link \"Join Free\" [ref=e4]\n  - textbox \"Search...\" [ref=e6]\n  - button \"Search\" [ref=e7]",
+  "refs": {
+    "e4": {"selector": "a.join-btn", "role": "link", "name": "Join Free", "tag": "a"},
+    "e6": {"selector": "input[placeholder=\"Search...\"]", "role": "textbox", "name": "Search...", "tag": "input"},
+    "e7": {"selector": "button.search-btn", "role": "button", "name": "Search", "tag": "button"}
+  },
+  "stats": {
+    "lines": 78,
+    "chars": 3820,
+    "tokens": 955,
+    "ref_count": 78,
+    "interactive": 78
+  }
+}
+```
+
+**Using refs in actions:**
+```bash
+# Click by ref (resolves to stored CSS selector)
+curl -X POST /api/session/$SID/click -d '{"selector":"@e4"}'
+
+# Type by ref
+curl -X POST /api/session/$SID/type -d '{"selector":"@e6","text":"startup ideas"}'
+
+# CSS selectors still work
+curl -X POST /api/session/$SID/click -d '{"selector":"button.submit"}'
+```
+
+**Optimal LLM workflow:**
+1. `POST /snapshot {"interactive":true}` → parse tree + refs (~955 tokens)
+2. Identify target from tree (e.g., `@e7` is Search button)
+3. `POST /click {"selector":"@e7"}` → get screenshot result
+4. Re-snapshot if page changed significantly
+
+---
 
 ### `POST /api/session/{id}/screenshot` — Snap
 
