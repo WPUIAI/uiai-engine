@@ -19,6 +19,7 @@ import (
 	"github.com/philoveracity/uiai-engine/internal/auth"
 	"github.com/philoveracity/uiai-engine/internal/config"
 	"github.com/philoveracity/uiai-engine/internal/credits"
+	"github.com/philoveracity/uiai-engine/internal/intelligence"
 	"github.com/philoveracity/uiai-engine/internal/media"
 	"github.com/philoveracity/uiai-engine/internal/ratelimit"
 	"github.com/philoveracity/uiai-engine/internal/routes"
@@ -169,7 +170,8 @@ func (e *Engine) mountRoutes() {
 		routes.MountReferenceReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/intelligence", func(r chi.Router) {
-		routes.MountIntelligenceReal(r, e.cfg, e.ai)
+		intel := intelligence.NewLayer(e.cfg, e.ai)
+		intel.Mount(r)
 	})
 	r.Route("/api/training", func(r chi.Router) {
 		routes.MountTrainingReal(r, e.cfg)
