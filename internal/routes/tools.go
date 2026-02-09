@@ -123,36 +123,36 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_click",
-			"description": "Click an element by CSS selector and screenshot the result. Use browser_dom to find selectors.",
+			"description": "Click an element. Accepts CSS selector OR @ref from browser_snapshot (e.g. \"@e3\"). Returns screenshot.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"session_id": map[string]string{"type": "string", "description": "Session ID"},
-					"selector":   map[string]string{"type": "string", "description": "CSS selector to click"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref (e.g. \"@e3\")"},
 				},
 				"required": []string{"session_id", "selector"},
 			},
 		},
 		{
 			"name":        "browser_hover",
-			"description": "Hover over an element to trigger hover states (dropdowns, tooltips). Returns screenshot.",
+			"description": "Hover over an element. Accepts CSS selector OR @ref from browser_snapshot. Returns screenshot.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"session_id": map[string]string{"type": "string", "description": "Session ID"},
-					"selector":   map[string]string{"type": "string", "description": "CSS selector to hover"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref"},
 				},
 				"required": []string{"session_id", "selector"},
 			},
 		},
 		{
 			"name":        "browser_type",
-			"description": "Type text into an input field (clears existing text first). Returns screenshot.",
+			"description": "Type text into an input. Accepts CSS selector OR @ref from browser_snapshot. Clears existing. Returns screenshot.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"session_id": map[string]string{"type": "string", "description": "Session ID"},
-					"selector":   map[string]string{"type": "string", "description": "CSS selector of input"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref"},
 					"text":       map[string]string{"type": "string", "description": "Text to type"},
 				},
 				"required": []string{"session_id", "selector", "text"},
@@ -171,8 +171,23 @@ func openAITools() []map[string]any {
 			},
 		},
 		{
+			"name":        "browser_snapshot",
+			"description": "Get accessibility tree with @ref selectors. PREFERRED over browser_dom. Returns a text tree like: '- link \"Sign In\" [ref=e3]'. Use refs in click/type/hover: {\"selector\": \"@e3\"}. Options: interactive (only buttons/links/inputs), compact (remove empty nodes), max_depth.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id":  map[string]string{"type": "string", "description": "Session ID"},
+					"interactive": map[string]string{"type": "boolean", "description": "Only show interactive elements (default: false)"},
+					"compact":     map[string]string{"type": "boolean", "description": "Remove empty structural nodes (default: false)"},
+					"max_depth":   map[string]string{"type": "integer", "description": "Max tree depth (default: unlimited)"},
+					"selector":    map[string]string{"type": "string", "description": "Scope to CSS selector (default: body)"},
+				},
+				"required": []string{"session_id"},
+			},
+		},
+		{
 			"name":        "browser_dom",
-			"description": "Get structured DOM info: headings, links, buttons, images, forms, and interactive elements with CSS selectors. No screenshot — just data. Use to discover what you can click/type.",
+			"description": "Get structured DOM info: headings, links, buttons, forms, interactive elements. Legacy — prefer browser_snapshot for @ref support.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{

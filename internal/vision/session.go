@@ -39,6 +39,7 @@ type Session struct {
 	pool  *Pool
 	timer *time.Timer
 	mu    sync.Mutex
+	refs  map[string]SnapshotRef // @ref → CSS selector, populated by Snapshot()
 }
 
 // SessionManager manages persistent browser sessions.

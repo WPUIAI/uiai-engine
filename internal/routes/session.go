@@ -193,7 +193,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			writeJSON(w, 200, snap)
 		})
 
-		// Click
+		// Click — accepts CSS selector or @ref from snapshot
 		r.Post("/click", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
@@ -205,11 +205,11 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector required"})
+				writeJSON(w, 400, map[string]string{"error": "selector required (CSS or @ref)"})
 				return
 			}
 
-			snap, err := sess.Click(body.Selector)
+			snap, err := sess.Click(sess.ResolveRef(body.Selector))
 			if err != nil {
 				writeJSON(w, 500, map[string]string{"error": err.Error()})
 				return
@@ -217,7 +217,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			writeJSON(w, 200, snap)
 		})
 
-		// Hover
+		// Hover — accepts CSS selector or @ref from snapshot
 		r.Post("/hover", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
@@ -229,11 +229,11 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector required"})
+				writeJSON(w, 400, map[string]string{"error": "selector required (CSS or @ref)"})
 				return
 			}
 
-			snap, err := sess.Hover(body.Selector)
+			snap, err := sess.Hover(sess.ResolveRef(body.Selector))
 			if err != nil {
 				writeJSON(w, 500, map[string]string{"error": err.Error()})
 				return
@@ -241,7 +241,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			writeJSON(w, 200, snap)
 		})
 
-		// Type into input
+		// Type into input — accepts CSS selector or @ref from snapshot
 		r.Post("/type", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
@@ -254,9 +254,10 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" || body.Text == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector and text required"})
+				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) and text required"})
 				return
 			}
+			body.Selector = sess.ResolveRef(body.Selector)
 
 			snap, err := sess.Type(body.Selector, body.Text)
 			if err != nil {
@@ -346,7 +347,50 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			writeJSON(w, 200, snap)
 		})
 
-		// DOM info — structured page data for LLM reasoning
+		// Snapshot — accessibility tree with @ref selectors
+		// This is the primary way LLMs should discover page elements.
+		// Returns a text tree + ref map. Use refs in click/type/hover: {"selector": "@e3"}
+		r.Post("/snapshot", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body vision.SnapshotOptions
+			json.NewDecoder(req.Body).Decode(&body)
+
+			snap, err := sess.Snapshot(body)
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+
+			// Store refs in session so click/type/hover can resolve @e3
+			sess.StoreRefs(snap.Refs)
+
+			writeJSON(w, 200, snap)
+		})
+
+		// Also support GET for simple snapshot (interactive mode)
+		r.Get("/snapshot", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+
+			opts := vision.SnapshotOptions{Interactive: true, Compact: true}
+			snap, err := sess.Snapshot(opts)
+			if err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+
+			sess.StoreRefs(snap.Refs)
+			writeJSON(w, 200, snap)
+		})
+
+		// DOM info — structured page data for LLM reasoning (legacy, prefer /snapshot)
 		r.Get("/dom", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
