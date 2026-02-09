@@ -68,6 +68,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			strings.HasPrefix(p, "/api/intelligence/") ||  // Per-handler auth
 			p == "/api/screenshot" || strings.HasPrefix(p, "/api/screenshot/") || // Screenshot: internal use (Coach vision, share)
 			strings.HasPrefix(p, "/api/session") ||         // Browser sessions: LLM tool API (localhost only)
+			strings.HasPrefix(p, "/api/tools") ||           // Tool discovery: agents search/discover tools
 			p == "/api/media/jobs" ||                       // Media job list: read-only
 			strings.HasPrefix(p, "/api/media/status/") ||  // Media status: read-only poll
 			strings.HasPrefix(p, "/api/share/") {          // Share viewing is public

@@ -219,6 +219,14 @@ func (e *Engine) mountRoutes() {
 		routes.MountSessionRoutes(r, e.cfg, e.sessions)
 	})
 
+	// Tool Discovery — LLM agents search/discover tools without loading all definitions
+	// GET /api/tools/search?q=screenshot → find specific tools (minimal context)
+	// GET /api/tools/openai → OpenAI function calling format
+	// GET /api/tools/mcp → MCP tool definitions
+	r.Route("/api/tools", func(r chi.Router) {
+		routes.MountToolsDiscovery(r, e.cfg)
+	})
+
 	// Pipeline operations (cloud-capable build steps)
 	r.Route("/api/design-system", func(r chi.Router) {
 		routes.MountDesignSystemRoute(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)

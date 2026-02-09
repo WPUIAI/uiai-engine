@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "browser": {
+      "command": "node",
+      "args": ["/home/wpuiai/uiai-engine/mcp/browser-session-mcp.mjs"],
+      "lifecycle": "lazy",
+      "idleTimeout": 60,
+      "description": "Persistent browser sessions for visual QA. Open pages, scroll, click, inject CSS, screenshot — like a human with a browser tab."
+    }
+  }
+}
