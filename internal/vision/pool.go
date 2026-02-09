@@ -111,18 +111,29 @@ drained:
 
 	l := launcher.New().
 		Headless(true).
+		// Flags NOT in Rod defaults — add explicitly
 		Set("disable-gpu").
 		Set("no-sandbox").
-		Set("disable-dev-shm-usage").
 		Set("disable-web-security").
 		Set("disable-extensions").
-		Set("disable-background-networking").
-		Set("disable-sync").
 		Set("disable-translate").
-		Set("metrics-recording-only").
 		Set("mute-audio").
-		Set("no-first-run").
-		Set("safebrowsing-disable-auto-update")
+		Set("safebrowsing-disable-auto-update").
+		// Memory reduction: kill unnecessary Chrome services
+		Set("disable-component-update").
+		Set("disable-domain-reliability").
+		Set("disable-crash-reporter").
+		Set("js-flags", "--max-old-space-size=256").
+		// Append to Rod's default disable-features (site-per-process,TranslateUI)
+		Append("disable-features",
+			"OnDeviceModel",         // kills on_device_model.mojom process (~31MB)
+			"ChromeMLService",       // ML service not needed for screenshots
+			"OptimizationHints",     // network hints not needed in headless
+			"MediaRouter",           // cast/media router useless in headless
+			"Translate",             // translation service
+			"ChromePasswordManager", // password manager
+			"PaintHolding",          // delays first paint
+		)
 
 	if chromePath != "" {
 		l = l.Bin(chromePath)
