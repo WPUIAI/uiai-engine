@@ -49,6 +49,7 @@ func New(cfg *config.Config) *Engine {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
+	r.Use(maxBodySize(10 * 1024 * 1024)) // 10MB max request body
 	r.Use(requestLogger)
 	r.Use(corsMiddleware(cfg))
 
@@ -300,6 +301,11 @@ func (e *Engine) Run() error {
 		log.Printf("Received %s, shutting down...", sig)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		// Close vision pool (kills Chrome) before server shutdown
+		if e.vision != nil {
+			log.Printf("Closing vision pool...")
+			e.vision.Close()
+		}
 		return e.server.Shutdown(ctx)
 	}
 }
@@ -319,6 +325,18 @@ func requestLogger(next http.Handler) http.Handler {
 		next.ServeHTTP(ww, r)
 		log.Printf("%s %s %d %s", r.Method, r.URL.Path, ww.Status(), time.Since(start).Round(time.Millisecond))
 	})
+}
+
+// maxBodySize limits request body size to prevent OOM from oversized POSTs.
+func maxBodySize(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Body != nil {
+				r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func corsMiddleware(cfg *config.Config) func(http.Handler) http.Handler {

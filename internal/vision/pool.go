@@ -423,10 +423,13 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 		}
 	}
 
-	// Overall deadline for the entire operation
+	// Overall deadline for the entire operation (capped at 60s)
 	timeout := time.Duration(opts.Timeout) * time.Second
 	if timeout <= 0 {
 		timeout = 30 * time.Second
+	}
+	if timeout > 60*time.Second {
+		timeout = 60 * time.Second
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -492,8 +495,41 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 	}
 }
 
+// isPrivateURL checks if a URL points to a private/internal IP (SSRF protection).
+func isPrivateURL(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return true // block unparseable URLs
+	}
+	host := parsed.Hostname()
+	// Block obvious private patterns
+	for _, prefix := range []string{
+		"127.", "10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.",
+		"172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+		"172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+		"0.", "169.254.", "::1", "fc", "fd", "fe80:",
+	} {
+		if strings.HasPrefix(host, prefix) {
+			return true
+		}
+	}
+	if host == "localhost" || host == "" {
+		return true
+	}
+	// Block file:// and other non-http schemes
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return true
+	}
+	return false
+}
+
 func (p *Pool) screenshotInner(ctx context.Context, opts ScreenshotOpts) (*ScreenshotResult, error) {
 	start := time.Now()
+
+	// SSRF protection: block private/internal URLs
+	if isPrivateURL(opts.URL) {
+		return nil, fmt.Errorf("URL not allowed: cannot screenshot private/internal addresses")
+	}
 
 	page, err := p.getPage()
 	if err != nil {
@@ -540,17 +576,27 @@ func (p *Pool) screenshotInner(ctx context.Context, opts ScreenshotOpts) (*Scree
 		return nil, ctx.Err()
 	}
 
+	// Cap navigation + DOM stable timeout to remaining context budget
+	navTimeout := 15 * time.Second
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline) - 5*time.Second // reserve 5s for screenshot
+		if remaining < navTimeout && remaining > 0 {
+			navTimeout = remaining
+		}
+	}
+
 	// Navigate with timeout — use DOMContentLoaded, NOT full load.
-	// Full load waits for all subresources (WebSockets, long-polling, etc.)
-	// which may never complete on dynamic sites.
-	navErr := page.Timeout(15 * time.Second).Navigate(opts.URL)
+	navErr := page.Timeout(navTimeout).Navigate(opts.URL)
 	if navErr != nil {
 		return nil, fmt.Errorf("navigation failed: %w", navErr)
 	}
 
-	// Wait for DOMContentLoaded (not load!) — this fires once HTML is parsed
-	// and deferred scripts have run, but doesn't wait for images/XHR/WS.
-	waitErr := page.Timeout(15 * time.Second).WaitDOMStable(300*time.Millisecond, 0.1)
+	// Wait for DOM stability — cap at half of navTimeout
+	stableTimeout := navTimeout / 2
+	if stableTimeout < 2*time.Second {
+		stableTimeout = 2 * time.Second
+	}
+	waitErr := page.Timeout(stableTimeout).WaitDOMStable(300*time.Millisecond, 0.1)
 	if waitErr != nil {
 		log.Printf("[vision] WaitDOMStable timeout for %s: %v (continuing with screenshot)", opts.URL, waitErr)
 	}
