@@ -133,7 +133,8 @@ drained:
 		Set("disable-component-update").
 		Set("disable-domain-reliability").
 		Set("disable-crash-reporter").
-		Set("js-flags", "--max-old-space-size=256").
+		// Note: --js-flags=--max-old-space-size was tested but causes Chrome to
+		// spin at 100% CPU during initialization. Removed in favor of feature disabling.
 		// Append to Rod's default disable-features (site-per-process,TranslateUI)
 		Append("disable-features",
 			"OnDeviceModel",         // kills on_device_model.mojom process (~31MB)
