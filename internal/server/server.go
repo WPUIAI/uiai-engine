@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/philoveracity/uiai-engine/internal/ai"
 	"github.com/philoveracity/uiai-engine/internal/auth"
+	captchaPkg "github.com/philoveracity/uiai-engine/internal/captcha"
 	"github.com/philoveracity/uiai-engine/internal/config"
 	"github.com/philoveracity/uiai-engine/internal/credits"
 	"github.com/philoveracity/uiai-engine/internal/intelligence"
@@ -43,6 +44,7 @@ type Engine struct {
 	vision    *vision.Pool
 	sessions  *vision.SessionManager
 	mediaJobs *media.JobStore
+	captcha   *captchaPkg.Solver
 }
 
 // New creates a new Engine with all routes wired.
@@ -99,6 +101,11 @@ func New(cfg *config.Config) *Engine {
 		sessionMgr = vision.NewSessionManager(visionPool)
 	}
 
+	// Captcha solver — uses AI provider + session API
+	captchaCfg := captchaPkg.DefaultCaptchaConfig()
+	// TODO: merge from config.yaml when captcha section is added
+	captchaSolver := captchaPkg.NewSolver(aiProvider, captchaCfg)
+
 	e := &Engine{
 		cfg:       cfg,
 		router:    r,
@@ -110,6 +117,7 @@ func New(cfg *config.Config) *Engine {
 		vision:    visionPool,
 		sessions:  sessionMgr,
 		mediaJobs: mediaJobs,
+		captcha:   captchaSolver,
 	}
 
 	e.mountRoutes()
@@ -216,7 +224,12 @@ func (e *Engine) mountRoutes() {
 	// Browser Sessions — persistent pages for LLM tool use
 	// Open → interact → screenshot → close (page stays alive between calls)
 	r.Route("/api/session", func(r chi.Router) {
-		routes.MountSessionRoutes(r, e.cfg, e.sessions)
+		routes.MountSessionRoutes(r, e.cfg, e.sessions, e.captcha)
+	})
+
+	// Captcha solver — stateless image solve + status
+	r.Route("/api/captcha", func(r chi.Router) {
+		routes.MountCaptchaRoutes(r, e.captcha)
 	})
 
 	// Tool Discovery — LLM agents search/discover tools without loading all definitions

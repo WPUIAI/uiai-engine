@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/philoveracity/uiai-engine/internal/captcha"
 	"github.com/philoveracity/uiai-engine/internal/config"
 	"github.com/philoveracity/uiai-engine/internal/vision"
 )
@@ -17,7 +18,7 @@ import (
 //   - Minimal required params, sensible defaults
 //   - Session ID in URL path (clear resource identity)
 //   - DOM info included so LLM can reason about interactive elements
-func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManager) {
+func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManager, solver ...*captcha.Solver) {
 	if sm == nil {
 		return
 	}
@@ -609,5 +610,10 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			writeJSON(w, 200, snap)
 		})
+
+		// Captcha solver — POST /api/session/{sessionID}/captcha/solve
+		if len(solver) > 0 && solver[0] != nil {
+			MountSessionCaptchaRoute(r, solver[0], sm)
+		}
 	})
 }

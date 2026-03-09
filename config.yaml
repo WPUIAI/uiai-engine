@@ -11,7 +11,7 @@ wordpress:
   url: "https://wpuiai.com"
   rest_namespace: "wpuiai-ai-cloud/v1"
   webhook_secret: "${WEBHOOK_SECRET}"
-  cache_ttl: 300  # 5 minutes
+  cache_ttl: 0  # 5 minutes
 
 ai:
   # default_model and default_provider are read from WP admin settings
@@ -29,6 +29,10 @@ ai:
       site_name: "WPUIAI AI Cloud"
     fireworks:
       api_url: "https://api.fireworks.ai/inference/v1"
+    kimi:
+      api_url: "https://api.kimi.com/coding/v1/messages"
+    minimax:
+      api_url: "https://api.minimax.io/v1"
 
 vision:
   pool_size: 4
@@ -36,6 +40,7 @@ vision:
   idle_timeout: 600s
   screenshot_quality: 65
   share_dir: "/home/wpuiai/ai-api/shares"
+  allow_private_urls: true
 
 media:
   script_dir: "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"

@@ -39,16 +39,16 @@ type Request struct {
 
 var modelCosts = map[string][2]float64{
 	// Anthropic
-	"claude-sonnet-4-20250514":  {0.000003, 0.000015},
-	"claude-opus-4-20250514":    {0.000015, 0.000075},
+	"claude-sonnet-4-20250514":   {0.000003, 0.000015},
+	"claude-opus-4-20250514":     {0.000015, 0.000075},
 	"claude-3-5-sonnet-20241022": {0.000003, 0.000015},
 	// OpenAI
-	"gpt-4o":      {0.0000025, 0.00001},
-	"gpt-4o-mini": {0.00000015, 0.0000006},
-	"gpt-4-turbo": {0.00001, 0.00003},
+	"gpt-4o":               {0.0000025, 0.00001},
+	"gpt-4o-mini":          {0.00000015, 0.0000006},
+	"gpt-4-turbo":          {0.00001, 0.00003},
 	"gpt-4-vision-preview": {0.00001, 0.00003}, // GPT-4 Vision
-	"o1":          {0.000015, 0.00006},
-	"o1-mini":     {0.000003, 0.000012},
+	"o1":                   {0.000015, 0.00006},
+	"o1-mini":              {0.000003, 0.000012},
 	// OpenRouter passthrough — costs come from OpenRouter pricing
 	"anthropic/claude-sonnet-4": {0.000003, 0.000015},
 	"anthropic/claude-opus-4":   {0.000015, 0.000075},
@@ -64,11 +64,11 @@ var modelCosts = map[string][2]float64{
 	"moonshot-v1-32k":  {0.000024, 0.000024},
 	"moonshot-v1-8k":   {0.000012, 0.000012},
 	// Qwen (Alibaba DashScope)
-	"qwen-max":       {0.000016, 0.000016},
-	"qwen-plus":      {0.000004, 0.000012},
-	"qwen-turbo":     {0.000002, 0.000006},
-	"qwen-vl-max":    {0.00001, 0.00001},
-	"qwen-vl-plus":   {0.000008, 0.000008},
+	"qwen-max":     {0.000016, 0.000016},
+	"qwen-plus":    {0.000004, 0.000012},
+	"qwen-turbo":   {0.000002, 0.000006},
+	"qwen-vl-max":  {0.00001, 0.00001},
+	"qwen-vl-plus": {0.000008, 0.000008},
 }
 
 type aiKeys struct {
@@ -77,6 +77,7 @@ type aiKeys struct {
 	OpenRouter string
 	Fireworks  string
 	Kimi       string
+	MiniMax    string
 	Qwen       string
 	fetchedAt  time.Time
 }
@@ -90,13 +91,13 @@ type ProviderModel struct {
 }
 
 type Provider struct {
-	cfg       *config.Config
-	keys      aiKeys
-	keysMu    sync.RWMutex
-	keysTTL   time.Duration
-	client    *http.Client
-	models    []ProviderModel // populated from WP settings
-	modelsMu  sync.RWMutex
+	cfg      *config.Config
+	keys     aiKeys
+	keysMu   sync.RWMutex
+	keysTTL  time.Duration
+	client   *http.Client
+	models   []ProviderModel // populated from WP settings
+	modelsMu sync.RWMutex
 }
 
 // AvailableModels returns the model list built from WP settings.
@@ -147,10 +148,10 @@ func (p *Provider) Complete(ctx context.Context, req Request) (*Response, error)
 		req.Provider = p.cfg.AI.DefaultProvider
 	}
 	if req.Provider == "" {
-		return nil, fmt.Errorf("no AI provider configured — set default_provider in WP Settings → AI Cloud")
+		return nil, fmt.Errorf("no AI provider configured — set default_provider in WP Settings or UIAI_DEFAULT_PROVIDER env")
 	}
 	if req.Model == "" {
-		return nil, fmt.Errorf("no AI model configured — set default_model in WP Settings → AI Cloud")
+		return nil, fmt.Errorf("no AI model configured — set default_model in WP Settings or UIAI_DEFAULT_MODEL env")
 	}
 
 	// Try the primary provider first
@@ -201,9 +202,9 @@ func (p *Provider) Complete(ctx context.Context, req Request) (*Response, error)
 // completeOnce makes a single attempt to the specified provider.
 func (p *Provider) completeOnce(ctx context.Context, req Request) (*Response, error) {
 	switch req.Provider {
-	case "anthropic":
+	case "anthropic", "kimi":
 		return p.anthropicComplete(ctx, req)
-	case "openai", "openrouter", "fireworks", "kimi", "qwen":
+	case "openai", "openrouter", "fireworks", "minimax", "qwen":
 		return p.openaiComplete(ctx, req)
 	default:
 		return nil, fmt.Errorf("unknown provider %q", req.Provider)
@@ -227,9 +228,10 @@ func (p *Provider) buildFallbackChain(skipProvider string) []fallbackProvider {
 		key      string
 		model    string
 	}
-	// Priority order: openrouter (cheapest routing), anthropic (direct), openai, fireworks
+	// Priority: subscribed/direct providers only. OpenRouter intentionally excluded from automatic fallback.
 	all := []candidate{
-		{"openrouter", p.keys.OpenRouter, p.cfg.AI.DefaultModel},
+		{"minimax", p.keys.MiniMax, "MiniMax-M2.5"},
+		{"kimi", p.keys.Kimi, "kimi-k2.5"},
 		{"anthropic", p.keys.Anthropic, "claude-sonnet-4-20250514"},
 		{"openai", p.keys.OpenAI, "gpt-4o"},
 		{"fireworks", p.keys.Fireworks, "accounts/fireworks/models/llama-v3p1-70b-instruct"},
@@ -288,10 +290,33 @@ func summarizeError(err error) string {
 
 func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Response, error) {
 	p.keysMu.RLock()
-	key := p.keys.Anthropic
+	var key, apiURL, providerName string
+	switch req.Provider {
+	case "minimax":
+		key = p.keys.MiniMax
+		apiURL = p.cfg.AI.Providers["minimax"].APIURL
+		providerName = "minimax"
+		if apiURL == "" {
+			apiURL = "https://api.minimax.io/anthropic/v1/messages"
+		}
+	case "kimi":
+		key = p.keys.Kimi
+		apiURL = p.cfg.AI.Providers["kimi"].APIURL
+		providerName = "kimi"
+		if apiURL == "" {
+			apiURL = "https://api.kimi.com/coding/v1/messages"
+		}
+	default:
+		key = p.keys.Anthropic
+		apiURL = p.cfg.AI.Providers["anthropic"].APIURL
+		providerName = "anthropic"
+		if apiURL == "" {
+			apiURL = "https://api.anthropic.com/v1/messages"
+		}
+	}
 	p.keysMu.RUnlock()
 	if key == "" {
-		return nil, fmt.Errorf("anthropic API key not configured")
+		return nil, fmt.Errorf("%s API key not configured", providerName)
 	}
 
 	var content any
@@ -316,10 +341,6 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 	}
 	b, _ := json.Marshal(body)
 
-	apiURL := p.cfg.AI.Providers["anthropic"].APIURL
-	if apiURL == "" {
-		apiURL = "https://api.anthropic.com/v1/messages"
-	}
 	httpReq, _ := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(b))
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("x-api-key", key)
@@ -333,12 +354,14 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("anthropic %d: %s", resp.StatusCode, string(respBody[:min(len(respBody), 200)]))
+		return nil, fmt.Errorf("%s %d: %s", providerName, resp.StatusCode, string(respBody[:min(len(respBody), 200)]))
 	}
 
 	var data struct {
-		Content []struct{ Text string `json:"text"` } `json:"content"`
-		Usage   struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+		Usage struct {
 			InputTokens  int `json:"input_tokens"`
 			OutputTokens int `json:"output_tokens"`
 		} `json:"usage"`
@@ -376,6 +399,12 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 		if baseURL == "" {
 			baseURL = "https://api.moonshot.cn/v1"
 		}
+	case "minimax":
+		key = p.keys.MiniMax
+		baseURL = p.cfg.AI.Providers["minimax"].APIURL
+		if baseURL == "" {
+			baseURL = "https://api.minimax.io/v1"
+		}
 	case "qwen":
 		key = p.keys.Qwen
 		baseURL = p.cfg.AI.Providers["qwen"].APIURL
@@ -393,6 +422,14 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 	}
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
+	}
+
+	if req.Provider == "minimax" && req.ImageBase64 != "" {
+		if resp, err := p.minimaxCodingPlanVisionComplete(ctx, key, baseURL, req); err == nil {
+			return resp, nil
+		} else {
+			log.Printf("[ai] minimax coding-plan vision path failed, falling back to text API: %v", summarizeError(err))
+		}
 	}
 
 	var msgContent any
@@ -422,7 +459,12 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 	}
 	b, _ := json.Marshal(body)
 
-	httpReq, _ := http.NewRequestWithContext(ctx, "POST", baseURL+"/chat/completions", bytes.NewReader(b))
+	endpoint := baseURL + "/chat/completions"
+	if req.Provider == "minimax" {
+		endpoint = baseURL + "/text/chatcompletion_v2"
+	}
+
+	httpReq, _ := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(b))
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+key)
 	if req.Provider == "openrouter" {
@@ -443,14 +485,27 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 
 	var data struct {
 		Choices []struct {
-			Message struct{ Content string `json:"content"` } `json:"message"`
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
 		} `json:"choices"`
 		Usage struct {
 			PromptTokens     int `json:"prompt_tokens"`
 			CompletionTokens int `json:"completion_tokens"`
 		} `json:"usage"`
+		BaseResp struct {
+			StatusCode int    `json:"status_code"`
+			StatusMsg  string `json:"status_msg"`
+		} `json:"base_resp"`
 	}
 	json.Unmarshal(respBody, &data)
+	if data.BaseResp.StatusCode != 0 {
+		msg := strings.TrimSpace(data.BaseResp.StatusMsg)
+		if msg == "" {
+			msg = fmt.Sprintf("MiniMax API error %d", data.BaseResp.StatusCode)
+		}
+		return nil, fmt.Errorf("%s %d: %s", req.Provider, data.BaseResp.StatusCode, msg)
+	}
 
 	text := ""
 	if len(data.Choices) > 0 {
@@ -464,6 +519,61 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 		InputTokens:  data.Usage.PromptTokens,
 		OutputTokens: data.Usage.CompletionTokens,
 		CostUSD:      cost,
+	}, nil
+}
+
+func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, baseURL string, req Request) (*Response, error) {
+	apiHost := strings.TrimSuffix(baseURL, "/v1")
+	if apiHost == "" || apiHost == baseURL {
+		apiHost = "https://api.minimax.io"
+	}
+	mediaType := req.ImageType
+	if mediaType == "" {
+		mediaType = "image/jpeg"
+	}
+	payload := map[string]any{
+		"prompt":    req.Prompt,
+		"image_url": fmt.Sprintf("data:%s;base64,%s", mediaType, req.ImageBase64),
+	}
+	b, _ := json.Marshal(payload)
+
+	httpReq, _ := http.NewRequestWithContext(ctx, "POST", apiHost+"/v1/coding_plan/vlm", bytes.NewReader(b))
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+key)
+	httpReq.Header.Set("MM-API-Source", "Minimax-MCP")
+
+	resp, err := p.client.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("minimax coding_plan_vlm %d: %s", resp.StatusCode, string(respBody[:min(len(respBody), 200)]))
+	}
+
+	var data struct {
+		Content  string `json:"content"`
+		BaseResp struct {
+			StatusCode int    `json:"status_code"`
+			StatusMsg  string `json:"status_msg"`
+		} `json:"base_resp"`
+	}
+	json.Unmarshal(respBody, &data)
+	if data.BaseResp.StatusCode != 0 {
+		msg := strings.TrimSpace(data.BaseResp.StatusMsg)
+		if msg == "" {
+			msg = fmt.Sprintf("MiniMax API error %d", data.BaseResp.StatusCode)
+		}
+		return nil, fmt.Errorf("minimax %d: %s", data.BaseResp.StatusCode, msg)
+	}
+	if strings.TrimSpace(data.Content) == "" {
+		return nil, fmt.Errorf("minimax coding_plan_vlm returned empty content")
+	}
+
+	return &Response{
+		Content: strings.TrimSpace(data.Content),
+		Model:   req.Model,
 	}, nil
 }
 
@@ -487,39 +597,29 @@ func (p *Provider) ensureKeys() error {
 	body, _ := io.ReadAll(resp.Body)
 
 	var settings struct {
-		DefaultProvider string                        `json:"default_provider"`
-		DefaultModel    string                        `json:"default_model"`
-		Anthropic       struct{ Key, Model string }   `json:"anthropic"`
-		OpenAI          struct{ Key, Model string }   `json:"openai"`
-		OpenRouter      struct{ Key, Model string }   `json:"openrouter"`
-		Fireworks       struct{ Key, Model string }   `json:"fireworks"`
-		Kimi            struct{ Key, Model string }   `json:"kimi"`
-		Qwen            struct{ Key, Model string }   `json:"qwen"`
+		DefaultProvider string                      `json:"default_provider"`
+		DefaultModel    string                      `json:"default_model"`
+		Anthropic       struct{ Key, Model string } `json:"anthropic"`
+		OpenAI          struct{ Key, Model string } `json:"openai"`
+		OpenRouter      struct{ Key, Model string } `json:"openrouter"`
+		Fireworks       struct{ Key, Model string } `json:"fireworks"`
+		Kimi            struct{ Key, Model string } `json:"kimi"`
+		MiniMax         struct{ Key, Model string } `json:"minimax"`
+		Qwen            struct{ Key, Model string } `json:"qwen"`
 	}
 	if resp.StatusCode != 200 {
-		log.Printf("[ai] WARNING: WP /ai-settings returned HTTP %d — AI may be degraded", resp.StatusCode)
-		// Don't cache a bad fetch — let it retry next call
-		return fmt.Errorf("WP /ai-settings returned HTTP %d", resp.StatusCode)
+		log.Printf("[ai] WARNING: WP /ai-settings returned HTTP %d — falling back to env vars", resp.StatusCode)
+		p.loadKeysFromEnv()
+		return nil
 	}
 
 	if err := json.Unmarshal(body, &settings); err != nil {
 		log.Printf("[ai] WARNING: WP /ai-settings returned invalid JSON: %v — falling back to env vars", err)
-		// Fallback to env vars, but log the problem clearly
-		p.keysMu.Lock()
-		p.keys = aiKeys{
-			Anthropic:  envOr("ANTHROPIC_API_KEY", ""),
-			OpenAI:     envOr("OPENAI_API_KEY", ""),
-			OpenRouter: envOr("OPENROUTER_API_KEY", ""),
-			Fireworks:  envOr("FIREWORKS_API_KEY", ""),
-			Kimi:       envOr("KIMI_API_KEY", ""),
-			Qwen:       envOr("QWEN_API_KEY", ""),
-			fetchedAt:  time.Now(),
-		}
-		p.keysMu.Unlock()
+		p.loadKeysFromEnv()
 		return nil
 	}
 
-	// Update runtime config with WP-managed defaults (takes precedence over config.yaml).
+	// Update runtime config with WP-managed defaults, then allow explicit env overrides.
 	if settings.DefaultProvider != "" {
 		p.cfg.AI.DefaultProvider = settings.DefaultProvider
 		log.Printf("[ai] default provider from WP: %s", settings.DefaultProvider)
@@ -528,15 +628,31 @@ func (p *Provider) ensureKeys() error {
 		p.cfg.AI.DefaultModel = settings.DefaultModel
 		log.Printf("[ai] default model from WP: %s", settings.DefaultModel)
 	}
+	if v := envOr("UIAI_DEFAULT_PROVIDER", ""); v != "" {
+		p.cfg.AI.DefaultProvider = v
+		log.Printf("[ai] default provider from env override: %s", v)
+	}
+	if v := envOr("UIAI_DEFAULT_MODEL", ""); v != "" {
+		p.cfg.AI.DefaultModel = v
+		log.Printf("[ai] default model from env override: %s", v)
+	}
+
+	merge := func(primary, fallback string) string {
+		if primary != "" {
+			return primary
+		}
+		return fallback
+	}
 
 	p.keysMu.Lock()
 	p.keys = aiKeys{
-		Anthropic:  settings.Anthropic.Key,
-		OpenAI:     settings.OpenAI.Key,
-		OpenRouter: settings.OpenRouter.Key,
-		Fireworks:  settings.Fireworks.Key,
-		Kimi:       settings.Kimi.Key,
-		Qwen:       settings.Qwen.Key,
+		Anthropic:  merge(settings.Anthropic.Key, envOr("ANTHROPIC_API_KEY", "")),
+		OpenAI:     merge(settings.OpenAI.Key, envOr("OPENAI_API_KEY", "")),
+		OpenRouter: merge(settings.OpenRouter.Key, envOr("OPENROUTER_API_KEY", "")),
+		Fireworks:  merge(settings.Fireworks.Key, envOr("FIREWORKS_API_KEY", "")),
+		Kimi:       merge(settings.Kimi.Key, envOr("KIMI_API_KEY", "")),
+		MiniMax:    merge(settings.MiniMax.Key, envOr("MINIMAX_API_KEY", "")),
+		Qwen:       merge(settings.Qwen.Key, envOr("QWEN_API_KEY", "")),
 		fetchedAt:  time.Now(),
 	}
 	p.keysMu.Unlock()
@@ -564,6 +680,7 @@ func (p *Provider) ensureKeys() error {
 		{"openrouter", settings.OpenRouter.Key, settings.OpenRouter.Model},
 		{"fireworks", settings.Fireworks.Key, settings.Fireworks.Model},
 		{"kimi", settings.Kimi.Key, settings.Kimi.Model},
+		{"minimax", settings.MiniMax.Key, settings.MiniMax.Model},
 		{"qwen", settings.Qwen.Key, settings.Qwen.Model},
 	}
 	for _, c := range configured {
@@ -579,6 +696,27 @@ func (p *Provider) ensureKeys() error {
 	log.Printf("[ai] loaded %d available models from WP settings", len(models))
 
 	return nil
+}
+
+func (p *Provider) loadKeysFromEnv() {
+	p.keysMu.Lock()
+	defer p.keysMu.Unlock()
+	p.keys = aiKeys{
+		Anthropic:  envOr("ANTHROPIC_API_KEY", ""),
+		OpenAI:     envOr("OPENAI_API_KEY", ""),
+		OpenRouter: envOr("OPENROUTER_API_KEY", ""),
+		Fireworks:  envOr("FIREWORKS_API_KEY", ""),
+		Kimi:       envOr("KIMI_API_KEY", ""),
+		MiniMax:    envOr("MINIMAX_API_KEY", ""),
+		Qwen:       envOr("QWEN_API_KEY", ""),
+		fetchedAt:  time.Now(),
+	}
+	if v := envOr("UIAI_DEFAULT_PROVIDER", ""); v != "" {
+		p.cfg.AI.DefaultProvider = v
+	}
+	if v := envOr("UIAI_DEFAULT_MODEL", ""); v != "" {
+		p.cfg.AI.DefaultModel = v
+	}
 }
 
 func calcCost(model string, inTok, outTok int) float64 {

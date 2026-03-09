@@ -16,8 +16,9 @@ import (
 // require fragile eval() workarounds.
 // ═══════════════════════════════════════════════════════
 
-// Fill clears an input completely and types new text.
-// More reliable than Type for replacing existing values.
+// Fill replaces an input value without using Rod's Must* panic path.
+// We prefer DOM assignment + input/change events so slow interactive pages
+// don't crash the whole handler on click timeouts.
 func (s *Session) Fill(selector, text string) (*SnapResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -32,14 +33,29 @@ func (s *Session) Fill(selector, text string) (*SnapResult, error) {
 		return nil, fmt.Errorf("element not found: %s", selector)
 	}
 
-	// Select all, delete, then type new value
-	el.MustClick()
-	el.SelectAllText()
-	el.Type(input.Backspace)
-	time.Sleep(50 * time.Millisecond)
-	el.Input(text)
-	time.Sleep(100 * time.Millisecond)
+	if err := el.ScrollIntoView(); err != nil {
+		return nil, fmt.Errorf("fill scroll failed: %w", err)
+	}
+	if err := el.Focus(); err != nil {
+		return nil, fmt.Errorf("fill focus failed: %w", err)
+	}
+	if _, err := el.Eval(`() => {
+		if (this.isContentEditable) {
+			this.textContent = '';
+		} else {
+			this.value = '';
+		}
+		this.dispatchEvent(new Event('input', { bubbles: true }));
+		this.dispatchEvent(new Event('change', { bubbles: true }));
+		return true;
+	}`); err != nil {
+		return nil, fmt.Errorf("fill clear failed: %w", err)
+	}
+	if err := el.Input(text); err != nil {
+		return nil, fmt.Errorf("fill input failed: %w", err)
+	}
 
+	time.Sleep(120 * time.Millisecond)
 	return s.snap(start)
 }
 
@@ -335,26 +351,55 @@ func (s *Session) LoadAuth(state json.RawMessage) error {
 	}
 
 	var data struct {
+		URL            string                 `json:"url"`
 		Cookies        []*proto.NetworkCookie `json:"cookies"`
-		LocalStorage   map[string]string      `json:"localStorage"`
-		SessionStorage map[string]string      `json:"sessionStorage"`
+		LocalStorage   json.RawMessage        `json:"localStorage"`
+		SessionStorage json.RawMessage        `json:"sessionStorage"`
 	}
 	if err := json.Unmarshal(state, &data); err != nil {
 		return fmt.Errorf("invalid auth state: %w", err)
 	}
 
-	// Restore cookies
+	parseStorage := func(raw json.RawMessage) map[string]string {
+		if len(raw) == 0 || string(raw) == "null" {
+			return nil
+		}
+		var m map[string]string
+		if err := json.Unmarshal(raw, &m); err == nil {
+			return m
+		}
+		var arr []any
+		if err := json.Unmarshal(raw, &arr); err == nil {
+			return map[string]string{}
+		}
+		return nil
+	}
+
+	if data.URL != "" {
+		_ = s.page.Navigate(data.URL)
+		s.page.Timeout(4 * time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
+	}
+
+	// Restore cookies with the same metadata we captured.
 	if len(data.Cookies) > 0 {
 		params := make([]*proto.NetworkCookieParam, 0, len(data.Cookies))
 		for _, c := range data.Cookies {
-			params = append(params, &proto.NetworkCookieParam{
+			param := &proto.NetworkCookieParam{
 				Name:     c.Name,
 				Value:    c.Value,
 				Domain:   c.Domain,
 				Path:     c.Path,
 				Secure:   c.Secure,
 				HTTPOnly: c.HTTPOnly,
-			})
+			}
+			if c.Expires != 0 {
+				param.Expires = c.Expires
+			}
+			if c.SameSite != "" {
+				sameSite := c.SameSite
+				param.SameSite = sameSite
+			}
+			params = append(params, param)
 		}
 		if err := s.page.SetCookies(params); err != nil {
 			return fmt.Errorf("cookie restore failed: %w", err)
@@ -362,14 +407,14 @@ func (s *Session) LoadAuth(state json.RawMessage) error {
 	}
 
 	// Restore localStorage
-	if len(data.LocalStorage) > 0 {
-		lsJSON, _ := json.Marshal(data.LocalStorage)
+	if storage := parseStorage(data.LocalStorage); storage != nil {
+		lsJSON, _ := json.Marshal(storage)
 		s.page.Eval(`(items) => { for (const [k,v] of Object.entries(JSON.parse(items))) localStorage.setItem(k,v); }`, string(lsJSON))
 	}
 
 	// Restore sessionStorage
-	if len(data.SessionStorage) > 0 {
-		ssJSON, _ := json.Marshal(data.SessionStorage)
+	if storage := parseStorage(data.SessionStorage); storage != nil {
+		ssJSON, _ := json.Marshal(storage)
 		s.page.Eval(`(items) => { for (const [k,v] of Object.entries(JSON.parse(items))) sessionStorage.setItem(k,v); }`, string(ssJSON))
 	}
 

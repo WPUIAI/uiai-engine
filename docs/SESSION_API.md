@@ -851,3 +851,8 @@ The bridge speaks MCP JSON-RPC over stdio:
 - **Port:** 7456 (localhost only, behind Cloudflare tunnel externally)
 - **Auth:** No auth required for localhost calls (auth bypass for `/api/session*`, `/api/tools*`)
 - **External:** Requires `X-Webhook-Secret` header through Cloudflare tunnel
+
+## Related Docs
+
+- [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — Self-hosted captcha solver (text + reCAPTCHA v2) as a session action
+- [`WORKFLOW_API_ORCHESTRATION.md`](WORKFLOW_API_ORCHESTRATION.md) — Full endpoint map and OCR routing

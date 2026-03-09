@@ -1,6 +1,6 @@
 # Workflow API Remote Orchestration
 
-**Updated:** 2026-02-08
+**Updated:** 2026-03-06
 
 ## Architecture
 
@@ -36,6 +36,27 @@ Go engine (uiai-engine) via HTTP.
 | `layout_compare` | `POST /api/critique` (mode=layout) | `call_layout_compare()` | local LLM |
 | `style_enhance` | `POST /api/critique` (mode=style) | `call_style_enhance()` | local LLM |
 | `copilot` | `POST /api/intake` | `call_copilot()` | local LLM |
+
+### Media Frame Pipeline (GitHub-vendored device frames)
+
+| Capability | Cloud Endpoint | Purpose |
+|------------|---------------|---------|
+| `frame_catalog` | `GET /api/media/frame/catalog` | List approved frame IDs + metadata |
+| `frame_render` | `POST /api/media/frame/render` | Composite screenshot into selected frame |
+
+Example render request:
+
+```json
+POST /api/media/frame/render
+{
+  "frameId": "macbook-pro-16-silver",
+  "imageBase64": "...",
+  "fit": "cover",
+  "format": "jpeg",
+  "quality": 90,
+  "scale": 1
+}
+```
 
 ### Critique Endpoint Contract
 
@@ -107,11 +128,14 @@ The plugin handles `parse_error` by attempting local JSON repair via `Design_Cri
 ### Reference Analysis Endpoint
 
 **Request:**
-```
-POST /api/reference/analyze?pass=full
+```json
+POST /api/reference/analyze
 {
   "imageBase64": "...",
-  "imageType": "image/webp"
+  "imageType": "image/webp",
+  "provider": "openrouter",
+  "model": "openai/gpt-4o-mini-2024-07-18",
+  "pass": "full"
 }
 ```
 
@@ -120,7 +144,91 @@ POST /api/reference/analyze?pass=full
 - `components` — Component identification
 - `tokens` — Design token extraction (colors, fonts, spacing)
 - `spacing` — Spacing system analysis
-- `full` — All 4 passes sequentially
+- `text` — OCR-style visible text extraction from an image
+- `full` — All 4 analysis passes sequentially
+
+### OCR / Verification Extraction
+
+The `text` pass is intended for reading visible human-readable text from screenshots or cropped regions, including verification strings and short captcha-style tokens on third-party forms.
+
+Example:
+
+```json
+POST /api/reference/analyze
+{
+  "imageBase64": "...",
+  "imageType": "image/jpeg",
+  "pass": "text"
+}
+```
+
+#### Route behavior
+
+`POST /api/reference/analyze` intentionally treats OCR a little differently from the other reference-analysis passes:
+
+- if the caller omits `provider` / `model`, the route clears them before calling `ExtractText()`
+- that lets the OCR layer itself choose the best runtime path instead of inheriting an unrelated generic default from another caller
+- callers may still force a provider/model explicitly, but should avoid doing so unless they truly need to override runtime policy
+
+#### Current OCR stack
+
+Current runtime behavior for `pass: "text"` is:
+
+1. prompt asks for **plain text only**
+2. if the image looks like a verification challenge / captcha, the prompt asks for **only the uppercase alphanumeric token**
+3. when provider/model are omitted, OCR prefers the runtime MiniMax path instead of a hardcoded OpenRouter caller route
+4. MiniMax image OCR is resolved in two stages:
+   - **first:** MiniMax Coding Plan VLM / MCP path at `POST /v1/coding_plan/vlm`
+   - **fallback:** raw MiniMax text API example path at `POST /v1/text/chatcompletion_v2`
+5. if MiniMax OCR fails or returns empty text, `uiai-engine` now falls back to **local Tesseract**
+6. local fallback preprocesses the crop with ImageMagick `convert`, runs several variants + PSM modes, normalizes to uppercase alphanumerics, and picks the best-scoring short token
+
+#### MiniMax findings that matter
+
+- Official MiniMax OpenAPI docs at `https://platform.minimax.io/docs/api-reference/text/api/openapi.json` document multimodal/image requests on `POST /v1/text/chatcompletion_v2`
+- Official image example uses model `MiniMax-Text-01` with `messages[].content[]` blocks of type `text` + `image_url`
+- MiniMax Coding Plan image understanding is separately exposed through `POST /v1/coding_plan/vlm`
+- raw MiniMax text/image responses may return HTTP 200 while still embedding a real failure in `base_resp.status_code`
+- callers and providers must treat non-zero `base_resp.status_code` as a failure even on HTTP 200
+- on this host, raw `MiniMax-Text-01` paygo-style image calls were observed returning `base_resp.status_code=1008` / `status_msg="insufficient balance"`, while the Coding Plan VLM path worked
+
+#### Local OCR fallback
+
+Local fallback currently depends on:
+
+- `tesseract`
+- ImageMagick `convert`
+
+Local fallback is currently **MiniMax-path fallback**, not a generic all-provider OCR chain.
+That means:
+
+- MiniMax fail/empty → try local Tesseract
+- explicit non-MiniMax provider failures are not automatically rerouted through local OCR here
+
+#### Example response
+
+```json
+{
+  "success": true,
+  "data": {
+    "text": "13FQM1",
+    "warnings": [
+      "OCR defaulted provider to MiniMax to avoid caller-side hardcoded OpenRouter routing.",
+      "MiniMax OCR switched away from the generic M2.5 text route; Coding Plan keys may use coding-plan VLM, while generic text API image examples use MiniMax-Text-01."
+    ]
+  }
+}
+```
+
+#### Notes / caller policy
+
+- `text` returns plain extracted text in `data.text`; any runtime notes appear in `data.warnings`
+- do not hardcode OCR to a specific provider/model in callers when runtime defaults exist
+- current host policy: prefer subscribed providers first, with MiniMax as the OCR-default path
+- OpenRouter is intentionally excluded from automatic OCR fallback on this host
+- captcha-style verification remains best-effort; if extraction is ambiguous, caller should fall back to human assist instead of blindly submitting
+- best results still come from **tight crops** around the verification image rather than full-page screenshots
+- **For dedicated captcha solving** (text captchas, reCAPTCHA v2), see [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — a self-hosted, session-aware solver using VLM + local fallback, designed to replace ad-hoc OCR calls in adapters
 
 ### Vision Interactive Endpoints
 
@@ -179,12 +287,19 @@ All pass → try cloud (with graceful degradation to local on failure)
 
 ## Authentication
 
-All endpoints require a valid license key in the `Authorization` header:
-```
+Protected endpoints accept any of these auth headers:
+
+```text
 Authorization: Bearer <license_key>
+X-License-Key: <license_key>
+X-API-Key: <api_key>
+X-Webhook-Secret: <internal_webhook_secret>
 ```
 
-The Go engine validates this against the WordPress license API.
+Notes:
+- `X-Webhook-Secret` is the server-to-server path for trusted local callers on the same host.
+- Public capability consumers should continue using license or API key auth.
+- Public info endpoints like `/api/health`, `/api/ui-reverse/models`, and `/api/ui-reverse/operations` remain readable without auth.
 
 ## Graceful Degradation (CRITICAL)
 

@@ -39,6 +39,11 @@ func MountMediaReal(r chi.Router, cfg *config.Config, creds *credits.Service, li
 	r.Post("/produce", d.handleProduce)
 	r.Get("/status/{jobID}", d.handleStatus)
 	r.Get("/jobs", d.handleList)
+
+	// Device frame rendering (GitHub-vendored frame assets)
+	r.Route("/frame", func(r chi.Router) {
+		mountFrameRoutes(r)
+	})
 }
 
 func (d *mediaDeps) handleProduce(w http.ResponseWriter, r *http.Request) {
@@ -143,9 +148,9 @@ func (d *mediaDeps) handleProduce(w http.ResponseWriter, r *http.Request) {
 	go d.executeJob(job)
 
 	writeJSON(w, 202, map[string]any{
-		"job_id": jobID,
-		"status": "pending",
-		"type":   req.Type,
+		"job_id":  jobID,
+		"status":  "pending",
+		"type":    req.Type,
 		"message": "Media production started",
 	})
 }
@@ -159,9 +164,9 @@ func (d *mediaDeps) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]any{
-		"job_id":    job.ID,
-		"type":      job.Type,
-		"status":    job.Status,
+		"job_id":     job.ID,
+		"type":       job.Type,
+		"status":     job.Status,
 		"created_at": job.CreatedAt,
 	}
 	if job.ResultURL != "" {
@@ -492,5 +497,3 @@ func uploadToR2(cfg *config.Config, localPath, r2Key string) (string, error) {
 	publicURL := fmt.Sprintf("%s/%s", cfg.Media.R2PublicURL, r2Key)
 	return publicURL, nil
 }
-
-

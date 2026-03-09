@@ -21,7 +21,7 @@ import (
 )
 
 // IdleTimeout is how long Chrome sits idle before being killed to free memory.
-const IdleTimeout = 10 * time.Minute
+const IdleTimeout = 5 * time.Minute
 
 // Queue constants
 const (
@@ -31,7 +31,7 @@ const (
 
 // WarmPageCount is how many blank pages to pre-create when Chrome launches.
 // These are ready to navigate immediately, eliminating page creation latency (~50ms each).
-const WarmPageCount = 2
+const WarmPageCount = 1
 
 type Pool struct {
 	mu       sync.Mutex

@@ -29,7 +29,7 @@ type referenceRequest struct {
 	ImageType   string `json:"imageType"`
 	Provider    string `json:"provider"`
 	Model       string `json:"model"`
-	Pass        string `json:"pass"` // "analyze", "components", "tokens", "spacing", "full"
+	Pass        string `json:"pass"` // "analyze", "components", "tokens", "spacing", "text", "full"
 	// For pass 2 (components) — sections from pass 1
 	Sections []reference.Section `json:"sections,omitempty"`
 	// For pass 4 (spacing) — components from pass 2
@@ -73,6 +73,8 @@ func (h *referenceHandler) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "imageBase64 is required"})
 		return
 	}
+	providerProvided := req.Provider != ""
+	modelProvided := req.Model != ""
 	if req.Model == "" {
 		req.Model = h.cfg.AI.DefaultModel
 	}
@@ -128,6 +130,24 @@ func (h *referenceHandler) analyze(w http.ResponseWriter, r *http.Request) {
 		h.logUsage("reference_spacing", req.Model, start)
 		writeJSON(w, 200, map[string]any{"success": true, "data": result})
 
+	case "text":
+		provider := req.Provider
+		model := req.Model
+		if !providerProvided {
+			provider = ""
+		}
+		if !modelProvided {
+			model = ""
+		}
+		result, err := h.analyzer.ExtractText(ctx, req.ImageBase64, req.ImageType, provider, model)
+		if err != nil {
+			writeJSON(w, 502, map[string]string{"error": err.Error()})
+			return
+		}
+		go h.credits.Deduct(id.LicenseID, "reference_text", "")
+		h.logUsage("reference_text", req.Model, start)
+		writeJSON(w, 200, map[string]any{"success": true, "data": result})
+
 	case "full":
 		result, err := h.analyzer.AnalyzeFull(ctx, req.ImageBase64, req.ImageType, req.Provider, req.Model)
 		if err != nil {
@@ -139,7 +159,7 @@ func (h *referenceHandler) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"success": true, "data": result})
 
 	default:
-		writeJSON(w, 400, map[string]string{"error": "pass must be: analyze, components, tokens, spacing, or full"})
+		writeJSON(w, 400, map[string]string{"error": "pass must be: analyze, components, tokens, spacing, text, or full"})
 	}
 }
 

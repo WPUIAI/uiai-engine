@@ -345,6 +345,30 @@ func openAITools() []map[string]any {
 			},
 		},
 		{
+			"name":        "frame_catalog",
+			"description": "List available device frames sourced from approved GitHub packs (id, source, safe area, output size).",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "frame_render",
+			"description": "Render a screenshot into a selected device frame. Use frame_catalog first to find frameId.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"frameId":    map[string]string{"type": "string", "description": "Frame ID from frame_catalog"},
+					"imageBase64": map[string]string{"type": "string", "description": "Source screenshot base64"},
+					"fit":        map[string]any{"type": "string", "description": "cover or contain", "default": "cover"},
+					"format":     map[string]any{"type": "string", "description": "png or jpeg", "default": "png"},
+					"quality":    map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 90},
+					"scale":      map[string]any{"type": "integer", "description": "Output scale multiplier", "default": 1},
+				},
+				"required": []string{"frameId", "imageBase64"},
+			},
+		},
+		{
 			"name":        "screenshot",
 			"description": "One-shot screenshot: navigate, capture, forget. For single checks when you don't need a persistent session.",
 			"parameters": map[string]any{

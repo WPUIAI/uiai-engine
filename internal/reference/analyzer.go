@@ -3,10 +3,10 @@
 // This is a direct port of PHP class-ui-reference-analyzer.php (1001 LOC).
 // Each pass uses vision AI to extract increasingly detailed information:
 //
-//   Pass 1: analyze_reference   → page metadata + section inventory
-//   Pass 2: extract_components  → component inventory per section
-//   Pass 3: extract_tokens      → design tokens (colors, typography, spacing, shapes)
-//   Pass 4: extract_spacing     → spacing system + alignment patterns
+//	Pass 1: analyze_reference   → page metadata + section inventory
+//	Pass 2: extract_components  → component inventory per section
+//	Pass 3: extract_tokens      → design tokens (colors, typography, spacing, shapes)
+//	Pass 4: extract_spacing     → spacing system + alignment patterns
 //
 // The Go implementation stores prompts as constants and uses jsonutil.Repair
 // for response parsing, matching the PHP behavior exactly.
@@ -14,7 +14,12 @@ package reference
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/philoveracity/uiai-engine/internal/ai"
@@ -33,9 +38,9 @@ func NewAnalyzer(aiProv *ai.Provider) *Analyzer {
 
 // AnalysisResult is the output of Pass 1.
 type AnalysisResult struct {
-	Page     PageMeta   `json:"page"`
-	Sections []Section  `json:"sections"`
-	Warnings []string   `json:"warnings,omitempty"`
+	Page     PageMeta  `json:"page"`
+	Sections []Section `json:"sections"`
+	Warnings []string  `json:"warnings,omitempty"`
 }
 
 type PageMeta struct {
@@ -93,6 +98,12 @@ type SpacingResult struct {
 	ContainerPadding  map[string]string `json:"container_padding"`
 	AlignmentPatterns map[string]string `json:"alignment_patterns"`
 	Warnings          []string          `json:"warnings,omitempty"`
+}
+
+// TextExtractionResult is the OCR-style output for visible image text.
+type TextExtractionResult struct {
+	Text     string   `json:"text"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -274,6 +285,168 @@ func (a *Analyzer) ExtractSpacing(ctx context.Context, imageBase64, imageType, p
 	}
 
 	return result, nil
+}
+
+// ═══════════════════════════════════════════════════════════
+// TEXT EXTRACTION
+// ═══════════════════════════════════════════════════════════
+
+// ExtractText performs OCR-style visible text extraction from an image.
+func (a *Analyzer) ExtractText(ctx context.Context, imageBase64, imageType, provider, model string) (*TextExtractionResult, error) {
+	prompt := strings.Join([]string{
+		"Read the image and extract only the visible human-readable text.",
+		"Return plain text only.",
+		"Preserve line breaks when they help readability.",
+		"Do not describe the image.",
+		"Do not return JSON, markdown, labels, or explanations.",
+		"If the image is a verification challenge or captcha, return only the exact uppercase alphanumeric token shown in the image, with no spaces or commentary.",
+	}, " ")
+
+	resolvedProvider := strings.TrimSpace(provider)
+	resolvedModel := strings.TrimSpace(model)
+	warnings := []string{}
+
+	// MiniMax docs split image handling into two paths:
+	// - Coding Plan keys expose image understanding via the coding-plan VLM/MCP path.
+	// - Generic text API image examples use MiniMax-Text-01 on /v1/text/chatcompletion_v2.
+	if resolvedProvider == "" || strings.EqualFold(resolvedProvider, "minimax") {
+		if resolvedProvider == "" {
+			resolvedProvider = "minimax"
+			warnings = append(warnings, "OCR defaulted provider to MiniMax to avoid caller-side hardcoded OpenRouter routing.")
+		}
+		if resolvedModel == "" || strings.EqualFold(resolvedModel, "MiniMax-M2.5") {
+			resolvedModel = "MiniMax-Text-01"
+			warnings = append(warnings, "MiniMax OCR switched away from the generic M2.5 text route; Coding Plan keys may use coding-plan VLM, while generic text API image examples use MiniMax-Text-01.")
+		}
+	}
+
+	resp, err := a.callVision(ctx, prompt, imageBase64, imageType, resolvedProvider, resolvedModel)
+	if err != nil {
+		if strings.EqualFold(resolvedProvider, "minimax") {
+			localText, localWarnings, localErr := extractTextWithLocalTesseract(ctx, imageBase64, imageType)
+			if localErr == nil && strings.TrimSpace(localText) != "" {
+				warnings = append(warnings, "MiniMax OCR failed; local Tesseract fallback used.")
+				warnings = append(warnings, localWarnings...)
+				return &TextExtractionResult{Text: strings.TrimSpace(localText), Warnings: warnings}, nil
+			}
+		}
+		return nil, fmt.Errorf("text extraction: %w", err)
+	}
+
+	text := strings.TrimSpace(resp.Content)
+	if text == "" && strings.EqualFold(resolvedProvider, "minimax") {
+		localText, localWarnings, localErr := extractTextWithLocalTesseract(ctx, imageBase64, imageType)
+		if localErr == nil && strings.TrimSpace(localText) != "" {
+			warnings = append(warnings, "MiniMax OCR returned empty content; local Tesseract fallback used.")
+			warnings = append(warnings, localWarnings...)
+			text = strings.TrimSpace(localText)
+		}
+	}
+
+	result := &TextExtractionResult{
+		Text:     text,
+		Warnings: warnings,
+	}
+	if result.Text == "" {
+		result.Warnings = append(result.Warnings, "No text extracted from image.")
+	}
+	return result, nil
+}
+
+var nonAlnumOCR = regexp.MustCompile(`[^A-Z0-9]+`)
+
+func extractTextWithLocalTesseract(ctx context.Context, imageBase64, imageType string) (string, []string, error) {
+	if strings.TrimSpace(imageBase64) == "" {
+		return "", nil, fmt.Errorf("empty image")
+	}
+	if _, err := exec.LookPath("tesseract"); err != nil {
+		return "", nil, err
+	}
+	if _, err := exec.LookPath("convert"); err != nil {
+		return "", nil, err
+	}
+
+	imgBytes, err := base64.StdEncoding.DecodeString(imageBase64)
+	if err != nil {
+		return "", nil, err
+	}
+
+	tmpDir, err := os.MkdirTemp("", "ocr-tess-*")
+	if err != nil {
+		return "", nil, err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	ext := ".jpg"
+	switch strings.ToLower(strings.TrimSpace(imageType)) {
+	case "image/png":
+		ext = ".png"
+	case "image/webp":
+		ext = ".webp"
+	case "image/jpeg", "image/jpg", "":
+		ext = ".jpg"
+	}
+	inputPath := filepath.Join(tmpDir, "input"+ext)
+	if err := os.WriteFile(inputPath, imgBytes, 0o600); err != nil {
+		return "", nil, err
+	}
+
+	variants := []struct {
+		name string
+		args []string
+	}{
+		{"gray-threshold", []string{inputPath, "-colorspace", "Gray", "-resize", "350%", "-contrast-stretch", "0", "-threshold", "55%", filepath.Join(tmpDir, "v1.png")}},
+		{"gray-sharpen", []string{inputPath, "-colorspace", "Gray", "-resize", "400%", "-contrast-stretch", "0", "-sharpen", "0x1", filepath.Join(tmpDir, "v2.png")}},
+		{"gray-negate", []string{inputPath, "-colorspace", "Gray", "-resize", "350%", "-negate", "-threshold", "60%", filepath.Join(tmpDir, "v3.png")}},
+	}
+
+	candidate := ""
+	warnings := []string{}
+	for _, variant := range variants {
+		cmd := exec.CommandContext(ctx, "convert", variant.args...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			warnings = append(warnings, fmt.Sprintf("convert %s failed: %s", variant.name, strings.TrimSpace(string(out))))
+			continue
+		}
+		outPath := variant.args[len(variant.args)-1]
+		for _, psm := range []string{"8", "7", "6"} {
+			cmd = exec.CommandContext(ctx, "tesseract", outPath, "stdout", "--psm", psm, "-l", "eng", "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("tesseract %s/psm%s failed: %s", variant.name, psm, strings.TrimSpace(string(out))))
+				continue
+			}
+			text := normalizeOCRToken(string(out))
+			if scoreOCRCandidate(text) > scoreOCRCandidate(candidate) {
+				candidate = text
+			}
+		}
+	}
+
+	if candidate == "" {
+		return "", warnings, fmt.Errorf("no local OCR text extracted")
+	}
+	return candidate, warnings, nil
+}
+
+func normalizeOCRToken(s string) string {
+	s = strings.ToUpper(strings.TrimSpace(s))
+	s = nonAlnumOCR.ReplaceAllString(s, "")
+	return strings.TrimSpace(s)
+}
+
+func scoreOCRCandidate(s string) int {
+	if s == "" {
+		return 0
+	}
+	score := len(s)
+	if len(s) >= 4 && len(s) <= 8 {
+		score += 20
+	}
+	if len(s) == 6 {
+		score += 15
+	}
+	return score
 }
 
 // ═══════════════════════════════════════════════════════════

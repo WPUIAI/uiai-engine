@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "generated_at": "2026-02-12T00:12:00Z",
+  "sources": [
+    {
+      "name": "pommeplate",
+      "repo": "https://github.com/ephread/PommePlate",
+      "commit": "1e9b89db15d270506d1f9ed142119d17d5735ab0",
+      "license": "CC0-1.0",
+      "license_status": "APPROVED"
+    },
+    {
+      "name": "ios-device-svg-templates",
+      "repo": "https://github.com/neogeek/ios-device-svg-templates",
+      "commit": "dc2d2f7be52c7c79d9f74eee62425323c71c1dab",
+      "license": "MIT",
+      "license_status": "APPROVED"
+    }
+  ],
+  "frames": [
+    {
+      "frame_id": "macbook-pro-16-silver",
+      "title": "MacBook Pro 16-inch (Silver)",
+      "source": "pommeplate",
+      "source_ref": "1e9b89db15d270506d1f9ed142119d17d5735ab0",
+      "license": "CC0-1.0",
+      "svg": "vendor/pommeplate/1e9b89db15d270506d1f9ed142119d17d5735ab0/MacBook Pro 16-inch - Silver.svg",
+      "safe_area": { "x": 419, "y": 95, "w": 3072, "h": 1920 },
+      "output": { "width": 3910, "height": 2236 },
+      "corner_radius": 0,
+      "active": true
+    },
+    {
+      "frame_id": "iphone-x-space-gray",
+      "title": "iPhone X / XS / 11 Pro (Space Gray)",
+      "source": "pommeplate",
+      "source_ref": "1e9b89db15d270506d1f9ed142119d17d5735ab0",
+      "license": "CC0-1.0",
+      "svg": "vendor/pommeplate/1e9b89db15d270506d1f9ed142119d17d5735ab0/iPhone X-XS-11 Pro Space Gray.svg",
+      "safe_area": { "x": 86, "y": 78, "w": 1125, "h": 2436 },
+      "output": { "width": 1296, "height": 2592 },
+      "corner_radius": 58,
+      "active": true
+    },
+    {
+      "frame_id": "iphone-5c-portrait",
+      "title": "iPhone 5c Portrait",
+      "source": "ios-device-svg-templates",
+      "source_ref": "dc2d2f7be52c7c79d9f74eee62425323c71c1dab",
+      "license": "MIT",
+      "svg": "vendor/ios-device-svg-templates/dc2d2f7be52c7c79d9f74eee62425323c71c1dab/iphone-5c-portrait.svg",
+      "safe_area": { "x": 80, "y": 251, "w": 640, "h": 1136 },
+      "output": { "width": 800, "height": 1640 },
+      "corner_radius": 0,
+      "active": true
+    }
+  ]
+}

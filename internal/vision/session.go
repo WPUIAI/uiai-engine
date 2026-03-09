@@ -18,7 +18,7 @@ import (
 const MaxSessions = 4
 
 // SessionTTL is how long an idle session stays alive before auto-cleanup.
-const SessionTTL = 10 * time.Minute
+const SessionTTL = 5 * time.Minute
 
 // Session is a persistent browser page with identity.
 // Unlike the transactional pool (navigate → snap → forget), a session keeps
