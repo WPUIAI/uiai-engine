@@ -42,14 +42,19 @@ const (
 
 // SolveRecaptchaV2 solves a reCAPTCHA v2 challenge in a live session.
 func (s *Solver) SolveRecaptchaV2(ctx context.Context, sess *vision.Session, cfg SolveConfig) *SolveResponse {
+	// Create a longer timeout context for the full reCAPTCHA solve
+	solveCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+	ctx = solveCtx
+
 	rcCfg := s.Config.Recaptcha
 	maxAttempts := rcCfg.MaxAttempts
 	if maxAttempts <= 0 {
-		maxAttempts = 4
+		maxAttempts = 2
 	}
 	maxRounds := rcCfg.MaxRounds
 	if maxRounds <= 0 {
-		maxRounds = 4
+		maxRounds = 3
 	}
 
 	strategy := cfg.Strategy
@@ -108,7 +113,7 @@ func (s *Solver) attemptRecaptcha(ctx context.Context, sess *vision.Session, str
 		return &SolveResponse{Solved: false, Error: result, Method: "none"}
 	}
 
-	randomDelay(1000, 2000)
+	randomDelay(800, 1500)
 
 	// 2. Check if already solved (no challenge appeared)
 	if s.isRecaptchaSolved(sess) {
@@ -241,35 +246,19 @@ func (s *Solver) extractChallengeInfo(sess *vision.Session) (*challengeInfo, err
 // ─── Strategy A: Full-grid screenshot ──────────────────────────────────────
 
 func (s *Solver) solveFullGrid(ctx context.Context, sess *vision.Session, info *challengeInfo) ([]int, error) {
-	// Screenshot the entire grid as one image
+	// reCAPTCHA uses ONE source image for all tiles (CSS clip shows different parts).
+	// Extract the full source image — it's already a grid composite.
 	js := fmt.Sprintf(`
 		var cf = document.querySelector(%q);
 		if (!cf) return "";
 		try {
 			var doc = cf.contentDocument;
-			var table = doc.querySelector(".rc-imageselect-challenge, .rc-imageselect-table-33, .rc-imageselect-table-44");
-			if (!table) return "";
+			var img = doc.querySelector(".rc-imageselect-tile img");
+			if (!img) return "ERR:no_tile_img";
 			var c = document.createElement("canvas");
-			var rect = table.getBoundingClientRect();
-			c.width = rect.width * 2;
-			c.height = rect.height * 2;
-			// Use html2canvas-style rendering via foreignObject
-			// Fallback: screenshot individual tiles and stitch
-			var imgs = doc.querySelectorAll(".rc-imageselect-tile img");
-			if (imgs.length === 0) return "";
-			// For 3x3: 3 cols; for 4x4: 4 cols
-			var cols = Math.round(Math.sqrt(imgs.length));
-			var rows = Math.ceil(imgs.length / cols);
-			var tileW = imgs[0].naturalWidth || imgs[0].width;
-			var tileH = imgs[0].naturalHeight || imgs[0].height;
-			c.width = cols * tileW;
-			c.height = rows * tileH;
-			var ctx2 = c.getContext("2d");
-			for (var i = 0; i < imgs.length; i++) {
-				var col = i %% cols;
-				var row = Math.floor(i / cols);
-				ctx2.drawImage(imgs[i], col * tileW, row * tileH);
-			}
+			c.width = img.naturalWidth;
+			c.height = img.naturalHeight;
+			c.getContext("2d").drawImage(img, 0, 0);
 			return c.toDataURL("image/jpeg", 0.9).split(",")[1];
 		} catch(e) { return "ERR:" + e.message; }
 	`, rcChallengeSel)
