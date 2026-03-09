@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/philoveracity/uiai-engine/internal/captcha"
-	"github.com/philoveracity/uiai-engine/internal/vision"
+	visionPkg "github.com/philoveracity/uiai-engine/internal/vision"
 )
 
 // MountCaptchaRoutes registers captcha solver endpoints.
@@ -47,6 +47,52 @@ func MountCaptchaRoutes(r chi.Router, solver *captcha.Solver) {
 		json.NewEncoder(w).Encode(result)
 	})
 
+	// POST /api/captcha/solve-proxied — solve via proxy-rotated browser
+	r.Post("/solve-proxied", func(w http.ResponseWriter, req *http.Request) {
+		var body struct {
+			URL     string               `json:"url"`
+			Width   int                  `json:"width"`
+			Height  int                  `json:"height"`
+			Fields  map[string]string    `json:"fields"`   // name→value to fill
+			Selects map[string]string    `json:"selects"`  // select name→value
+			Captcha captcha.SolveRequest `json:"captcha"`
+		}
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+			return
+		}
+		if body.URL == "" {
+			http.Error(w, `{"error":"url is required"}`, http.StatusBadRequest)
+			return
+		}
+		if body.Width <= 0 {
+			body.Width = 1280
+		}
+		if body.Height <= 0 {
+			body.Height = 900
+		}
+
+		result := solver.SolveViaProxy(req.Context(), body.URL, body.Width, body.Height,
+			func(sess *visionPkg.Session) error {
+				// Fill input fields
+				for name, val := range body.Fields {
+					selector := `input[name="` + name + `"]`
+					sess.Fill(selector, val)
+				}
+				// Fill selects via eval
+				for name, val := range body.Selects {
+					js := `var el=document.querySelector('select[name="` + name + `"]');if(el){el.value="` + val + `";el.dispatchEvent(new Event('change',{bubbles:true}));return "ok"}return "not_found"`
+					sess.Eval(js)
+				}
+				return nil
+			},
+			body.Captcha,
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	})
+
 	// GET /api/captcha/status
 	r.Get("/status", func(w http.ResponseWriter, req *http.Request) {
 		status := solver.GetStatus()
@@ -57,7 +103,7 @@ func MountCaptchaRoutes(r chi.Router, solver *captcha.Solver) {
 
 // MountSessionCaptchaRoute adds POST /captcha/solve under a session route group.
 // Called from session.go route setup.
-func MountSessionCaptchaRoute(r chi.Router, solver *captcha.Solver, sm *vision.SessionManager) {
+func MountSessionCaptchaRoute(r chi.Router, solver *captcha.Solver, sm *visionPkg.SessionManager) {
 	if solver == nil {
 		return
 	}

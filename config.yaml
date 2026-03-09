@@ -69,6 +69,39 @@ rate_limits:
     agency:     { per_hour: 2000, per_day: 20000 }
     enterprise: { per_hour: 5000, per_day: 50000 }
 
+captcha:
+  enabled: true
+  default_provider: "openrouter"
+  default_model: "google/gemini-2.0-flash-001"
+  text:
+    max_attempts: 5
+    retry_delay: "1s"
+    prompt_template: "blind_assistant"
+    fallback_chain: ["vlm", "tesseract"]
+  recaptcha:
+    strategy: "full_grid"
+    max_rounds: 3
+    max_attempts: 2
+    action_delay_min_ms: 200
+    action_delay_max_ms: 800
+    verify_delay_min_ms: 500
+    verify_delay_max_ms: 1000
+    audio_fallback: true
+    whisper_url: "http://localhost:8115"
+  proxy:
+    enabled: false
+    strategy: "round_robin"
+    # Add SOCKS5/HTTP proxies here:
+    # proxies:
+    #   - "socks5://user:pass@residential-proxy.example.com:1080"
+    #   - "http://user:pass@datacenter-proxy.example.com:8080"
+  stealth:
+    patch_webdriver: true
+    random_user_agent: true
+  stats:
+    enabled: true
+    log_file: "/var/log/uiai/captcha-stats.jsonl"
+
 storage:
   data_dir: "/home/wpuiai/uiai-engine/data"
   usage_file: "usage.json"

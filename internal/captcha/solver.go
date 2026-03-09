@@ -193,6 +193,19 @@ func (s *Solver) GetStatus() *StatusResponse {
 		}
 	}
 
+	// Proxy
+	if s.Config.Proxy.Enabled && len(s.Config.Proxy.Proxies) > 0 {
+		resp.Backends["proxy"] = Backend{
+			Available: true,
+			Version:   fmt.Sprintf("%d proxies, %s", len(s.Config.Proxy.Proxies), s.Config.Proxy.Strategy),
+		}
+	} else {
+		resp.Backends["proxy"] = Backend{
+			Available: false,
+			Version:   "no proxies configured",
+		}
+	}
+
 	return resp
 }
 

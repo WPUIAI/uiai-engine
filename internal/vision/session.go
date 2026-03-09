@@ -57,6 +57,27 @@ func NewSessionManager(pool *Pool) *SessionManager {
 	}
 }
 
+// WrapPage creates a Session from a raw rod.Page, without a pool or manager.
+// Used by the captcha solver's proxy module to wrap ephemeral browser pages.
+func WrapPage(page *rod.Page, url string, width, height int) *Session {
+	now := time.Now()
+	title := ""
+	if el, err := page.Eval(`() => document.title`); err == nil {
+		title = el.Value.Str()
+	}
+	return &Session{
+		ID:        generateID(),
+		URL:       url,
+		Title:     title,
+		Width:     width,
+		Height:    height,
+		CreatedAt: now,
+		LastUsed:  now,
+		page:      page,
+		refs:      make(map[string]SnapshotRef),
+	}
+}
+
 // generateID creates a short unique session ID.
 func generateID() string {
 	b := make([]byte, 6)

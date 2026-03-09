@@ -114,6 +114,7 @@ type CaptchaConfig struct {
 	Recaptcha       RecaptchaConfig           `yaml:"recaptcha" json:"recaptcha"`
 	Voting          VotingConfig             `yaml:"voting" json:"voting"`
 	Stealth         StealthConfig            `yaml:"stealth" json:"stealth"`
+	Proxy           ProxyConfig              `yaml:"proxy" json:"proxy"`
 	Stats           StatsConfig              `yaml:"stats" json:"stats"`
 	Profiles        map[string]ProfileConfig `yaml:"profiles" json:"profiles"`
 }
