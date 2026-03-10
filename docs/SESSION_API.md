@@ -872,10 +872,18 @@ See [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) for full API reference, a
 ### Stateless Endpoints (no session needed)
 
 - `POST /api/captcha/solve-image` — solve text captcha from raw base64 image
-- `POST /api/captcha/solve-proxied` — open proxied browser, fill form, solve captcha
-- `GET /api/captcha/status` — backend availability and solve stats
+- `POST /api/captcha/solve-proxied` — open proxied browser on clean IP, fill form, solve captcha (auto-retries on different IP)
+- `GET /api/captcha/status` — backend availability, solve stats, IP pool info
+
+### IP Pool Management
+
+- `GET /api/captcha/pool` — per-IP health, success rates, probe status, cooldown state
+- `POST /api/captcha/pool/add` — add IP at runtime (`{"endpoint":"local:1.2.3.4"}`)
+- `POST /api/captcha/pool/remove` — remove IP at runtime
+
+The pool runs 3 clean server IPs with weighted rotation, active health probes every 5min, auto-cooldown on flag detection, and auto-retry across IPs on failure.
 
 ## Related Docs
 
-- [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — Self-hosted captcha solver (text + reCAPTCHA v2) with proxy rotation, multi-model voting, accuracy data
+- [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — Complete captcha solver reference: IP pool, accuracy data, config, cost model, design decisions
 - [`WORKFLOW_API_ORCHESTRATION.md`](WORKFLOW_API_ORCHESTRATION.md) — Full endpoint map and OCR routing

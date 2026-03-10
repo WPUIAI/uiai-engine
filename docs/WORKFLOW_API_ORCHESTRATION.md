@@ -43,15 +43,15 @@ Go engine (uiai-engine) via HTTP.
 |------------|----------|---------|
 | `solve_image` | `POST /api/captcha/solve-image` | Stateless text captcha solve from base64 image |
 | `solve_session` | `POST /api/session/{id}/captcha/solve` | Session-scoped solve (text + reCAPTCHA v2) |
-| `solve_proxied` | `POST /api/captcha/solve-proxied` | One-shot proxied browser solve with form fill |
-| `captcha_status` | `GET /api/captcha/status` | Backend availability and solve stats |
-| `pool_status` | `GET /api/captcha/pool` | Per-IP health, success rates, cooldown state |
+| `solve_proxied` | `POST /api/captcha/solve-proxied` | One-shot proxied browser: navigate + fill + solve (auto-retries on different IP) |
+| `captcha_status` | `GET /api/captcha/status` | Backend availability, solve stats, IP pool summary |
+| `pool_status` | `GET /api/captcha/pool` | Per-IP health, success rates, probe status, cooldown state |
 | `pool_add` | `POST /api/captcha/pool/add` | Add IP at runtime (no restart) |
 | `pool_remove` | `POST /api/captcha/pool/remove` | Remove IP at runtime |
 
-IP pool uses weighted rotation with per-IP health tracking, auto-cooldown on flag detection, and concurrent solve limits. IPs at $1/mo each.
+**IP Pool features:** 3 clean server IPs, weighted/least-conn rotation, active health probes every 5min, auto-cooldown on flag detection, auto-retry on different IP, concurrent solve limits (2 per IP), runtime add/remove. Scale at $1/IP/mo.
 
-See [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) for full API reference, accuracy data, and scale model.
+See [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) for full reference.
 
 ### Media Frame Pipeline (GitHub-vendored device frames)
 
