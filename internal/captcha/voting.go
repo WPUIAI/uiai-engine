@@ -195,9 +195,9 @@ type VoterModel struct {
 // hallucinate English words instead of reading distorted characters.
 func DefaultVoters() []VoterModel {
 	return []VoterModel{
-		{Provider: "openrouter", Model: "google/gemini-2.0-flash-001", Temperature: 0.8, Weight: 2},
-		{Provider: "openrouter", Model: "google/gemini-2.0-flash-001", Temperature: 0.3, Weight: 2},
-		{Provider: "openrouter", Model: "google/gemini-2.0-flash-001", Temperature: 1.0, Weight: 1},
+		{Provider: "openrouter", Model: "anthropic/claude-3.5-sonnet", Temperature: 0.0, Weight: 5},
+		{Provider: "openrouter", Model: "anthropic/claude-3.5-sonnet", Temperature: 0.3, Weight: 3},
+		{Provider: "openrouter", Model: "anthropic/claude-3.5-sonnet", Temperature: 0.7, Weight: 2},
 	}
 }
 
@@ -220,12 +220,12 @@ type PassResult struct {
 // and picks the best answer via voting.
 func SolveTextMultiPass(ctx context.Context, aiProv *ai.Provider, imgBase64, imgType string, cfg SolveConfig, captchaCfg CaptchaConfig) (*ImageSolveResponse, error) {
 	variants := []PreprocessConfig{
-		// Variant 1: light preprocessing
+		// Variant 1: light preprocessing (no median — good for clean captchas)
 		{Upscale: 2, Threshold: 120},
-		// Variant 2: medium — good for crosshatch
-		{Upscale: 3, Threshold: 100, MorphologyKernel: 3, ComponentMinArea: 20},
-		// Variant 3: aggressive — heavy noise removal
-		{Upscale: 4, Threshold: 80, MorphologyKernel: 5, ComponentMinArea: 50, ComponentMaxAspect: 6},
+		// Variant 2: median+threshold — good for crosshatch grid removal
+		{MedianKernel: 5, Threshold: 107, MorphologyKernel: 3},
+		// Variant 3: aggressive — heavy noise removal with component filter
+		{MedianKernel: 5, Threshold: 80, MorphologyKernel: 5, ComponentMinArea: 50, ComponentMaxAspect: 6},
 	}
 
 	prompt := buildTextPrompt(cfg)

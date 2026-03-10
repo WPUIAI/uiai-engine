@@ -18,7 +18,7 @@ import (
 const MaxSessions = 4
 
 // SessionTTL is how long an idle session stays alive before auto-cleanup.
-const SessionTTL = 5 * time.Minute
+const SessionTTL = 10 * time.Minute
 
 // Session is a persistent browser page with identity.
 // Unlike the transactional pool (navigate → snap → forget), a session keeps
@@ -545,7 +545,7 @@ func (s *Session) Eval(js string) (string, *SnapResult, error) {
 
 	start := time.Now()
 
-	result, err := s.page.Eval(`() => { ` + js + ` }`)
+	result, err := s.page.Timeout(30 * time.Second).Eval(`() => { ` + js + ` }`)
 	jsResult := ""
 	if err != nil {
 		jsResult = "error: " + err.Error()

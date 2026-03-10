@@ -29,11 +29,12 @@ type SolveConfig struct {
 
 // PreprocessConfig for image cleaning before OCR/VLM.
 type PreprocessConfig struct {
-	Upscale           int `json:"upscale,omitempty"`             // 2-4x
-	Threshold         int `json:"threshold,omitempty"`           // 0-255
-	MorphologyKernel  int `json:"morphology_kernel,omitempty"`   // odd, e.g. 3 or 5
-	ComponentMinArea  int `json:"component_min_area,omitempty"`  // min pixel area
-	ComponentMaxAspect int `json:"component_max_aspect,omitempty"` // max w/h ratio
+	Upscale           int `json:"upscale,omitempty" yaml:"upscale,omitempty"`                         // 2-4x
+	MedianKernel      int `json:"median_kernel,omitempty" yaml:"median_kernel,omitempty"`             // odd, e.g. 5 — median filter to blur thin grid lines
+	Threshold         int `json:"threshold,omitempty" yaml:"threshold,omitempty"`                     // 0-255
+	MorphologyKernel  int `json:"morphology_kernel,omitempty" yaml:"morphology_kernel,omitempty"`     // odd, e.g. 3 or 5
+	ComponentMinArea  int `json:"component_min_area,omitempty" yaml:"component_min_area,omitempty"`   // min pixel area
+	ComponentMaxAspect int `json:"component_max_aspect,omitempty" yaml:"component_max_aspect,omitempty"` // max w/h ratio
 }
 
 // VotingConfig for multi-model consensus.
@@ -69,6 +70,7 @@ type SolveDebug struct {
 type ImageSolveRequest struct {
 	ImageBase64   string          `json:"image_base64"`
 	ImageType     string          `json:"image_type,omitempty"` // default "image/png"
+	Site          string          `json:"site,omitempty"`       // profile name (e.g. "prlog") — resolves preprocessing/hint/template
 	Hint          string          `json:"hint,omitempty"`
 	Preprocessing *PreprocessConfig `json:"preprocessing,omitempty"`
 	Provider      string          `json:"provider,omitempty"`
@@ -239,16 +241,13 @@ func DefaultCaptchaConfig() CaptchaConfig {
 		Profiles: map[string]ProfileConfig{
 			"prlog": {
 				Type:           "text",
-				ImageSelector:  "img[src^='data:image']",
-				AnswerSelector: "input[name='captcha']",
-				SubmitSelector: "input[type='submit']",
-				Hint:           "Exactly 5 lowercase English letters. Ignore ALL grid/crosshatch lines completely.",
+				ImageSelector:  "img[alt*='human'], img[alt*='Human']",
+				AnswerSelector: "input[name='captcha_hash']",
+				SubmitSelector: "button[value='Create']",
+				Hint:           "Read the distorted text in the image. The text contains exactly 5 lowercase letters (a-z only, no digits). The image has crosshatch grid lines overlaying the text — ignore the grid lines and focus only on the thick dark letter shapes. Output ONLY the 5 letters, nothing else.",
 				PromptTemplate: "lowercase_captcha",
 				VotingEnabled:  true,
-				Preprocessing: &PreprocessConfig{
-					Upscale:   3,
-					Threshold: 100,
-				},
+				// No preprocessing — VLMs read raw captchas better than preprocessed
 			},
 			"openpr": {
 				Type:           "text",
