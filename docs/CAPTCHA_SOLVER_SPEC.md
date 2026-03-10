@@ -211,7 +211,9 @@ With 5 retry attempts (each gets a fresh captcha), effective success rate: **>99
 
 ### Why
 
-reCAPTCHA flags IPs after failed solve attempts. The flag persists across all sites using reCAPTCHA on the same IP. Residential proxies provide clean IPs that Google hasn't flagged.
+reCAPTCHA flags IPs after failed solve attempts. The flag persists across all sites using reCAPTCHA on the same IP. Any **clean IP** (datacenter or residential) that hasn't been flagged will work. Residential IPs are not required — the issue is IP reputation, not IP type.
+
+For our volume (~5 account registrations, not millions of scrapes), a fresh datacenter IP from a cheap VPS is sufficient.
 
 ### Architecture
 
@@ -251,39 +253,35 @@ captcha:
       - "http://user:pass@dc-proxy.example.com:8080"
 ```
 
-### Proxy Provider Research (2026-03-09)
+### Proxy Source Options (2026-03-09)
 
-| Provider | Type | Price/GB | Min Purchase | SOCKS5 | Key Feature |
-|----------|------|----------|-------------|--------|-------------|
-| **DataImpulse** | Residential | **$1/GB** | None (pay-as-you-go) | ✅ | Cheapest per-GB, no minimum |
-| **Geonode** | Residential | **$0.50-1/GB** | $50/mo (50GB) | ✅ | Best value at volume |
-| **IPRoyal** | Residential | $4/GB | $1.75 (trial) | ✅ | 32M+ IPs, 195 countries |
-| **Decodo (Smartproxy)** | Residential | $4/GB | $12.50 | ✅ | Reliable, good docs |
-| **Bright Data** | Residential | $5.04/GB | $500/mo | ✅ | Largest pool (72M+ IPs), open-source Proxy Manager |
-| **Oxylabs** | Residential | $8/GB | $99/mo | ✅ | Enterprise grade |
-| **SOAX** | Residential | $3.90/GB | $99/mo | ✅ | Good geo-targeting |
-| **PacketStream** | Residential P2P | $1/GB | $10 | ✅ | P2P network, cheapest |
+For our use case (~5 account registrations), we need clean IPs, not residential IPs. Three tiers:
 
-**Recommendation for Wire Pitch captcha solving:**
+#### Tier 1: Self-Hosted (cheapest, sufficient for our volume)
 
-**DataImpulse** ($1/GB, no minimum) or **Geonode** ($0.50-1/GB at volume).
+| Option | Cost | IPs | Notes |
+|--------|------|-----|-------|
+| **Cheap VPS** (Hetzner, Vultr, DO) | $3-5/mo each | 1 per VPS | Fresh datacenter IP, SOCKS5 via SSH tunnel |
+| **[rota](https://github.com/alpkeskin/rota)** | Free (Go, self-hosted) | Rotates upstream proxies | Health monitoring, auto-failover, round-robin |
+| **Tailscale exit node** | Free | 1 (Mac/phone IP) | Route through existing device, residential IP |
+| **SSH SOCKS5 tunnel** | Free (existing VPS) | 1 per VPS | `ssh -D 1080 user@vps` = instant SOCKS5 proxy |
 
-Cost math for press release distribution:
-- Each reCAPTCHA solve: ~100KB traffic (grid images + API calls) = ~0.1MB
-- 1000 press releases × 0.1MB = 100MB = 0.1GB
-- Cost: **$0.10 per 1000 press releases** (DataImpulse) or **$0.05** (Geonode)
-- Even account registrations (one-time, ~1MB each) cost pennies
+**Recommended:** 2-3 cheap VPS ($6-15/mo total) → feed into rota → automatic rotation + health checks. Or just `ssh -D` tunnel for one-off registrations.
 
-### Self-Hosted Proxy Options
+#### Tier 2: Commercial Pay-per-GB (if volume grows)
 
-| Tool | Type | Notes |
-|------|------|-------|
-| [rota](https://github.com/alpkeskin/rota) | Go proxy rotation engine | Health monitoring, auto-rotation, no residential IPs |
-| Bright Data Proxy Manager | Open source | Requires Bright Data subscription for IPs |
-| Squid + HAProxy | Traditional | Rotates datacenter IPs, not residential |
-| Tailscale exit node | VPN | Route through Mac/phone for residential IP (free, limited) |
+| Provider | Type | Price/GB | Min | SOCKS5 |
+|----------|------|----------|-----|--------|
+| **DataImpulse** | Residential | $1/GB | None | ✅ |
+| **Geonode** | Residential | $0.50-1/GB | $50/mo | ✅ |
+| **PacketStream** | Residential P2P | $1/GB | $10 | ✅ |
+| **IPRoyal** | Residential | $4/GB | $1.75 | ✅ |
 
-**Self-hosted can rotate datacenter IPs but cannot provide residential IPs.** Residential requires a commercial provider because the IPs come from real consumer ISP connections.
+#### Tier 3: Enterprise (not needed)
+
+Bright Data, Oxylabs, SOAX — $99-500/mo minimums. Overkill for press distribution.
+
+**Cost math:** Account registrations are one-time. Even with commercial proxies, 5 registrations = ~5MB = $0.005.
 
 ## Text Captcha Solver Details
 
