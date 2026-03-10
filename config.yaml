@@ -89,12 +89,18 @@ captcha:
     audio_fallback: true
     whisper_url: "http://localhost:8115"
   proxy:
-    enabled: false
-    strategy: "round_robin"
-    # Add SOCKS5/HTTP proxies here:
+    enabled: true
+    strategy: "weighted"           # "weighted" (prefer healthy) | "round_robin" | "random"
+    max_concurrent_per_ip: 2       # max simultaneous solves per IP
+    cooldown_minutes: 60           # auto-cooldown flagged IPs
+    health_file: "/var/log/uiai/ip-pool-health.json"  # persist health across restarts
+    local_ips:
+      - "199.167.201.52"           # unused server IP (free)
+      - "199.167.202.209"          # unused server IP (free)
+      # Add more at $1/IP/mo as needed
+    # External proxies (if local IPs get flagged):
     # proxies:
-    #   - "socks5://user:pass@residential-proxy.example.com:1080"
-    #   - "http://user:pass@datacenter-proxy.example.com:8080"
+    #   - "socks5://user:pass@host:port"
   stealth:
     patch_webdriver: true
     random_user_agent: true

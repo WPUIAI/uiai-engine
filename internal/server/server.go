@@ -103,7 +103,28 @@ func New(cfg *config.Config) *Engine {
 
 	// Captcha solver — uses AI provider + session API
 	captchaCfg := captchaPkg.DefaultCaptchaConfig()
-	// TODO: merge from config.yaml when captcha section is added
+	// Merge proxy config from config.yaml
+	captchaCfg.Proxy.Enabled = cfg.Captcha.Proxy.Enabled
+	captchaCfg.Proxy.LocalIPs = cfg.Captcha.Proxy.LocalIPs
+	captchaCfg.Proxy.Proxies = cfg.Captcha.Proxy.Proxies
+	if cfg.Captcha.Proxy.Strategy != "" {
+		captchaCfg.Proxy.Strategy = cfg.Captcha.Proxy.Strategy
+	}
+	if cfg.Captcha.Proxy.MaxConcurrentPerIP > 0 {
+		captchaCfg.Proxy.MaxConcurrentPerIP = cfg.Captcha.Proxy.MaxConcurrentPerIP
+	}
+	if cfg.Captcha.Proxy.CooldownMinutes > 0 {
+		captchaCfg.Proxy.CooldownMinutes = cfg.Captcha.Proxy.CooldownMinutes
+	}
+	if cfg.Captcha.Proxy.HealthFile != "" {
+		captchaCfg.Proxy.HealthFile = cfg.Captcha.Proxy.HealthFile
+	}
+	if cfg.Captcha.DefaultProvider != "" {
+		captchaCfg.DefaultProvider = cfg.Captcha.DefaultProvider
+	}
+	if cfg.Captcha.DefaultModel != "" {
+		captchaCfg.DefaultModel = cfg.Captcha.DefaultModel
+	}
 	captchaSolver := captchaPkg.NewSolver(aiProvider, captchaCfg)
 
 	e := &Engine{

@@ -20,16 +20,25 @@ type Solver struct {
 	AI     *ai.Provider
 	Config CaptchaConfig
 	Stats  *StatsTracker
+	pool   *IPPool // IP rotation pool for proxied solves
 }
 
 // NewSolver creates a Solver with the given config.
 func NewSolver(aiProv *ai.Provider, cfg CaptchaConfig) *Solver {
-	return &Solver{
+	s := &Solver{
 		AI:     aiProv,
 		Config: cfg,
 		Stats:  NewStatsTracker(cfg.Stats),
 	}
+	// Initialize IP pool if proxy is enabled
+	if cfg.Proxy.Enabled && (len(cfg.Proxy.LocalIPs) > 0 || len(cfg.Proxy.Proxies) > 0) {
+		s.pool = NewIPPool(cfg.Proxy)
+	}
+	return s
 }
+
+// Pool returns the IP pool for API access (status, add/remove).
+func (s *Solver) Pool() *IPPool { return s.pool }
 
 // SolveInSession solves a captcha within an active browser session.
 func (s *Solver) SolveInSession(ctx context.Context, sess *vision.Session, req SolveRequest) *SolveResponse {
@@ -193,16 +202,23 @@ func (s *Solver) GetStatus() *StatusResponse {
 		}
 	}
 
-	// Proxy
-	if s.Config.Proxy.Enabled && len(s.Config.Proxy.Proxies) > 0 {
-		resp.Backends["proxy"] = Backend{
+	// IP Pool
+	if s.pool != nil {
+		ps := s.pool.Status()
+		healthy := 0
+		for _, ip := range ps.IPs {
+			if ip.Status == "healthy" {
+				healthy++
+			}
+		}
+		resp.Backends["ip_pool"] = Backend{
 			Available: true,
-			Version:   fmt.Sprintf("%d proxies, %s", len(s.Config.Proxy.Proxies), s.Config.Proxy.Strategy),
+			Version:   fmt.Sprintf("%d total, %d healthy, strategy=%s", ps.TotalIPs, healthy, ps.Strategy),
 		}
 	} else {
-		resp.Backends["proxy"] = Backend{
+		resp.Backends["ip_pool"] = Backend{
 			Available: false,
-			Version:   "no proxies configured",
+			Version:   "disabled",
 		}
 	}
 

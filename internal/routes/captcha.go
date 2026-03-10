@@ -99,6 +99,65 @@ func MountCaptchaRoutes(r chi.Router, solver *captcha.Solver) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(status)
 	})
+
+	// ─── IP Pool management ──────────────────────────────────────────
+
+	// GET /api/captcha/pool — full pool status with per-IP health
+	r.Get("/pool", func(w http.ResponseWriter, req *http.Request) {
+		pool := solver.Pool()
+		if pool == nil {
+			json.NewEncoder(w).Encode(map[string]string{"error": "IP pool not enabled"})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(pool.Status())
+	})
+
+	// POST /api/captcha/pool/add — add an IP at runtime
+	r.Post("/pool/add", func(w http.ResponseWriter, req *http.Request) {
+		pool := solver.Pool()
+		if pool == nil {
+			http.Error(w, `{"error":"IP pool not enabled"}`, http.StatusBadRequest)
+			return
+		}
+		var body struct {
+			Endpoint string `json:"endpoint"` // "local:1.2.3.4" or "socks5://..."
+		}
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil || body.Endpoint == "" {
+			http.Error(w, `{"error":"endpoint is required"}`, http.StatusBadRequest)
+			return
+		}
+		if err := pool.AddIP(body.Endpoint); err != nil {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "added", "endpoint": body.Endpoint})
+	})
+
+	// POST /api/captcha/pool/remove — remove an IP at runtime
+	r.Post("/pool/remove", func(w http.ResponseWriter, req *http.Request) {
+		pool := solver.Pool()
+		if pool == nil {
+			http.Error(w, `{"error":"IP pool not enabled"}`, http.StatusBadRequest)
+			return
+		}
+		var body struct {
+			Endpoint string `json:"endpoint"`
+		}
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil || body.Endpoint == "" {
+			http.Error(w, `{"error":"endpoint is required"}`, http.StatusBadRequest)
+			return
+		}
+		if err := pool.RemoveIP(body.Endpoint); err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "removed", "endpoint": body.Endpoint})
+	})
 }
 
 // MountSessionCaptchaRoute adds POST /captcha/solve under a session route group.

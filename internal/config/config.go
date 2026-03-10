@@ -21,6 +21,30 @@ type Config struct {
 	Logging    LoggingConfig    `yaml:"logging"`
 	CORS       CORSConfig       `yaml:"cors"`
 	Media      MediaConfig      `yaml:"media"`
+	Captcha    CaptchaYAML      `yaml:"captcha"`
+}
+
+// CaptchaYAML mirrors the YAML structure for captcha config loading.
+// Converted to captcha.CaptchaConfig at runtime.
+type CaptchaYAML struct {
+	Enabled         bool              `yaml:"enabled"`
+	DefaultProvider string            `yaml:"default_provider"`
+	DefaultModel    string            `yaml:"default_model"`
+	Text            map[string]any    `yaml:"text"`
+	Recaptcha       map[string]any    `yaml:"recaptcha"`
+	Proxy           CaptchaProxyYAML  `yaml:"proxy"`
+	Stealth         map[string]any    `yaml:"stealth"`
+	Stats           map[string]any    `yaml:"stats"`
+}
+
+type CaptchaProxyYAML struct {
+	Enabled            bool     `yaml:"enabled"`
+	LocalIPs           []string `yaml:"local_ips"`
+	Proxies            []string `yaml:"proxies"`
+	Strategy           string   `yaml:"strategy"`
+	MaxConcurrentPerIP int      `yaml:"max_concurrent_per_ip"`
+	CooldownMinutes    int      `yaml:"cooldown_minutes"`
+	HealthFile         string   `yaml:"health_file"`
 }
 
 type MediaConfig struct {
