@@ -207,26 +207,77 @@ With 5 retry attempts (each gets a fresh captcha), effective success rate: **>99
 
 **Blocker:** reCAPTCHA's IP reputation system. This server's IP is flagged across all reCAPTCHA domains. Solution: proxy rotation (built, needs proxy config).
 
-## Proxy Rotation
+## IP Pool (Service-Scale)
 
 ### Why
 
-reCAPTCHA flags IPs after failed solve attempts. The flag persists across all sites using reCAPTCHA on the same IP. Any **clean IP** (datacenter or residential) that hasn't been flagged will work. Residential IPs are not required — the issue is IP reputation, not IP type.
-
-For our volume (~5 account registrations, not millions of scrapes), a fresh datacenter IP from a cheap VPS is sufficient.
+Sites flag IPs after failed captcha attempts. The flag persists across all sites on the same IP. Any **clean IP** works — datacenter or residential. At $1/IP/month, the pool scales linearly.
 
 ### Architecture
 
 ```
-uiai-engine
-  └── Solver.SolveViaProxy()
-        └── LaunchProxiedBrowser(proxyURL)
-              └── Ephemeral Chrome + --proxy-server=socks5://...
-                    └── Anti-detection (webdriver patch, UA, plugins)
-                          └── Navigate → Fill form → Solve captcha → Close
+                    ┌─────────────────────────┐
+                    │       IP Pool           │
+                    │                         │
+   API calls ──────▶  Pick() → best IP       │
+                    │  ├─ weighted scoring    │
+                    │  ├─ concurrency limits  │
+                    │  └─ cooldown tracking   │
+                    │                         │
+                    │  ReportResult()         │
+                    │  ├─ success rate        │
+                    │  ├─ flag detection      │
+                    │  └─ auto-cooldown       │
+                    │                         │
+                    │  local:199.167.201.52 ──┼──▶ in-process SOCKS5 ──▶ Chrome
+                    │  local:199.167.202.209 ─┼──▶ in-process SOCKS5 ──▶ Chrome
+                    │  socks5://external ─────┼──────────────────────▶ Chrome
+                    └─────────────────────────┘
 ```
 
-Each proxy gets its own isolated Chrome instance. No cookies, no fingerprint linkage between attempts. Round-robin or random rotation across the proxy list.
+### Per-IP Health Tracking
+
+Each IP tracks:
+- **Success rate** — weighted rotation prefers higher rates
+- **Flagged state** — auto-detected from error messages ("automated queries", "unusual traffic")
+- **Cooldown timer** — flagged IPs auto-cool for N minutes (default 60)
+- **Active count** — concurrent solves in progress (max 2 per IP)
+- **Last used / last success / last error** — full observability
+
+Health persists to `/var/log/uiai/ip-pool-health.json` across restarts.
+
+### Weighted Rotation
+
+Default strategy scores IPs by:
+- Higher success rate = higher score
+- New IPs (0 attempts) get a 0.8 bonus to be tried
+- Active solves penalize: -0.3 per active
+- Recently flagged: -0.2
+- Weighted random selection from scored pool
+
+### API Management (Runtime, No Restart)
+
+```bash
+# View pool health
+GET /api/captcha/pool
+
+# Add new $1/mo IP
+POST /api/captcha/pool/add
+{"endpoint": "local:199.167.204.100"}
+
+# Remove flagged IP
+POST /api/captcha/pool/remove
+{"endpoint": "local:199.167.201.52"}
+```
+
+### Scale Model
+
+| IPs | Cost/mo | Max Concurrent | Notes |
+|-----|---------|---------------|-------|
+| 2 | $0 | 4 | Existing unused server IPs |
+| 5 | $3 | 10 | Good for moderate volume |
+| 10 | $8 | 20 | Handles steady fleet work |
+| 20 | $18 | 40 | High-volume service |
 
 ### Anti-Detection (Built In)
 
@@ -247,41 +298,27 @@ Plus: random delays (200-800ms between actions), timing jitter, User-Agent rotat
 captcha:
   proxy:
     enabled: true
-    strategy: round_robin    # or "random"
-    proxies:
-      - "socks5://user:pass@us-resi.example.com:1080"
-      - "http://user:pass@dc-proxy.example.com:8080"
+    strategy: weighted               # "weighted" | "round_robin" | "random"
+    max_concurrent_per_ip: 2         # max simultaneous solves per IP
+    cooldown_minutes: 60             # auto-cooldown flagged IPs
+    health_file: /var/log/uiai/ip-pool-health.json
+    local_ips:                       # server IPs ($1/mo each to add more)
+      - "199.167.201.52"
+      - "199.167.202.209"
+    # proxies:                       # external if needed
+    #   - "socks5://user:pass@host:port"
 ```
 
-### Proxy Source Options (2026-03-09)
+### IP Source Options
 
-For our use case (~5 account registrations), we need clean IPs, not residential IPs. Three tiers:
+| Source | Cost | How |
+|--------|------|-----|
+| **Server IPs** (primary) | $1/IP/mo | Add via hosting provider, `local_ips` in config |
+| **Tailscale exit node** | Free | Route through Mac/phone, add as external proxy |
+| **External VPS** | $3-5/mo each | SSH SOCKS5 tunnel, add as `socks5://` proxy |
+| **Commercial residential** | $1-4/GB | DataImpulse, Geonode — if datacenter IPs get flagged |
 
-#### Tier 1: Self-Hosted (cheapest, sufficient for our volume)
-
-| Option | Cost | IPs | Notes |
-|--------|------|-----|-------|
-| **Cheap VPS** (Hetzner, Vultr, DO) | $3-5/mo each | 1 per VPS | Fresh datacenter IP, SOCKS5 via SSH tunnel |
-| **[rota](https://github.com/alpkeskin/rota)** | Free (Go, self-hosted) | Rotates upstream proxies | Health monitoring, auto-failover, round-robin |
-| **Tailscale exit node** | Free | 1 (Mac/phone IP) | Route through existing device, residential IP |
-| **SSH SOCKS5 tunnel** | Free (existing VPS) | 1 per VPS | `ssh -D 1080 user@vps` = instant SOCKS5 proxy |
-
-**Recommended:** 2-3 cheap VPS ($6-15/mo total) → feed into rota → automatic rotation + health checks. Or just `ssh -D` tunnel for one-off registrations.
-
-#### Tier 2: Commercial Pay-per-GB (if volume grows)
-
-| Provider | Type | Price/GB | Min | SOCKS5 |
-|----------|------|----------|-----|--------|
-| **DataImpulse** | Residential | $1/GB | None | ✅ |
-| **Geonode** | Residential | $0.50-1/GB | $50/mo | ✅ |
-| **PacketStream** | Residential P2P | $1/GB | $10 | ✅ |
-| **IPRoyal** | Residential | $4/GB | $1.75 | ✅ |
-
-#### Tier 3: Enterprise (not needed)
-
-Bright Data, Oxylabs, SOAX — $99-500/mo minimums. Overkill for press distribution.
-
-**Cost math:** Account registrations are one-time. Even with commercial proxies, 5 registrations = ~5MB = $0.005.
+**Primary strategy:** Server IPs at $1/mo each. The pool handles health, rotation, and cooldown automatically. Add more IPs via API when volume grows.
 
 ## Text Captcha Solver Details
 
