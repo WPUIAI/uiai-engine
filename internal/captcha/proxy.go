@@ -36,13 +36,16 @@ import (
 
 // ProxyConfig holds IP pool settings loaded from config.yaml.
 type ProxyConfig struct {
-	Enabled           bool     `yaml:"enabled" json:"enabled"`
-	LocalIPs          []string `yaml:"local_ips" json:"local_ips"`   // server IPs to bind outgoing
-	Proxies           []string `yaml:"proxies" json:"proxies"`       // external socks5://... or http://...
-	Strategy          string   `yaml:"strategy" json:"strategy"`     // "weighted" | "round_robin" | "random"
-	MaxConcurrentPerIP int    `yaml:"max_concurrent_per_ip" json:"max_concurrent_per_ip"` // default 2
-	CooldownMinutes    int    `yaml:"cooldown_minutes" json:"cooldown_minutes"`           // default 60
-	HealthFile         string `yaml:"health_file" json:"health_file"`                     // persist health across restarts
+	Enabled            bool     `yaml:"enabled" json:"enabled"`
+	LocalIPs           []string `yaml:"local_ips" json:"local_ips"`
+	Proxies            []string `yaml:"proxies" json:"proxies"`
+	Strategy           string   `yaml:"strategy" json:"strategy"`     // "weighted" | "least_conn" | "round_robin" | "random"
+	MaxConcurrentPerIP int      `yaml:"max_concurrent_per_ip" json:"max_concurrent_per_ip"` // default 2
+	CooldownMinutes    int      `yaml:"cooldown_minutes" json:"cooldown_minutes"`           // default 60
+	HealthFile         string   `yaml:"health_file" json:"health_file"`
+	HealthProbeURL     string   `yaml:"health_probe_url" json:"health_probe_url"`           // URL to probe (default: https://www.google.com/recaptcha/api.js)
+	HealthProbeSeconds int      `yaml:"health_probe_seconds" json:"health_probe_seconds"`   // probe interval (default: 300 = 5min)
+	MaxRetries         int      `yaml:"max_retries" json:"max_retries"`                     // auto-retry on different IP (default: 2)
 }
 
 // ─── IP Pool ───────────────────────────────────────────────────────────────
@@ -54,6 +57,7 @@ type IPPool struct {
 	index    int // for round_robin
 	config   ProxyConfig
 	socksMap map[string]*socksProxy // local IP → running SOCKS5 listener
+	stopCh   chan struct{}           // stops the probe loop on shutdown
 }
 
 // IPNode is a single IP endpoint with health state.
@@ -67,15 +71,19 @@ type IPNode struct {
 	TotalSolved   int       `json:"total_solved"`
 	TotalFailed   int       `json:"total_failed"`
 	SuccessRate   float64   `json:"success_rate"`
-	Flagged       bool      `json:"flagged"`        // reCAPTCHA/site flagged this IP
+	Flagged       bool      `json:"flagged"`
 	FlaggedAt     time.Time `json:"flagged_at"`
-	CooldownUntil time.Time `json:"cooldown_until"` // don't use until this time
+	CooldownUntil time.Time `json:"cooldown_until"`
 	LastUsed      time.Time `json:"last_used"`
 	LastSuccess   time.Time `json:"last_success"`
 	LastError     string    `json:"last_error"`
 
+	// Active health probes
+	LastProbe time.Time `json:"last_probe"`
+	ProbeOK   bool      `json:"probe_ok"`
+
 	// Concurrency
-	Active int `json:"active"` // currently solving
+	Active int `json:"active"`
 }
 
 type socksProxy struct {
@@ -89,6 +97,7 @@ func NewIPPool(cfg ProxyConfig) *IPPool {
 	pool := &IPPool{
 		config:   cfg,
 		socksMap: make(map[string]*socksProxy),
+		stopCh:   make(chan struct{}),
 	}
 	if pool.config.MaxConcurrentPerIP <= 0 {
 		pool.config.MaxConcurrentPerIP = 2
@@ -99,12 +108,22 @@ func NewIPPool(cfg ProxyConfig) *IPPool {
 	if pool.config.Strategy == "" {
 		pool.config.Strategy = "weighted"
 	}
+	if pool.config.HealthProbeURL == "" {
+		pool.config.HealthProbeURL = "https://www.google.com/recaptcha/api.js"
+	}
+	if pool.config.HealthProbeSeconds <= 0 {
+		pool.config.HealthProbeSeconds = 300 // 5 min
+	}
+	if pool.config.MaxRetries <= 0 {
+		pool.config.MaxRetries = 2
+	}
 
 	// Add local IPs
 	for _, ip := range cfg.LocalIPs {
 		pool.nodes = append(pool.nodes, &IPNode{
 			Endpoint: "local:" + ip,
 			Label:    ip,
+			ProbeOK:  true, // assume healthy until proven otherwise
 		})
 	}
 	// Add external proxies
@@ -112,15 +131,20 @@ func NewIPPool(cfg ProxyConfig) *IPPool {
 		pool.nodes = append(pool.nodes, &IPNode{
 			Endpoint: p,
 			Label:    maskEndpoint(p),
+			ProbeOK:  true,
 		})
 	}
 
 	// Restore health from disk
 	pool.loadHealth()
 
-	log.Printf("[ip-pool] Initialized: %d endpoints (%d local, %d external), strategy=%s, max_concurrent=%d, cooldown=%dm",
+	// Start active health probe goroutine
+	go pool.probeLoop()
+
+	log.Printf("[ip-pool] Initialized: %d endpoints (%d local, %d external), strategy=%s, max_concurrent=%d, cooldown=%dm, probe_interval=%ds, max_retries=%d",
 		len(pool.nodes), len(cfg.LocalIPs), len(cfg.Proxies),
-		pool.config.Strategy, pool.config.MaxConcurrentPerIP, pool.config.CooldownMinutes)
+		pool.config.Strategy, pool.config.MaxConcurrentPerIP, pool.config.CooldownMinutes,
+		pool.config.HealthProbeSeconds, pool.config.MaxRetries)
 
 	return pool
 }
@@ -130,12 +154,28 @@ func NewIPPool(cfg ProxyConfig) *IPPool {
 // Pick selects the best available IP and increments its active count.
 // Returns the endpoint string and a release func the caller MUST defer.
 func (p *IPPool) Pick() (string, func(), error) {
+	return p.PickExcluding(nil)
+}
+
+// PickExcluding selects an IP, skipping any in the exclude set (for retries).
+func (p *IPPool) PickExcluding(exclude map[string]bool) (string, func(), error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	available := p.availableNodes()
+	// Filter out excluded endpoints
+	if len(exclude) > 0 {
+		var filtered []*IPNode
+		for _, n := range available {
+			if !exclude[n.Endpoint] {
+				filtered = append(filtered, n)
+			}
+		}
+		available = filtered
+	}
+
 	if len(available) == 0 {
-		return "", nil, fmt.Errorf("no healthy IPs available (%d total, all flagged/busy/cooling)", len(p.nodes))
+		return "", nil, fmt.Errorf("no healthy IPs available (%d total, all flagged/busy/cooling/excluded)", len(p.nodes))
 	}
 
 	var node *IPNode
@@ -145,7 +185,9 @@ func (p *IPPool) Pick() (string, func(), error) {
 	case "round_robin":
 		node = available[p.index%len(available)]
 		p.index++
-	default: // "weighted" — prefer higher success rate, lower active count
+	case "least_conn":
+		node = p.pickLeastConn(available)
+	default: // "weighted"
 		node = p.pickWeighted(available)
 	}
 
@@ -248,19 +290,24 @@ func (p *IPPool) Status() IPPoolStatus {
 	defer p.mu.RUnlock()
 
 	s := IPPoolStatus{
-		TotalIPs:   len(p.nodes),
-		Strategy:   p.config.Strategy,
-		MaxPerIP:   p.config.MaxConcurrentPerIP,
+		TotalIPs:    len(p.nodes),
+		Strategy:    p.config.Strategy,
+		MaxPerIP:    p.config.MaxConcurrentPerIP,
 		CooldownMin: p.config.CooldownMinutes,
-		IPs:        make([]IPNodeStatus, 0, len(p.nodes)),
+		MaxRetries:  p.config.MaxRetries,
+		ProbeURL:    p.config.HealthProbeURL,
+		ProbeInterval: p.config.HealthProbeSeconds,
+		IPs:         make([]IPNodeStatus, 0, len(p.nodes)),
 	}
 
 	for _, n := range p.nodes {
 		status := "healthy"
-		if n.Flagged && time.Now().Before(n.CooldownUntil) {
+		if !n.ProbeOK && !n.LastProbe.IsZero() {
+			status = "probe_failed"
+		} else if n.Flagged && time.Now().Before(n.CooldownUntil) {
 			status = "cooling"
 		} else if n.Flagged {
-			status = "flagged_expired" // cooldown expired, will be retried
+			status = "flagged_expired"
 		}
 		if n.Active >= p.config.MaxConcurrentPerIP {
 			status = "busy"
@@ -277,6 +324,8 @@ func (p *IPPool) Status() IPPoolStatus {
 			CooldownUntil: n.CooldownUntil,
 			LastUsed:      n.LastUsed,
 			LastError:     n.LastError,
+			ProbeOK:       n.ProbeOK,
+			LastProbe:     n.LastProbe,
 		})
 	}
 	return s
@@ -284,17 +333,20 @@ func (p *IPPool) Status() IPPoolStatus {
 
 // IPPoolStatus is the API response for pool state.
 type IPPoolStatus struct {
-	TotalIPs    int            `json:"total_ips"`
-	Strategy    string         `json:"strategy"`
-	MaxPerIP    int            `json:"max_concurrent_per_ip"`
-	CooldownMin int            `json:"cooldown_minutes"`
-	IPs         []IPNodeStatus `json:"ips"`
+	TotalIPs      int            `json:"total_ips"`
+	Strategy      string         `json:"strategy"`
+	MaxPerIP      int            `json:"max_concurrent_per_ip"`
+	CooldownMin   int            `json:"cooldown_minutes"`
+	MaxRetries    int            `json:"max_retries"`
+	ProbeURL      string         `json:"probe_url"`
+	ProbeInterval int            `json:"probe_interval_seconds"`
+	IPs           []IPNodeStatus `json:"ips"`
 }
 
 type IPNodeStatus struct {
 	Endpoint      string    `json:"endpoint"`
 	Label         string    `json:"label"`
-	Status        string    `json:"status"` // "healthy" | "cooling" | "flagged_expired" | "busy"
+	Status        string    `json:"status"` // "healthy" | "cooling" | "flagged_expired" | "busy" | "probe_failed"
 	Active        int       `json:"active"`
 	TotalAttempts int       `json:"total_attempts"`
 	TotalSolved   int       `json:"total_solved"`
@@ -303,6 +355,8 @@ type IPNodeStatus struct {
 	CooldownUntil time.Time `json:"cooldown_until,omitempty"`
 	LastUsed      time.Time `json:"last_used,omitempty"`
 	LastError     string    `json:"last_error,omitempty"`
+	ProbeOK       bool      `json:"probe_ok"`
+	LastProbe     time.Time `json:"last_probe,omitempty"`
 }
 
 // ─── Internal ──────────────────────────────────────────────────────────────
@@ -319,9 +373,27 @@ func (p *IPPool) availableNodes() []*IPNode {
 		if n.Flagged && now.Before(n.CooldownUntil) {
 			continue
 		}
+		// Skip if active probe failed (IP unreachable)
+		if !n.ProbeOK && !n.LastProbe.IsZero() {
+			continue
+		}
 		result = append(result, n)
 	}
 	return result
+}
+
+// pickLeastConn selects the node with the fewest active connections.
+// Ties broken by higher success rate.
+func (p *IPPool) pickLeastConn(nodes []*IPNode) *IPNode {
+	best := nodes[0]
+	for _, n := range nodes[1:] {
+		if n.Active < best.Active {
+			best = n
+		} else if n.Active == best.Active && n.SuccessRate > best.SuccessRate {
+			best = n
+		}
+	}
+	return best
 }
 
 func (p *IPPool) pickWeighted(nodes []*IPNode) *IPNode {
@@ -409,6 +481,8 @@ func (p *IPPool) loadHealth() {
 			n.CooldownUntil = s.CooldownUntil
 			n.LastSuccess = s.LastSuccess
 			n.LastError = s.LastError
+			n.LastProbe = s.LastProbe
+			n.ProbeOK = s.ProbeOK
 		}
 	}
 	log.Printf("[ip-pool] Restored health for %d endpoints", len(saved))
@@ -559,7 +633,8 @@ func (pb *ProxiedBrowser) OpenPage(targetURL string, width, height int, stealth 
 // ─── Solver integration ────────────────────────────────────────────────────
 
 // SolveViaProxy picks an IP, launches a browser, fills the form, solves captcha.
-// Reports result back to the pool for health tracking.
+// On failure, automatically retries on a different IP up to MaxRetries times.
+// Reports each attempt back to the pool for health tracking.
 func (s *Solver) SolveViaProxy(ctx context.Context, targetURL string, width, height int,
 	setup func(sess *vision.Session) error,
 	solveReq SolveRequest,
@@ -573,15 +648,51 @@ func (s *Solver) SolveViaProxy(ctx context.Context, targetURL string, width, hei
 		}
 	}
 
-	endpoint, release, err := s.pool.Pick()
-	if err != nil {
-		return &SolveResponse{
-			Solved: false,
-			Error:  fmt.Sprintf("IP pool: %v", err),
-			Method: "proxy",
-		}
+	maxRetries := s.pool.config.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 1
 	}
-	defer release()
+
+	tried := make(map[string]bool)
+	var lastResult *SolveResponse
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		endpoint, release, err := s.pool.PickExcluding(tried)
+		if err != nil {
+			if lastResult != nil {
+				return lastResult // return last failure if we ran out of IPs
+			}
+			return &SolveResponse{
+				Solved: false,
+				Error:  fmt.Sprintf("IP pool (attempt %d/%d): %v", attempt, maxRetries, err),
+				Method: "proxy",
+			}
+		}
+		tried[endpoint] = true
+
+		result := s.solveOnIP(ctx, endpoint, targetURL, width, height, setup, solveReq)
+		release()
+
+		if result.Solved {
+			if attempt > 1 {
+				log.Printf("[ip-pool] Solved on retry %d/%d via %s", attempt, maxRetries, maskEndpoint(endpoint))
+			}
+			return result
+		}
+
+		lastResult = result
+		log.Printf("[ip-pool] Attempt %d/%d failed on %s: %s — retrying on different IP",
+			attempt, maxRetries, maskEndpoint(endpoint), result.Error)
+	}
+
+	return lastResult
+}
+
+// solveOnIP does a single solve attempt on one specific IP.
+func (s *Solver) solveOnIP(ctx context.Context, endpoint, targetURL string, width, height int,
+	setup func(sess *vision.Session) error,
+	solveReq SolveRequest,
+) *SolveResponse {
 
 	pb, err := s.pool.LaunchWithEndpoint(endpoint)
 	if err != nil {
@@ -619,17 +730,117 @@ func (s *Solver) SolveViaProxy(ctx context.Context, targetURL string, width, hei
 	result := s.SolveInSession(ctx, sess, solveReq)
 
 	// Detect IP flagging from solve result
-	flagged := false
-	if result.Error != "" {
-		lower := strings.ToLower(result.Error)
-		flagged = strings.Contains(lower, "automated queries") ||
-			strings.Contains(lower, "unusual traffic") ||
-			strings.Contains(lower, "blocked") ||
-			strings.Contains(lower, "rate limit")
-	}
+	flagged := detectFlagged(result.Error)
 	s.pool.ReportResult(endpoint, result.Solved, flagged, result.Error)
 
 	return result
+}
+
+// detectFlagged checks error messages for IP-flagging indicators.
+func detectFlagged(errMsg string) bool {
+	if errMsg == "" {
+		return false
+	}
+	lower := strings.ToLower(errMsg)
+	return strings.Contains(lower, "automated queries") ||
+		strings.Contains(lower, "unusual traffic") ||
+		strings.Contains(lower, "blocked") ||
+		strings.Contains(lower, "rate limit") ||
+		strings.Contains(lower, "access denied") ||
+		strings.Contains(lower, "forbidden")
+}
+
+// ─── Active health probes ──────────────────────────────────────────────────
+
+// probeLoop periodically tests each IP can reach the target (e.g. Google reCAPTCHA).
+// Runs in a goroutine, stopped via pool.stopCh.
+func (p *IPPool) probeLoop() {
+	// Initial probe after 10s startup grace
+	timer := time.NewTimer(10 * time.Second)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-p.stopCh:
+			return
+		case <-timer.C:
+			p.probeAll()
+			timer.Reset(time.Duration(p.config.HealthProbeSeconds) * time.Second)
+		}
+	}
+}
+
+// probeAll tests every IP in the pool.
+func (p *IPPool) probeAll() {
+	p.mu.RLock()
+	nodes := make([]*IPNode, len(p.nodes))
+	copy(nodes, p.nodes)
+	p.mu.RUnlock()
+
+	var wg sync.WaitGroup
+	for _, n := range nodes {
+		wg.Add(1)
+		go func(node *IPNode) {
+			defer wg.Done()
+			ok := p.probeOne(node.Endpoint)
+
+			p.mu.Lock()
+			node.LastProbe = time.Now()
+			node.ProbeOK = ok
+			if !ok {
+				log.Printf("[ip-pool] Probe FAILED: %s", node.Label)
+			}
+			p.mu.Unlock()
+		}(n)
+	}
+	wg.Wait()
+	p.saveHealth()
+}
+
+// probeOne tests if an IP can reach the health probe URL.
+func (p *IPPool) probeOne(endpoint string) bool {
+	var dialer *net.Dialer
+
+	if strings.HasPrefix(endpoint, "local:") {
+		ip := strings.TrimPrefix(endpoint, "local:")
+		dialer = &net.Dialer{
+			LocalAddr: &net.TCPAddr{IP: net.ParseIP(ip)},
+			Timeout:   10 * time.Second,
+		}
+	} else {
+		// External proxy — just check TCP connectivity to the proxy host
+		u, err := url.Parse(endpoint)
+		if err != nil {
+			return false
+		}
+		conn, err := net.DialTimeout("tcp", u.Host, 10*time.Second)
+		if err != nil {
+			return false
+		}
+		conn.Close()
+		return true
+	}
+
+	// For local IPs, do an actual HTTP GET through that IP
+	transport := &net.Dialer{
+		LocalAddr: dialer.LocalAddr,
+		Timeout:   10 * time.Second,
+	}
+	conn, err := transport.Dial("tcp", "www.google.com:443")
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+// Stop shuts down the probe loop.
+func (p *IPPool) Stop() {
+	select {
+	case <-p.stopCh:
+	default:
+		close(p.stopCh)
+	}
 }
 
 // ─── SOCKS5 management ────────────────────────────────────────────────────

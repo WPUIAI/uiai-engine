@@ -45,6 +45,9 @@ type CaptchaProxyYAML struct {
 	MaxConcurrentPerIP int      `yaml:"max_concurrent_per_ip"`
 	CooldownMinutes    int      `yaml:"cooldown_minutes"`
 	HealthFile         string   `yaml:"health_file"`
+	HealthProbeURL     string   `yaml:"health_probe_url"`
+	HealthProbeSeconds int      `yaml:"health_probe_seconds"`
+	MaxRetries         int      `yaml:"max_retries"`
 }
 
 type MediaConfig struct {

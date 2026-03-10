@@ -119,6 +119,15 @@ func New(cfg *config.Config) *Engine {
 	if cfg.Captcha.Proxy.HealthFile != "" {
 		captchaCfg.Proxy.HealthFile = cfg.Captcha.Proxy.HealthFile
 	}
+	if cfg.Captcha.Proxy.HealthProbeURL != "" {
+		captchaCfg.Proxy.HealthProbeURL = cfg.Captcha.Proxy.HealthProbeURL
+	}
+	if cfg.Captcha.Proxy.HealthProbeSeconds > 0 {
+		captchaCfg.Proxy.HealthProbeSeconds = cfg.Captcha.Proxy.HealthProbeSeconds
+	}
+	if cfg.Captcha.Proxy.MaxRetries > 0 {
+		captchaCfg.Proxy.MaxRetries = cfg.Captcha.Proxy.MaxRetries
+	}
 	if cfg.Captcha.DefaultProvider != "" {
 		captchaCfg.DefaultProvider = cfg.Captcha.DefaultProvider
 	}

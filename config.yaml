@@ -90,10 +90,13 @@ captcha:
     whisper_url: "http://localhost:8115"
   proxy:
     enabled: true
-    strategy: "weighted"           # "weighted" (prefer healthy) | "round_robin" | "random"
+    strategy: "weighted"           # "weighted" | "least_conn" | "round_robin" | "random"
     max_concurrent_per_ip: 2       # max simultaneous solves per IP
     cooldown_minutes: 60           # auto-cooldown flagged IPs
-    health_file: "/var/log/uiai/ip-pool-health.json"  # persist health across restarts
+    max_retries: 2                 # auto-retry on different IP before returning failure
+    health_file: "/var/log/uiai/ip-pool-health.json"
+    health_probe_url: "https://www.google.com/recaptcha/api.js"  # periodic reachability check
+    health_probe_seconds: 300      # probe every 5 min
     local_ips:
       - "199.167.201.52"           # unused, clean
       - "199.167.202.209"          # unused, clean
