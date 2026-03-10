@@ -37,6 +37,17 @@ Go engine (uiai-engine) via HTTP.
 | `style_enhance` | `POST /api/critique` (mode=style) | `call_style_enhance()` | local LLM |
 | `copilot` | `POST /api/intake` | `call_copilot()` | local LLM |
 
+### Captcha Solver (Wire Pitch / Press Distribution)
+
+| Capability | Endpoint | Purpose |
+|------------|----------|---------|
+| `solve_image` | `POST /api/captcha/solve-image` | Stateless text captcha solve from base64 image |
+| `solve_session` | `POST /api/session/{id}/captcha/solve` | Session-scoped solve (text + reCAPTCHA v2) |
+| `solve_proxied` | `POST /api/captcha/solve-proxied` | One-shot proxied browser solve with form fill |
+| `captcha_status` | `GET /api/captcha/status` | Backend availability and solve stats |
+
+See [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) for full API reference and accuracy data.
+
 ### Media Frame Pipeline (GitHub-vendored device frames)
 
 | Capability | Cloud Endpoint | Purpose |
@@ -228,7 +239,7 @@ That means:
 - OpenRouter is intentionally excluded from automatic OCR fallback on this host
 - captcha-style verification remains best-effort; if extraction is ambiguous, caller should fall back to human assist instead of blindly submitting
 - best results still come from **tight crops** around the verification image rather than full-page screenshots
-- **For dedicated captcha solving** (text captchas, reCAPTCHA v2), see [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — a self-hosted, session-aware solver using VLM + local fallback, designed to replace ad-hoc OCR calls in adapters
+- **For dedicated captcha solving** (text captchas, reCAPTCHA v2), see [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — **implemented and live** as `POST /api/session/{id}/captcha/solve` and `POST /api/captcha/solve-image`. Uses multi-model VLM voting (Gemini Flash), multi-pass preprocessing, proxy-rotated browsers, and per-site profiles. ~80% first-attempt accuracy on text captchas, >99% with retries
 
 ### Vision Interactive Endpoints
 

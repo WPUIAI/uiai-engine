@@ -852,7 +852,30 @@ The bridge speaks MCP JSON-RPC over stdio:
 - **Auth:** No auth required for localhost calls (auth bypass for `/api/session*`, `/api/tools*`)
 - **External:** Requires `X-Webhook-Secret` header through Cloudflare tunnel
 
+## Captcha Solver (Session Action)
+
+The captcha solver operates as a session action. It detects, extracts, solves, and fills captchas within an active session.
+
+### `POST /api/session/{id}/captcha/solve`
+
+Auto-detects captcha type (text vs reCAPTCHA) or specify explicitly:
+
+```json
+{"type": "auto", "profile": "prlog"}
+```
+
+For text captchas: extracts image from DOM → multi-model VLM voting → fills answer field.  
+For reCAPTCHA v2: clicks checkbox → extracts grid → VLM tile classification → clicks tiles → verifies.
+
+See [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) for full API reference, accuracy data, and proxy configuration.
+
+### Stateless Endpoints (no session needed)
+
+- `POST /api/captcha/solve-image` — solve text captcha from raw base64 image
+- `POST /api/captcha/solve-proxied` — open proxied browser, fill form, solve captcha
+- `GET /api/captcha/status` — backend availability and solve stats
+
 ## Related Docs
 
-- [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — Self-hosted captcha solver (text + reCAPTCHA v2) as a session action
+- [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — Self-hosted captcha solver (text + reCAPTCHA v2) with proxy rotation, multi-model voting, accuracy data
 - [`WORKFLOW_API_ORCHESTRATION.md`](WORKFLOW_API_ORCHESTRATION.md) — Full endpoint map and OCR routing
