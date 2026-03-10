@@ -1,9 +1,11 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/philoveracity/uiai-engine/internal/captcha"
@@ -72,7 +74,11 @@ func MountCaptchaRoutes(r chi.Router, solver *captcha.Solver) {
 			body.Height = 900
 		}
 
-		result := solver.SolveViaProxy(req.Context(), body.URL, body.Width, body.Height,
+		// Use a background context so VLM calls don't die when HTTP write timeout fires
+		solveCtx, solveCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer solveCancel()
+
+		result := solver.SolveViaProxy(solveCtx, body.URL, body.Width, body.Height,
 			func(sess *visionPkg.Session) error {
 				// Fill input fields
 				for name, val := range body.Fields {

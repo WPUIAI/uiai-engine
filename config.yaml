@@ -5,7 +5,7 @@ server:
   disable_vision: false
   vision_pool_size: 4
   read_timeout: 60s
-  write_timeout: 120s  # AI responses can be slow
+  write_timeout: 360s  # captcha proxy solves need 3-5 min
 
 wordpress:
   url: "https://wpuiai.com"
