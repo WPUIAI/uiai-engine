@@ -23,7 +23,7 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 			"format": "openai_function_calling",
 			"tools":  openAITools(),
 			"count":  len(openAITools()),
-			"note":   "Use GET /api/tools/search?q=screenshot to find specific tools without loading all definitions",
+			"note":   "Use GET /api/tools/search?q=screenshot for visual tools or ?q=console/?q=network/?q=error for browser_diagnostics without loading all definitions",
 		})
 	})
 
@@ -55,7 +55,7 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 			writeJSON(w, 200, map[string]any{
 				"tools": brief,
 				"count": len(brief),
-				"hint":  "Add ?q=keyword to search. Full definitions at /api/tools/openai or /api/tools/mcp",
+				"hint":  "Add ?q=keyword to search. Try q=screenshot, q=console, q=network, q=error, q=exception, or q=devtools. Full definitions at /api/tools/openai or /api/tools/mcp",
 			})
 			return
 		}
@@ -84,7 +84,7 @@ func openAITools() []map[string]any {
 	return []map[string]any{
 		{
 			"name":        "browser_open",
-			"description": "Open a persistent browser session on a URL. Returns session_id and initial screenshot. The page stays alive for scrolling, clicking, and re-screenshotting.",
+			"description": "Open a persistent browser session on a URL. Returns session_id and initial screenshot. For browser errors, console logs, JS exceptions, failed requests, API failures, CORS, or network debugging, call browser_diagnostics next.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -97,7 +97,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_screenshot",
-			"description": "Instant re-screenshot of current page state (~30ms). No navigation — captures what's visible now.",
+			"description": "Instant re-screenshot of current page state (~30ms). No navigation — captures what's visible now. If the page looks broken or blank, call browser_diagnostics for console/network evidence.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -123,7 +123,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_click",
-			"description": "Click an element. Accepts CSS selector OR @ref from browser_snapshot (e.g. \"@e3\"). Returns screenshot.",
+			"description": "Click an element. Accepts CSS selector OR @ref from browser_snapshot (e.g. \"@e3\"). Returns screenshot. After failed clicks, unexpected UI, or navigation/API errors, call browser_diagnostics.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -160,7 +160,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_eval",
-			"description": "Execute JavaScript on the page. Returns the result value and a screenshot. Use 'return' for output.",
+			"description": "Execute JavaScript on the page. Returns the result value and a screenshot. Use 'return' for output. For DevTools-style console, JS exception, or network logs, use browser_diagnostics.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -172,7 +172,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_diagnostics",
-			"description": "Get bounded browser diagnostics for a session: console logs/errors, JS exceptions, network requests, and failed requests. Does not take a screenshot.",
+			"description": "DEVTOOLS DEBUG TOOL: inspect browser console logs/errors/warnings, JS exceptions/page errors, network requests, failed requests, HTTP 4xx/5xx, CORS/API failures, blank page, broken page, and visual failure clues. Call during browser troubleshooting after browser_open, browser_click, browser_eval, browser_wait, or any visual failure. No screenshot.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{

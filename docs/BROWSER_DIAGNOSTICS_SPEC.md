@@ -270,7 +270,37 @@ UIAI diagnostics are evidence, not authority. Focusa should ingest bounded diagn
 
 See companion spec: `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`.
 
-## 12. Acceptance checks
+## 12. Agent discoverability requirements
+
+The diagnostics tool must be discoverable during normal browser work, not only when an agent already knows the exact tool name.
+
+Required discovery paths:
+
+- `GET /api/tools/search?q=diagnostics` returns `browser_diagnostics`.
+- `GET /api/tools/search?q=console` returns `browser_diagnostics`.
+- `GET /api/tools/search?q=network` returns `browser_diagnostics`.
+- `GET /api/tools/search?q=error` returns `browser_diagnostics`.
+- `GET /api/tools/search?q=exception` returns `browser_diagnostics`.
+- `GET /api/tools/search?q=devtools` returns `browser_diagnostics`.
+- `GET /api/tools/search?q=blank%20page` returns `browser_diagnostics`.
+- `GET /api/tools/search?q=broken%20page` returns `browser_diagnostics`.
+- `GET /api/tools/search?q=visual%20failure` returns `browser_diagnostics`.
+
+Related browser tool descriptions (`browser_open`, `browser_screenshot`, `browser_click`, `browser_eval`) should mention `browser_diagnostics` so agents discover diagnostics while using the browser workflow.
+
+## 13. Stress harness
+
+A repeatable local stress harness lives at `scripts/stress-browser-diagnostics.sh`. It starts an isolated temp UIAI Engine port and temp static site, then verifies concurrent session diagnostics capture console errors, JS exceptions, and failed requests.
+
+Example:
+
+```bash
+SESSIONS=4 ROUNDS=10 OUT=/tmp/uiai-browser-diagnostics-stress-4x10.json scripts/stress-browser-diagnostics.sh
+```
+
+Recent proof: 40/40 runs passed, average 1028.2ms, max 1656ms, with evidence at `/tmp/uiai-browser-diagnostics-stress-4x10.json`.
+
+## 14. Acceptance checks
 
 - `GET /api/session/{id}/diagnostics` returns console/error/network arrays without taking a screenshot.
 - A page with `console.error("x")` records one console error.

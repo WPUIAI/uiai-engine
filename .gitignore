@@ -2,6 +2,7 @@
 uiai-engine
 uiai-engine-v*
 uiai-engine.bak
+uiai-engine.bak.*
 
 # Runtime logs/state
 engine.log

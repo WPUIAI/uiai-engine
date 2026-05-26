@@ -12,6 +12,8 @@ Session API is **persistent**: open once → snap/scroll/click/type/eval instant
 
 Session tools now expose lightweight DevTools-style diagnostics specified in [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md): bounded console logs, JS exceptions, network requests, failed requests, and summaries without adding Playwright/Puppeteer or taking screenshots on diagnostics reads.
 
+Agent discoverability rule: during browser troubleshooting, call `browser_diagnostics` after `browser_open` and after any failed/blank/broken screenshot, unexpected click/navigation, JS eval issue, failed wait, CORS/API/network suspicion, or console-error clue. Tool search terms that should find it: `diagnostics`, `console`, `network`, `error`, `exception`, `failed request`, `devtools`, `CORS`, `API failure`, `blank page`, `broken page`, `visual failure`.
+
 Focusa ingestion for those diagnostics is specified in `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`.
 
 ## Quick Start
@@ -420,7 +422,7 @@ Returns `{"status": "loaded"}`. Navigate after loading to trigger auth.
 
 ## LLM Tool Definitions
 
-Live tool definitions are served by `GET /api/tools`, `GET /api/tools/mcp`, and `GET /api/tools/search?q=diagnostics`. Those generated definitions are authoritative. The examples below show the main shape; current live tools include `browser_diagnostics` and `browser_diagnostics_clear`.
+Live tool definitions are served by `GET /api/tools`, `GET /api/tools/mcp`, and `GET /api/tools/search?q=diagnostics`. Those generated definitions are authoritative. The examples below show the main shape; current live tools include `browser_diagnostics` and `browser_diagnostics_clear`. Discoverability checks should pass for `q=console`, `q=network`, `q=error`, `q=exception`, and `q=devtools`.
 
 ### OpenAI Function Calling Format
 
