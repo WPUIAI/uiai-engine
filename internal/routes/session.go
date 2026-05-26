@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/philoveracity/uiai-engine/internal/captcha"
@@ -71,8 +72,8 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				"width":  sess.Width,
 				"height": sess.Height,
 			},
-			"screenshot": snap.Screenshot,
-			"size":       snap.Size,
+			"screenshot":  snap.Screenshot,
+			"size":        snap.Size,
 			"duration_ms": snap.Duration,
 		})
 	})
@@ -568,6 +569,30 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			sess.StoreRefs(snap.Refs)
 			writeJSON(w, 200, snap)
+		})
+
+		// Diagnostics — bounded console, exception, and network evidence (no screenshot)
+		r.Get("/diagnostics", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
+			level := req.URL.Query().Get("level")
+			failedOnly := req.URL.Query().Get("failed_only") == "true" || req.URL.Query().Get("failed_only") == "1"
+			writeJSON(w, 200, sess.Diagnostics(limit, level, failedOnly))
+		})
+
+		// Diagnostics clear — reset session diagnostic buffers
+		r.Post("/diagnostics/clear", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			sess.ClearDiagnostics()
+			writeJSON(w, 200, map[string]string{"status": "cleared", "session_id": sess.ID})
 		})
 
 		// DOM info — structured page data for LLM reasoning (legacy, prefer /snapshot)

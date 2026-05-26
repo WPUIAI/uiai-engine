@@ -1,6 +1,6 @@
 # Browser Diagnostics Spec — Console, Exceptions, Network, and Flake Evidence
 
-**Status:** design spec for local UIAI Engine session API.  
+**Status:** implemented baseline for local UIAI Engine session API.  
 **Scope:** `localhost:7456` browser sessions backed by the existing Rod/Chrome pool.  
 **Companion Focusa spec:** `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`.
 
@@ -60,7 +60,7 @@ Implemented session routes in `internal/routes/session.go`:
 
 Current session state in `internal/vision/session.go` stores identity, URL/title, viewport, counters, Rod page, timer, mutex, and @ref map. It does not store console/network/exception buffers.
 
-## 5. Proposed API
+## 5. Implemented API
 
 ### `GET /api/session/{id}/diagnostics`
 
@@ -170,7 +170,7 @@ When an existing action fails, the response SHOULD include a small diagnostic su
 }
 ```
 
-## 6. Proposed MCP/OpenAI tool names
+## 6. Implemented MCP/OpenAI tool names
 
 Add to `/api/tools` and MCP bridge metadata:
 

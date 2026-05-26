@@ -70,9 +70,9 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 			}
 		}
 		writeJSON(w, 200, map[string]any{
-			"query":   q,
-			"tools":   matches,
-			"count":   len(matches),
+			"query": q,
+			"tools": matches,
+			"count": len(matches),
 		})
 	})
 }
@@ -168,6 +168,31 @@ func openAITools() []map[string]any {
 					"js":         map[string]string{"type": "string", "description": "JavaScript to execute (use 'return' for output)"},
 				},
 				"required": []string{"session_id", "js"},
+			},
+		},
+		{
+			"name":        "browser_diagnostics",
+			"description": "Get bounded browser diagnostics for a session: console logs/errors, JS exceptions, network requests, and failed requests. Does not take a screenshot.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id":  map[string]string{"type": "string", "description": "Session ID"},
+					"limit":       map[string]any{"type": "integer", "description": "Max events per category", "default": 100},
+					"level":       map[string]string{"type": "string", "description": "Console level filter: all, error, warning, info"},
+					"failed_only": map[string]any{"type": "boolean", "description": "Return only failed network requests in network list", "default": false},
+				},
+				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_diagnostics_clear",
+			"description": "Clear diagnostic buffers for a browser session.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+				},
+				"required": []string{"session_id"},
 			},
 		},
 		{
@@ -358,12 +383,12 @@ func openAITools() []map[string]any {
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"frameId":    map[string]string{"type": "string", "description": "Frame ID from frame_catalog"},
+					"frameId":     map[string]string{"type": "string", "description": "Frame ID from frame_catalog"},
 					"imageBase64": map[string]string{"type": "string", "description": "Source screenshot base64"},
-					"fit":        map[string]any{"type": "string", "description": "cover or contain", "default": "cover"},
-					"format":     map[string]any{"type": "string", "description": "png or jpeg", "default": "png"},
-					"quality":    map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 90},
-					"scale":      map[string]any{"type": "integer", "description": "Output scale multiplier", "default": 1},
+					"fit":         map[string]any{"type": "string", "description": "cover or contain", "default": "cover"},
+					"format":      map[string]any{"type": "string", "description": "png or jpeg", "default": "png"},
+					"quality":     map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 90},
+					"scale":       map[string]any{"type": "integer", "description": "Output scale multiplier", "default": 1},
 				},
 				"required": []string{"frameId", "imageBase64"},
 			},

@@ -35,11 +35,13 @@ type Session struct {
 	NavCount  int       `json:"nav_count"`
 	SnapCount int       `json:"snap_count"`
 
-	page  *rod.Page
-	pool  *Pool
-	timer *time.Timer
-	mu    sync.Mutex
-	refs  map[string]SnapshotRef // @ref → CSS selector, populated by Snapshot()
+	page              *rod.Page
+	pool              *Pool
+	timer             *time.Timer
+	mu                sync.Mutex
+	refs              map[string]SnapshotRef // @ref → CSS selector, populated by Snapshot()
+	diagnostics       *diagnosticsRecorder
+	diagnosticsCancel func()
 }
 
 // SessionManager manages persistent browser sessions.
@@ -65,17 +67,20 @@ func WrapPage(page *rod.Page, url string, width, height int) *Session {
 	if el, err := page.Eval(`() => document.title`); err == nil {
 		title = el.Value.Str()
 	}
-	return &Session{
-		ID:        generateID(),
-		URL:       url,
-		Title:     title,
-		Width:     width,
-		Height:    height,
-		CreatedAt: now,
-		LastUsed:  now,
-		page:      page,
-		refs:      make(map[string]SnapshotRef),
+	sess := &Session{
+		ID:          generateID(),
+		URL:         url,
+		Title:       title,
+		Width:       width,
+		Height:      height,
+		CreatedAt:   now,
+		LastUsed:    now,
+		page:        page,
+		refs:        make(map[string]SnapshotRef),
+		diagnostics: newDiagnosticsRecorder(),
 	}
+	sess.initDiagnostics()
+	return sess
 }
 
 // generateID creates a short unique session ID.
@@ -121,31 +126,35 @@ func (sm *SessionManager) Open(url string, width, height int) (*Session, *SnapRe
 		return nil, nil, fmt.Errorf("viewport failed: %w", err)
 	}
 
-	// Navigate
+	now := time.Now()
+	sess := &Session{
+		ID:          generateID(),
+		URL:         url,
+		Width:       width,
+		Height:      height,
+		CreatedAt:   now,
+		LastUsed:    now,
+		page:        page,
+		pool:        sm.pool,
+		refs:        make(map[string]SnapshotRef),
+		diagnostics: newDiagnosticsRecorder(),
+	}
+	sess.initDiagnostics()
+
+	// Navigate after diagnostics are attached so initial page console/network events are captured.
 	if err := page.Timeout(15 * time.Second).Navigate(url); err != nil {
+		if sess.diagnosticsCancel != nil {
+			sess.diagnosticsCancel()
+		}
 		sm.pool.ReleasePage(page)
 		return nil, nil, fmt.Errorf("navigation failed: %w", err)
 	}
 
 	// Wait for DOM stability
-	page.Timeout(4 * time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
+	page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
 
-	title := safeEvalStr(page, `() => document.title`)
-
-	now := time.Now()
-	sess := &Session{
-		ID:        generateID(),
-		URL:       url,
-		Title:     title,
-		Width:     width,
-		Height:    height,
-		CreatedAt: now,
-		LastUsed:  now,
-		NavCount:  1,
-		SnapCount: 0,
-		page:      page,
-		pool:      sm.pool,
-	}
+	sess.Title = safeEvalStr(page, `() => document.title`)
+	sess.NavCount = 1
 
 	// Auto-expire timer
 	sess.timer = time.AfterFunc(SessionTTL, func() {
@@ -191,6 +200,10 @@ func (sm *SessionManager) Close(id string) error {
 	defer sess.mu.Unlock()
 	if sess.timer != nil {
 		sess.timer.Stop()
+	}
+	if sess.diagnosticsCancel != nil {
+		sess.diagnosticsCancel()
+		sess.diagnosticsCancel = nil
 	}
 	if sess.page != nil {
 		sm.pool.ReleasePage(sess.page)
@@ -425,7 +438,7 @@ func (s *Session) Click(selector string) (*SnapResult, error) {
 
 	// Wait for any triggered navigation or DOM change
 	time.Sleep(300 * time.Millisecond)
-	s.page.Timeout(2 * time.Second).WaitDOMStable(100*time.Millisecond, 0.2)
+	s.page.Timeout(2*time.Second).WaitDOMStable(100*time.Millisecond, 0.2)
 
 	s.URL = safeEvalStr(s.page, `() => window.location.href`)
 	s.Title = safeEvalStr(s.page, `() => document.title`)
@@ -597,7 +610,7 @@ func (s *Session) Navigate(url string) (*SnapResult, error) {
 		return nil, fmt.Errorf("navigation failed: %w", err)
 	}
 
-	s.page.Timeout(4 * time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
+	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
 
 	s.URL = url
 	s.Title = safeEvalStr(s.page, `() => document.title`)

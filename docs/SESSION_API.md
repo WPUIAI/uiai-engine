@@ -8,9 +8,9 @@ Traditional screenshot APIs are **transactional**: navigate → snap → forget.
 
 Session API is **persistent**: open once → snap/scroll/click/type/eval instantly. Re-screenshots take **30ms** instead of 1.7s. That's **57x faster**.
 
-## Diagnostics roadmap
+## Diagnostics
 
-Current session tools are optimized for visual QA and interaction. The planned lightweight DevTools-style upgrade is specified in [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md): bounded console logs, JS exceptions, network failures, and diagnostic summaries without adding Playwright/Puppeteer or taking screenshots on diagnostics reads.
+Session tools now expose lightweight DevTools-style diagnostics specified in [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md): bounded console logs, JS exceptions, network requests, failed requests, and summaries without adding Playwright/Puppeteer or taking screenshots on diagnostics reads.
 
 Focusa ingestion for those diagnostics is specified in `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`.
 
@@ -98,7 +98,7 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `POST` | `/api/session/{id}/auth/load` | Restore auth state from saved JSON | **instant** |
 | `GET` | `/api/session/{id}/dom` | DOM structure (legacy, prefer snapshot) | **instant** |
 
-Planned diagnostics endpoints are specified in [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md): `GET /api/session/{id}/diagnostics` and `POST /api/session/{id}/diagnostics/clear`.
+Diagnostics endpoints are implemented per [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md): `GET /api/session/{id}/diagnostics` and `POST /api/session/{id}/diagnostics/clear`.
 
 ---
 

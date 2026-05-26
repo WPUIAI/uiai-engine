@@ -144,6 +144,21 @@ async function toolsCall(name, args) {
       body = { interactive: args.interactive, compact: args.compact, max_depth: args.max_depth, selector: args.selector };
       break;
 
+    case "browser_diagnostics": {
+      const q = new URLSearchParams();
+      if (args.limit !== undefined) q.set("limit", String(args.limit));
+      if (args.level !== undefined) q.set("level", String(args.level));
+      if (args.failed_only !== undefined) q.set("failed_only", args.failed_only ? "true" : "false");
+      url = `${ENGINE}/api/session/${args.session_id}/diagnostics${q.toString() ? `?${q.toString()}` : ""}`;
+      method = "GET";
+      break;
+    }
+
+    case "browser_diagnostics_clear":
+      url = `${ENGINE}/api/session/${args.session_id}/diagnostics/clear`;
+      method = "POST";
+      break;
+
     case "browser_fill":
       url = `${ENGINE}/api/session/${args.session_id}/fill`;
       method = "POST";
