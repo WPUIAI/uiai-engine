@@ -1,0 +1,11 @@
+[Unit]
+Description=Run UIAI runtime log trim daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=15m
+Unit=uiai-log-trim.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Trim UIAI runtime logs and usage state
+Documentation=file:/home/wpuiai/uiai-engine/scripts/trim-runtime-logs.sh
+
+[Service]
+Type=oneshot
+User=wpuiai
+Group=wpuiai
+WorkingDirectory=/home/wpuiai/uiai-engine
+ExecStart=/home/wpuiai/uiai-engine/scripts/trim-runtime-logs.sh
