@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/philoveracity/uiai-engine/internal/captcha"
@@ -60,7 +61,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 		sess, snap, err := sm.Open(body.URL, body.Width, body.Height)
 		if err != nil {
-			writeJSON(w, 500, map[string]string{"error": err.Error()})
+			writeSessionError(w, 500, classifySessionError(err), err, sess)
 			return
 		}
 
@@ -133,7 +134,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				snap, err = sess.Screenshot(body.Format, body.Quality)
 			}
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -157,7 +158,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			snap, err := sess.Navigate(body.URL)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -189,7 +190,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				snap, err = sess.Scroll(body.DeltaX, body.DeltaY)
 			}
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -213,7 +214,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			snap, err := sess.Click(sess.ResolveRef(body.Selector))
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -237,7 +238,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			snap, err := sess.Hover(sess.ResolveRef(body.Selector))
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -263,7 +264,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			snap, err := sess.Type(body.Selector, body.Text)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -287,7 +288,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			jsResult, snap, err := sess.Eval(body.JS)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 
@@ -319,7 +320,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			snap, err := sess.Resize(body.Width, body.Height)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -343,7 +344,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			snap, err := sess.InjectCSS(body.CSS)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -367,7 +368,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			snap, err := sess.Fill(sess.ResolveRef(body.Selector), body.Text)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -391,7 +392,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			snap, err := sess.Select(sess.ResolveRef(body.Selector), body.Values)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -414,7 +415,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			snap, err := sess.Press(body.Key)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -429,7 +430,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			snap, err := sess.Back()
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -444,7 +445,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			snap, err := sess.Forward()
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -467,7 +468,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			text, err := sess.TextContent(sess.ResolveRef(body.Selector))
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, map[string]any{"text": text, "selector": body.Selector})
@@ -487,7 +488,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			result, err := sess.Cookies(body)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, result)
@@ -502,7 +503,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			}
 			state, err := sess.SaveAuth()
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -522,7 +523,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				return
 			}
 			if err := sess.LoadAuth(state); err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, map[string]string{"status": "loaded"})
@@ -542,7 +543,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			snap, err := sess.Snapshot(body)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 
@@ -563,7 +564,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			opts := vision.SnapshotOptions{Interactive: true, Compact: true}
 			snap, err := sess.Snapshot(opts)
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 
@@ -605,7 +606,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			dom, err := sess.DOMInfo()
 			if err != nil {
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
 			writeJSON(w, 200, dom)
@@ -630,7 +631,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 			snap, err := sess.WaitFor(body.Selector, body.TimeoutMs)
 			if err != nil {
-				writeJSON(w, 408, map[string]string{"error": err.Error()})
+				writeSessionError(w, 408, "timeout", err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -641,4 +642,52 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			MountSessionCaptchaRoute(r, solver[0], sm)
 		}
 	})
+}
+
+func writeSessionError(w http.ResponseWriter, status int, class string, err error, sess *vision.Session) {
+	resp := map[string]any{
+		"error":       err.Error(),
+		"error_class": class,
+	}
+	if sess != nil {
+		diag := sess.Diagnostics(20, "all", false)
+		resp["url"] = diag.URL
+		resp["title"] = diag.Title
+		resp["diagnostics_summary"] = diag.Summary
+		if len(diag.FailedRequests) > 0 {
+			resp["failed_requests"] = diag.FailedRequests
+		}
+		if len(diag.Console) > 0 {
+			resp["console"] = diag.Console
+		}
+		if len(diag.Exceptions) > 0 {
+			resp["exceptions"] = diag.Exceptions
+		}
+	}
+	writeJSON(w, status, resp)
+}
+
+func classifySessionError(err error) string {
+	if err == nil {
+		return "unknown"
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "selector") || strings.Contains(msg, "element"):
+		return "selector_not_found"
+	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline") || strings.Contains(msg, "timed out"):
+		return "timeout"
+	case strings.Contains(msg, "navigation") || strings.Contains(msg, "navigate"):
+		return "navigation_failed"
+	case strings.Contains(msg, "screenshot"):
+		return "screenshot_failed"
+	case strings.Contains(msg, "click"):
+		return "click_failed"
+	case strings.Contains(msg, "eval") || strings.Contains(msg, "javascript"):
+		return "eval_failed"
+	case strings.Contains(msg, "closed") || strings.Contains(msg, "crash") || strings.Contains(msg, "target"):
+		return "page_unavailable"
+	default:
+		return "action_failed"
+	}
 }

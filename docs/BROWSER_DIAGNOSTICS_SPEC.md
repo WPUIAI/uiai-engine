@@ -154,7 +154,7 @@ Response:
 
 ### Failure-response enrichment
 
-When an existing action fails, the response SHOULD include a small diagnostic summary when available:
+Session actions return typed failure envelopes with diagnostic context when available:
 
 ```json
 {
@@ -302,6 +302,7 @@ Recent proof: 40/40 runs passed, average 1028.2ms, max 1656ms, with evidence at 
 
 ## 14. Acceptance checks
 
+- Session action failures return `error_class` plus `diagnostics_summary` when a session exists.
 - `GET /api/session/{id}/diagnostics` returns console/error/network arrays without taking a screenshot.
 - A page with `console.error("x")` records one console error.
 - A page that throws an uncaught JS exception records one exception with source location when available.
