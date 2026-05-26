@@ -1,5 +1,11 @@
+# Built binaries
 uiai-engine
 uiai-engine-v*
 uiai-engine.bak
+
+# Runtime logs/state
 engine.log
 data/usage.json
+
+# Local config backups
+config.yaml.bak.*
