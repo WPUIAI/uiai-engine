@@ -699,9 +699,7 @@ func (p *Provider) ensureKeys() error {
 }
 
 func (p *Provider) loadKeysFromEnv() {
-	p.keysMu.Lock()
-	defer p.keysMu.Unlock()
-	p.keys = aiKeys{
+	keys := aiKeys{
 		Anthropic:  envOr("ANTHROPIC_API_KEY", ""),
 		OpenAI:     envOr("OPENAI_API_KEY", ""),
 		OpenRouter: envOr("OPENROUTER_API_KEY", ""),
@@ -717,6 +715,19 @@ func (p *Provider) loadKeysFromEnv() {
 	if v := envOr("UIAI_DEFAULT_MODEL", ""); v != "" {
 		p.cfg.AI.DefaultModel = v
 	}
+
+	p.keysMu.Lock()
+	p.keys = keys
+	p.keysMu.Unlock()
+
+	models := []ProviderModel{}
+	if p.cfg.AI.DefaultProvider != "" && p.cfg.AI.DefaultModel != "" {
+		models = append(models, ProviderModel{ID: p.cfg.AI.DefaultModel, Name: p.cfg.AI.DefaultModel, Provider: p.cfg.AI.DefaultProvider, Default: true})
+	}
+	p.modelsMu.Lock()
+	p.models = models
+	p.modelsMu.Unlock()
+	log.Printf("[ai] loaded %d available models from env fallback", len(models))
 }
 
 func calcCost(model string, inTok, outTok int) float64 {

@@ -3,6 +3,7 @@ package captcha
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -32,12 +33,12 @@ import (
 //   7. Check if solved, repeat if new challenge appears
 
 const (
-	rcCheckboxSel    = `iframe[title="reCAPTCHA"]`
-	rcChallengeSel   = `iframe[title*="challenge"]`
-	rcGridImageSel   = `.rc-imageselect-challenge img, .rc-image-tile-wrapper img`
-	rcDescSel        = `.rc-imageselect-desc, .rc-imageselect-desc-wrapper`
-	rcVerifyBtnSel   = `#recaptcha-verify-button`
-	rcAnchorChecked  = `#recaptcha-anchor`
+	rcCheckboxSel   = `iframe[title="reCAPTCHA"]`
+	rcChallengeSel  = `iframe[title*="challenge"]`
+	rcGridImageSel  = `.rc-imageselect-challenge img, .rc-image-tile-wrapper img`
+	rcDescSel       = `.rc-imageselect-desc, .rc-imageselect-desc-wrapper`
+	rcVerifyBtnSel  = `#recaptcha-verify-button`
+	rcAnchorChecked = `#recaptcha-anchor`
 )
 
 // SolveRecaptchaV2 solves a reCAPTCHA v2 challenge in a live session.
@@ -411,7 +412,7 @@ func (s *Solver) clickTile(sess *vision.Session, tileNum, gridSize int) error {
 
 	result, _, _ := sess.Eval(js)
 	if strings.HasPrefix(result, "ERR:") {
-		return fmt.Errorf(result)
+		return errors.New(result)
 	}
 	return nil
 }

@@ -178,7 +178,7 @@ func cleanVLMResponse(raw string) string {
 				src = raw[idx:]
 			}
 		}
-		for _, key := range []string{"answer", "text", "code", "captcha", "result"} {
+		for _, key := range []string{"answer", "text", "code", "captcha", "result", "response", "characters", "letters", "value", "word"} {
 			pattern := `"` + key + `"`
 			if idx := strings.Index(strings.ToLower(src), strings.ToLower(pattern)); idx >= 0 {
 				rest := src[idx+len(pattern):]

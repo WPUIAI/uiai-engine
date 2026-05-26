@@ -36,6 +36,11 @@ func Preprocess(imgBase64, imgType string, cfg *PreprocessConfig) (string, error
 	// 2. Grayscale
 	gray := toGrayscale(img)
 
+	// 2.5 Median filter (blurs thin grid/crosshatch lines before threshold)
+	if cfg.MedianKernel > 0 {
+		gray = medianFilter(gray, cfg.MedianKernel)
+	}
+
 	// 3. Threshold → binary
 	if cfg.Threshold > 0 {
 		gray = threshold(gray, uint8(cfg.Threshold))
@@ -66,6 +71,54 @@ func upscale(src image.Image, factor int) image.Image {
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
 	draw.NearestNeighbor.Scale(dst, dst.Bounds(), src, bounds, draw.Over, nil)
 	return dst
+}
+
+// medianFilter applies a median filter to remove thin noise lines.
+// Kernel must be odd (e.g. 3, 5, 7). This blurs single-pixel-width grid lines
+// while preserving thick letter strokes.
+func medianFilter(src *image.Gray, kernel int) *image.Gray {
+	if kernel < 3 {
+		kernel = 3
+	}
+	if kernel%2 == 0 {
+		kernel++
+	}
+	bounds := src.Bounds()
+	out := image.NewGray(bounds)
+	half := kernel / 2
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			// Collect neighborhood pixels
+			var vals []uint8
+			for dy := -half; dy <= half; dy++ {
+				for dx := -half; dx <= half; dx++ {
+					nx, ny := x+dx, y+dy
+					if nx >= bounds.Min.X && nx < bounds.Max.X && ny >= bounds.Min.Y && ny < bounds.Max.Y {
+						vals = append(vals, src.GrayAt(nx, ny).Y)
+					}
+				}
+			}
+			// Sort and take median
+			sortUint8(vals)
+			median := vals[len(vals)/2]
+			out.SetGray(x, y, color.Gray{Y: median})
+		}
+	}
+	return out
+}
+
+// sortUint8 sorts a small slice of uint8 values (insertion sort, fast for small N).
+func sortUint8(a []uint8) {
+	for i := 1; i < len(a); i++ {
+		key := a[i]
+		j := i - 1
+		for j >= 0 && a[j] > key {
+			a[j+1] = a[j]
+			j--
+		}
+		a[j+1] = key
+	}
 }
 
 // toGrayscale converts any image to 8-bit grayscale.

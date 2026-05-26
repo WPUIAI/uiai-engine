@@ -96,6 +96,25 @@ func (s *Solver) SolveImage(ctx context.Context, req ImageSolveRequest) (*ImageS
 		Preprocessing: req.Preprocessing,
 	}
 
+	// Resolve site profile — applies preprocessing, hint, template from config.yaml
+	if req.Site != "" {
+		if profile, ok := s.Config.Profiles[req.Site]; ok {
+			log.Printf("[captcha] resolving profile %q for site %q", req.Site, req.Site)
+			if cfg.Hint == "" {
+				cfg.Hint = profile.Hint
+			}
+			if cfg.PromptTemplate == "" {
+				cfg.PromptTemplate = profile.PromptTemplate
+			}
+			if cfg.Preprocessing == nil {
+				cfg.Preprocessing = profile.Preprocessing
+			}
+			if profile.VotingEnabled && !req.Voting {
+				req.Voting = true
+			}
+		}
+	}
+
 	var result *ImageSolveResponse
 	var err error
 
