@@ -72,7 +72,7 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `GET` | `/api/session/{id}` | Get session info |
 | `DELETE` | `/api/session/{id}` | Close session, release page |
 
-### Session Actions (all return screenshot except snapshot/dom)
+### Session Actions (all return screenshot except snapshot/dom/diagnostics)
 
 | Method | Path | Description | Typical Latency |
 |--------|------|-------------|-----------------|
@@ -97,8 +97,10 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `POST` | `/api/session/{id}/auth/save` | Save cookies + localStorage to JSON | **instant** |
 | `POST` | `/api/session/{id}/auth/load` | Restore auth state from saved JSON | **instant** |
 | `GET` | `/api/session/{id}/dom` | DOM structure (legacy, prefer snapshot) | **instant** |
+| `GET` | `/api/session/{id}/diagnostics` | Console/errors/exceptions/network summary (no screenshot) | **instant** |
+| `POST` | `/api/session/{id}/diagnostics/clear` | Clear diagnostic buffers | **instant** |
 
-Diagnostics endpoints are implemented per [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md): `GET /api/session/{id}/diagnostics` and `POST /api/session/{id}/diagnostics/clear`.
+Diagnostics endpoints are implemented per [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md).
 
 ---
 
@@ -418,6 +420,8 @@ Returns `{"status": "loaded"}`. Navigate after loading to trigger auth.
 
 ## LLM Tool Definitions
 
+Live tool definitions are served by `GET /api/tools`, `GET /api/tools/mcp`, and `GET /api/tools/search?q=diagnostics`. Those generated definitions are authoritative. The examples below show the main shape; current live tools include `browser_diagnostics` and `browser_diagnostics_clear`.
+
 ### OpenAI Function Calling Format
 
 ```json
@@ -501,6 +505,31 @@ Returns `{"status": "loaded"}`. Navigate after loading to trigger auth.
   {
     "name": "browser_dom",
     "description": "Get the DOM structure of the current page without a screenshot. Returns headings, links, buttons, images, forms, and interactive elements with their CSS selectors. Use this to understand what you can click/type.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "string" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "browser_diagnostics",
+    "description": "Get bounded console, exception, network, failed request, and summary diagnostics without taking a screenshot.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "string" },
+        "limit": { "type": "integer", "default": 100 },
+        "level": { "type": "string", "description": "all, error, warning, info" },
+        "failed_only": { "type": "boolean", "default": false }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "browser_diagnostics_clear",
+    "description": "Clear diagnostic buffers for a browser session.",
     "parameters": {
       "type": "object",
       "properties": {

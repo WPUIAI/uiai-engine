@@ -6,11 +6,11 @@
 
 ## 1. Problem
 
-The current Browser Session API is strong for visual QA and interaction, but it does not expose Chrome DevTools-style diagnostic streams as first-class API data.
+The Browser Session API is strong for visual QA and interaction. The implemented diagnostics baseline now exposes bounded Chrome DevTools-style console, exception, and network streams as first-class session API data.
 
-Current implemented surfaces include screenshots, snapshot/@ref, DOM, eval, cookies/auth, navigation, form actions, and captcha integration. Current live tools do not include console, network, HAR, trace, devtools, or diagnostic endpoints.
+Current implemented surfaces include screenshots, snapshot/@ref, DOM, eval, cookies/auth, navigation, form actions, captcha integration, `browser_diagnostics`, and `browser_diagnostics_clear`. Full HAR, trace export, source-map mapping, and raw body/header capture remain out of scope for the baseline.
 
-That gap makes flaky web failures hard for agents to debug because a model often sees only a screenshot after failure, not the underlying browser evidence.
+This closes the main flake-debugging gap: agents can inspect browser evidence instead of relying on screenshots alone.
 
 ## 2. Goals
 
@@ -58,7 +58,7 @@ Implemented session routes in `internal/routes/session.go`:
 - `GET /api/session/{id}/dom`
 - `POST /api/session/{id}/wait`
 
-Current session state in `internal/vision/session.go` stores identity, URL/title, viewport, counters, Rod page, timer, mutex, and @ref map. It does not store console/network/exception buffers.
+Current session state in `internal/vision/session.go` stores identity, URL/title, viewport, counters, Rod page, timer, mutex, @ref map, diagnostics recorder, and diagnostics cancel function. The recorder implementation lives in `internal/vision/diagnostics.go`.
 
 ## 5. Implemented API
 
@@ -72,10 +72,9 @@ Query parameters:
 |---|---:|---|
 | `limit` | `100` | Max events per category, capped by server max. |
 | `level` | `all` | `all`, `error`, `warning`, `info`. |
-| `since_seq` | omitted | Return events newer than a prior sequence. |
-| `include_headers` | `false` | Include redacted request/response headers. |
-| `include_bodies` | `false` | Future opt-in only; disabled unless explicitly implemented safely. |
-| `failed_only` | `false` | Return only failed/4xx/5xx network events. |
+| `failed_only` | `false` | Return only failed/4xx/5xx network events in the `network` list. |
+
+Not implemented in the baseline: `since_seq`, header capture, body capture, HAR export, and trace export.
 
 Example response:
 
