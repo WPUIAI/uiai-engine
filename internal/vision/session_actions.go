@@ -28,7 +28,7 @@ func (s *Session) Fill(selector, text string) (*SnapResult, error) {
 
 	start := time.Now()
 
-	el, err := s.page.Timeout(5 * time.Second).Element(selector)
+	el, err := retryElement(s.page, selector)
 	if err != nil {
 		return nil, fmt.Errorf("element not found: %s", selector)
 	}
@@ -69,7 +69,7 @@ func (s *Session) Select(selector string, values []string) (*SnapResult, error) 
 
 	start := time.Now()
 
-	el, err := s.page.Timeout(5 * time.Second).Element(selector)
+	el, err := retryElement(s.page, selector)
 	if err != nil {
 		return nil, fmt.Errorf("element not found: %s", selector)
 	}
@@ -105,7 +105,7 @@ func (s *Session) Press(key string) (*SnapResult, error) {
 
 	s.page.Keyboard.Press(k)
 	time.Sleep(200 * time.Millisecond)
-	s.page.Timeout(2 * time.Second).WaitDOMStable(100*time.Millisecond, 0.2)
+	s.page.Timeout(2*time.Second).WaitDOMStable(100*time.Millisecond, 0.2)
 
 	s.URL = safeEvalStr(s.page, `() => window.location.href`)
 	s.Title = safeEvalStr(s.page, `() => document.title`)
@@ -126,7 +126,7 @@ func (s *Session) Back() (*SnapResult, error) {
 	if err := s.page.NavigateBack(); err != nil {
 		return nil, fmt.Errorf("back failed: %w", err)
 	}
-	s.page.Timeout(4 * time.Second).WaitDOMStable(150*time.Millisecond, 0.2)
+	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.2)
 
 	s.URL = safeEvalStr(s.page, `() => window.location.href`)
 	s.Title = safeEvalStr(s.page, `() => document.title`)
@@ -148,7 +148,7 @@ func (s *Session) Forward() (*SnapResult, error) {
 	if err := s.page.NavigateForward(); err != nil {
 		return nil, fmt.Errorf("forward failed: %w", err)
 	}
-	s.page.Timeout(4 * time.Second).WaitDOMStable(150*time.Millisecond, 0.2)
+	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.2)
 
 	s.URL = safeEvalStr(s.page, `() => window.location.href`)
 	s.Title = safeEvalStr(s.page, `() => document.title`)
@@ -165,7 +165,7 @@ func (s *Session) TextContent(selector string) (string, error) {
 		return "", fmt.Errorf("session closed")
 	}
 
-	el, err := s.page.Timeout(5 * time.Second).Element(selector)
+	el, err := retryElement(s.page, selector)
 	if err != nil {
 		return "", fmt.Errorf("element not found: %s", selector)
 	}
@@ -326,11 +326,11 @@ func (s *Session) SaveAuth() (json.RawMessage, error) {
 	ss := safeEvalStr(s.page, `() => JSON.stringify(Object.fromEntries(Object.entries(sessionStorage)))`)
 
 	state := map[string]any{
-		"url":             safeEvalStr(s.page, `() => window.location.href`),
-		"cookies":         cookies,
-		"localStorage":    json.RawMessage(ls),
-		"sessionStorage":  json.RawMessage(ss),
-		"savedAt":         time.Now().UTC().Format(time.RFC3339),
+		"url":            safeEvalStr(s.page, `() => window.location.href`),
+		"cookies":        cookies,
+		"localStorage":   json.RawMessage(ls),
+		"sessionStorage": json.RawMessage(ss),
+		"savedAt":        time.Now().UTC().Format(time.RFC3339),
 	}
 
 	data, err := json.Marshal(state)
@@ -377,7 +377,7 @@ func (s *Session) LoadAuth(state json.RawMessage) error {
 
 	if data.URL != "" {
 		_ = s.page.Navigate(data.URL)
-		s.page.Timeout(4 * time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
+		s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
 	}
 
 	// Restore cookies with the same metadata we captured.

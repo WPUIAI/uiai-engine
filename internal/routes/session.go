@@ -212,9 +212,10 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				return
 			}
 
-			snap, err := sess.Click(sess.ResolveRef(body.Selector))
+			resolved := sess.ResolveRef(body.Selector)
+			snap, err := sess.Click(resolved)
 			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess)
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "click", "selector": body.Selector, "resolved_selector": resolved})
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -236,9 +237,10 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				return
 			}
 
-			snap, err := sess.Hover(sess.ResolveRef(body.Selector))
+			resolved := sess.ResolveRef(body.Selector)
+			snap, err := sess.Hover(resolved)
 			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess)
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "hover", "selector": body.Selector, "resolved_selector": resolved})
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -260,11 +262,12 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) and text required"})
 				return
 			}
+			originalSelector := body.Selector
 			body.Selector = sess.ResolveRef(body.Selector)
 
 			snap, err := sess.Type(body.Selector, body.Text)
 			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess)
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "type", "selector": originalSelector, "resolved_selector": body.Selector})
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -366,9 +369,10 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) and text required"})
 				return
 			}
-			snap, err := sess.Fill(sess.ResolveRef(body.Selector), body.Text)
+			resolved := sess.ResolveRef(body.Selector)
+			snap, err := sess.Fill(resolved, body.Text)
 			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess)
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "fill", "selector": body.Selector, "resolved_selector": resolved})
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -390,9 +394,10 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				writeJSON(w, 400, map[string]string{"error": "selector and values required"})
 				return
 			}
-			snap, err := sess.Select(sess.ResolveRef(body.Selector), body.Values)
+			resolved := sess.ResolveRef(body.Selector)
+			snap, err := sess.Select(resolved, body.Values)
 			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess)
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "select", "selector": body.Selector, "resolved_selector": resolved, "values": body.Values})
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -466,9 +471,10 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) required"})
 				return
 			}
-			text, err := sess.TextContent(sess.ResolveRef(body.Selector))
+			resolved := sess.ResolveRef(body.Selector)
+			text, err := sess.TextContent(resolved)
 			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess)
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "text", "selector": body.Selector, "resolved_selector": resolved})
 				return
 			}
 			writeJSON(w, 200, map[string]any{"text": text, "selector": body.Selector})
@@ -644,13 +650,20 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 	})
 }
 
-func writeSessionError(w http.ResponseWriter, status int, class string, err error, sess *vision.Session) {
+func writeSessionError(w http.ResponseWriter, status int, class string, err error, sess *vision.Session, context ...map[string]any) {
 	resp := map[string]any{
-		"error":       err.Error(),
-		"error_class": class,
+		"error":                 err.Error(),
+		"error_class":           class,
+		"suggested_next_action": suggestedNextSessionAction(class),
+	}
+	for _, ctx := range context {
+		for k, v := range ctx {
+			resp[k] = v
+		}
 	}
 	if sess != nil {
 		diag := sess.Diagnostics(20, "all", false)
+		resp["session_id"] = diag.SessionID
 		resp["url"] = diag.URL
 		resp["title"] = diag.Title
 		resp["diagnostics_summary"] = diag.Summary
@@ -665,6 +678,21 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 		}
 	}
 	writeJSON(w, status, resp)
+}
+
+func suggestedNextSessionAction(class string) string {
+	switch class {
+	case "selector_not_found":
+		return "Call /api/session/{id}/snapshot or /diagnostics, then retry using a current @ref or more specific selector."
+	case "timeout", "navigation_failed":
+		return "Read diagnostics for console/network failures; retry once if transient, otherwise fix the page/navigation target."
+	case "page_unavailable":
+		return "Close the stale session and open a new session before retrying the action."
+	case "screenshot_failed":
+		return "Retry screenshot once, then reopen the session if the page target is unavailable."
+	default:
+		return "Inspect error_class, diagnostics_summary, console, exceptions, and failed_requests before retrying."
+	}
 }
 
 func classifySessionError(err error) string {

@@ -20,6 +20,12 @@ const MaxSessions = 4
 // SessionTTL is how long an idle session stays alive before auto-cleanup.
 const SessionTTL = 10 * time.Minute
 
+const (
+	sessionOpenAttempts = 2
+	elementRetryBudget  = 5 * time.Second
+	elementRetryStep    = 175 * time.Millisecond
+)
+
 // Session is a persistent browser page with identity.
 // Unlike the transactional pool (navigate → snap → forget), a session keeps
 // the page alive between calls — enabling instant re-screenshots, scrolling,
@@ -97,7 +103,8 @@ func generateID() string {
 }
 
 // Open creates a new session, navigates to the URL, and returns the session
-// with an initial screenshot.
+// with an initial screenshot. It retries one cold-page acquisition because
+// Rod/Chrome page creation can transiently race pool pressure or target startup.
 func (sm *SessionManager) Open(url string, width, height int) (*Session, *SnapResult, error) {
 	sm.mu.Lock()
 	if len(sm.sessions) >= MaxSessions {
@@ -113,36 +120,39 @@ func (sm *SessionManager) Open(url string, width, height int) (*Session, *SnapRe
 		height = 800
 	}
 
+	var lastErr error
+	for attempt := 1; attempt <= sessionOpenAttempts; attempt++ {
+		sess, snap, err := sm.openOnce(url, width, height)
+		if err == nil {
+			if attempt > 1 {
+				log.Printf("[session] open recovered on attempt %d → %s", attempt, url)
+			}
+			return sess, snap, nil
+		}
+		lastErr = err
+		if attempt < sessionOpenAttempts {
+			time.Sleep(time.Duration(attempt) * 250 * time.Millisecond)
+		}
+	}
+	return nil, nil, fmt.Errorf("session open failed after %d attempts: %w", sessionOpenAttempts, lastErr)
+}
+
+func (sm *SessionManager) openOnce(url string, width, height int) (*Session, *SnapResult, error) {
 	page, err := sm.pool.GetPage()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get page: %w", err)
 	}
 
-	// Set viewport
-	if err := page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
-		Width: width, Height: height, DeviceScaleFactor: 1,
-	}); err != nil {
+	if err := page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: width, Height: height, DeviceScaleFactor: 1}); err != nil {
 		sm.pool.ReleasePage(page)
 		return nil, nil, fmt.Errorf("viewport failed: %w", err)
 	}
 
 	now := time.Now()
-	sess := &Session{
-		ID:          generateID(),
-		URL:         url,
-		Width:       width,
-		Height:      height,
-		CreatedAt:   now,
-		LastUsed:    now,
-		page:        page,
-		pool:        sm.pool,
-		refs:        make(map[string]SnapshotRef),
-		diagnostics: newDiagnosticsRecorder(),
-	}
+	sess := &Session{ID: generateID(), URL: url, Width: width, Height: height, CreatedAt: now, LastUsed: now, page: page, pool: sm.pool, refs: make(map[string]SnapshotRef), diagnostics: newDiagnosticsRecorder()}
 	sess.initDiagnostics()
 
-	// Navigate after diagnostics are attached so initial page console/network events are captured.
-	if err := page.Timeout(15 * time.Second).Navigate(url); err != nil {
+	if err := page.Timeout(18 * time.Second).Navigate(url); err != nil {
 		if sess.diagnosticsCancel != nil {
 			sess.diagnosticsCancel()
 		}
@@ -150,13 +160,9 @@ func (sm *SessionManager) Open(url string, width, height int) (*Session, *SnapRe
 		return nil, nil, fmt.Errorf("navigation failed: %w", err)
 	}
 
-	// Wait for DOM stability
 	page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
-
 	sess.Title = safeEvalStr(page, `() => document.title`)
 	sess.NavCount = 1
-
-	// Auto-expire timer
 	sess.timer = time.AfterFunc(SessionTTL, func() {
 		log.Printf("[session] %s expired after %s idle", sess.ID, SessionTTL)
 		sm.Close(sess.ID)
@@ -166,15 +172,34 @@ func (sm *SessionManager) Open(url string, width, height int) (*Session, *SnapRe
 	sm.sessions[sess.ID] = sess
 	sm.mu.Unlock()
 
-	// Take initial screenshot
 	snap, err := sess.Screenshot("jpeg", 80)
 	if err != nil {
 		sm.Close(sess.ID)
 		return nil, nil, fmt.Errorf("initial screenshot failed: %w", err)
 	}
-
 	log.Printf("[session] opened %s → %s (%dx%d)", sess.ID, url, width, height)
 	return sess, snap, nil
+}
+
+func retryElement(page *rod.Page, selector string) (*rod.Element, error) {
+	deadline := time.Now().Add(elementRetryBudget)
+	var lastErr error
+	for attempt := 1; ; attempt++ {
+		el, err := page.Timeout(elementRetryStep).Element(selector)
+		if err == nil {
+			return el, nil
+		}
+		lastErr = err
+		if time.Now().Add(elementRetryStep).After(deadline) {
+			break
+		}
+		backoff := time.Duration(attempt) * 75 * time.Millisecond
+		if backoff > 300*time.Millisecond {
+			backoff = 300 * time.Millisecond
+		}
+		time.Sleep(backoff)
+	}
+	return nil, fmt.Errorf("element not found after %s: %s (%w)", elementRetryBudget.Round(time.Millisecond), selector, lastErr)
 }
 
 // Get returns a session by ID.
@@ -427,7 +452,7 @@ func (s *Session) Click(selector string) (*SnapResult, error) {
 
 	start := time.Now()
 
-	el, err := s.page.Timeout(5 * time.Second).Element(selector)
+	el, err := retryElement(s.page, selector)
 	if err != nil {
 		return nil, fmt.Errorf("element not found: %s", selector)
 	}
@@ -475,7 +500,7 @@ func (s *Session) Hover(selector string) (*SnapResult, error) {
 
 	start := time.Now()
 
-	el, err := s.page.Timeout(5 * time.Second).Element(selector)
+	el, err := retryElement(s.page, selector)
 	if err != nil {
 		return nil, fmt.Errorf("element not found: %s", selector)
 	}
@@ -517,7 +542,7 @@ func (s *Session) Type(selector, text string) (*SnapResult, error) {
 
 	start := time.Now()
 
-	el, err := s.page.Timeout(5 * time.Second).Element(selector)
+	el, err := retryElement(s.page, selector)
 	if err != nil {
 		return nil, fmt.Errorf("element not found: %s", selector)
 	}
