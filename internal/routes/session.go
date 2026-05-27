@@ -304,6 +304,37 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			writeJSON(w, 200, resp)
 		})
 
+		// Eval bounded async JavaScript. Prefer browser actions/snapshot for long UI flows.
+		r.Post("/eval_async", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				JS        string `json:"js"`
+				TimeoutMs int    `json:"timeout_ms"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.JS == "" {
+				writeJSON(w, 400, map[string]string{"error": "js required"})
+				return
+			}
+
+			jsResult, snap, err := sess.EvalAsync(body.JS, body.TimeoutMs)
+			if err != nil {
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "eval_async", "timeout_ms": body.TimeoutMs})
+				return
+			}
+			resp := map[string]any{"result": jsResult, "bounded_async": true}
+			if snap != nil {
+				resp["screenshot"] = snap.Screenshot
+				resp["size"] = snap.Size
+				resp["duration_ms"] = snap.Duration
+			}
+			writeJSON(w, 200, resp)
+		})
+
 		// Resize viewport
 		r.Post("/resize", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))

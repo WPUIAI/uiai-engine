@@ -84,7 +84,8 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `POST` | `/api/session/{id}/click` | Click element (CSS or @ref) + screenshot | **300ms** |
 | `POST` | `/api/session/{id}/hover` | Hover element (CSS or @ref) + screenshot | **200ms** |
 | `POST` | `/api/session/{id}/type` | Type into input (CSS or @ref) + screenshot | **150ms** |
-| `POST` | `/api/session/{id}/eval` | Run JS + screenshot | **150ms** |
+| `POST` | `/api/session/{id}/eval` | Run short sync JS + screenshot | **150ms** |
+| `POST` | `/api/session/{id}/eval_async` | Run bounded async JS + screenshot | timeout-bounded |
 | `POST` | `/api/session/{id}/navigate` | Go to new URL + screenshot | **1-2s** |
 | `POST` | `/api/session/{id}/resize` | Change viewport + screenshot | **300ms** |
 | `POST` | `/api/session/{id}/css` | Inject CSS + screenshot | **150ms** |
@@ -245,11 +246,13 @@ curl -X POST /api/session/$SID/click -d '{"selector":"button.submit"}'
 }
 ```
 
-### `POST /api/session/{id}/eval` — JavaScript
+### `POST /api/session/{id}/eval` — Short synchronous JavaScript
 
 ```json
 { "js": "return document.querySelectorAll('h1').length + ' headings'" }
 ```
+
+Use this for short sync reads. Avoid long async Promises here; use `eval_async` for bounded awaits, or split UI workflows into direct click/type/wait calls.
 
 **Response:**
 ```json
@@ -260,6 +263,17 @@ curl -X POST /api/session/$SID/click -d '{"selector":"button.submit"}'
   "duration_ms": 95
 }
 ```
+
+### `POST /api/session/{id}/eval_async` — Bounded async JavaScript
+
+```json
+{
+  "js": "await new Promise(r => setTimeout(r, 250)); return document.title",
+  "timeout_ms": 2000
+}
+```
+
+`timeout_ms` defaults to 5000 and is capped at 15000. For long UI workflows, prefer `snapshot` + direct browser actions to avoid fragile long-lived Promise handles.
 
 ### `POST /api/session/{id}/resize` — Viewport
 

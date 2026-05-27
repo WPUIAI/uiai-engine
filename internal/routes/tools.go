@@ -160,19 +160,32 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_eval",
-			"description": "Execute JavaScript on the page. Returns the result value and a screenshot. Use 'return' for output. For DevTools-style console, JS exception, or network logs, use browser_diagnostics.",
+			"description": "Execute short synchronous JavaScript on the page. Returns result + screenshot. Use 'return' for output. Avoid long async Promises here; use browser_eval_async for bounded awaits, or split into direct browser actions/clicks. For console, JS exception, or network logs, use browser_diagnostics.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"session_id": map[string]string{"type": "string", "description": "Session ID"},
-					"js":         map[string]string{"type": "string", "description": "JavaScript to execute (use 'return' for output)"},
+					"js":         map[string]string{"type": "string", "description": "Short JavaScript to execute (use 'return' for output; avoid long async Promises)"},
+				},
+				"required": []string{"session_id", "js"},
+			},
+		},
+		{
+			"name":        "browser_eval_async",
+			"description": "Execute bounded async JavaScript and await the result with timeout_ms (max 15000). Use for small awaited DOM/network checks only; for long UI workflows prefer browser_snapshot + direct click/type/wait actions to avoid Promise collection flake.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+					"js":         map[string]string{"type": "string", "description": "Async-capable JavaScript body; use return/await inside"},
+					"timeout_ms": map[string]any{"type": "integer", "description": "Bounded async timeout, max 15000", "default": 5000},
 				},
 				"required": []string{"session_id", "js"},
 			},
 		},
 		{
 			"name":        "browser_diagnostics",
-			"description": "DEVTOOLS DEBUG TOOL: inspect browser console logs/errors/warnings, JS exceptions/page errors, network requests, failed requests/failed_request, HTTP 4xx/5xx, CORS/API failures, retry/flakiness clues, blank page, broken page, and visual failure clues. Call during browser troubleshooting after browser_open, browser_click, browser_eval, browser_wait, or any visual failure. No screenshot.",
+			"description": "DEVTOOLS DEBUG TOOL: inspect browser console logs/errors/warnings, JS exceptions/page errors, network requests, failed requests/failed_request, HTTP 4xx/5xx, CORS/API failures, retry/flakiness clues, long async eval issues, blank page, broken page, and visual failure clues. Call during browser troubleshooting after browser_open, browser_click, browser_eval, browser_eval_async, browser_wait, or any visual failure. No screenshot.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
