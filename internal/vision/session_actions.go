@@ -51,7 +51,7 @@ func (s *Session) Fill(selector, text string) (*SnapResult, error) {
 	}`); err != nil {
 		return nil, fmt.Errorf("fill clear failed: %w", err)
 	}
-	if err := el.Input(text); err != nil {
+	if err := el.Timeout(3 * time.Second).Input(text); err != nil {
 		return nil, fmt.Errorf("fill input failed: %w", err)
 	}
 
@@ -75,10 +75,10 @@ func (s *Session) Select(selector string, values []string) (*SnapResult, error) 
 	}
 
 	// Try selecting by value first via Rod's Select method
-	err = el.Select(values, true, rod.SelectorTypeText)
+	err = el.Timeout(3*time.Second).Select(values, true, rod.SelectorTypeText)
 	if err != nil {
 		// Fallback: try by value attribute
-		err = el.Select(values, true, rod.SelectorTypeCSSSector)
+		err = el.Timeout(3*time.Second).Select(values, true, rod.SelectorTypeCSSSector)
 		if err != nil {
 			return nil, fmt.Errorf("option not found: %v", values)
 		}
@@ -123,8 +123,16 @@ func (s *Session) Back() (*SnapResult, error) {
 
 	start := time.Now()
 
-	if err := s.page.NavigateBack(); err != nil {
-		return nil, fmt.Errorf("back failed: %w", err)
+	var navErr error
+	for attempt := 1; attempt <= 2; attempt++ {
+		navErr = s.page.NavigateBack()
+		if navErr == nil {
+			break
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	if navErr != nil {
+		return nil, fmt.Errorf("back failed after retries: %w", navErr)
 	}
 	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.2)
 
@@ -145,8 +153,16 @@ func (s *Session) Forward() (*SnapResult, error) {
 
 	start := time.Now()
 
-	if err := s.page.NavigateForward(); err != nil {
-		return nil, fmt.Errorf("forward failed: %w", err)
+	var navErr error
+	for attempt := 1; attempt <= 2; attempt++ {
+		navErr = s.page.NavigateForward()
+		if navErr == nil {
+			break
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	if navErr != nil {
+		return nil, fmt.Errorf("forward failed after retries: %w", navErr)
 	}
 	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.2)
 

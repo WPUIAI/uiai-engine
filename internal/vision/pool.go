@@ -25,8 +25,8 @@ const IdleTimeout = 5 * time.Minute
 
 // Queue constants
 const (
-	MaxQueueDepth  = 20               // max waiting requests before 429
-	QueueWaitMax   = 30 * time.Second // max time in queue before 408
+	MaxQueueDepth = 20               // max waiting requests before 429
+	QueueWaitMax  = 30 * time.Second // max time in queue before 408
 )
 
 // WarmPageCount is how many blank pages to pre-create when Chrome launches.
@@ -50,10 +50,12 @@ type Pool struct {
 	// Screenshot cache: avoids redundant Chrome renders
 	cache *screenshotCache
 	// Request queue: graceful degradation under load
-	queued    int64 // atomic: requests currently waiting for a page
-	queueMax  int
-	queueDone int64 // total requests served from queue (waited > 0s)
-	queueDrop int64 // total requests rejected (queue full or timeout)
+	queued           int64 // atomic: requests currently waiting for a page
+	queueMax         int
+	queueDone        int64 // total requests served from queue (waited > 0s)
+	queueDrop        int64 // total requests rejected (queue full or timeout)
+	queueWaitTotalMs int64 // cumulative time spent waiting for pooled pages
+	queueWaitMaxMs   int64 // max observed queue wait in milliseconds
 	// SSRF: when true, block private/internal IPs in screenshot URLs.
 	// Commercial deployments may set false to allow localhost screenshots.
 	blockPrivateURLs bool
@@ -178,17 +180,17 @@ drained:
 		Set("disable-domain-reliability").
 		Set("disable-crash-reporter").
 		// === JET FUEL: Speed optimizations ===
-		Set("disable-background-networking").       // no background fetches
-		Set("disable-default-apps").                // don't load default apps
-		Set("disable-sync").                        // no account sync
-		Set("disable-backgrounding-occluded-windows"). // render even when "hidden"
-		Set("disable-renderer-backgrounding").      // never throttle renderers
-		Set("disable-ipc-flooding-protection").     // allow rapid IPC (we control the pages)
-		Set("disable-hang-monitor").                // no hang detection overhead
-		Set("disable-prompt-on-repost").            // no repost dialog
-		Set("disable-client-side-phishing-detection"). // no phishing checks
-		Set("metrics-recording-only").              // metrics without upload
-		Set("no-first-run").                        // skip first-run experience
+		Set("disable-background-networking").               // no background fetches
+		Set("disable-default-apps").                        // don't load default apps
+		Set("disable-sync").                                // no account sync
+		Set("disable-backgrounding-occluded-windows").      // render even when "hidden"
+		Set("disable-renderer-backgrounding").              // never throttle renderers
+		Set("disable-ipc-flooding-protection").             // allow rapid IPC (we control the pages)
+		Set("disable-hang-monitor").                        // no hang detection overhead
+		Set("disable-prompt-on-repost").                    // no repost dialog
+		Set("disable-client-side-phishing-detection").      // no phishing checks
+		Set("metrics-recording-only").                      // metrics without upload
+		Set("no-first-run").                                // skip first-run experience
 		Set("enable-features", "NetworkServiceInProcess2"). // network service in main process (fewer context switches)
 		// Block analytics/tracking at DNS level — zero network overhead
 		Set("host-resolver-rules",
@@ -207,14 +209,14 @@ drained:
 		// spin at 100% CPU during initialization. Removed in favor of feature disabling.
 		// Append to Rod's default disable-features (site-per-process,TranslateUI)
 		Append("disable-features",
-			"OnDeviceModel",         // kills on_device_model.mojom process (~31MB)
-			"ChromeMLService",       // ML service not needed for screenshots
-			"OptimizationHints",     // network hints not needed in headless
-			"MediaRouter",           // cast/media router useless in headless
-			"Translate",             // translation service
-			"ChromePasswordManager", // password manager
-			"PaintHolding",          // delays first paint — JET FUEL: faster first render
-			"BackForwardCache",      // no BFCache overhead for screenshot pages
+			"OnDeviceModel",               // kills on_device_model.mojom process (~31MB)
+			"ChromeMLService",             // ML service not needed for screenshots
+			"OptimizationHints",           // network hints not needed in headless
+			"MediaRouter",                 // cast/media router useless in headless
+			"Translate",                   // translation service
+			"ChromePasswordManager",       // password manager
+			"PaintHolding",                // delays first paint — JET FUEL: faster first render
+			"BackForwardCache",            // no BFCache overhead for screenshot pages
 			"AutofillServerCommunication", // no autofill network calls
 			"CalculateNativeWinOcclusion", // Linux: skip Windows occlusion calc
 		)
@@ -384,11 +386,20 @@ func (p *Pool) getPage() (*rod.Page, error) {
 	p.mu.Unlock()
 
 	// Enter queue — wait for a page to be released
+	queueStarted := time.Now()
 	atomic.AddInt64(&p.queued, 1)
 	log.Printf("[vision] queued request (depth=%d, active=%d, max=%d)", depth+1, p.active, p.maxPages)
 
 	select {
 	case page := <-p.pages:
+		waitMs := time.Since(queueStarted).Milliseconds()
+		atomic.AddInt64(&p.queueWaitTotalMs, waitMs)
+		for {
+			old := atomic.LoadInt64(&p.queueWaitMaxMs)
+			if waitMs <= old || atomic.CompareAndSwapInt64(&p.queueWaitMaxMs, old, waitMs) {
+				break
+			}
+		}
 		atomic.AddInt64(&p.queued, -1)
 		atomic.AddInt64(&p.queueDone, 1)
 		p.mu.Lock()
@@ -920,23 +931,32 @@ func (p *Pool) Stats() map[string]any {
 		}
 	}
 
+	queueServed := atomic.LoadInt64(&p.queueDone)
+	queueAvgWaitMs := int64(0)
+	if queueServed > 0 {
+		queueAvgWaitMs = atomic.LoadInt64(&p.queueWaitTotalMs) / queueServed
+	}
+
 	stats := map[string]any{
-		"max_pages":       p.maxPages,
-		"created_pages":   p.created,
-		"available_pages": len(p.pages),
-		"active_pages":    p.active,
-		"browser_pid":     p.browserPID,
-		"browser_alive":   p.browser != nil && p.isBrowserAlive(),
-		"browser_state":   browserState,
-		"last_success":    p.lastSuccess.Format(time.RFC3339),
-		"fail_count":        p.failCount,
-		"screenshot_count":  atomic.LoadInt64(&p.screenshotCount),
-		"recycle_every":     RecycleAfter,
+		"max_pages":        p.maxPages,
+		"created_pages":    p.created,
+		"available_pages":  len(p.pages),
+		"active_pages":     p.active,
+		"browser_pid":      p.browserPID,
+		"browser_alive":    p.browser != nil && p.isBrowserAlive(),
+		"browser_state":    browserState,
+		"last_success":     p.lastSuccess.Format(time.RFC3339),
+		"fail_count":       p.failCount,
+		"screenshot_count": atomic.LoadInt64(&p.screenshotCount),
+		"recycle_every":    RecycleAfter,
 		"queue": map[string]any{
-			"depth":    atomic.LoadInt64(&p.queued),
-			"max":      p.queueMax,
-			"served":   atomic.LoadInt64(&p.queueDone),
-			"rejected": atomic.LoadInt64(&p.queueDrop),
+			"depth":         atomic.LoadInt64(&p.queued),
+			"max":           p.queueMax,
+			"served":        queueServed,
+			"rejected":      atomic.LoadInt64(&p.queueDrop),
+			"avg_wait_ms":   queueAvgWaitMs,
+			"max_wait_ms":   atomic.LoadInt64(&p.queueWaitMaxMs),
+			"total_wait_ms": atomic.LoadInt64(&p.queueWaitTotalMs),
 		},
 	}
 	if p.cache != nil {

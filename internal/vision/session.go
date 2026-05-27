@@ -202,6 +202,21 @@ func retryElement(page *rod.Page, selector string) (*rod.Element, error) {
 	return nil, fmt.Errorf("element not found after %s: %s (%w)", elementRetryBudget.Round(time.Millisecond), selector, lastErr)
 }
 
+func retryNavigate(page *rod.Page, url string) error {
+	var lastErr error
+	for attempt := 1; attempt <= 2; attempt++ {
+		err := page.Timeout(15 * time.Second).Navigate(url)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+		if attempt < 2 {
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+	return fmt.Errorf("navigation failed after 2 attempts: %w", lastErr)
+}
+
 // Get returns a session by ID.
 func (sm *SessionManager) Get(id string) (*Session, bool) {
 	sm.mu.RLock()
@@ -457,7 +472,11 @@ func (s *Session) Click(selector string) (*SnapResult, error) {
 		return nil, fmt.Errorf("element not found: %s", selector)
 	}
 
-	if err := el.Click(proto.InputMouseButtonLeft, 1); err != nil {
+	if _, err := el.Eval(`() => {
+		this.scrollIntoView({ block: 'center', inline: 'center' });
+		this.click();
+		return true;
+	}`); err != nil {
 		return nil, fmt.Errorf("click failed: %w", err)
 	}
 
@@ -505,7 +524,7 @@ func (s *Session) Hover(selector string) (*SnapResult, error) {
 		return nil, fmt.Errorf("element not found: %s", selector)
 	}
 
-	if err := el.Hover(); err != nil {
+	if err := el.Timeout(3 * time.Second).Hover(); err != nil {
 		return nil, fmt.Errorf("hover failed: %w", err)
 	}
 	time.Sleep(200 * time.Millisecond)
@@ -548,7 +567,7 @@ func (s *Session) Type(selector, text string) (*SnapResult, error) {
 	}
 
 	el.SelectAllText()
-	el.Input(text)
+	el.Timeout(3 * time.Second).Input(text)
 	time.Sleep(100 * time.Millisecond)
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
@@ -631,8 +650,8 @@ func (s *Session) Navigate(url string) (*SnapResult, error) {
 
 	start := time.Now()
 
-	if err := s.page.Timeout(15 * time.Second).Navigate(url); err != nil {
-		return nil, fmt.Errorf("navigation failed: %w", err)
+	if err := retryNavigate(s.page, url); err != nil {
+		return nil, err
 	}
 
 	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
