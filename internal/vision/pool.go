@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/url"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -52,10 +54,11 @@ type Pool struct {
 	// Request queue: graceful degradation under load
 	queued           int64 // atomic: requests currently waiting for a page
 	queueMax         int
-	queueDone        int64 // total requests served from queue (waited > 0s)
-	queueDrop        int64 // total requests rejected (queue full or timeout)
-	queueWaitTotalMs int64 // cumulative time spent waiting for pooled pages
-	queueWaitMaxMs   int64 // max observed queue wait in milliseconds
+	queueDone        int64   // total requests served from queue (waited > 0s)
+	queueDrop        int64   // total requests rejected (queue full or timeout)
+	queueWaitTotalMs int64   // cumulative time spent waiting for pooled pages
+	queueWaitMaxMs   int64   // max observed queue wait in milliseconds
+	queueWaitSamples []int64 // bounded tail for p95/p99 metrics, protected by mu
 	// SSRF: when true, block private/internal IPs in screenshot URLs.
 	// Commercial deployments may set false to allow localhost screenshots.
 	blockPrivateURLs bool
@@ -403,6 +406,7 @@ func (p *Pool) getPage() (*rod.Page, error) {
 		atomic.AddInt64(&p.queued, -1)
 		atomic.AddInt64(&p.queueDone, 1)
 		p.mu.Lock()
+		p.recordQueueWaitSampleLocked(waitMs)
 		p.active++
 		p.mu.Unlock()
 		return page, nil
@@ -918,6 +922,31 @@ func (p *Pool) Close() {
 	log.Printf("[vision] Pool closed")
 }
 
+func (p *Pool) recordQueueWaitSampleLocked(waitMs int64) {
+	const maxQueueWaitSamples = 512
+	p.queueWaitSamples = append(p.queueWaitSamples, waitMs)
+	if len(p.queueWaitSamples) > maxQueueWaitSamples {
+		copy(p.queueWaitSamples, p.queueWaitSamples[len(p.queueWaitSamples)-maxQueueWaitSamples:])
+		p.queueWaitSamples = p.queueWaitSamples[:maxQueueWaitSamples]
+	}
+}
+
+func percentileInt64(values []int64, pct float64) int64 {
+	if len(values) == 0 {
+		return 0
+	}
+	copyValues := append([]int64(nil), values...)
+	sort.Slice(copyValues, func(i, j int) bool { return copyValues[i] < copyValues[j] })
+	idx := int(math.Ceil(float64(len(copyValues))*pct)) - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(copyValues) {
+		idx = len(copyValues) - 1
+	}
+	return copyValues[idx]
+}
+
 func (p *Pool) Stats() map[string]any {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -936,6 +965,8 @@ func (p *Pool) Stats() map[string]any {
 	if queueServed > 0 {
 		queueAvgWaitMs = atomic.LoadInt64(&p.queueWaitTotalMs) / queueServed
 	}
+	queueP95WaitMs := percentileInt64(p.queueWaitSamples, 0.95)
+	queueP99WaitMs := percentileInt64(p.queueWaitSamples, 0.99)
 
 	stats := map[string]any{
 		"max_pages":        p.maxPages,
@@ -955,6 +986,8 @@ func (p *Pool) Stats() map[string]any {
 			"served":        queueServed,
 			"rejected":      atomic.LoadInt64(&p.queueDrop),
 			"avg_wait_ms":   queueAvgWaitMs,
+			"p95_wait_ms":   queueP95WaitMs,
+			"p99_wait_ms":   queueP99WaitMs,
 			"max_wait_ms":   atomic.LoadInt64(&p.queueWaitMaxMs),
 			"total_wait_ms": atomic.LoadInt64(&p.queueWaitTotalMs),
 		},
