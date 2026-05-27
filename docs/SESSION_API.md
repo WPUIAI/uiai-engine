@@ -275,6 +275,13 @@ Use this for short sync reads. Avoid long async Promises here; use `eval_async` 
 
 `timeout_ms` defaults to 5000 and is capped at 15000. For long UI workflows, prefer `snapshot` + direct browser actions to avoid fragile long-lived Promise handles.
 
+**Async eval reliability rule:**
+
+- Use `/eval` for short synchronous DOM reads only.
+- Use `/eval_async` for small bounded awaits, with the shortest practical `timeout_ms`.
+- Use `snapshot` + `click`/`type`/`wait`/`diagnostics` for multi-step UI workflows; do not hide long browser flows inside one Promise.
+- If an eval flakes or returns a collected/stale Promise symptom, split the workflow into direct actions and read `diagnostics` before patching app code.
+
 ### `POST /api/session/{id}/resize` — Viewport
 
 ```json

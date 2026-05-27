@@ -286,19 +286,36 @@ Required discovery paths:
 - `GET /api/tools/search?q=broken%20page` returns `browser_diagnostics`.
 - `GET /api/tools/search?q=visual%20failure` returns `browser_diagnostics`.
 
-Related browser tool descriptions (`browser_open`, `browser_screenshot`, `browser_click`, `browser_eval`) should mention `browser_diagnostics` so agents discover diagnostics while using the browser workflow.
+Related browser tool descriptions (`browser_open`, `browser_screenshot`, `browser_click`, `browser_eval`, and `browser_eval_async`) should mention `browser_diagnostics` so agents discover diagnostics while using the browser workflow.
 
-## 13. Stress harness
+## 13. Stress, soak, and release gate
 
 A repeatable local stress harness lives at `scripts/stress-browser-diagnostics.sh`. It starts an isolated temp UIAI Engine port and temp static site, then verifies concurrent session diagnostics capture console errors, JS exceptions, and failed requests.
 
-Example:
+A mixed browser soak harness lives at `scripts/soak-browser-flakiness.sh`. It exercises session open, snapshot, direct actions, diagnostics, and failure classification over a bounded duration.
+
+Make targets:
 
 ```bash
-SESSIONS=4 ROUNDS=10 OUT=/tmp/uiai-browser-diagnostics-stress-4x10.json scripts/stress-browser-diagnostics.sh
+make browser-stress              # default 4 sessions x 10 rounds
+make browser-soak                # default 30s mixed soak, concurrency 2
+make browser-reliability         # go test ./... + stress + soak
+make release-browser-reliability # default 5m soak for pre-release proof
 ```
 
-Recent proof: 40/40 runs passed, average 1028.2ms, max 1656ms, with evidence at `/tmp/uiai-browser-diagnostics-stress-4x10.json`.
+Hosted CI gate:
+
+- `.github/workflows/browser-reliability.yml`
+- Runs `go test ./...`, diagnostics stress `40/40`, mixed browser soak, and uploads JSON/log artifacts.
+- Manual `workflow_dispatch` supports custom `soak_seconds` and `concurrency`.
+
+Recent local proof:
+
+- `make browser-reliability` passed.
+- Diagnostics stress: `40/40` passed, evidence `/tmp/uiai-browser-diagnostics-4x10.json`.
+- Mixed soak: `9/9` passed, evidence `/tmp/uiai-browser-flakiness-soak.json`.
+
+For full runbook, see [`BROWSER_RELIABILITY_RUNBOOK.md`](BROWSER_RELIABILITY_RUNBOOK.md).
 
 ## 14. Acceptance checks
 
