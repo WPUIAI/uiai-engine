@@ -66,6 +66,7 @@ type DiagnosticsSnapshot struct {
 	Title          string             `json:"title"`
 	Seq            uint64             `json:"seq"`
 	GeneratedAt    string             `json:"generated_at"`
+	FocusaScope    *FocusaScope       `json:"focusa_scope,omitempty"`
 	Console        []ConsoleEvent     `json:"console"`
 	Exceptions     []ExceptionEvent   `json:"exceptions"`
 	Network        []NetworkEvent     `json:"network"`
@@ -151,6 +152,7 @@ func (s *Session) Diagnostics(limit int, level string, failedOnly bool) Diagnost
 		Title:          s.Title,
 		Seq:            s.diagnostics.seq,
 		GeneratedAt:    time.Now().UTC().Format(time.RFC3339),
+		FocusaScope:    s.FocusaScope,
 		Console:        console,
 		Exceptions:     exceptions,
 		Network:        network,

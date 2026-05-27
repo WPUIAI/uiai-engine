@@ -30,17 +30,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 		sessions := sm.List()
 		out := make([]map[string]any, 0, len(sessions))
 		for _, s := range sessions {
-			out = append(out, map[string]any{
-				"id":         s.ID,
-				"url":        s.URL,
-				"title":      s.Title,
-				"width":      s.Width,
-				"height":     s.Height,
-				"created_at": s.CreatedAt,
-				"last_used":  s.LastUsed,
-				"nav_count":  s.NavCount,
-				"snap_count": s.SnapCount,
-			})
+			out = append(out, sessionInfoPayload(s))
 		}
 		writeJSON(w, 200, map[string]any{"sessions": out, "count": len(out), "max": vision.MaxSessions})
 	})
@@ -48,9 +38,14 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 	// Open a new session
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
-			URL    string `json:"url"`
-			Width  int    `json:"width"`
-			Height int    `json:"height"`
+			URL          string              `json:"url"`
+			Width        int                 `json:"width"`
+			Height       int                 `json:"height"`
+			FocusaScope  *vision.FocusaScope `json:"focusa_scope"`
+			WorkpointID  string              `json:"workpoint_id"`
+			ContinuityID string              `json:"continuity_id"`
+			ProjectRoot  string              `json:"project_root"`
+			EvidenceRef  string              `json:"evidence_ref"`
 		}
 		json.NewDecoder(req.Body).Decode(&body)
 
@@ -64,15 +59,10 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			writeSessionError(w, 500, classifySessionError(err), err, sess)
 			return
 		}
+		sess.SetFocusaScope(resolveFocusaScope(body.FocusaScope, body.WorkpointID, body.ContinuityID, body.ProjectRoot, body.EvidenceRef))
 
 		writeJSON(w, 201, map[string]any{
-			"session": map[string]any{
-				"id":     sess.ID,
-				"url":    sess.URL,
-				"title":  sess.Title,
-				"width":  sess.Width,
-				"height": sess.Height,
-			},
+			"session":     sessionInfoPayload(sess),
 			"screenshot":  snap.Screenshot,
 			"size":        snap.Size,
 			"duration_ms": snap.Duration,
@@ -89,17 +79,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				writeJSON(w, 404, map[string]string{"error": "session not found"})
 				return
 			}
-			writeJSON(w, 200, map[string]any{
-				"id":         sess.ID,
-				"url":        sess.URL,
-				"title":      sess.Title,
-				"width":      sess.Width,
-				"height":     sess.Height,
-				"created_at": sess.CreatedAt,
-				"last_used":  sess.LastUsed,
-				"nav_count":  sess.NavCount,
-				"snap_count": sess.SnapCount,
-			})
+			writeJSON(w, 200, sessionInfoPayload(sess))
 		})
 
 		// Close session
@@ -681,6 +661,34 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 	})
 }
 
+func sessionInfoPayload(sess *vision.Session) map[string]any {
+	out := map[string]any{
+		"id":         sess.ID,
+		"url":        sess.URL,
+		"title":      sess.Title,
+		"width":      sess.Width,
+		"height":     sess.Height,
+		"created_at": sess.CreatedAt,
+		"last_used":  sess.LastUsed,
+		"nav_count":  sess.NavCount,
+		"snap_count": sess.SnapCount,
+	}
+	if sess.FocusaScope != nil {
+		out["focusa_scope"] = sess.FocusaScope
+	}
+	return out
+}
+
+func resolveFocusaScope(scope *vision.FocusaScope, workpointID, continuityID, projectRoot, evidenceRef string) *vision.FocusaScope {
+	if scope != nil {
+		return scope
+	}
+	if workpointID == "" && continuityID == "" && projectRoot == "" && evidenceRef == "" {
+		return nil
+	}
+	return &vision.FocusaScope{WorkpointID: workpointID, ContinuityID: continuityID, ProjectRoot: projectRoot, EvidenceRef: evidenceRef}
+}
+
 func writeSessionError(w http.ResponseWriter, status int, class string, err error, sess *vision.Session, context ...map[string]any) {
 	resp := map[string]any{
 		"error":                 err.Error(),
@@ -697,6 +705,9 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 		resp["session_id"] = diag.SessionID
 		resp["url"] = diag.URL
 		resp["title"] = diag.Title
+		if diag.FocusaScope != nil {
+			resp["focusa_scope"] = diag.FocusaScope
+		}
 		resp["diagnostics_summary"] = diag.Summary
 		if len(diag.FailedRequests) > 0 {
 			resp["failed_requests"] = diag.FailedRequests

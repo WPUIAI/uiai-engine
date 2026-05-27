@@ -30,16 +30,24 @@ const (
 // Unlike the transactional pool (navigate → snap → forget), a session keeps
 // the page alive between calls — enabling instant re-screenshots, scrolling,
 // clicking, CSS injection, and JS evaluation without re-navigating.
+type FocusaScope struct {
+	WorkpointID  string `json:"workpoint_id,omitempty"`
+	ContinuityID string `json:"continuity_id,omitempty"`
+	ProjectRoot  string `json:"project_root,omitempty"`
+	EvidenceRef  string `json:"evidence_ref,omitempty"`
+}
+
 type Session struct {
-	ID        string    `json:"id"`
-	URL       string    `json:"url"`
-	Title     string    `json:"title"`
-	Width     int       `json:"width"`
-	Height    int       `json:"height"`
-	CreatedAt time.Time `json:"created_at"`
-	LastUsed  time.Time `json:"last_used"`
-	NavCount  int       `json:"nav_count"`
-	SnapCount int       `json:"snap_count"`
+	ID          string       `json:"id"`
+	URL         string       `json:"url"`
+	Title       string       `json:"title"`
+	Width       int          `json:"width"`
+	Height      int          `json:"height"`
+	CreatedAt   time.Time    `json:"created_at"`
+	LastUsed    time.Time    `json:"last_used"`
+	NavCount    int          `json:"nav_count"`
+	SnapCount   int          `json:"snap_count"`
+	FocusaScope *FocusaScope `json:"focusa_scope,omitempty"`
 
 	page              *rod.Page
 	pool              *Pool
@@ -100,6 +108,14 @@ func generateID() string {
 		s = s[:8]
 	}
 	return s
+}
+
+func (s *Session) SetFocusaScope(scope *FocusaScope) {
+	if scope == nil || (scope.WorkpointID == "" && scope.ContinuityID == "" && scope.ProjectRoot == "" && scope.EvidenceRef == "") {
+		s.FocusaScope = nil
+		return
+	}
+	s.FocusaScope = scope
 }
 
 // Open creates a new session, navigates to the URL, and returns the session

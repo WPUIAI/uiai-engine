@@ -82,6 +82,14 @@ func TestDiagnosticsFailedOnly(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsIncludesFocusaScope(t *testing.T) {
+	s := &Session{ID: "sid", diagnostics: newDiagnosticsRecorder(), FocusaScope: &FocusaScope{WorkpointID: "wp1", ContinuityID: "cont1"}}
+	diag := s.Diagnostics(10, "all", false)
+	if diag.FocusaScope == nil || diag.FocusaScope.WorkpointID != "wp1" || diag.FocusaScope.ContinuityID != "cont1" {
+		t.Fatalf("missing focusa scope: %+v", diag.FocusaScope)
+	}
+}
+
 func TestClearDiagnosticsResetsRecorder(t *testing.T) {
 	s := &Session{ID: "sid", diagnostics: newDiagnosticsRecorder()}
 	s.diagnostics.seq = 42
