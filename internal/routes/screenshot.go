@@ -1,7 +1,9 @@
 package routes
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,6 +14,11 @@ import (
 	"github.com/philoveracity/uiai-engine/internal/storage"
 	"github.com/philoveracity/uiai-engine/internal/vision"
 )
+
+func screenshotEvidenceRef(data []byte) string {
+	sum := sha256.Sum256(data)
+	return "uiai-screenshot:sha256:" + hex.EncodeToString(sum[:])[:16]
+}
 
 func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usage *storage.UsageStore) {
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
@@ -24,9 +31,9 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usag
 			Quality  int    `json:"quality"`
 			WaitFor  string `json:"waitFor"`
 			Delay    int    `json:"delay"`
-			Cookies  string `json:"cookies"`  // "name=value; name2=value2"
-			Timeout  int    `json:"timeout"`  // overall timeout in seconds (default: 30)
-			NoCache  bool   `json:"nocache"`  // skip cache, always take fresh screenshot
+			Cookies  string `json:"cookies"` // "name=value; name2=value2"
+			Timeout  int    `json:"timeout"` // overall timeout in seconds (default: 30)
+			NoCache  bool   `json:"nocache"` // skip cache, always take fresh screenshot
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
@@ -79,6 +86,7 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usag
 			})
 		}
 
+		artifactRef := screenshotEvidenceRef(result.Data)
 		resp := map[string]any{
 			"screenshot": base64.StdEncoding.EncodeToString(result.Data),
 			"width":      result.Width,
@@ -86,6 +94,14 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usag
 			"format":     result.Format,
 			"size":       len(result.Data),
 			"duration":   result.Duration.Milliseconds(),
+			"focusa_evidence": map[string]any{
+				"target_ref":   body.URL,
+				"result":       "UIAI screenshot captured",
+				"evidence_ref": artifactRef,
+				"artifact_ref": artifactRef,
+				"mime_type":    "image/" + result.Format,
+				"bytes":        len(result.Data),
+			},
 		}
 		if result.DOMReport != "" {
 			resp["dom_report"] = result.DOMReport

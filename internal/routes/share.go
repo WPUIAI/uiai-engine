@@ -16,13 +16,14 @@ import (
 )
 
 type shareEntry struct {
-	ID        string         `json:"id"`
-	URL       string         `json:"url"`
-	Title     string         `json:"title"`
-	Data      map[string]any `json:"data"`
-	CreatedAt time.Time      `json:"createdAt"`
-	ExpiresAt time.Time      `json:"expiresAt"`
-	Views     int            `json:"views"`
+	ID             string         `json:"id"`
+	URL            string         `json:"url"`
+	Title          string         `json:"title"`
+	Data           map[string]any `json:"data"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	ExpiresAt      time.Time      `json:"expiresAt"`
+	Views          int            `json:"views"`
+	FocusaEvidence map[string]any `json:"focusa_evidence,omitempty"`
 }
 
 var shareStore sync.Map
@@ -59,6 +60,19 @@ func persistShare(entry *shareEntry) {
 	}
 	data, _ := json.MarshalIndent(entry, "", "  ")
 	os.WriteFile(filepath.Join(shareDataDir, entry.ID+".json"), data, 0644)
+}
+
+func shareEvidence(id, targetURL, title string) map[string]any {
+	result := "UIAI share artifact created"
+	if title != "" {
+		result += ": " + title
+	}
+	return map[string]any{
+		"target_ref":   targetURL,
+		"result":       result,
+		"evidence_ref": "uiai-share:" + id,
+		"artifact_ref": "/api/share/" + id,
+	}
 }
 
 func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
@@ -106,20 +120,22 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
 		}
 
 		entry := &shareEntry{
-			ID:        id,
-			URL:       body.URL,
-			Title:     body.Title,
-			Data:      body.Data,
-			CreatedAt: time.Now(),
-			ExpiresAt: time.Now().Add(time.Duration(expiresIn) * time.Minute),
+			ID:             id,
+			URL:            body.URL,
+			Title:          body.Title,
+			Data:           body.Data,
+			CreatedAt:      time.Now(),
+			ExpiresAt:      time.Now().Add(time.Duration(expiresIn) * time.Minute),
+			FocusaEvidence: shareEvidence(id, body.URL, body.Title),
 		}
 		shareStore.Store(id, entry)
 		persistShare(entry)
 
 		writeJSON(w, 200, map[string]any{
-			"id":        id,
-			"shareUrl":  "/api/share/" + id,
-			"expiresAt": entry.ExpiresAt,
+			"id":              id,
+			"shareUrl":        "/api/share/" + id,
+			"expiresAt":       entry.ExpiresAt,
+			"focusa_evidence": entry.FocusaEvidence,
 		})
 	})
 
@@ -151,21 +167,23 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
 			URL:   body.URLs[0],
 			Title: body.Title,
 			Data: map[string]any{
-				"urls":     body.URLs,
-				"custom":   body.Data,
+				"urls":      body.URLs,
+				"custom":    body.Data,
 				"pageCount": len(body.URLs),
 			},
-			CreatedAt: time.Now(),
-			ExpiresAt: time.Now().Add(time.Duration(expiresIn) * time.Minute),
+			CreatedAt:      time.Now(),
+			ExpiresAt:      time.Now().Add(time.Duration(expiresIn) * time.Minute),
+			FocusaEvidence: shareEvidence(id, body.URLs[0], body.Title),
 		}
 		shareStore.Store(id, entry)
 		persistShare(entry)
 
 		writeJSON(w, 200, map[string]any{
-			"id":        id,
-			"shareUrl":  "/api/share/" + id,
-			"pages":     len(body.URLs),
-			"expiresAt": entry.ExpiresAt,
+			"id":              id,
+			"shareUrl":        "/api/share/" + id,
+			"pages":           len(body.URLs),
+			"expiresAt":       entry.ExpiresAt,
+			"focusa_evidence": entry.FocusaEvidence,
 		})
 	})
 
@@ -218,7 +236,10 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
 			return
 		}
 
+		artifactRef := screenshotEvidenceRef(result.Data)
 		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("X-Focusa-Evidence-Ref", artifactRef)
+		w.Header().Set("X-Focusa-Target-Ref", entry.URL)
 		w.Write(result.Data)
 	})
 }
