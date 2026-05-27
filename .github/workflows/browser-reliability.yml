@@ -1,0 +1,56 @@
+name: Browser Reliability
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      soak_seconds:
+        description: "Mixed browser soak duration in seconds"
+        required: false
+        default: "300"
+      concurrency:
+        description: "Mixed browser soak concurrency"
+        required: false
+        default: "2"
+
+jobs:
+  browser-reliability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OUT_DIR: /tmp/uiai-browser-reliability
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
+      - name: Go tests
+        run: go test ./...
+      - name: Diagnostics stress 40/40
+        run: |
+          mkdir -p "$OUT_DIR"
+          SESSIONS=4 ROUNDS=10 OUT="$OUT_DIR/diagnostics-4x10.json" scripts/stress-browser-diagnostics.sh
+      - name: Mixed browser soak
+        run: |
+          mkdir -p "$OUT_DIR"
+          SOAK="${{ github.event.inputs.soak_seconds || 30 }}"
+          CONCURRENCY="${{ github.event.inputs.concurrency || 2 }}"
+          DURATION_SECONDS="$SOAK" CONCURRENCY="$CONCURRENCY" OUT="$OUT_DIR/browser-soak.json" scripts/soak-browser-flakiness.sh
+      - name: Upload reliability artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uiai-browser-reliability-${{ github.run_id }}
+          path: |
+            /tmp/uiai-browser-reliability/*.json
+            /tmp/uiai-diag-stress-engine.log
+            /tmp/uiai-diag-stress-site.log
+            /tmp/uiai-soak-engine.log
+            /tmp/uiai-soak-site.log
+          if-no-files-found: ignore
