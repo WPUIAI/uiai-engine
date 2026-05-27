@@ -73,7 +73,7 @@ for _ in $(seq 1 60); do
 done
 curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null
 
-export ENGINE_PORT SITE_PORT WIDTH HEIGHT
+export ENGINE_PORT SITE_PORT WIDTH HEIGHT FOCUSA_WORKPOINT_ID="${FOCUSA_WORKPOINT_ID:-}" FOCUSA_CONTINUITY_ID="${FOCUSA_CONTINUITY_ID:-}" FOCUSA_PROJECT_ROOT="${FOCUSA_PROJECT_ROOT:-}" FOCUSA_EVIDENCE_REF="${FOCUSA_EVIDENCE_REF:-uiai-browser-diagnostics-stress:$OUT}"
 python3 - "$SESSIONS" "$ROUNDS" "$OUT" <<'PY'
 import concurrent.futures, json, os, subprocess, sys, time, urllib.request
 
@@ -84,6 +84,12 @@ engine = f"http://127.0.0.1:{os.environ['ENGINE_PORT']}"
 site = f"http://127.0.0.1:{os.environ['SITE_PORT']}"
 width = int(os.environ['WIDTH'])
 height = int(os.environ['HEIGHT'])
+focusa_scope = {k: v for k, v in {
+    'workpoint_id': os.environ.get('FOCUSA_WORKPOINT_ID', ''),
+    'continuity_id': os.environ.get('FOCUSA_CONTINUITY_ID', ''),
+    'project_root': os.environ.get('FOCUSA_PROJECT_ROOT', ''),
+    'evidence_ref': os.environ.get('FOCUSA_EVIDENCE_REF', ''),
+}.items() if v}
 
 def http_json(method, url, body=None):
     data = None if body is None else json.dumps(body).encode()
@@ -95,7 +101,10 @@ def run_one(round_idx, idx):
     label = f"r{round_idx}s{idx}"
     target = f"{site}/?id={label}&round={round_idx}"
     start = time.time()
-    opened = http_json('POST', f"{engine}/api/session", {'url': target, 'width': width, 'height': height})
+    open_body = {'url': target, 'width': width, 'height': height}
+    if focusa_scope:
+        open_body['focusa_scope'] = focusa_scope
+    opened = http_json('POST', f"{engine}/api/session", open_body)
     sid = opened['session']['id']
     time.sleep(0.35)
     diag = http_json('GET', f"{engine}/api/session/{sid}/diagnostics?limit=50")
@@ -129,6 +138,7 @@ for r in range(rounds):
 
 total_ms = round((time.time() - started) * 1000)
 passed = sum(1 for r in results if r['ok'])
+evidence_ref = os.environ.get('FOCUSA_EVIDENCE_REF', f'uiai-browser-diagnostics-stress:{out_path}')
 report = {
     'ok': passed == len(results),
     'sessions': sessions,
@@ -139,6 +149,14 @@ report = {
     'total_ms': total_ms,
     'avg_elapsed_ms': round(sum(r['elapsed_ms'] for r in results) / len(results), 1) if results else 0,
     'max_elapsed_ms': max((r['elapsed_ms'] for r in results), default=0),
+    'focusa_evidence': {
+        'target_ref': 'WPUIAI browser diagnostics stress',
+        'result': f"diagnostics stress ok={passed == len(results)} passed={passed}/{len(results)} avg_ms={round(sum(r['elapsed_ms'] for r in results) / len(results), 1) if results else 0}",
+        'evidence_ref': evidence_ref,
+        'diagnostics_ref': out_path,
+        'focusa_scope': focusa_scope,
+        'intake_tool': 'focusa_evidence_capture',
+    },
     'results': results,
 }
 with open(out_path, 'w') as f:

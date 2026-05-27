@@ -47,7 +47,7 @@ python3 -m http.server "$SITE_PORT" -d "$TMPDIR/site" >/tmp/uiai-soak-site.log 2
 for _ in $(seq 1 80); do curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null 2>&1 && break; sleep 0.25; done
 curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null
 
-export ENGINE_PORT SITE_PORT DURATION_SECONDS CONCURRENCY OUT
+export ENGINE_PORT SITE_PORT DURATION_SECONDS CONCURRENCY OUT FOCUSA_WORKPOINT_ID="${FOCUSA_WORKPOINT_ID:-}" FOCUSA_CONTINUITY_ID="${FOCUSA_CONTINUITY_ID:-}" FOCUSA_PROJECT_ROOT="${FOCUSA_PROJECT_ROOT:-}" FOCUSA_EVIDENCE_REF="${FOCUSA_EVIDENCE_REF:-uiai-browser-flakiness-soak:$OUT}"
 python3 - <<'PY'
 import concurrent.futures, json, os, statistics, time, urllib.error, urllib.request
 engine=f"http://127.0.0.1:{os.environ['ENGINE_PORT']}"
@@ -56,6 +56,12 @@ duration=int(os.environ['DURATION_SECONDS'])
 concurrency=int(os.environ['CONCURRENCY'])
 out=os.environ['OUT']
 end=time.time()+duration
+focusa_scope={k:v for k,v in {
+    'workpoint_id': os.environ.get('FOCUSA_WORKPOINT_ID',''),
+    'continuity_id': os.environ.get('FOCUSA_CONTINUITY_ID',''),
+    'project_root': os.environ.get('FOCUSA_PROJECT_ROOT',''),
+    'evidence_ref': os.environ.get('FOCUSA_EVIDENCE_REF',''),
+}.items() if v}
 
 def req(method,url,body=None,ok=(200,201)):
     data=None if body is None else json.dumps(body).encode()
@@ -73,7 +79,10 @@ def req(method,url,body=None,ok=(200,201)):
 def one(i):
     label=f"w{i}-{int(time.time()*1000)}"
     started=time.time()
-    status, opened=req('POST',f"{engine}/api/session",{'url':f'{site}/?id={label}','width':800,'height':600})
+    open_body={'url':f'{site}/?id={label}','width':800,'height':600}
+    if focusa_scope:
+        open_body['focusa_scope']=focusa_scope
+    status, opened=req('POST',f"{engine}/api/session",open_body)
     if status!=201:
         return {'ok':False,'phase':'open','status':status,'error_class':opened.get('error_class'),'elapsed_ms':round((time.time()-started)*1000)}
     sid=opened['session']['id']
@@ -109,7 +118,10 @@ classes={}
 for r in results:
     k=r.get('error_class') or ('ok' if r.get('ok') else r.get('phase','unknown'))
     classes[k]=classes.get(k,0)+1
-report={'ok': all(r.get('ok') for r in results) and bool(results), 'duration_seconds':duration,'concurrency':concurrency,'total_runs':len(results),'passed':sum(1 for r in results if r.get('ok')),'failed':sum(1 for r in results if not r.get('ok')),'avg_elapsed_ms':round(statistics.mean(lat),1) if lat else 0,'p95_elapsed_ms':pct(95),'p99_elapsed_ms':pct(99),'max_elapsed_ms':max(lat) if lat else 0,'failure_classes':classes,'results':results}
+passed=sum(1 for r in results if r.get('ok'))
+failed=sum(1 for r in results if not r.get('ok'))
+evidence_ref=os.environ.get('FOCUSA_EVIDENCE_REF',f'uiai-browser-flakiness-soak:{out}')
+report={'ok': all(r.get('ok') for r in results) and bool(results), 'duration_seconds':duration,'concurrency':concurrency,'total_runs':len(results),'passed':passed,'failed':failed,'avg_elapsed_ms':round(statistics.mean(lat),1) if lat else 0,'p95_elapsed_ms':pct(95),'p99_elapsed_ms':pct(99),'max_elapsed_ms':max(lat) if lat else 0,'failure_classes':classes,'focusa_evidence':{'target_ref':'WPUIAI browser flakiness soak','result':f"flakiness soak ok={failed == 0 and bool(results)} passed={passed}/{len(results)} p95_ms={pct(95)} p99_ms={pct(99)}",'evidence_ref':evidence_ref,'diagnostics_ref':out,'focusa_scope':focusa_scope,'intake_tool':'focusa_evidence_capture'},'results':results}
 with open(out,'w') as f: json.dump(report,f,indent=2)
 print(json.dumps({k:report[k] for k in ['ok','duration_seconds','concurrency','total_runs','passed','failed','avg_elapsed_ms','p95_elapsed_ms','p99_elapsed_ms','max_elapsed_ms','failure_classes']},indent=2))
 if not report['ok']:
