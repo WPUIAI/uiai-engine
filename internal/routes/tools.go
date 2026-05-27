@@ -2,6 +2,8 @@ package routes
 
 import (
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/philoveracity/uiai-engine/internal/config"
@@ -60,21 +62,73 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 			return
 		}
 
-		// Search by substring in name or description
-		matches := make([]map[string]any, 0)
-		for _, t := range openAITools() {
-			name := t["name"].(string)
-			desc := t["description"].(string)
-			if containsCI(name, q) || containsCI(desc, q) {
-				matches = append(matches, t)
-			}
-		}
+		// Search by substring in name or description. Rank name matches before
+		// description matches so specific searches like q=eval_async surface
+		// browser_eval_async before browser_eval mentioning it in guidance.
+		matches := rankedToolSearch(openAITools(), q)
 		writeJSON(w, 200, map[string]any{
 			"query": q,
 			"tools": matches,
 			"count": len(matches),
 		})
 	})
+}
+
+func rankedToolSearch(tools []map[string]any, query string) []map[string]any {
+	type rankedTool struct {
+		tool  map[string]any
+		score int
+		idx   int
+	}
+	ranked := make([]rankedTool, 0)
+	for idx, t := range tools {
+		name, _ := t["name"].(string)
+		desc, _ := t["description"].(string)
+		score := toolSearchScore(name, desc, query)
+		if score > 0 {
+			ranked = append(ranked, rankedTool{tool: t, score: score, idx: idx})
+		}
+	}
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].score != ranked[j].score {
+			return ranked[i].score > ranked[j].score
+		}
+		return ranked[i].idx < ranked[j].idx
+	})
+	matches := make([]map[string]any, 0, len(ranked))
+	for _, item := range ranked {
+		matches = append(matches, item.tool)
+	}
+	return matches
+}
+
+func toolSearchScore(name, desc, query string) int {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return 0
+	}
+	nameLower := strings.ToLower(name)
+	descLower := strings.ToLower(desc)
+	score := 0
+	if nameLower == q {
+		score = max(score, 1000)
+	}
+	if strings.HasPrefix(nameLower, q) {
+		score = max(score, 900)
+	}
+	if strings.Contains(nameLower, q) {
+		score = max(score, 800)
+	}
+	// Token-ish aliases help users search by the suffix after browser_.
+	for _, part := range strings.FieldsFunc(nameLower, func(r rune) bool { return r == '_' || r == '-' || r == '.' }) {
+		if part == q {
+			score = max(score, 700)
+		}
+	}
+	if strings.Contains(descLower, q) {
+		score = max(score, 100)
+	}
+	return score
 }
 
 // containsCI is defined in intelligence.go (shared within routes package)
