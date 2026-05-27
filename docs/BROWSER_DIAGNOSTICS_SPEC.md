@@ -260,13 +260,20 @@ Requirements:
 
 UIAI diagnostics are evidence, not authority. Focusa should ingest bounded diagnostic snapshots through its existing evidence/prediction/Workpoint flow:
 
-1. Agent opens or reuses a UIAI browser session.
+1. Agent opens or reuses a UIAI browser session, passing `focusa_scope` when `workpoint_id`, `continuity_id`, `project_root`, or `evidence_ref` are known.
 2. Agent reproduces the page issue.
-3. Agent reads `browser_diagnostics`.
-4. Agent captures a stable evidence reference in Focusa.
+3. Agent reads `browser_diagnostics`; diagnostics echo `focusa_scope` when the session was scoped.
+4. Agent captures a stable evidence reference in Focusa, preferably through `focusa_browser_diagnostics_intake` so embedded scope is reused.
 5. Focusa active object resolution maps URL/stack/API routes to likely project files.
 6. Focusa prediction records the likely cause/fix path.
 7. Fix verification captures a second diagnostics snapshot proving console/network clean or improved.
+
+Session, diagnostics, share, and screenshot responses now carry Focusa-friendly handles:
+
+- `focusa_scope` on scoped sessions and diagnostics.
+- `focusa_evidence` in reliability stress/soak reports.
+- `focusa_evidence` in `/api/screenshot` JSON responses with `uiai-screenshot:sha256:*` refs.
+- `focusa_evidence` in `/api/share/create` and `/api/share/multi` responses with `uiai-share:*` refs.
 
 See companion spec: `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`.
 
@@ -293,6 +300,8 @@ Related browser tool descriptions (`browser_open`, `browser_screenshot`, `browse
 A repeatable local stress harness lives at `scripts/stress-browser-diagnostics.sh`. It starts an isolated temp UIAI Engine port and temp static site, then verifies concurrent session diagnostics capture console errors, JS exceptions, and failed requests.
 
 A mixed browser soak harness lives at `scripts/soak-browser-flakiness.sh`. It exercises session open, snapshot, direct actions, diagnostics, and failure classification over a bounded duration.
+
+Both harnesses accept `FOCUSA_WORKPOINT_ID`, `FOCUSA_CONTINUITY_ID`, `FOCUSA_PROJECT_ROOT`, and `FOCUSA_EVIDENCE_REF`; when set, they pass `focusa_scope` into sessions and write a `focusa_evidence` packet into the JSON report.
 
 Make targets:
 
@@ -328,3 +337,6 @@ For full runbook, see [`BROWSER_RELIABILITY_RUNBOOK.md`](BROWSER_RELIABILITY_RUN
 - `/api/tools` lists `browser_diagnostics` and `browser_diagnostics_clear`.
 - Redaction test proves auth/cookie headers are not returned.
 - Focusa docs cross-reference this spec and define evidence ingestion shape.
+- Scoped sessions echo `focusa_scope` through diagnostics and session error envelopes.
+- Stress/soak reports include `focusa_evidence` when Focusa scope env vars are present.
+- Screenshot/share APIs return stable Focusa evidence handles instead of requiring raw image/share blobs in agent context.

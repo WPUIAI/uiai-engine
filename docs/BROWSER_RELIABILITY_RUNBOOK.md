@@ -7,7 +7,7 @@ Current local runbook for UIAI browser/session reliability gates.
 - Catch diagnostics/session regressions before release.
 - Keep browser QA fast enough for agent loops.
 - Prefer direct browser actions over fragile long async eval chains.
-- Preserve proof as JSON/log artifacts.
+- Preserve proof as JSON/log artifacts and, when available, Focusa-ready `focusa_evidence` packets.
 
 ## Commands
 
@@ -29,6 +29,18 @@ Override example:
 ```bash
 DURATION_SECONDS=600 CONCURRENCY=3 OUT=/tmp/uiai-soak-10m.json make browser-soak
 ```
+
+Focusa scoped proof example:
+
+```bash
+FOCUSA_WORKPOINT_ID="019..." \
+FOCUSA_CONTINUITY_ID="focusa-cont-..." \
+FOCUSA_PROJECT_ROOT="/path/to/project" \
+FOCUSA_EVIDENCE_REF="uiai-browser-reliability:/tmp/uiai-soak-10m.json" \
+OUT=/tmp/uiai-soak-10m.json make browser-soak
+```
+
+When these variables are set, the stress/soak harnesses pass `focusa_scope` to UIAI sessions and write a `focusa_evidence` object into the JSON report.
 
 ## CI gate
 
@@ -79,6 +91,12 @@ Typical local artifacts:
 - `/tmp/uiai-soak-engine.log`
 - `/tmp/uiai-soak-site.log`
 
+Focusa-ready handles:
+
+- Stress/soak JSON: `.focusa_evidence` contains `target_ref`, `result`, `evidence_ref`, `diagnostics_ref`, `focusa_scope`, and suggested intake tool.
+- Screenshot JSON responses: `.focusa_evidence.evidence_ref` uses `uiai-screenshot:sha256:<prefix>`.
+- Share create/multi responses: `.focusa_evidence.evidence_ref` uses `uiai-share:<share_id>`.
+
 ## Acceptance
 
 - `go test ./...` passes.
@@ -86,3 +104,5 @@ Typical local artifacts:
 - soak reports `ok=true`, `failed=0` or only expected negative-test failure classes.
 - diagnostics buffers remain bounded and secret-redacted.
 - browser action failures return typed error classes plus diagnostics summary when available.
+- scoped stress/soak runs include `focusa_evidence` in the output report.
+- screenshot/share artifact endpoints return stable Focusa evidence refs.

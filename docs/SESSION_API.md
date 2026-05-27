@@ -14,7 +14,7 @@ Session tools now expose lightweight DevTools-style diagnostics specified in [`B
 
 Agent discoverability rule: during browser troubleshooting, call `browser_diagnostics` after `browser_open` and after any failed/blank/broken screenshot, unexpected click/navigation, JS eval issue, failed wait, CORS/API/network suspicion, or console-error clue. Tool search terms that should find it: `diagnostics`, `console`, `network`, `error`, `exception`, `failed request`, `devtools`, `CORS`, `API failure`, `blank page`, `broken page`, `visual failure`.
 
-Focusa ingestion for those diagnostics is specified in `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`.
+Focusa ingestion for those diagnostics is specified in `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`. When a session is opened with `focusa_scope`, diagnostics and session error envelopes echo the scope so `focusa_browser_diagnostics_intake` can link evidence without guessing Workpoint/project identity.
 
 ## Quick Start
 
@@ -103,7 +103,7 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `GET` | `/api/session/{id}/diagnostics` | Console/errors/exceptions/network summary (no screenshot) | **instant** |
 | `POST` | `/api/session/{id}/diagnostics/clear` | Clear diagnostic buffers | **instant** |
 
-Diagnostics endpoints are implemented per [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md).
+Diagnostics endpoints are implemented per [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md). `GET /api/session/{id}/diagnostics` includes `focusa_scope` when the session was opened with scope metadata.
 
 ---
 
@@ -113,7 +113,13 @@ Diagnostics endpoints are implemented per [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSE
 {
   "url": "https://example.com",    // required
   "width": 1280,                    // default: 1280
-  "height": 800                     // default: 800
+  "height": 800,                    // default: 800
+  "focusa_scope": {                 // optional evidence/Workpoint scope
+    "workpoint_id": "019...",
+    "continuity_id": "focusa-cont-...",
+    "project_root": "/path/to/project",
+    "evidence_ref": "uiai-diagnostics:example"
+  }
 }
 ```
 
@@ -125,7 +131,13 @@ Diagnostics endpoints are implemented per [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSE
     "url": "https://example.com",
     "title": "Example Domain",
     "width": 1280,
-    "height": 800
+    "height": 800,
+    "focusa_scope": {
+      "workpoint_id": "019...",
+      "continuity_id": "focusa-cont-...",
+      "project_root": "/path/to/project",
+      "evidence_ref": "uiai-diagnostics:example"
+    }
   },
   "screenshot": "<base64>",
   "size": 45230,
