@@ -52,8 +52,8 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		// Skip auth on health/status/public info endpoints + routes that Bun serves without auth
 		p := r.URL.Path
 		if p == "/" || p == "/health" || p == "/api/status" || p == "/dashboard" ||
-			// Health
-			p == "/api/health" || p == "/api/health/providers" ||
+			// Health / metrics
+			p == "/api/health" || strings.HasPrefix(p, "/api/health/") || p == "/api/metrics/browser" ||
 			// Public info
 			p == "/api/critique/models" || p == "/api/critique/dimensions" ||
 			p == "/api/ui-reverse/models" || p == "/api/ui-reverse/operations" ||
@@ -64,14 +64,14 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			strings.HasPrefix(p, "/api/memory/") ||
 			strings.HasPrefix(p, "/api/usage/") ||
 			strings.HasPrefix(p, "/api/workflow/") ||
-			strings.HasPrefix(p, "/api/training/") ||       // Has own service-token auth
-			strings.HasPrefix(p, "/api/intelligence/") ||  // Per-handler auth
+			strings.HasPrefix(p, "/api/training/") || // Has own service-token auth
+			strings.HasPrefix(p, "/api/intelligence/") || // Per-handler auth
 			p == "/api/screenshot" || strings.HasPrefix(p, "/api/screenshot/") || // Screenshot: internal use (Coach vision, share)
-			strings.HasPrefix(p, "/api/session") ||         // Browser sessions: LLM tool API (localhost only)
-			strings.HasPrefix(p, "/api/tools") ||           // Tool discovery: agents search/discover tools
-			p == "/api/media/jobs" ||                       // Media job list: read-only
-			strings.HasPrefix(p, "/api/media/status/") ||  // Media status: read-only poll
-			strings.HasPrefix(p, "/api/share/") {          // Share viewing is public
+			strings.HasPrefix(p, "/api/session") || // Browser sessions: LLM tool API (localhost only)
+			strings.HasPrefix(p, "/api/tools") || // Tool discovery: agents search/discover tools
+			p == "/api/media/jobs" || // Media job list: read-only
+			strings.HasPrefix(p, "/api/media/status/") || // Media status: read-only poll
+			strings.HasPrefix(p, "/api/share/") { // Share viewing is public
 			// Try to extract identity if credentials present, but don't block
 			if id, err := a.Authenticate(r); err == nil {
 				ctx := context.WithValue(r.Context(), ctxKey{}, id)
@@ -172,11 +172,11 @@ func (a *Authenticator) validateAPIKey(key string) (*Identity, error) {
 	}
 
 	var data struct {
-		Valid    bool   `json:"valid"`
-		ClientID string `json:"client_id"`
-		LicenseID int   `json:"license_id"`
-		Tier     string `json:"tier"`
-		Error    string `json:"error"`
+		Valid     bool   `json:"valid"`
+		ClientID  string `json:"client_id"`
+		LicenseID int    `json:"license_id"`
+		Tier      string `json:"tier"`
+		Error     string `json:"error"`
 	}
 	if err := json.Unmarshal(resp, &data); err != nil {
 		return nil, fmt.Errorf("invalid key response")
@@ -220,10 +220,10 @@ func (a *Authenticator) validateExtToken(token string) (*Identity, error) {
 	defer resp.Body.Close()
 
 	var data struct {
-		Valid   bool     `json:"valid"`
-		UserID  string   `json:"userId"`
-		Scope   []string `json:"scope"`
-		Error   string   `json:"error"`
+		Valid  bool     `json:"valid"`
+		UserID string   `json:"userId"`
+		Scope  []string `json:"scope"`
+		Error  string   `json:"error"`
 	}
 	json.NewDecoder(resp.Body).Decode(&data)
 	if !data.Valid {
@@ -280,13 +280,21 @@ func httpPost(url, body, secret string) ([]byte, error) {
 	return buf[:n], nil
 }
 
-type nopReadCloser struct{ data []byte; off int }
+type nopReadCloser struct {
+	data []byte
+	off  int
+}
+
 func nopCloser(b []byte) *nopReadCloser { return &nopReadCloser{data: b} }
 func (r *nopReadCloser) Read(p []byte) (int, error) {
-	if r.off >= len(r.data) { return 0, io.EOF }
+	if r.off >= len(r.data) {
+		return 0, io.EOF
+	}
 	n := copy(p, r.data[r.off:])
 	r.off += n
-	if r.off >= len(r.data) { return n, io.EOF }
+	if r.off >= len(r.data) {
+		return n, io.EOF
+	}
 	return n, nil
 }
 func (r *nopReadCloser) Close() error { return nil }

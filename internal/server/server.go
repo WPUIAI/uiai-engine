@@ -55,7 +55,7 @@ func New(cfg *config.Config) *Engine {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Compress(5)) // gzip compression — reduces transfer size for JSON + screenshot data
+	r.Use(middleware.Compress(5))        // gzip compression — reduces transfer size for JSON + screenshot data
 	r.Use(maxBodySize(10 * 1024 * 1024)) // 10MB max request body
 	r.Use(requestLogger)
 	r.Use(corsMiddleware(cfg))
@@ -164,6 +164,10 @@ func (e *Engine) mountRoutes() {
 	// Health (no auth)
 	r.Route("/api/health", func(r chi.Router) {
 		routes.MountHealth(r, e.cfg, e.ai)
+		routes.MountBrowserHealth(r, e.vision)
+	})
+	r.Route("/api/metrics", func(r chi.Router) {
+		routes.MountBrowserHealth(r, e.vision)
 	})
 
 	// Also respond to /health for PHP API compat + health monitor
@@ -307,8 +311,8 @@ func (e *Engine) handleRoot(w http.ResponseWriter, r *http.Request) {
 		"status":  "running",
 		"runtime": "go",
 		"endpoints": map[string]string{
-			"critique":     "/api/critique",
-			"uiReverse":    "/api/ui-reverse",
+			"critique":      "/api/critique",
+			"uiReverse":     "/api/ui-reverse",
 			"sectionDetect": "/api/section-detect",
 			"layoutCompare": "/api/layout-compare",
 			"styleEnhance":  "/api/style-enhance",
