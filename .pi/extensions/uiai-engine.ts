@@ -129,6 +129,88 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 
 
 	pi.registerTool({
+		name: "uiai_browser_navigate",
+		label: "UIAI Browser Navigate",
+		description: "Navigate an existing UIAI browser session to a new URL. Use read/snapshot after navigation, diagnostics on failures.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			url: Type.String({ description: "Destination URL" }),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await callEngine(`/api/session/${params.session_id}/navigate`, {
+				method: "POST",
+				body: JSON.stringify({ url: params.url }),
+			}), { endpoint: "/api/session/{id}/navigate" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_click",
+		label: "UIAI Browser Click",
+		description: "Click a CSS selector or @ref from uiai_browser_snapshot. Read diagnostics after unexpected UI or failed actions.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			selector: Type.String({ description: "CSS selector or @ref, e.g. @e3" }),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await callEngine(`/api/session/${params.session_id}/click`, {
+				method: "POST",
+				body: JSON.stringify({ selector: params.selector }),
+			}), { endpoint: "/api/session/{id}/click" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_fill",
+		label: "UIAI Browser Fill",
+		description: "Replace an input value using a CSS selector or @ref. Prefer this over type when setting form values.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			selector: Type.String({ description: "CSS selector or @ref" }),
+			text: Type.String({ description: "Text value to fill" }),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await callEngine(`/api/session/${params.session_id}/fill`, {
+				method: "POST",
+				body: JSON.stringify({ selector: params.selector, text: params.text }),
+			}), { endpoint: "/api/session/{id}/fill" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_press",
+		label: "UIAI Browser Press",
+		description: "Press a keyboard key such as Enter, Tab, Escape, ArrowDown, or Backspace in the current session.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			key: Type.String({ description: "Keyboard key name" }),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await callEngine(`/api/session/${params.session_id}/press`, {
+				method: "POST",
+				body: JSON.stringify({ key: params.key }),
+			}), { endpoint: "/api/session/{id}/press" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_wait",
+		label: "UIAI Browser Wait",
+		description: "Wait for a selector before reading, snapshotting, clicking, or diagnosing a page.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			selector: Type.String({ description: "CSS selector to wait for" }),
+			timeout_ms: Type.Optional(Type.Number({ description: "Max wait time in ms", default: 5000 })),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await callEngine(`/api/session/${params.session_id}/wait`, {
+				method: "POST",
+				body: JSON.stringify({ selector: params.selector, timeout_ms: params.timeout_ms }),
+			}), { endpoint: "/api/session/{id}/wait" });
+		},
+	});
+
+	pi.registerTool({
 		name: "uiai_browser_read",
 		label: "UIAI Browser Read",
 		description: "Read compact page or region text for web surfing without taking a screenshot. Use after open/navigate when content matters more than pixels.",
@@ -187,7 +269,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 				ctx.ui.setWidget("uiai-engine", [
 					"UIAI Engine",
 					`Base: ${engineUrl()}`,
-					"Use tools: pi_uiai_agent_card, pi_uiai_tool_graph, pi_uiai_tool_search, uiai_browser_open, uiai_browser_read, uiai_browser_diagnostics",
+					"Use tools: pi_uiai_agent_card, pi_uiai_tool_graph, pi_uiai_tool_search, uiai_browser_open, uiai_browser_read/snapshot/click/fill/press/wait, uiai_browser_diagnostics",
 				]);
 			} catch (err) {
 				ctx.ui.notify(`UIAI unavailable: ${err instanceof Error ? err.message : String(err)}`, "warning");

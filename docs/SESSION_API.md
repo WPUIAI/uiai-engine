@@ -83,6 +83,11 @@ This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.
 - `uiai_health` — check browser readiness/pressure.
 - `uiai_browser_open` — open a persistent browser session; accepts optional `focusa_scope`.
 - `uiai_browser_snapshot` — get @ref accessibility tree for reliable actions.
+- `uiai_browser_navigate` — navigate an existing session.
+- `uiai_browser_click` — click a CSS selector or snapshot @ref.
+- `uiai_browser_fill` — replace an input value by selector or @ref.
+- `uiai_browser_press` — press keyboard keys such as Enter, Tab, or Escape.
+- `uiai_browser_wait` — wait for a selector before reading or acting.
 - `uiai_browser_read` — extract compact page/region text for web surfing.
 - `uiai_browser_diagnostics` — read console/exception/network evidence.
 - `uiai_browser_close` — free session resources.

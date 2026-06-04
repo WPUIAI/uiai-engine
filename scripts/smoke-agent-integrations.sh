@@ -21,4 +21,20 @@ fetch "$ENGINE_URL/api/tools/search?q=read" | jq -e '.tools[] | select(.name == 
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "browser_open") | .related_tools | index("focusa_browser_diagnostics_intake")' >/dev/null
 node --check "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/mcp/browser-session-mcp.mjs" >/dev/null
 
+PI_EXT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.pi/extensions/uiai-engine.ts"
+for tool in \
+  uiai_browser_open \
+  uiai_browser_read \
+  uiai_browser_snapshot \
+  uiai_browser_navigate \
+  uiai_browser_click \
+  uiai_browser_fill \
+  uiai_browser_press \
+  uiai_browser_wait \
+  uiai_browser_diagnostics \
+  uiai_browser_close
+  do
+  grep -q "name: \"$tool\"" "$PI_EXT"
+done
+
 say "agent integration smoke ok"
