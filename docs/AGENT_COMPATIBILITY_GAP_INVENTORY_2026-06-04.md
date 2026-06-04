@@ -31,7 +31,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - `node --check mcp/browser-session-mcp.mjs` passed.
 - `uiai-engine.service` active after rebuild/restart.
 - Loopback no-auth search smoke: `POST /api/search` returned `count=2`, `provider=brave`.
-- Provider metadata smoke: `/api/search/providers` returned `configured=true`.
+- Provider metadata smoke: `/api/search/providers` returns `configured`, `status`, and `degraded_reason`; missing Brave key is covered by a degraded-mode unit test.
 - MCP JSON-RPC smoke: `tools/list` includes `browser_search`; `tools/call browser_search` returned `provider=brave`.
 - MCP core smoke: `tools/call uiai_health` and `tools/call uiai_status` returned valid health/status payloads.
 - MCP critique metadata smoke: `tools/call critique_models` and `tools/call critique_dimensions` returned valid read-only metadata payloads.
@@ -72,7 +72,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 ### 5. Portability
 
 - Ensure installer/smoke scripts mention `BRAVE_SEARCH_API_KEY`, `UIAI_ENGINE_URL`, `UIAI_API_KEY`, `UIAI_BEARER_TOKEN`, and MCP config location.
-- Add a degraded-mode check showing `/api/search/providers` reports `configured=false` when Brave is missing.
+- Completed: degraded-mode check shows `/api/search/providers` reports `configured=false`, `status=degraded`, and `degraded_reason=missing_key` when Brave is missing.
 - Keep provider-specific secrets out of repo and public docs.
 
 ### 6. Security, performance, and stability

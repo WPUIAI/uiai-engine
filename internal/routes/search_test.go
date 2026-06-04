@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -50,6 +51,41 @@ func TestSearchBraveMapsWebResults(t *testing.T) {
 	}
 	if results[0].Title != "One" || results[0].URL != "https://example.com/one" || results[0].Source != "example.com" {
 		t.Fatalf("unexpected first result: %+v", results[0])
+	}
+}
+
+func TestSearchProvidersReportsMissingKeyDegraded(t *testing.T) {
+	oldKey, hadKey := os.LookupEnv("BRAVE_SEARCH_API_KEY")
+	_ = os.Unsetenv("BRAVE_SEARCH_API_KEY")
+	defer func() {
+		if hadKey {
+			_ = os.Setenv("BRAVE_SEARCH_API_KEY", oldKey)
+		}
+	}()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/search/providers", nil)
+	res := httptest.NewRecorder()
+	handleSearchProviders(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status=%d", res.Code)
+	}
+	var body struct {
+		Providers []struct {
+			ID             string `json:"id"`
+			Configured     bool   `json:"configured"`
+			Status         string `json:"status"`
+			DegradedReason string `json:"degraded_reason"`
+		} `json:"providers"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode providers: %v", err)
+	}
+	if len(body.Providers) != 1 || body.Providers[0].ID != "brave" {
+		t.Fatalf("unexpected providers: %+v", body.Providers)
+	}
+	brave := body.Providers[0]
+	if brave.Configured || brave.Status != "degraded" || brave.DegradedReason != "missing_key" {
+		t.Fatalf("expected missing-key degraded Brave provider, got %+v", brave)
 	}
 }
 

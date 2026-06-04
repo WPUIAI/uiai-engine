@@ -64,15 +64,25 @@ func MountSearchRoutes(r chi.Router, _ *config.Config) {
 }
 
 func handleSearchProviders(w http.ResponseWriter, _ *http.Request) {
+	braveConfigured := strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")) != ""
+	braveStatus := "ready"
+	braveReason := ""
+	if !braveConfigured {
+		braveStatus = "degraded"
+		braveReason = "missing_key"
+	}
+
 	writeJSON(w, 200, map[string]any{
 		"schema":           "uiai.search_providers.v1",
 		"default_provider": "brave",
 		"providers": []map[string]any{
 			{
-				"id":           "brave",
-				"name":         "Brave Search",
-				"configured":   strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")) != "",
-				"capabilities": []string{"web_search", "source_urls", "snippets"},
+				"id":              "brave",
+				"name":            "Brave Search",
+				"configured":      braveConfigured,
+				"status":          braveStatus,
+				"degraded_reason": braveReason,
+				"capabilities":    []string{"web_search", "source_urls", "snippets"},
 			},
 		},
 	})
