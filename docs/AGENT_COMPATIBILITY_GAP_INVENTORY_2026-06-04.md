@@ -68,7 +68,7 @@ Current proof commands:
 
 - Completed: `scripts/smoke-pi-uiai-off.sh` verifies `/uiai off|hide|clear|disable` clears the widget before engine fetch in freshly loaded extension source.
 - Completed: `scripts/smoke-pi-extension-registration.sh` statically verifies Pi tool registrations, `/uiai` command registration, compact wrapper, and MCP mirrors.
-- Deferred to `uiai-engine-dfm`: evaluate persistent user setting for showing/hiding the UIAI widget by default, instead of command-only clearing.
+- Completed: `/uiai off|hide|clear|disable` persists hidden widget state in the Pi session; `/uiai on|show|enable` restores/persists visible state using documented `pi.appendEntry` session persistence.
 
 ### 2. MCP access to core features
 

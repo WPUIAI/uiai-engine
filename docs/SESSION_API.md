@@ -133,7 +133,7 @@ This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.
 - Browser advanced operations: `uiai_browser_eval`, `uiai_browser_eval_async`, `uiai_browser_resize`, `uiai_browser_css`, `uiai_browser_text`, `uiai_browser_cookies`.
 - Capture/media helpers: `uiai_screenshot`, `uiai_frame_catalog`, `uiai_frame_render`.
 
-Command: `/uiai` uses Pi's supported `ctx.ui.select()` menu/dialog API to prefill common UIAI workflows; it includes **Hide UIAI card**, and `/uiai off` (also `hide`, `clear`, `disable`) clears the persistent UIAI widget. It does not use a non-existent `menu.items` API. Set `UIAI_ENGINE_URL` to target a remote tunnel or non-default port; default is `http://localhost:7456`. Set `UIAI_PI_TIMEOUT_MS` to tune Pi extension HTTP timeout; default is 30000 ms. Set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` when calling authenticated routes such as media/frame helpers or remote deployments.
+Command: `/uiai` uses Pi's supported `ctx.ui.select()` menu/dialog API to prefill common UIAI workflows; it includes **Hide UIAI card**. `/uiai off` (also `hide`, `clear`, `disable`) clears the UIAI widget and persists hidden state in the Pi session with `pi.appendEntry`; `/uiai on`/`show`/`enable` restores and persists the widget. It does not use a non-existent `menu.items` API. Set `UIAI_ENGINE_URL` to target a remote tunnel or non-default port; default is `http://localhost:7456`. Set `UIAI_PI_TIMEOUT_MS` to tune Pi extension HTTP timeout; default is 30000 ms. Set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` when calling authenticated routes such as media/frame helpers or remote deployments.
 
 
 ## Interconnected Tool Graph + [Focusa](https://github.com/Startempire-Wire/focusa) Routing

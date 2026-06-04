@@ -5,6 +5,7 @@ import { Type } from "typebox";
 
 const DEFAULT_ENGINE_URL = "http://localhost:7456";
 const REQUEST_TIMEOUT_MS = Number(process.env.UIAI_PI_TIMEOUT_MS || 30000);
+const UIAI_WIDGET_STATE_ENTRY = "uiai-widget-visibility";
 
 function engineUrl(): string {
 	return (process.env.UIAI_ENGINE_URL || DEFAULT_ENGINE_URL).replace(/\/$/, "");
@@ -75,6 +76,25 @@ function post(path: string, body: Record<string, any>) {
 	return callEngine(path, { method: "POST", body: JSON.stringify(cleanBody(body)) });
 }
 
+function renderUiaiWidget(ctx: any) {
+	ctx.ui.setWidget("uiai-engine", [
+		"UIAI Engine",
+		`Base: ${engineUrl()}`,
+		"Tools: agent_card/search/graph + full browser session, screenshot, frame catalog/render",
+	]);
+}
+
+function latestWidgetVisibility(ctx: any): boolean | undefined {
+	const entries = ctx.sessionManager?.getEntries?.() || [];
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i];
+		if (entry?.type === "custom" && entry?.customType === UIAI_WIDGET_STATE_ENTRY && typeof entry?.data?.visible === "boolean") {
+			return entry.data.visible;
+		}
+	}
+	return undefined;
+}
+
 function compactSummary(data: any, details: Record<string, any> = {}) {
 	const endpoint = details.endpoint ? `${details.endpoint}` : "UIAI";
 	if (data?.error || data?.error_class) {
@@ -116,6 +136,10 @@ function compactRenderResult(result: any, { expanded, isPartial }: { expanded?: 
 }
 
 export default function uiaiEngineExtension(pi: ExtensionAPI) {
+	pi.on("session_start", async (_event, ctx) => {
+		if (latestWidgetVisibility(ctx) === true) renderUiaiWidget(ctx);
+	});
+
 	const registerTool = pi.registerTool.bind(pi);
 	pi.registerTool = ((definition: any) => registerTool({
 		...definition,
@@ -576,17 +600,21 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 			const action = String(args || "").trim().toLowerCase();
 			if (["off", "hide", "clear", "disable"].includes(action)) {
 				ctx.ui.setWidget("uiai-engine", undefined);
+				pi.appendEntry(UIAI_WIDGET_STATE_ENTRY, { visible: false });
 				ctx.ui.notify("UIAI card hidden", "info");
+				return;
+			}
+			if (["on", "show", "enable"].includes(action)) {
+				renderUiaiWidget(ctx);
+				pi.appendEntry(UIAI_WIDGET_STATE_ENTRY, { visible: true });
+				ctx.ui.notify("UIAI card shown", "info");
 				return;
 			}
 			try {
 				const card = await callEngine("/api/tools/agent-card");
 				ctx.ui.notify(`UIAI ready: ${card.purpose || "agent card loaded"}`, "info");
-				ctx.ui.setWidget("uiai-engine", [
-					"UIAI Engine",
-					`Base: ${engineUrl()}`,
-					"Tools: agent_card/search/graph + full browser session, screenshot, frame catalog/render",
-				]);
+				renderUiaiWidget(ctx);
+				pi.appendEntry(UIAI_WIDGET_STATE_ENTRY, { visible: true });
 				const choice = await ctx.ui.select("UIAI action", [
 					"Hide UIAI card",
 					"Show agent card",
@@ -598,6 +626,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 				]);
 				if (choice === "Hide UIAI card") {
 					ctx.ui.setWidget("uiai-engine", undefined);
+					pi.appendEntry(UIAI_WIDGET_STATE_ENTRY, { visible: false });
 					ctx.ui.notify("UIAI card hidden", "info");
 					return;
 				}
