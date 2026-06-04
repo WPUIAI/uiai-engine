@@ -395,19 +395,12 @@ func redactURL(raw string) string {
 	if raw == "" {
 		return raw
 	}
-	redacted := raw
-	for _, key := range []string{"token=", "key=", "secret=", "password=", "auth=", "apikey=", "api_key="} {
-		idx := strings.Index(strings.ToLower(redacted), key)
-		if idx >= 0 {
-			start := idx + len(key)
-			end := start
-			for end < len(redacted) && redacted[end] != '&' && redacted[end] != '#' {
-				end++
-			}
-			redacted = redacted[:start] + "REDACTED" + redacted[end:]
+	for _, sep := range []string{"?", "#"} {
+		if idx := strings.Index(raw, sep); idx >= 0 {
+			raw = raw[:idx]
 		}
 	}
-	return redacted
+	return raw
 }
 
 func truncateDiag(s string, max int) string {

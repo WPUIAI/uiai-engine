@@ -66,6 +66,12 @@ func TestDiagnosticsLimitAndSummary(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsRedactsURLQueryAndFragment(t *testing.T) {
+	if got, want := redactURL("https://example.test/api?token=secret&q=public#frag"), "https://example.test/api"; got != want {
+		t.Fatalf("redacted URL=%q want %q", got, want)
+	}
+}
+
 func TestDiagnosticsFailedOnly(t *testing.T) {
 	s := &Session{ID: "sid"}
 	s.diagnostics = newDiagnosticsRecorder()

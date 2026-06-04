@@ -190,7 +190,7 @@ func sanitizeList(in []any) []any {
 		if structured, ok := sanitizeStructured(v); ok {
 			out = append(out, structured)
 		} else if s, ok := v.(string); ok {
-			out = append(out, truncate(s, 300))
+			out = append(out, sanitizeStringValue(s))
 		} else {
 			out = append(out, v)
 		}
@@ -217,10 +217,18 @@ func sanitizeDecoded(v any) any {
 	case []any:
 		return sanitizeList(val)
 	case string:
-		return truncate(val, 300)
+		return sanitizeStringValue(val)
 	default:
 		return val
 	}
+}
+
+func sanitizeStringValue(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if strings.HasPrefix(strings.ToLower(trimmed), "http://") || strings.HasPrefix(strings.ToLower(trimmed), "https://") {
+		return sanitizeURL(trimmed)
+	}
+	return truncate(value, 300)
 }
 
 func sensitiveKey(k string) bool {

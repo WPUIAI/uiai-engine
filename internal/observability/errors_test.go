@@ -49,6 +49,37 @@ func TestNewErrorEnvelopeIncludesActionAndDiagnostics(t *testing.T) {
 	}
 }
 
+func TestErrorStoreRedactsNestedURLsAndSecrets(t *testing.T) {
+	store := &ErrorStore{}
+	event := store.Record(ErrorEvent{
+		Source: "browser_session",
+		Class:  "network_error",
+		Context: map[string]any{
+			"requests": []any{
+				"https://example.test/api?token=secret#frag",
+				map[string]any{"url": "https://example.test/path?api_key=secret#frag", "authorization": "Bearer secret"},
+			},
+		},
+	})
+	items, ok := event.Context["requests"].([]any)
+	if !ok || len(items) != 2 {
+		t.Fatalf("missing sanitized request list: %+v", event.Context)
+	}
+	if items[0] != "https://example.test/api" {
+		t.Fatalf("list URL not redacted: %+v", items[0])
+	}
+	nested, ok := items[1].(map[string]any)
+	if !ok {
+		t.Fatalf("nested request not retained: %+v", items[1])
+	}
+	if nested["url"] != "https://example.test/path" {
+		t.Fatalf("nested URL not redacted: %+v", nested)
+	}
+	if _, ok := nested["authorization"]; ok {
+		t.Fatalf("nested auth key retained: %+v", nested)
+	}
+}
+
 func TestErrorStoreFiltersRecent(t *testing.T) {
 	store := &ErrorStore{}
 	store.Record(ErrorEvent{Source: "http", Class: "client_error"})
