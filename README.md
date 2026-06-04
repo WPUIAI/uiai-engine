@@ -382,6 +382,7 @@ scripts/install-agent-integrations.sh
 
 # Smoke-check discovery/graph/MCP bridge
 scripts/smoke-agent-integrations.sh
+scripts/smoke-mcp-tool-routes.sh
 ```
 
 Remote/tunnel setup:

@@ -323,6 +323,12 @@ async function toolsCall(name, args) {
       body = { js: args.js };
       break;
 
+    case "browser_eval_async":
+      url = `${ENGINE}/api/session/${args.session_id}/eval_async`;
+      method = "POST";
+      body = { js: args.js, timeout_ms: args.timeout_ms };
+      break;
+
     case "browser_snapshot":
       url = `${ENGINE}/api/session/${args.session_id}/snapshot`;
       method = "POST";
