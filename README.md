@@ -425,6 +425,10 @@ Output modes: `--compact` (default), `--json`, `--pretty`.
 `browser_eval_async` returns a structured `eval_failed` error envelope for JS/runtime errors instead of a successful text payload; its next action points agents to browser_diagnostics console/exceptions and bounded direct-action retries.
  The Pi extension also uses compact-by-default rendering with Ctrl+O expansion to full JSON for representative success/error tool results. Exit codes: `0` success, `1` API/tool failure, `2` usage error, `3` missing dependency, `4` auth/config error. Auth/env vars match Pi/MCP: `UIAI_ENGINE_URL`, `UIAI_API_KEY`, `UIAI_BEARER_TOKEN`, `UIAI_CLI_TIMEOUT_SECONDS`.
 
+## Security/auth matrix
+
+Endpoint auth modes and update rules live in [`docs/ENDPOINT_AUTH_MATRIX.md`](docs/ENDPOINT_AUTH_MATRIX.md).
+
 ## Build, test, and run
 
 ```bash

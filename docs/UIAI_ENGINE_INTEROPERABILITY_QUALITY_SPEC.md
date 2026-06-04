@@ -74,6 +74,9 @@ Rules:
 
 ### 4.3 Auth boundary contract
 
+Canonical endpoint auth mode table and update rules: [`ENDPOINT_AUTH_MATRIX.md`](ENDPOINT_AUTH_MATRIX.md).
+
+
 Endpoint groups use one of these auth modes:
 
 | Mode | Meaning | Examples |
