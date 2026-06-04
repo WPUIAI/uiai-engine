@@ -32,7 +32,7 @@ Auth references:
 | Screenshot health | `includes/class-screenshot-provider-vision.php:255` | `/api/screenshot/health` | GET | loopback-public remote-auth | none | health/status | Reports engine reachable/healthy. | Engine also exposes `/api/health/browser`; consider aligning health route naming. |
 | Cloud screenshot provider | `includes/class-screenshot-provider-cloud.php:121` | `/api/screenshot` via `WPUIAI_Cloud_API::request("screenshot")` | POST | loopback-public remote-auth locally; remote-auth via Cloud_API | screenshot args | screenshot payload | Cloud_API handles retry/402 but not structured fields. | Same structured error preservation as vision provider. |
 | Cloud health | `includes/class-screenshot-provider-cloud.php:210` | `/api/health` via `WPUIAI_Cloud_API::request("health")` | GET | public | none | health payload | Fallback host retry. | OK; no structured error required beyond transport failure. |
-| Training datasets from DevConsole | `includes/devconsole/tabs/class-tab-ai-calls.php:423` | `/api/training/datasets` | POST | service-token | dataset payload | dataset/job response | Uses `WPUIAI_Cloud_API::request`; route requires training service token per matrix. | Verify Cloud_API supplies correct service token or mark unsupported. |
+| Training datasets from DevConsole | `includes/devconsole/tabs/class-tab-ai-calls.php:423` | `/api/training/datasets` | POST | service-token | dataset payload | dataset/job response | Uses `WPUIAI_Cloud_API::request`; route requires training service token per matrix. | Cloud_API does not supply training service-token auth by default; treat as unsupported unless a service token is explicitly configured/wired. |
 
 ## Shared plugin auth behavior
 
@@ -45,13 +45,12 @@ Auth references:
 
 ## Current highest-priority gaps
 
-1. **Structured error propagation:** Most plugin cloud paths collapse engine failures to a string `error`. Product UI/logs should retain `error_id`, `error_class`, `suggested_next_action`, and `diagnostics` when present.
-2. **Screenshot/session fallback visibility:** Session fallback hides or concatenates structured JSON. Parse and display actionable class/action text.
-3. **Training service-token mismatch risk:** `WPUIAI_Cloud_API::request("training/datasets")` needs verification against `/api/training/*` service-token auth.
-4. **Legacy route naming:** Screenshot health uses `/api/screenshot/health`; engine status also has `/api/health/browser`. Keep both documented or converge callers.
+1. **Training service-token mismatch risk:** `WPUIAI_Cloud_API::request("training/datasets")` is not aligned with `/api/training/*` service-token auth until a dedicated service-token header is configured/wired.
+2. **Legacy route naming:** Screenshot health uses `/api/screenshot/health`; engine status also has `/api/health/browser`. Keep both documented or converge callers.
 
 ## Update rules
 
-- Any new plugin cloud call must add a row here with method, auth mode, request/response shape, and error behavior.
+- Any new plugin cloud call must add a row here with method, auth mode, request/response shape, retry behavior, and error behavior.
+- Paid or mutating POST paths must not blindly retry alternate bases after transport/5xx failures; the original request may have reached the engine.
 - Any engine route response change must update the corresponding plugin expected response row.
 - Plugin UI changes for errors should use the structured engine fields, not raw response bodies or opaque strings.
