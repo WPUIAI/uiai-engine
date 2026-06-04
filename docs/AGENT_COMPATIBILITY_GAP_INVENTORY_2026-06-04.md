@@ -19,6 +19,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - Provider-neutral search route exists: `GET/POST /api/search`.
 - Brave provider is implemented behind the generic search contract.
 - Search provider metadata exists: `GET /api/search/providers`.
+- Search timeout/quota behavior documented: Brave provider calls use a bounded 12s timeout; upstream quota/rate limits stay provider-account concerns; UIAI reports configured/degraded readiness without exposing secrets.
 - Pi extension exposes `uiai_search` and `/uiai off` / menu **Hide UIAI card**.
 - MCP bridge exposes and fallback-normalizes `browser_search`.
 - MCP metadata cache/reconnect behavior documented: restart/reconnect MCP clients and reload Pi MCP-adapter sessions after tool/schema/call-route changes.
@@ -81,7 +82,7 @@ Current proof commands:
 
 - Search → open → read → snapshot → diagnostics workflow is now advertised and smoke-tested.
 - Add optional `open_result` helper only if repeated agent workflows show the separate search/open/read sequence is too verbose.
-- Consider search result caching/rate limiting to reduce provider cost and protect Brave quota.
+- Consider search result caching/rate limiting to reduce provider cost and protect Brave quota beyond the documented provider-account quota boundary.
 
 ### 4. Focusa integration
 
@@ -99,7 +100,7 @@ Current proof commands:
 ### 6. Security, performance, and stability
 
 - Completed: remote-auth positive test covers `/api/search*`, `/api/errors*`, `/api/media/frame*`, `/api/session*`, and `/api/screenshot*` with API key and Bearer credentials.
-- Consider provider request timeout/rate-limit controls beyond the current 12s HTTP timeout.
+- Completed: provider timeout/quota behavior is documented; future work remains optional caching/rate-limit controls beyond the current 12s HTTP timeout.
 - Consider bounded response truncation/redaction if future providers return richer metadata.
 - Review service memory/CPU behavior under repeated search + browser workflows.
 

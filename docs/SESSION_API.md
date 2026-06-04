@@ -16,6 +16,12 @@ Traditional screenshot APIs are **transactional**: navigate → snap → forget.
 
 Session API is **persistent**: open once → snap/scroll/click/type/eval instantly. Re-screenshots take **30ms** instead of 1.7s. That's **57x faster**.
 
+## Search provider behavior
+
+`GET/POST /api/search` is provider-neutral; Brave Search is the current default provider. Set `BRAVE_SEARCH_API_KEY` in the server/service environment to enable live Brave calls. `GET /api/search/providers` reports readiness without exposing secrets: `configured=true/status=ready` when the key is present, or `configured=false/status=degraded/degraded_reason=missing_key` when absent.
+
+Provider calls are bounded by the current Brave HTTP timeout of 12 seconds in `internal/routes/search.go`. Provider quota/rate limits belong to the upstream provider account; UIAI does not expose provider keys, raw quota counters, or secret headers. Future provider quota protection should prefer bounded provider metadata, local caching/rate limiting, and stable `uiai-search:<provider>:<query-hash>:<rank>` evidence handles rather than raw SERP blobs.
+
 ## Diagnostics
 
 Session tools now expose lightweight DevTools-style diagnostics specified in [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md): bounded console logs, JS exceptions, network requests, failed requests, and summaries without adding Playwright/Puppeteer or taking screenshots on diagnostics reads.
