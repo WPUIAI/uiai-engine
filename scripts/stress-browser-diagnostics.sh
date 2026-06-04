@@ -4,7 +4,8 @@
 
 set -euo pipefail
 
-ROOT_DIR="${UIAI_ROOT:-/home/wpuiai/uiai-engine}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${UIAI_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 ENGINE_PORT="${ENGINE_PORT:-7468}"
 SITE_PORT="${SITE_PORT:-7469}"
 SESSIONS="${SESSIONS:-4}"

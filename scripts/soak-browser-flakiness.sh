@@ -2,7 +2,8 @@
 # Mixed UIAI browser soak: sessions + delayed actions + screenshots + diagnostics + failure envelopes.
 set -euo pipefail
 
-ROOT_DIR="${UIAI_ROOT:-/home/wpuiai/uiai-engine}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${UIAI_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 ENGINE_PORT="${ENGINE_PORT:-7470}"
 SITE_PORT="${SITE_PORT:-7471}"
 DURATION_SECONDS="${DURATION_SECONDS:-300}"
