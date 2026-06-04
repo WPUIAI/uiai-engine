@@ -55,6 +55,7 @@ Start here by task:
 
 | Need | Read |
 |---|---|
+| HLT ledger and current trajectory | [`docs/HLT_LEDGER.md`](docs/HLT_LEDGER.md) |
 | Browser/session API, agent tools, MCP formats, security boundaries, portability helpers | [`docs/SESSION_API.md`](docs/SESSION_API.md) |
 | Diagnostics contract: console/errors/network/failed requests/[Focusa](https://github.com/Startempire-Wire/focusa) evidence refs | [`docs/BROWSER_DIAGNOSTICS_SPEC.md`](docs/BROWSER_DIAGNOSTICS_SPEC.md) |
 | Browser reliability gates, soak/stress commands, CI expectations | [`docs/BROWSER_RELIABILITY_RUNBOOK.md`](docs/BROWSER_RELIABILITY_RUNBOOK.md) |
