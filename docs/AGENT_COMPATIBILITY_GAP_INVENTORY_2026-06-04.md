@@ -21,6 +21,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - Loopback no-auth search smoke: `POST /api/search` returned `count=2`, `provider=brave`.
 - Provider metadata smoke: `/api/search/providers` returned `configured=true`.
 - MCP JSON-RPC smoke: `tools/list` includes `browser_search`; `tools/call browser_search` returned `provider=brave`.
+- MCP core smoke: `tools/call uiai_health` and `tools/call uiai_status` returned valid health/status payloads.
 - Focusa handoff smoke: UIAI session opened with `focusa_scope`; diagnostics echoed scope; `focusa_browser_diagnostics_intake` completed with evidence `uiai-diagnostics:health-focusa-scope-smoke`.
 - Ownership check: no root-owned files under `/home/wpuiai/uiai-engine`.
 
@@ -34,9 +35,10 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ### 2. MCP access to core features
 
-- MCP bridge now exposes browser/session/search core tools; inventory non-browser core APIs that agents may need next: critique, reference analysis, media/frame rendering, health/status, and usage-safe admin reads.
-- Add MCP smoke coverage for at least one non-browser core API before broadening the tool list.
-- Document MCP metadata cache behavior and reconnect requirements when tools change.
+- Completed: MCP bridge exposes browser/session/search plus non-browser `uiai_health` and `uiai_status` core tools.
+- Completed: MCP smoke coverage verifies `uiai_health` and `uiai_status` calls.
+- Remaining: inventory deeper non-browser APIs agents may need next: critique, reference analysis, media/frame rendering, and usage-safe admin reads.
+- Remaining: document client reconnect requirements where MCP metadata is cached.
 
 ### 3. Agent web surfing
 
@@ -71,4 +73,4 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ## Recommended next slice
 
-Portability/security hardening: add installer/smoke coverage for `BRAVE_SEARCH_API_KEY`, remote-auth `/api/search*` checks, and documented MCP/Pi reconnect behavior after tool changes.
+Next agent-core expansion: evaluate whether critique/reference/media helpers should be exposed through MCP/Pi, then add only the highest-utility low-risk tools with smoke tests and docs.
