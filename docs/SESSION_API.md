@@ -948,13 +948,15 @@ Environment knobs:
 | `UIAI_PI_EXTENSION_DEST` | Pi extension install destination. | `$HOME/.pi/agent/extensions/uiai-engine.ts` |
 | `UIAI_MCP_CONFIG_DEST` | MCP config destination. | `$HOME/.pi/agent/mcp.json` |
 | `UIAI_MCP_SERVER_NAME` | MCP server key to write. | `uiai-browser` |
-| `UIAI_API_KEY` | Optional API key sent by the Pi extension as `X-API-Key`; required for authenticated remote/media helpers. | unset |
-| `UIAI_BEARER_TOKEN` | Optional bearer token sent by the Pi extension as `Authorization: Bearer ...`; alternative to `UIAI_API_KEY`. | unset |
+| `UIAI_LOCAL_API_TOKEN` | Server-side eternal local token accepted as `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`; store only in protected env files. | unset |
+| `UIAI_LOCAL_API_TOKENS` | Optional comma-separated server-side local tokens for rotation/overlap. | unset |
+| `UIAI_API_KEY` | Client-side API key sent by the Pi extension as `X-API-Key`; for the local VPS this may match `UIAI_LOCAL_API_TOKEN`. | unset |
+| `UIAI_BEARER_TOKEN` | Client-side bearer token sent by the Pi extension as `Authorization: Bearer ...`; alternative to `UIAI_API_KEY`. | unset |
 | `UIAI_PI_TIMEOUT_MS` | Pi extension request timeout. | `30000` |
 | `UIAI_MCP_TIMEOUT_MS` | MCP bridge request timeout. | `60000` |
 | `UIAI_SMOKE_TIMEOUT_SECONDS` | Smoke curl timeout. | `20` |
 
-Remote deployment reminder: browser/session and screenshot endpoints require auth for non-loopback callers; media/frame helpers also require auth unless the deployment explicitly opens them. Tool discovery remains public; use authenticated tunnels/proxies for remote agents.
+Remote deployment reminder: browser/session and screenshot endpoints require auth for non-loopback callers; media/frame helpers also require auth unless the deployment explicitly opens them. Tool discovery remains public; use authenticated tunnels/proxies for remote agents. On the local VPS, an eternal env-backed token can be configured as `UIAI_LOCAL_API_TOKEN` and then supplied by clients through either `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`.
 
 ## Security + Remote Exposure Boundaries
 

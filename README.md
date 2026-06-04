@@ -432,13 +432,13 @@ Security notes:
 
 - Secrets should be referenced through environment variables, not committed literal values.
 - `vision.allow_private_urls: true` is appropriate for local/dev; remote deployment should review URL safety rules in [`docs/SESSION_API.md`](docs/SESSION_API.md).
-- Browser/session and screenshot APIs are loopback-public only; remote callers must authenticate. The Pi extension can send `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` for authenticated remote/media helpers.
+- Browser/session and screenshot APIs are loopback-public only; remote callers must authenticate. The Pi extension can send `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` for authenticated remote/media helpers. Local VPS deployments may configure an eternal env-backed `UIAI_LOCAL_API_TOKEN` accepted as `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`.
 
 ## Security and exposure model
 
 - `/api/tools*` discovery is intentionally public and low-context.
 - `/api/session*` and `/api/screenshot*` are unauthenticated only for loopback callers.
-- Remote browser/session/screenshot callers require normal UIAI auth headers; Pi extension callers can set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`.
+- Remote browser/session/screenshot callers require normal UIAI auth headers; Pi extension callers can set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`. The local VPS eternal token is configured server-side with `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_API_TOKENS`.
 - Browser navigation accepts `http://` and `https://` only.
 - `file://`, `data:`, `ftp://`, and similar schemes are blocked.
 - Private/internal hosts are blocked unless `vision.allow_private_urls: true` is configured.

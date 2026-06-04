@@ -2,11 +2,13 @@ package auth
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -131,18 +133,59 @@ func (a *Authenticator) Authenticate(r *http.Request) (*Identity, error) {
 		return &Identity{Tier: "internal", LicenseID: 0}, nil
 	}
 	if lk := r.Header.Get("X-License-Key"); lk != "" {
+		if id, ok := validateLocalToken(lk); ok {
+			return id, nil
+		}
 		return a.validateLicense(lk)
 	}
 	if ak := r.Header.Get("X-API-Key"); ak != "" {
+		if id, ok := validateLocalToken(ak); ok {
+			return id, nil
+		}
 		return a.validateAPIKey(ak)
 	}
 	if et := r.Header.Get("X-Extension-Token"); et != "" {
 		return a.validateExtToken(et)
 	}
 	if ah := r.Header.Get("Authorization"); len(ah) > 7 {
-		return a.validateLicense(ah[7:]) // Bearer <key>
+		parts := strings.SplitN(ah, " ", 2)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+			bearer := strings.TrimSpace(parts[1])
+			if id, ok := validateLocalToken(bearer); ok {
+				return id, nil
+			}
+			return a.validateLicense(bearer)
+		}
 	}
 	return nil, fmt.Errorf("missing authentication header")
+}
+
+func validateLocalToken(token string) (*Identity, bool) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil, false
+	}
+	for _, candidate := range localAuthTokens() {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		if subtle.ConstantTimeCompare([]byte(token), []byte(candidate)) == 1 {
+			return &Identity{APIKey: token, ClientID: "local-vps", Tier: "internal"}, true
+		}
+	}
+	return nil, false
+}
+
+func localAuthTokens() []string {
+	var tokens []string
+	if single := os.Getenv("UIAI_LOCAL_API_TOKEN"); single != "" {
+		tokens = append(tokens, single)
+	}
+	if multiple := os.Getenv("UIAI_LOCAL_API_TOKENS"); multiple != "" {
+		tokens = append(tokens, strings.Split(multiple, ",")...)
+	}
+	return tokens
 }
 
 func (a *Authenticator) validateLicense(key string) (*Identity, error) {
