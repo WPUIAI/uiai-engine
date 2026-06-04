@@ -4,7 +4,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ## Current verified slice
 
-- WordPress plugin route parity inventory added:  maps existing plugin callers to Go routes/auth/error contracts.
+- WordPress plugin route parity inventory added: `docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md` maps existing plugin callers to Go routes/auth/error contracts.
 - Endpoint auth matrix added: `docs/ENDPOINT_AUTH_MATRIX.md` maps route families to public, loopback-public remote-auth, authenticated, service-token, and handler-auth modes with update rules.
 - Browser class/action tuning: `eval_failed` now has specific browser_diagnostics console/exception guidance, validated by the regression smoke.
 - Browser error regression smoke added: `scripts/smoke-browser-error-regressions.sh` covers selector_not_found, timeout, eval_failed, stale-session not_found event, and url_not_allowed.
@@ -29,6 +29,22 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ## Proof handles
 
+Recent pushed proof commits:
+
+- `68f64c6` — README interoperability matrix links.
+- `f84c638` — remote-auth positive coverage for loopback-public route families.
+- `aec92b7` — search missing-key degraded-mode provider test.
+- `8ef5ee2` — failed-network diagnostics smoke.
+- `6068667` — Focusa `uiai-error:*` evidence smoke.
+- `fdbcb81` — stable Focusa evidence-handle docs.
+- `3835866` — MCP metadata cache/reconnect docs.
+- `fc21f2f` — `/uiai off` verification smoke.
+- `bf9afeb` — WP auth/retry policy docs.
+- `b2734af` — diagnostics redaction hardening.
+- `106edf4` — WordPress plugin route parity matrix.
+
+Current proof commands:
+
 - `go test ./...` passed.
 - `node --check mcp/browser-session-mcp.mjs` passed.
 - `uiai-engine.service` active after rebuild/restart.
@@ -46,8 +62,8 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ### 1. Pi plugin support
 
-- Verify updated `/uiai off` behavior in a freshly reloaded Pi session; current running sessions may retain old extension code.
-- Add a small static/runtime test for `.pi/extensions/uiai-engine.ts` command registration if the project adopts a Pi extension test harness.
+- Completed: `scripts/smoke-pi-uiai-off.sh` verifies `/uiai off|hide|clear|disable` clears the widget before engine fetch in freshly loaded extension source.
+- Completed: `scripts/smoke-pi-extension-registration.sh` statically verifies Pi tool registrations, `/uiai` command registration, compact wrapper, and MCP mirrors.
 - Consider a persistent user setting for showing/hiding the UIAI widget by default, instead of command-only clearing.
 
 ### 2. MCP access to core features
@@ -86,10 +102,10 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ### 7. Public and related documentation
 
-- README and Session API are updated for search and `/uiai off`.
+- README and Session API are updated for search, `/uiai off`, Focusa evidence handles, MCP reconnect behavior, auth matrices, and interoperability matrix discoverability.
 - Add a dedicated search API section if the route gains more providers or parameters.
 - Update MCP/Pi install smoke docs after adding broader non-browser MCP tools.
 
 ## Recommended next slice
 
-Next stability slice: exercise `uiai_errors` during real browser-agent failures and tune error classes/suggested actions from observed evidence.
+Next stability slice: review remaining P1 epics for closeout criteria, then choose the next concrete bead that adds proof rather than only inventory.
