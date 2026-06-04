@@ -76,7 +76,7 @@ Current proof commands:
 - Completed: MCP smoke coverage verifies `uiai_health` and `uiai_status` calls.
 - Completed: read-only critique metadata tools are exposed through MCP/Pi (`critique_models`, `critique_dimensions`; Pi `uiai_critique_*`).
 - Completed: MCP bridge now routes existing frame helpers (`frame_catalog`, `frame_render`) with loopback-public/remote-auth parity.
-- Remaining: inventory deeper non-browser APIs agents may need next: reference analysis and usage-safe admin reads.
+- Completed: deeper non-browser API expose/omit rationale documented in `docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md` for reference, admin/usage, memory, workflow, intelligence, training, captcha, and related route families.
 - Completed: client reconnect requirements are documented for cached MCP metadata and loaded bridge code.
 
 ### 3. Agent web surfing
@@ -107,7 +107,7 @@ Current proof commands:
 
 ### 7. Public and related documentation
 
-- README and Session API are updated for search, `/uiai off`, Focusa evidence handles, MCP reconnect behavior, auth matrices, deployment env-file redaction, and interoperability matrix discoverability.
+- README and Session API are updated for search, `/uiai off`, Focusa evidence handles, MCP reconnect behavior, auth matrices, deployment env-file redaction, non-browser exposure inventory, and interoperability matrix discoverability.
 - Add a dedicated search API section if the route gains more providers or parameters.
 - Update MCP/Pi install smoke docs after adding broader non-browser MCP tools.
 

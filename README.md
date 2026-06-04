@@ -60,6 +60,7 @@ Start here by task:
 | Browser/session API, agent tools, MCP formats, security boundaries, portability helpers | [`docs/SESSION_API.md`](docs/SESSION_API.md) |
 | Cross-surface interoperability contracts, acceptance matrix, and proof gates | [`docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md`](docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md) |
 | Agent-surface release proof checklist | [`docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md`](docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md) |
+| Non-browser agent API exposure inventory | [`docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md`](docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md) |
 | Endpoint auth mode matrix and route update rules | [`docs/ENDPOINT_AUTH_MATRIX.md`](docs/ENDPOINT_AUTH_MATRIX.md) |
 | Existing WordPress plugin ↔ Go engine route parity matrix | [`docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md) |
 | Diagnostics contract: console/errors/network/failed requests/[Focusa](https://github.com/Startempire-Wire/focusa) evidence refs | [`docs/BROWSER_DIAGNOSTICS_SPEC.md`](docs/BROWSER_DIAGNOSTICS_SPEC.md) |
@@ -493,6 +494,7 @@ Security notes:
 ## Security and exposure model
 
 - `/api/tools*` discovery is intentionally public and low-context.
+- Non-browser paid/mutating/admin/training/memory route families are not automatically agent-exposed; current expose/omit rationale lives in [`docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md`](docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md).
 - `/api/session*`, `/api/screenshot*`, and `/api/search*` are unauthenticated only for loopback callers.
 - Remote browser/session/screenshot callers require normal UIAI auth headers; Pi extension callers can set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`. The local VPS eternal token is configured server-side with `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_API_TOKENS`.
 - Browser navigation accepts `http://` and `https://` only.

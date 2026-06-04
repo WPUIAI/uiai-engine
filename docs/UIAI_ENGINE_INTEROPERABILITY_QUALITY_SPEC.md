@@ -45,7 +45,7 @@ Every capability exposed to agents should have an explicit parity record:
 5. **Smoke proof** verifies at least one happy path and one meaningful failure/degraded path where applicable.
 6. **Docs** name auth requirements, env vars, output shape, and recovery path.
 
-If a capability intentionally lacks Pi/MCP/CLI exposure, the spec or gap inventory must state why.
+If a capability intentionally lacks Pi/MCP/CLI exposure, the spec, gap inventory, or [`AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md`](AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md) must state why.
 
 ### 4.2 Error envelope contract
 
@@ -121,8 +121,8 @@ A feature is not considered interoperable until proof exists in at least one sta
 | Critique metadata | `/api/critique/models`, `/dimensions` | `uiai_critique_*` | `critique_*` | optional tools route | none | metadata smoke |
 | Frame helpers | `/api/media/frame/*` | `uiai_frame_*` | `frame_*` | optional media route | screenshot evidence | catalog/render smoke |
 | WordPress product flows | plugin REST/UI | indirect | indirect | limited | optional | parity tests needed |
-| Reference analysis | `/api/reference/analyze` | not yet exposed | not yet exposed | not yet exposed | optional | workflow/auth evaluation needed |
-| Admin usage reads | `/api/admin/*`, `/api/usage/*` | not yet exposed | not yet exposed | not yet exposed | optional | security review needed |
+| Reference analysis | `/api/reference/analyze` | intentionally omitted | intentionally omitted | intentionally omitted | optional | see [`AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md`](AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md) |
+| Admin usage reads | `/api/admin/*`, `/api/usage/*` | intentionally omitted | intentionally omitted | intentionally omitted | optional | see [`AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md`](AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md) |
 
 ## 6. Implementation tracks
 
