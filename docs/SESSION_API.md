@@ -993,7 +993,7 @@ mcp({ tool: "browser_screenshot", args: '{"session_id": "abc123"}' })
 mcp({ tool: "browser_close", args: '{"session_id": "abc123"}' })
 ```
 
-The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP also exposes `uiai_agent_card`, `uiai_tool_search`, and `uiai_tool_graph`; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
+The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP exposes and bridge-normalizes `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, and `browser_read` even if the running engine returns stale metadata; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
 
 ### Claude Desktop
 

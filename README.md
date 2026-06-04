@@ -348,7 +348,7 @@ Implementation anchors: [`internal/intelligence/`](internal/intelligence/), [`in
 ## Agent integration highlights
 
 - Project-local Pi extension: [`.pi/extensions/uiai-engine.ts`](.pi/extensions/uiai-engine.ts) registers compact UIAI tools for Pi sessions.
-- MCP bridge: [`mcp/browser-session-mcp.mjs`](mcp/browser-session-mcp.mjs) exposes browser/session tools plus `uiai_agent_card` and `uiai_tool_search`.
+- MCP bridge: [`mcp/browser-session-mcp.mjs`](mcp/browser-session-mcp.mjs) exposes browser/session tools plus `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, and `browser_read`; `tools/list` normalizes these core tools even when a running engine returns stale metadata.
 - Agent web surfing: persistent sessions include `/api/session/{id}/read` / `browser_read` for bounded page text extraction.
 - Diagnostics-first debugging: `browser_diagnostics` exposes console/errors/network/failed requests without forcing screenshots.
 - [Focusa](https://github.com/Startempire-Wire/focusa) handoff: `browser_open` accepts `focusa_scope`; diagnostics and evidence flows preserve project/workpoint scope; `/api/tools/graph` exposes [Focusa](https://github.com/Startempire-Wire/focusa)-aware related-tool routes.

@@ -102,15 +102,60 @@ async function handleMethod(method, params) {
   }
 }
 
-// ── tools/list — fetched from engine, cached ──────────────
+// ── tools/list — fetched from engine, cached, then bridge-normalized ──────────────
 
 let cachedTools = null;
 
+const BRIDGE_CORE_TOOLS = [
+  {
+    name: "uiai_agent_card",
+    description: "Read compact UIAI Engine bootstrap guidance: discovery endpoints, workflows, health, schema links, and diagnostics rules.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "uiai_tool_search",
+    description: "Search UIAI tools by keyword without loading all schemas. Try diagnostics, screenshot, snapshot, read, click, console, network, visual failure.",
+    inputSchema: { type: "object", properties: { q: { type: "string", description: "Keyword or phrase to search" } }, required: ["q"] },
+  },
+  {
+    name: "uiai_tool_graph",
+    description: "Return UIAI tool relationship graph, workflow routes, and Focusa integration metadata.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "browser_read",
+    description: "Extract compact readable page/region text without taking a screenshot. Use for agent web surfing after open/navigate.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_id: { type: "string", description: "Session ID" },
+        selector: { type: "string", description: "Optional CSS selector or @ref region" },
+        max_chars: { type: "integer", default: 8000, description: "Max text characters" },
+        include_links: { type: "boolean", default: true, description: "Include visible links" },
+      },
+      required: ["session_id"],
+    },
+  },
+];
+
+function mergeTools(engineTools) {
+  const merged = Array.isArray(engineTools) ? [...engineTools] : [];
+  const names = new Set(merged.map((tool) => tool && tool.name).filter(Boolean));
+  for (const tool of BRIDGE_CORE_TOOLS) {
+    if (!names.has(tool.name)) merged.unshift(tool);
+  }
+  return merged;
+}
+
 async function toolsList() {
   if (!cachedTools) {
-    const { res, data } = await fetchJSON(`${ENGINE}/api/tools/mcp`);
-    if (!res.ok) throw new Error(`Engine tools fetch failed: ${res.status} ${formatError(data)}`);
-    cachedTools = data.tools || [];
+    try {
+      const { res, data } = await fetchJSON(`${ENGINE}/api/tools/mcp`);
+      if (!res.ok) throw new Error(`Engine tools fetch failed: ${res.status} ${formatError(data)}`);
+      cachedTools = mergeTools(data.tools || []);
+    } catch (err) {
+      cachedTools = mergeTools([]);
+    }
   }
   return { tools: cachedTools };
 }
