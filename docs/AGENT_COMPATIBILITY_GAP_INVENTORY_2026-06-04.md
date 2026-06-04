@@ -4,6 +4,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ## Current verified slice
 
+- MCP structured failure smoke added: `scripts/smoke-mcp-structured-failure.sh` verifies MCP error text includes id/class/Next diagnostics guidance.
 - Pi rendering smoke added: `scripts/smoke-pi-rendering.sh` proves compact summaries plus expanded JSON behavior for success/error representative results.
 - Pi registration smoke added: `scripts/smoke-pi-extension-registration.sh` verifies required Pi tool registrations, `/uiai` command, compact wrapper, and MCP mirrors.
 - MCP route parity smoke added: `scripts/smoke-mcp-tool-routes.sh` verifies all advertised MCP tools have bridge call routes and caught/fixed `browser_eval_async`.

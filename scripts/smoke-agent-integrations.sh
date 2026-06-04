@@ -40,6 +40,7 @@ fetch_auth "$ENGINE_URL/api/search/providers" | jq -e '.providers[] | select(.id
 fetch_auth -X POST "$ENGINE_URL/api/search" -H "Content-Type: application/json" -d '{"query":"UIAI Engine browser agents","limit":1}' | jq -e '.provider == "brave" and .count >= 1' >/dev/null
 node --check "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/mcp/browser-session-mcp.mjs" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-mcp-tool-routes.sh" >/dev/null
+"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-mcp-structured-failure.sh" >/dev/null
 CLI="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/uiai"
 bash -n "$CLI"
 "$CLI" --json status | jq -e '.type == "status"' >/dev/null

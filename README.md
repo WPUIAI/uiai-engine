@@ -383,6 +383,7 @@ scripts/install-agent-integrations.sh
 # Smoke-check discovery/graph/MCP bridge
 scripts/smoke-agent-integrations.sh
 scripts/smoke-mcp-tool-routes.sh
+scripts/smoke-mcp-structured-failure.sh
 scripts/smoke-pi-extension-registration.sh
 scripts/smoke-pi-rendering.sh
 ```
