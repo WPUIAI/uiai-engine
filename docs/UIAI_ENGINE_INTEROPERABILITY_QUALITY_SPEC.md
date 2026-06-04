@@ -128,6 +128,9 @@ A feature is not considered interoperable until proof exists in at least one sta
 
 ### Track A — WordPress plugin ↔ Go engine parity
 
+Current route contract inventory: [`WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md).
+
+
 **Problem:** Product users experience UIAI through WordPress, but many recent improvements landed in Go/Pi/MCP. The plugin must surface the same contracts: structured errors, auth status, and route parity.
 
 **Spec requirements:**

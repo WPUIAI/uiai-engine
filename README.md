@@ -427,7 +427,7 @@ Output modes: `--compact` (default), `--json`, `--pretty`.
 
 ## Security/auth matrix
 
-Endpoint auth modes and update rules live in [`docs/ENDPOINT_AUTH_MATRIX.md`](docs/ENDPOINT_AUTH_MATRIX.md).
+Endpoint auth modes and update rules live in [`docs/ENDPOINT_AUTH_MATRIX.md`](docs/ENDPOINT_AUTH_MATRIX.md). Existing WordPress plugin route parity is inventoried in [`docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md).
 
 ## Build, test, and run
 

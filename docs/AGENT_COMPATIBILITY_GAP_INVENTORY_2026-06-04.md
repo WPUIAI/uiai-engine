@@ -4,6 +4,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ## Current verified slice
 
+- WordPress plugin route parity inventory added:  maps existing plugin callers to Go routes/auth/error contracts.
 - Endpoint auth matrix added: `docs/ENDPOINT_AUTH_MATRIX.md` maps route families to public, loopback-public remote-auth, authenticated, service-token, and handler-auth modes with update rules.
 - Browser class/action tuning: `eval_failed` now has specific browser_diagnostics console/exception guidance, validated by the regression smoke.
 - Browser error regression smoke added: `scripts/smoke-browser-error-regressions.sh` covers selector_not_found, timeout, eval_failed, stale-session not_found event, and url_not_allowed.
