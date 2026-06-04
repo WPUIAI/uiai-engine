@@ -361,7 +361,7 @@ Current route contract inventory: [`WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](WO
 2. `/api/search/providers` must report provider readiness without exposing secrets.
 3. Missing provider key must return configured/degraded state consistently across HTTP/Pi/MCP/CLI.
 4. Provider timeout/rate behavior must be bounded.
-5. Search result evidence should use handles/hashes instead of raw SERP blobs when linked to Focusa.
+5. Search result evidence should use deterministic `uiai-search:<provider>:<query-hash>:<rank>` handles instead of raw SERP blobs when linked to Focusa.
 
 **Acceptance criteria:**
 

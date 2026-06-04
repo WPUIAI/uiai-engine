@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -17,6 +18,26 @@ func TestNormalizeSearchLimit(t *testing.T) {
 	}
 	if got := normalizeSearchLimit(3); got != 3 {
 		t.Fatalf("explicit limit = %d, want 3", got)
+	}
+}
+
+func TestSearchEvidenceRefsAreStableAndRanked(t *testing.T) {
+	ref1 := searchEvidenceRef("brave", "  Agent   Browser  ", 1)
+	ref2 := searchEvidenceRef("brave", "agent browser", 1)
+	if ref1 != ref2 {
+		t.Fatalf("refs should normalize query whitespace/case: %s %s", ref1, ref2)
+	}
+	if !strings.HasPrefix(ref1, "uiai-search:brave:") || !strings.HasSuffix(ref1, ":1") {
+		t.Fatalf("unexpected evidence ref: %s", ref1)
+	}
+
+	results := []searchResult{{Title: "One"}, {Title: "Two"}}
+	annotateSearchEvidence(results, "brave", "agent browser")
+	if results[0].Rank != 1 || results[1].Rank != 2 {
+		t.Fatalf("unexpected ranks: %+v", results)
+	}
+	if results[0].EvidenceRef == results[1].EvidenceRef || !strings.HasSuffix(results[1].EvidenceRef, ":2") {
+		t.Fatalf("unexpected refs: %+v", results)
 	}
 }
 

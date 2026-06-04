@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -29,6 +31,8 @@ type searchResult struct {
 	Description string `json:"description,omitempty"`
 	Source      string `json:"source,omitempty"`
 	Age         string `json:"age,omitempty"`
+	Rank        int    `json:"rank,omitempty"`
+	EvidenceRef string `json:"evidence_ref,omitempty"`
 }
 
 type searchResponse struct {
@@ -132,13 +136,14 @@ func runSearch(w http.ResponseWriter, req searchRequest) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "search_provider_unavailable", "provider": provider, "message": err.Error()})
 		return
 	}
+	annotateSearchEvidence(results, provider, query)
 	writeJSON(w, 200, searchResponse{
 		Schema:   "uiai.search_results.v1",
 		Provider: provider,
 		Query:    query,
 		Count:    len(results),
 		Results:  results,
-		Next:     []string{"browser_open a selected result URL", "browser_read page text", "browser_diagnostics on navigation failure"},
+		Next:     []string{"browser_open a selected result URL", "browser_read page text", "browser_diagnostics on navigation failure", "cite selected result with evidence_ref"},
 	})
 }
 
@@ -150,6 +155,24 @@ func normalizeSearchLimit(limit int) int {
 		return maxSearchLimit
 	}
 	return limit
+}
+
+func searchQueryHash(query string) string {
+	normalized := strings.ToLower(strings.Join(strings.Fields(query), " "))
+	sum := sha256.Sum256([]byte(normalized))
+	return hex.EncodeToString(sum[:])[:16]
+}
+
+func searchEvidenceRef(provider, query string, rank int) string {
+	return fmt.Sprintf("uiai-search:%s:%s:%d", provider, searchQueryHash(query), rank)
+}
+
+func annotateSearchEvidence(results []searchResult, provider, query string) {
+	for i := range results {
+		rank := i + 1
+		results[i].Rank = rank
+		results[i].EvidenceRef = searchEvidenceRef(provider, query, rank)
+	}
 }
 
 func searchBrave(query string, limit int) ([]searchResult, error) {

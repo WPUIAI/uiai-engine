@@ -37,7 +37,7 @@ fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_erro
 fetch "$ENGINE_URL/api/media/frame/catalog" | jq -e '.count > 0' >/dev/null
 fetch "$ENGINE_URL/api/errors?limit=1" | jq -e 'has("events") and has("redaction")' >/dev/null
 fetch_auth "$ENGINE_URL/api/search/providers" | jq -e '.providers[] | select(.id == "brave") | has("configured")' >/dev/null
-fetch_auth -X POST "$ENGINE_URL/api/search" -H "Content-Type: application/json" -d '{"query":"UIAI Engine browser agents","limit":1}' | jq -e '.provider == "brave" and .count >= 1' >/dev/null
+fetch_auth -X POST "$ENGINE_URL/api/search" -H "Content-Type: application/json" -d '{"query":"UIAI Engine browser agents","limit":1}' | jq -e '.provider == "brave" and .count >= 1 and (.results[0].evidence_ref | startswith("uiai-search:brave:")) and .results[0].rank == 1' >/dev/null
 node --check "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/mcp/browser-session-mcp.mjs" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-mcp-tool-routes.sh" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-mcp-structured-failure.sh" >/dev/null
