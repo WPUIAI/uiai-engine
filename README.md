@@ -349,6 +349,15 @@ Cross-link: [`docs/CAPTCHA_SOLVER_SPEC.md`](docs/CAPTCHA_SOLVER_SPEC.md)
 
 Implementation anchors: [`internal/intelligence/`](internal/intelligence/), [`internal/routes/training.go`](internal/routes/training.go)
 
+
+### Engine/browser error tracking
+
+- `GET /api/errors?limit=20&source=&class=` returns bounded, redacted engine/browser error events.
+- Browser/session failures and recovered panics return structured envelopes: `error_id`, `error_class`, `message`, `suggested_next_action`, `diagnostics`, and redacted `details`.
+- Captures HTTP 4xx/5xx, recovered panics, and rich browser-session action failures with session diagnostics summaries.
+- Query strings, fragments, auth headers, cookies, request bodies, and secret-like context keys are not stored.
+- Pi/MCP error text surfaces the id/class/next action and points agents to `uiai_errors`; UIAI Pi tool results render compact by default and expand with `Ctrl+O` (`app.tools.expand`).
+
 ## Agent integration highlights
 
 - Project-local Pi extension: [`.pi/extensions/uiai-engine.ts`](.pi/extensions/uiai-engine.ts) registers a full Pi-facing mirror of the MCP/browser tool surface: agent card/tool search/graph, provider web search, browser sessions/actions/diagnostics, one-shot screenshots, and frame catalog/render helpers. `/uiai off` clears the UIAI widget.

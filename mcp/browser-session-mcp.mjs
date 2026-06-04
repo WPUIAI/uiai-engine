@@ -56,7 +56,15 @@ async function fetchJSON(url, options = {}) {
 function formatError(data) {
   if (!data) return "unknown error";
   if (typeof data === "string") return data;
-  return data.error || data.message || JSON.stringify(data);
+  const message = data.message || data.error || "UIAI request failed";
+  const parts = [];
+  if (data.error_id) parts.push(`id=${data.error_id}`);
+  if (data.error_class) parts.push(`class=${data.error_class}`);
+  if (data.status) parts.push(`status=${data.status}`);
+  let out = parts.length ? `${message} (${parts.join(", ")})` : message;
+  if (data.suggested_next_action) out += `\nNext: ${data.suggested_next_action}`;
+  if (data.diagnostics) out += `\nDiagnostics: call uiai_errors or GET ${data.diagnostics}`;
+  return out;
 }
 
 // ── MCP JSON-RPC stdio transport ──────────────────────────

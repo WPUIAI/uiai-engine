@@ -34,6 +34,21 @@ func TestErrorStoreRedactsAndBounds(t *testing.T) {
 	}
 }
 
+func TestNewErrorEnvelopeIncludesActionAndDiagnostics(t *testing.T) {
+	store := &ErrorStore{}
+	event := store.Record(ErrorEvent{Source: "browser_session", Class: "selector_not_found", Status: 500, Message: "click failed", SuggestedNextAction: "Call snapshot"})
+	env := NewErrorEnvelope(event, "fallback", map[string]any{"selector": "@bad", "api_key": "secret"})
+	if env.ErrorID != event.ID || env.ErrorClass != "selector_not_found" || env.Message != "click failed" {
+		t.Fatalf("bad envelope: %+v", env)
+	}
+	if env.SuggestedNextAction != "Call snapshot" || env.Diagnostics == "" {
+		t.Fatalf("missing action/diagnostics: %+v", env)
+	}
+	if _, ok := env.Details["api_key"]; ok {
+		t.Fatalf("secret detail retained: %+v", env.Details)
+	}
+}
+
 func TestErrorStoreFiltersRecent(t *testing.T) {
 	store := &ErrorStore{}
 	store.Record(ErrorEvent{Source: "http", Class: "client_error"})

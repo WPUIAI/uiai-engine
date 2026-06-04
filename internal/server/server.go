@@ -438,17 +438,18 @@ func errorRecovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				observability.Record(observability.ErrorEvent{
-					Source:  "panic",
-					Class:   "panic",
-					Status:  http.StatusInternalServerError,
-					Method:  r.Method,
-					Path:    r.URL.Path,
-					Message: fmt.Sprint(rec),
-					Context: map[string]any{"request_id": middleware.GetReqID(r.Context())},
+				event := observability.Record(observability.ErrorEvent{
+					Source:              "panic",
+					Class:               "panic",
+					Status:              http.StatusInternalServerError,
+					Method:              r.Method,
+					Path:                r.URL.Path,
+					Message:             "internal server error",
+					SuggestedNextAction: "Call uiai_errors or GET /api/errors?source=panic, then inspect service logs around the matching error_id.",
+					Context:             map[string]any{"request_id": middleware.GetReqID(r.Context()), "panic_preview": fmt.Sprint(rec)},
 				})
-				log.Printf("[panic] %s %s: %v", r.Method, r.URL.Path, rec)
-				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+				log.Printf("[panic] %s %s %s: %v", r.Method, r.URL.Path, event.ID, rec)
+				writeJSON(w, http.StatusInternalServerError, observability.NewErrorEnvelope(event, "internal server error", nil))
 			}
 		}()
 		next.ServeHTTP(w, r)

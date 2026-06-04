@@ -714,35 +714,31 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 	if class == "url_not_allowed" && status >= 500 {
 		status = http.StatusBadRequest
 	}
-	resp := map[string]any{
-		"error":                 err.Error(),
-		"error_class":           class,
-		"suggested_next_action": suggestedNextSessionAction(class),
-	}
+	details := map[string]any{}
 	for _, ctx := range context {
 		for k, v := range ctx {
-			resp[k] = v
+			details[k] = v
 		}
 	}
 	var diag *vision.DiagnosticsSnapshot
 	if sess != nil {
 		d := sess.Diagnostics(20, "all", false)
 		diag = &d
-		resp["session_id"] = diag.SessionID
-		resp["url"] = diag.URL
-		resp["title"] = diag.Title
+		details["session_id"] = diag.SessionID
+		details["url"] = diag.URL
+		details["title"] = diag.Title
 		if diag.FocusaScope != nil {
-			resp["focusa_scope"] = diag.FocusaScope
+			details["focusa_scope"] = diag.FocusaScope
 		}
-		resp["diagnostics_summary"] = diag.Summary
+		details["diagnostics_summary"] = diag.Summary
 		if len(diag.FailedRequests) > 0 {
-			resp["failed_requests"] = diag.FailedRequests
+			details["failed_requests"] = diag.FailedRequests
 		}
 		if len(diag.Console) > 0 {
-			resp["console"] = diag.Console
+			details["console"] = diag.Console
 		}
 		if len(diag.Exceptions) > 0 {
-			resp["exceptions"] = diag.Exceptions
+			details["exceptions"] = diag.Exceptions
 		}
 	}
 	event := observability.ErrorEvent{
@@ -770,7 +766,8 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 			event.Context["focusa_continuity"] = diag.FocusaScope.ContinuityID
 		}
 	}
-	observability.Record(event)
+	event = observability.Record(event)
+	resp := observability.NewErrorEnvelope(event, err.Error(), details)
 	writeJSON(w, status, resp)
 }
 

@@ -2,6 +2,14 @@
 
 **Persistent browser sessions for AI agents.** Open a page once, interact with it continuously — like a human with a browser tab.
 
+### Engine/browser error tracking
+
+- `GET /api/errors?limit=20&source=&class=` returns bounded, redacted engine/browser error events.
+- Browser/session failures and recovered panics return structured envelopes: `error_id`, `error_class`, `message`, `suggested_next_action`, `diagnostics`, and redacted `details`.
+- Captures HTTP 4xx/5xx, recovered panics, and rich browser-session action failures with session diagnostics summaries.
+- Query strings, fragments, auth headers, cookies, request bodies, and secret-like context keys are not stored.
+- Pi/MCP error text surfaces the id/class/next action and points agents to `uiai_errors`; UIAI Pi tool results render compact by default and expand with `Ctrl+O` (`app.tools.expand`).
+
 ## Why This Exists
 
 Traditional screenshot APIs are **transactional**: navigate → snap → forget. Every call pays the full navigation cost (~1.7s). An LLM doing visual QA must re-navigate the same page 5–10 times per iteration.

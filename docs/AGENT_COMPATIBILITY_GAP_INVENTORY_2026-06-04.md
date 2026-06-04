@@ -24,7 +24,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - MCP core smoke: `tools/call uiai_health` and `tools/call uiai_status` returned valid health/status payloads.
 - MCP critique metadata smoke: `tools/call critique_models` and `tools/call critique_dimensions` returned valid read-only metadata payloads.
 - MCP media-frame smoke: `tools/call frame_catalog` returned catalog metadata and `tools/call frame_render` rendered a valid PNG frame payload.
-- Engine error tracking smoke: `/api/errors?limit=1` returned bounded redacted event envelope; MCP/Pi advertise `uiai_errors`.
+- Engine error tracking smoke: `/api/errors?limit=1` returned bounded redacted event envelope; MCP/Pi advertise `uiai_errors`; structured errors include id/class/message/next-action diagnostics links.
 - Focusa handoff smoke: UIAI session opened with `focusa_scope`; diagnostics echoed scope; `focusa_browser_diagnostics_intake` completed with evidence `uiai-diagnostics:health-focusa-scope-smoke`.
 - Ownership check: no root-owned files under `/home/wpuiai/uiai-engine`.
 

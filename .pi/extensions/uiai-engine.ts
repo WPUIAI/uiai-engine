@@ -34,12 +34,24 @@ async function callEngine(path: string, init?: RequestInit): Promise<any> {
 			// Keep raw text for non-JSON responses.
 		}
 		if (!res.ok) {
-			throw new Error(`UIAI ${res.status}: ${typeof data === "string" ? data : data?.error || data?.message || JSON.stringify(data)}`);
+			throw new Error(formatEngineError(data, res.status, path));
 		}
 		return data;
 	} finally {
 		clearTimeout(timeout);
 	}
+}
+
+function formatEngineError(data: any, status: number, path: string) {
+	if (typeof data === "string") return `UIAI ${status} ${path}: ${data}`;
+	const message = data?.message || data?.error || "request failed";
+	const parts = [`UIAI ${status}`, path];
+	if (data?.error_id) parts.push(`id=${data.error_id}`);
+	if (data?.error_class) parts.push(`class=${data.error_class}`);
+	let out = `${parts.join(" ")}: ${message}`;
+	if (data?.suggested_next_action) out += `\nNext: ${data.suggested_next_action}`;
+	if (data?.diagnostics) out += `\nDiagnostics: run uiai_errors or GET ${data.diagnostics}`;
+	return out;
 }
 
 function textResult(data: any, details: Record<string, any> = {}) {
@@ -66,7 +78,9 @@ function post(path: string, body: Record<string, any>) {
 function compactSummary(data: any, details: Record<string, any> = {}) {
 	const endpoint = details.endpoint ? `${details.endpoint}` : "UIAI";
 	if (data?.error || data?.error_class) {
-		return `${endpoint} error${data.error_class ? `:${data.error_class}` : ""} ${data.error || ""}`.trim();
+		const id = data.error_id ? ` id=${data.error_id}` : "";
+		const next = data.suggested_next_action ? ` → ${data.suggested_next_action}` : "";
+		return `${endpoint} error${data.error_class ? `:${data.error_class}` : ""}${id} ${data.message || data.error || ""}${next}`.trim();
 	}
 	if (Array.isArray(data?.events)) {
 		return `${endpoint} ${data.count ?? data.events.length} error events stored=${data.stored_count ?? "?"}`;

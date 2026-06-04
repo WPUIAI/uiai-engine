@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -27,6 +28,17 @@ type ErrorEvent struct {
 	Context             map[string]any `json:"context,omitempty"`
 }
 
+type ErrorEnvelope struct {
+	Error               string         `json:"error"`
+	Message             string         `json:"message"`
+	ErrorID             string         `json:"error_id,omitempty"`
+	ErrorClass          string         `json:"error_class,omitempty"`
+	Status              int            `json:"status,omitempty"`
+	SuggestedNextAction string         `json:"suggested_next_action,omitempty"`
+	Diagnostics         string         `json:"diagnostics,omitempty"`
+	Details             map[string]any `json:"details,omitempty"`
+}
+
 type ErrorStore struct {
 	mu     sync.Mutex
 	events []ErrorEvent
@@ -41,6 +53,36 @@ func Recent(limit int, source, class string) []ErrorEvent {
 }
 func Count() int { return defaultStore.Count() }
 func Clear()     { defaultStore.Clear() }
+
+func NewErrorEnvelope(event ErrorEvent, fallbackMessage string, details map[string]any) ErrorEnvelope {
+	message := strings.TrimSpace(event.Message)
+	if message == "" {
+		message = fallbackMessage
+	}
+	if message == "" {
+		message = "UIAI request failed"
+	}
+	return ErrorEnvelope{
+		Error:               message,
+		Message:             message,
+		ErrorID:             event.ID,
+		ErrorClass:          event.Class,
+		Status:              event.Status,
+		SuggestedNextAction: event.SuggestedNextAction,
+		Diagnostics:         "/api/errors?limit=20" + diagnosticsFilter(event),
+		Details:             sanitizeContext(details),
+	}
+}
+
+func diagnosticsFilter(event ErrorEvent) string {
+	if event.Source != "" {
+		return "&source=" + event.Source
+	}
+	if event.Class != "" {
+		return "&class=" + event.Class
+	}
+	return ""
+}
 
 func (s *ErrorStore) Record(event ErrorEvent) ErrorEvent {
 	if event.Source == "" {
@@ -121,14 +163,64 @@ func sanitizeContext(in map[string]any) map[string]any {
 			}
 		case int, int64, uint64, bool, float64:
 			out[key] = val
+		case map[string]any:
+			out[key] = sanitizeContext(val)
+		case []any:
+			out[key] = sanitizeList(val)
 		default:
-			out[key] = truncate(fmt.Sprint(val), 300)
+			if structured, ok := sanitizeStructured(val); ok {
+				out[key] = structured
+			} else {
+				out[key] = truncate(fmt.Sprint(val), 300)
+			}
 		}
 	}
 	if len(out) == 0 {
 		return nil
 	}
 	return out
+}
+
+func sanitizeList(in []any) []any {
+	out := make([]any, 0, min(len(in), 20))
+	for i, v := range in {
+		if i >= 20 {
+			break
+		}
+		if structured, ok := sanitizeStructured(v); ok {
+			out = append(out, structured)
+		} else if s, ok := v.(string); ok {
+			out = append(out, truncate(s, 300))
+		} else {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func sanitizeStructured(v any) (any, bool) {
+	data, err := json.Marshal(v)
+	if err != nil || len(data) > 10000 {
+		return nil, false
+	}
+	var decoded any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return nil, false
+	}
+	return sanitizeDecoded(decoded), true
+}
+
+func sanitizeDecoded(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		return sanitizeContext(val)
+	case []any:
+		return sanitizeList(val)
+	case string:
+		return truncate(val, 300)
+	default:
+		return val
+	}
 }
 
 func sensitiveKey(k string) bool {
