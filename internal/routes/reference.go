@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/auth"
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/credits"
+	"github.com/WPUIAI/uiai-engine/internal/ratelimit"
+	"github.com/WPUIAI/uiai-engine/internal/reference"
+	"github.com/WPUIAI/uiai-engine/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/ai"
-	"github.com/philoveracity/uiai-engine/internal/auth"
-	"github.com/philoveracity/uiai-engine/internal/config"
-	"github.com/philoveracity/uiai-engine/internal/credits"
-	"github.com/philoveracity/uiai-engine/internal/ratelimit"
-	"github.com/philoveracity/uiai-engine/internal/reference"
-	"github.com/philoveracity/uiai-engine/internal/storage"
 )
 
 type referenceHandler struct {

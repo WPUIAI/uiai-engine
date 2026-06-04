@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/auth"
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/ratelimit"
+	"github.com/WPUIAI/uiai-engine/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/auth"
-	"github.com/philoveracity/uiai-engine/internal/config"
-	"github.com/philoveracity/uiai-engine/internal/ratelimit"
-	"github.com/philoveracity/uiai-engine/internal/storage"
 )
 
 var startTime = time.Now()
@@ -24,17 +24,17 @@ var startTime = time.Now()
 var apiKeyStore sync.Map // keyHash → *apiKeyEntry
 
 type apiKeyEntry struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	KeyHash   string    `json:"key_hash"`
-	KeyPrefix string    `json:"key_prefix"` // first 8 chars for display
-	Tier      string    `json:"tier"`
-	SiteURL   string    `json:"site_url"`
-	Scopes    []string  `json:"scopes"`
-	CreatedAt time.Time `json:"created_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-	LastUsed  time.Time `json:"last_used,omitempty"`
-	UsageCount int      `json:"usage_count"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	KeyHash    string    `json:"key_hash"`
+	KeyPrefix  string    `json:"key_prefix"` // first 8 chars for display
+	Tier       string    `json:"tier"`
+	SiteURL    string    `json:"site_url"`
+	Scopes     []string  `json:"scopes"`
+	CreatedAt  time.Time `json:"created_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	LastUsed   time.Time `json:"last_used,omitempty"`
+	UsageCount int       `json:"usage_count"`
 }
 
 func MountAdminReal(r chi.Router, cfg *config.Config, usage *storage.UsageStore, limiter *ratelimit.Limiter, authenticator *auth.Authenticator) {
@@ -76,7 +76,7 @@ func MountAdminReal(r chi.Router, cfg *config.Config, usage *storage.UsageStore,
 				"requests": last24h,
 				"cost":     cost24h,
 			},
-			"by_type":         byType,
+			"by_type":          byType,
 			"rate_limit_tiers": cfg.RateLimits.Tiers,
 		})
 	})
@@ -97,14 +97,14 @@ func MountAdminReal(r chi.Router, cfg *config.Config, usage *storage.UsageStore,
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
 		writeJSON(w, 200, map[string]any{
-			"memory_alloc_mb":  float64(m.Alloc) / 1024 / 1024,
-			"memory_sys_mb":    float64(m.Sys) / 1024 / 1024,
-			"memory_total_mb":  float64(m.TotalAlloc) / 1024 / 1024,
-			"gc_runs":          m.NumGC,
-			"goroutines":       runtime.NumGoroutine(),
-			"uptime":           time.Since(startTime).String(),
-			"go_version":       runtime.Version(),
-			"num_cpu":          runtime.NumCPU(),
+			"memory_alloc_mb": float64(m.Alloc) / 1024 / 1024,
+			"memory_sys_mb":   float64(m.Sys) / 1024 / 1024,
+			"memory_total_mb": float64(m.TotalAlloc) / 1024 / 1024,
+			"gc_runs":         m.NumGC,
+			"goroutines":      runtime.NumGoroutine(),
+			"uptime":          time.Since(startTime).String(),
+			"go_version":      runtime.Version(),
+			"num_cpu":         runtime.NumCPU(),
 		})
 	})
 
@@ -227,10 +227,10 @@ func MountAdminReal(r chi.Router, cfg *config.Config, usage *storage.UsageStore,
 		}
 		hourUsed, hourLimit, dayUsed, dayLimit := limiter.Status(key, tier)
 		writeJSON(w, 200, map[string]any{
-			"key":        key,
-			"tier":       tier,
-			"hourly":     map[string]int{"used": hourUsed, "limit": hourLimit},
-			"daily":      map[string]int{"used": dayUsed, "limit": dayLimit},
+			"key":    key,
+			"tier":   tier,
+			"hourly": map[string]int{"used": hourUsed, "limit": hourLimit},
+			"daily":  map[string]int{"used": dayUsed, "limit": dayLimit},
 		})
 	})
 
@@ -327,32 +327,32 @@ func MountAdminReal(r chi.Router, cfg *config.Config, usage *storage.UsageStore,
 	r.Get("/upgrade-prompts", func(w http.ResponseWriter, req *http.Request) {
 		prompts := []map[string]any{
 			{
-				"trigger":  "rate_limited",
-				"message":  "You've reached your free tier limit. Upgrade to Pro for 50x more AI calls.",
-				"cta":      "Upgrade to Pro",
-				"url":      "https://wpuiai.com/pricing/",
-				"tier":     "free",
+				"trigger": "rate_limited",
+				"message": "You've reached your free tier limit. Upgrade to Pro for 50x more AI calls.",
+				"cta":     "Upgrade to Pro",
+				"url":     "https://wpuiai.com/pricing/",
+				"tier":    "free",
 			},
 			{
-				"trigger":  "vision_blocked",
-				"message":  "Cloud screenshots require Pro or higher. Upgrade to unlock AI-powered visual analysis.",
-				"cta":      "Unlock Vision",
-				"url":      "https://wpuiai.com/pricing/",
-				"tier":     "free",
+				"trigger": "vision_blocked",
+				"message": "Cloud screenshots require Pro or higher. Upgrade to unlock AI-powered visual analysis.",
+				"cta":     "Unlock Vision",
+				"url":     "https://wpuiai.com/pricing/",
+				"tier":    "free",
 			},
 			{
-				"trigger":  "credits_low",
-				"message":  "Running low on credits. Top up or upgrade for more monthly credits.",
-				"cta":      "Top Up Credits",
-				"url":      "https://wpuiai.com/account/credits/",
-				"tier":     "starter",
+				"trigger": "credits_low",
+				"message": "Running low on credits. Top up or upgrade for more monthly credits.",
+				"cta":     "Top Up Credits",
+				"url":     "https://wpuiai.com/account/credits/",
+				"tier":    "starter",
 			},
 			{
-				"trigger":  "media_blocked",
-				"message":  "Media production (mockups, GIFs) requires Agency tier. Upgrade to create professional marketing assets.",
-				"cta":      "Upgrade to Agency",
-				"url":      "https://wpuiai.com/pricing/",
-				"tier":     "pro",
+				"trigger": "media_blocked",
+				"message": "Media production (mockups, GIFs) requires Agency tier. Upgrade to create professional marketing assets.",
+				"cta":     "Upgrade to Agency",
+				"url":     "https://wpuiai.com/pricing/",
+				"tier":    "pro",
 			},
 		}
 		writeJSON(w, 200, map[string]any{"prompts": prompts})
@@ -361,15 +361,15 @@ func MountAdminReal(r chi.Router, cfg *config.Config, usage *storage.UsageStore,
 	// --- Config summary (non-sensitive) ---
 	r.Get("/config", func(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, 200, map[string]any{
-			"server_port":     cfg.Server.Port,
-			"wp_url":          cfg.WordPress.URL,
-			"vision_pool":     cfg.Vision.PoolSize,
-			"vision_max_pool": cfg.Vision.MaxPool,
-			"cors_origins":    cfg.CORS.Origins,
+			"server_port":      cfg.Server.Port,
+			"wp_url":           cfg.WordPress.URL,
+			"vision_pool":      cfg.Vision.PoolSize,
+			"vision_max_pool":  cfg.Vision.MaxPool,
+			"cors_origins":     cfg.CORS.Origins,
 			"rate_limit_tiers": cfg.RateLimits.Tiers,
 			"default_provider": cfg.AI.DefaultProvider,
-			"default_model":   cfg.AI.DefaultModel,
-			"providers":       providerNames(cfg),
+			"default_model":    cfg.AI.DefaultModel,
+			"providers":        providerNames(cfg),
 		})
 	})
 }

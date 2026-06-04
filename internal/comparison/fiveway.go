@@ -3,11 +3,11 @@
 // Port of PHP class-five-way-comparison.php (793 LOC).
 // Compares a built page against reference analysis across 5 dimensions:
 //
-//   1. Token compliance  — colors, typography, spacing, shapes
-//   2. Section compliance — section inventory, order, completeness
-//   3. Component compliance — component types, counts, positions
-//   4. UICrit scores — 7-dimension design critique scores
-//   5. Priority fixes — aggregated, ranked actionable fixes
+//  1. Token compliance  — colors, typography, spacing, shapes
+//  2. Section compliance — section inventory, order, completeness
+//  3. Component compliance — component types, counts, positions
+//  4. UICrit scores — 7-dimension design critique scores
+//  5. Priority fixes — aggregated, ranked actionable fixes
 //
 // The Go implementation operates on HTML strings rather than fetching URLs,
 // keeping the engine stateless. The plugin or caller is responsible for
@@ -25,25 +25,25 @@ import (
 
 // TokenCompliance is the result of comparing built-page tokens vs reference.
 type TokenCompliance struct {
-	Success           bool            `json:"success"`
-	ColorsMatch       int             `json:"colors_match"`
-	TypographyMatch   int             `json:"typography_match"`
-	SpacingMatch      int             `json:"spacing_match"`
-	ShapesMatch       int             `json:"shapes_match"`
-	OverallCompliance int             `json:"overall_compliance"`
-	Details           map[string]any  `json:"details,omitempty"`
+	Success           bool           `json:"success"`
+	ColorsMatch       int            `json:"colors_match"`
+	TypographyMatch   int            `json:"typography_match"`
+	SpacingMatch      int            `json:"spacing_match"`
+	ShapesMatch       int            `json:"shapes_match"`
+	OverallCompliance int            `json:"overall_compliance"`
+	Details           map[string]any `json:"details,omitempty"`
 }
 
 // SectionCompliance is the result of comparing built sections vs reference.
 type SectionCompliance struct {
-	Success           bool     `json:"success"`
-	SectionsExpected  int      `json:"sections_expected"`
-	SectionsFound     int      `json:"sections_found"`
-	Matched           int      `json:"matched"`
-	Missing           []string `json:"missing"`
-	Extra             []string `json:"extra"`
-	OrderCorrect      bool     `json:"order_correct"`
-	ComplianceScore   int      `json:"compliance_score"`
+	Success          bool     `json:"success"`
+	SectionsExpected int      `json:"sections_expected"`
+	SectionsFound    int      `json:"sections_found"`
+	Matched          int      `json:"matched"`
+	Missing          []string `json:"missing"`
+	Extra            []string `json:"extra"`
+	OrderCorrect     bool     `json:"order_correct"`
+	ComplianceScore  int      `json:"compliance_score"`
 }
 
 // ComponentCompliance is the result of comparing built components vs reference.
@@ -72,7 +72,7 @@ type PriorityFixes struct {
 type FiveWayResult struct {
 	TokenCompliance     *TokenCompliance     `json:"token_compliance,omitempty"`
 	SectionCompliance   *SectionCompliance   `json:"section_compliance,omitempty"`
-	ComponentCompliance *ComponentCompliance  `json:"component_compliance,omitempty"`
+	ComponentCompliance *ComponentCompliance `json:"component_compliance,omitempty"`
 	CritiqueScores      map[string]any       `json:"critique_scores,omitempty"`
 	PriorityFixes       *PriorityFixes       `json:"priority_fixes,omitempty"`
 }
@@ -345,7 +345,7 @@ type priorityFix struct {
 }
 
 var (
-	cssColorRe  = regexp.MustCompile(`(?i)(?:color|background-color|border-color):\s*(#[0-9a-fA-F]{3,6})`)
+	cssColorRe   = regexp.MustCompile(`(?i)(?:color|background-color|border-color):\s*(#[0-9a-fA-F]{3,6})`)
 	fontFamilyRe = regexp.MustCompile(`(?i)font-family:\s*([^;]+)`)
 	fontWeightRe = regexp.MustCompile(`(?i)font-weight:\s*(\d+)`)
 	paddingRe    = regexp.MustCompile(`(?i)padding:\s*([^;]+)`)

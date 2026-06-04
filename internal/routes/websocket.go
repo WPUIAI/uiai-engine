@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/philoveracity/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/config"
 )
 
 // SSE-based real-time streaming (no external WebSocket dependency needed).

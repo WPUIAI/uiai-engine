@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/philoveracity/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/config"
 )
 
 // DefaultAITimeout is applied when the caller's context has no deadline.

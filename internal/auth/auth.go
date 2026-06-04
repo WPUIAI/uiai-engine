@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/philoveracity/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/config"
 )
 
 type Identity struct {

@@ -234,8 +234,8 @@ func filterComponents(src *image.Gray, minArea, maxAspect int) *image.Gray {
 	}
 
 	type compInfo struct {
-		area                     int
-		minX, minY, maxX, maxY   int
+		area                   int
+		minX, minY, maxX, maxY int
 	}
 	var components []compInfo
 	label := 0
@@ -258,14 +258,24 @@ func filterComponents(src *image.Gray, minArea, maxAspect int) *image.Gray {
 					}
 					labels[p.y][p.x] = label
 					info.area++
-					if p.x < info.minX { info.minX = p.x }
-					if p.y < info.minY { info.minY = p.y }
-					if p.x > info.maxX { info.maxX = p.x }
-					if p.y > info.maxY { info.maxY = p.y }
+					if p.x < info.minX {
+						info.minX = p.x
+					}
+					if p.y < info.minY {
+						info.minY = p.y
+					}
+					if p.x > info.maxX {
+						info.maxX = p.x
+					}
+					if p.y > info.maxY {
+						info.maxY = p.y
+					}
 
 					for dy := -1; dy <= 1; dy++ {
 						for dx := -1; dx <= 1; dx++ {
-							if dx == 0 && dy == 0 { continue }
+							if dx == 0 && dy == 0 {
+								continue
+							}
 							stack = append(stack, struct{ x, y int }{p.x + dx, p.y + dy})
 						}
 					}
@@ -284,10 +294,16 @@ func filterComponents(src *image.Gray, minArea, maxAspect int) *image.Gray {
 		cw := c.maxX - c.minX + 1
 		ch := c.maxY - c.minY + 1
 		aspect := cw
-		if ch > cw { aspect = ch }
+		if ch > cw {
+			aspect = ch
+		}
 		minor := cw
-		if ch < cw { minor = ch }
-		if minor == 0 { minor = 1 }
+		if ch < cw {
+			minor = ch
+		}
+		if minor == 0 {
+			minor = 1
+		}
 		if aspect/minor > maxAspect {
 			continue // too elongated — likely a grid line
 		}

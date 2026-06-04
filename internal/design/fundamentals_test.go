@@ -14,7 +14,7 @@ func TestRelativeLuminance(t *testing.T) {
 	}{
 		{"#000000", 0.0},
 		{"#FFFFFF", 1.0},
-		{"#ff0000", 0.2126},  // pure red
+		{"#ff0000", 0.2126}, // pure red
 	}
 
 	for _, tt := range tests {
@@ -172,8 +172,8 @@ func TestAuditDesignSystem_BadColors(t *testing.T) {
 	ds := map[string]any{
 		"colors": map[string]any{
 			"background": "#FFFFFF",
-			"text":       "#cccccc",  // very light text on white
-			"primary":    "#FFD700",  // yellow
+			"text":       "#cccccc", // very light text on white
+			"primary":    "#FFD700", // yellow
 		},
 	}
 

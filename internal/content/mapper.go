@@ -8,11 +8,11 @@
 // The Go engine ports the ALGORITHMS (mapping strategies, similarity scoring,
 // pattern resolution) but NOT the WordPress block markup templates, which
 // remain in the PHP plugin. The engine provides:
-//   1. MapDocsToPatterns — 5-strategy content mapping
-//   2. FindBestMatch — fuzzy pattern matching with Levenshtein similarity
-//   3. ResolvePatternAlias — canonical pattern name resolution
-//   4. AvailablePatterns — the pattern library
-//   5. FillMissingPatterns — intelligent default content generation
+//  1. MapDocsToPatterns — 5-strategy content mapping
+//  2. FindBestMatch — fuzzy pattern matching with Levenshtein similarity
+//  3. ResolvePatternAlias — canonical pattern name resolution
+//  4. AvailablePatterns — the pattern library
+//  5. FillMissingPatterns — intelligent default content generation
 package content
 
 import (
@@ -29,14 +29,14 @@ type Document struct {
 
 // PatternContent is the mapped content for a pattern section.
 type PatternContent struct {
-	Title       string `json:"title,omitempty"`
-	Headline    string `json:"headline,omitempty"`
-	Subheadline string `json:"subheadline,omitempty"`
-	Description string `json:"description,omitempty"`
-	Content     string `json:"content,omitempty"`
-	CTAText     string `json:"cta_text,omitempty"`
-	CTALink     string `json:"cta_link,omitempty"`
-	Strategy    string `json:"strategy,omitempty"`
+	Title       string  `json:"title,omitempty"`
+	Headline    string  `json:"headline,omitempty"`
+	Subheadline string  `json:"subheadline,omitempty"`
+	Description string  `json:"description,omitempty"`
+	Content     string  `json:"content,omitempty"`
+	CTAText     string  `json:"cta_text,omitempty"`
+	CTALink     string  `json:"cta_link,omitempty"`
+	Strategy    string  `json:"strategy,omitempty"`
 	Confidence  float64 `json:"confidence,omitempty"`
 }
 
@@ -45,23 +45,23 @@ type ContentMap map[string]*PatternContent
 
 // PatternKeywords maps patterns to their search keywords.
 var PatternKeywords = map[string][]string{
-	"hero":           {"hero", "header", "banner", "landing", "main", "home"},
-	"features":       {"feature", "service", "benefit", "capability", "what-we-do"},
-	"services-grid":  {"service", "offering", "solution"},
-	"testimonials":   {"testimonial", "review", "quote", "client", "customer"},
-	"about-preview":  {"about", "story", "who-we-are", "mission"},
-	"cta":            {"cta", "call-to-action", "contact", "get-started"},
-	"stats":          {"stat", "number", "metric", "impact", "achievement"},
-	"pricing":        {"pricing", "plan", "tier", "package"},
-	"team-grid":      {"team", "people", "staff", "member"},
-	"faq":            {"faq", "question", "answer", "help"},
-	"gallery":        {"gallery", "image", "photo", "portfolio", "work"},
-	"timeline":       {"timeline", "milestone", "history", "process", "step"},
-	"contact":        {"contact", "form", "reach", "email"},
-	"content":        {"content", "body", "text", "article"},
-	"values":         {"value", "principle", "belief", "standard"},
-	"story":          {"story", "journey", "history", "about"},
-	"comparison":     {"comparison", "compare", "versus", "vs"},
+	"hero":          {"hero", "header", "banner", "landing", "main", "home"},
+	"features":      {"feature", "service", "benefit", "capability", "what-we-do"},
+	"services-grid": {"service", "offering", "solution"},
+	"testimonials":  {"testimonial", "review", "quote", "client", "customer"},
+	"about-preview": {"about", "story", "who-we-are", "mission"},
+	"cta":           {"cta", "call-to-action", "contact", "get-started"},
+	"stats":         {"stat", "number", "metric", "impact", "achievement"},
+	"pricing":       {"pricing", "plan", "tier", "package"},
+	"team-grid":     {"team", "people", "staff", "member"},
+	"faq":           {"faq", "question", "answer", "help"},
+	"gallery":       {"gallery", "image", "photo", "portfolio", "work"},
+	"timeline":      {"timeline", "milestone", "history", "process", "step"},
+	"contact":       {"contact", "form", "reach", "email"},
+	"content":       {"content", "body", "text", "article"},
+	"values":        {"value", "principle", "belief", "standard"},
+	"story":         {"story", "journey", "history", "about"},
+	"comparison":    {"comparison", "compare", "versus", "vs"},
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -228,7 +228,7 @@ var PatternAliases = map[string]string{
 	"values": "features",
 	"review": "testimonials", "reviews": "testimonials", "quotes": "testimonials",
 	"about": "about-preview", "who-we-are": "about-preview", "mission": "about-preview",
-	"story": "about-preview",
+	"story":          "about-preview",
 	"call-to-action": "cta", "get-started": "cta",
 	"numbers": "stats", "metrics": "stats", "impact": "stats", "achievements": "stats",
 	"plans": "pricing", "packages": "pricing", "tiers": "pricing",
@@ -237,7 +237,7 @@ var PatternAliases = map[string]string{
 	"photos": "gallery", "portfolio": "gallery", "work": "gallery",
 	"milestones": "timeline", "process": "timeline", "how-it-works": "timeline",
 	"steps": "timeline",
-	"form": "contact", "reach-us": "contact",
+	"form":  "contact", "reach-us": "contact",
 	"compare": "comparison", "versus": "comparison",
 	"posts": "posts-grid", "blog": "posts-grid", "articles": "posts-grid",
 	"related": "posts-grid", "specs": "faq", "filters": "content",
@@ -451,27 +451,27 @@ func fillMissingPatterns(contentMap ContentMap, patterns []string, archetype str
 		"services-grid": {
 			Title: "Our Services", Headline: "What We Offer",
 			Description: "Discover our range of services designed to meet your needs.",
-			Strategy: "default", Confidence: 0.3,
+			Strategy:    "default", Confidence: 0.3,
 		},
 		"testimonials": {
 			Title: "What Our Clients Say", Headline: "Client Testimonials",
 			Description: "Hear from those who have experienced our services.",
-			Strategy: "default", Confidence: 0.3,
+			Strategy:    "default", Confidence: 0.3,
 		},
 		"about-preview": {
 			Title: "About Us", Headline: "Who We Are",
 			Description: orDefault(heroSub, "Learn more about our story and mission."),
-			Strategy: "default", Confidence: 0.3,
+			Strategy:    "default", Confidence: 0.3,
 		},
 		"stats": {
 			Title: "By The Numbers", Headline: "Our Impact",
-			Content: "100+ Happy Clients | 50+ Projects Completed | 10+ Years Experience",
+			Content:  "100+ Happy Clients | 50+ Projects Completed | 10+ Years Experience",
 			Strategy: "default", Confidence: 0.3,
 		},
 		"cta": {
 			Title: "Ready to Get Started?", Headline: orDefault(heroHeadline, "Let's Work Together"),
 			Description: "Contact us today to start your project.",
-			CTAText: "Get Started", CTALink: "/contact",
+			CTAText:     "Get Started", CTALink: "/contact",
 			Strategy: "default", Confidence: 0.3,
 		},
 	}

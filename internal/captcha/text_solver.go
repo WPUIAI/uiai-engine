@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/philoveracity/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/ai"
 )
 
 // ─── Prompt templates ──────────────────────────────────────────────────────
@@ -65,9 +65,9 @@ func SolveTextCaptcha(ctx context.Context, aiProv *ai.Provider, imgBase64, imgTy
 				answers = append(answers, text)
 				lastMethod = method
 				return &ImageSolveResponse{
-					Text:       text,
-					Confidence: "high",
-					Method:     method,
+					Text:         text,
+					Confidence:   "high",
+					Method:       method,
 					Alternatives: answers,
 				}, nil
 			}
@@ -83,9 +83,9 @@ func SolveTextCaptcha(ctx context.Context, aiProv *ai.Provider, imgBase64, imgTy
 				answers = append(answers, text)
 				lastMethod = "tesseract"
 				return &ImageSolveResponse{
-					Text:       text,
-					Confidence: "medium",
-					Method:     "tesseract",
+					Text:         text,
+					Confidence:   "medium",
+					Method:       "tesseract",
 					Alternatives: answers,
 				}, nil
 			}
@@ -101,9 +101,9 @@ func SolveTextCaptcha(ctx context.Context, aiProv *ai.Provider, imgBase64, imgTy
 				answers = append(answers, text)
 				lastMethod = "ddddocr"
 				return &ImageSolveResponse{
-					Text:       text,
-					Confidence: "low",
-					Method:     "ddddocr",
+					Text:         text,
+					Confidence:   "low",
+					Method:       "ddddocr",
 					Alternatives: answers,
 				}, nil
 			}

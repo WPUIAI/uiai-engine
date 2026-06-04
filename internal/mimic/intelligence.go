@@ -5,11 +5,11 @@
 //   - class-intake-ai-inference.php (1024 LOC) — AI enrichment of intake data
 //
 // The Go engine ports the INTELLIGENCE layer:
-//   1. Archetype inference (slug → home/about/listing/detail)
-//   2. Page inference from patterns (patterns → page structure)
-//   3. Blueprint generation (plan → markdown document)
-//   4. AI plan enrichment prompts (intake data → enhanced plan)
-//   5. Content suggestions (page type + intake → section content)
+//  1. Archetype inference (slug → home/about/listing/detail)
+//  2. Page inference from patterns (patterns → page structure)
+//  3. Blueprint generation (plan → markdown document)
+//  4. AI plan enrichment prompts (intake data → enhanced plan)
+//  5. Content suggestions (page type + intake → section content)
 //
 // The WordPress-specific orchestration (intake DB queries, Google Drive API,
 // website analyzer calls) remains in the PHP plugin. The plugin calls the
@@ -25,21 +25,21 @@ import (
 
 // Plan represents a site build plan.
 type Plan struct {
-	Success         bool              `json:"success"`
-	ReferenceURLs   []string          `json:"reference_urls"`
-	Sources         []string          `json:"sources"`
-	Business        Business          `json:"business"`
-	Pages           []Page            `json:"pages"`
-	Patterns        []string          `json:"patterns"`
-	Plugins         []Plugin          `json:"plugins"`
-	Config          map[string]any    `json:"config"`
-	Branding        Branding          `json:"branding"`
-	SocialLinks     map[string]string `json:"social_links"`
-	ContentMapping  map[string]any    `json:"content_mapping"`
-	Navigation      Navigation        `json:"navigation,omitempty"`
-	ReferenceAnalysis map[string]any  `json:"reference_analysis,omitempty"`
-	DesignSystem    map[string]any    `json:"design_system,omitempty"`
-	Confidence      Confidence        `json:"confidence"`
+	Success           bool              `json:"success"`
+	ReferenceURLs     []string          `json:"reference_urls"`
+	Sources           []string          `json:"sources"`
+	Business          Business          `json:"business"`
+	Pages             []Page            `json:"pages"`
+	Patterns          []string          `json:"patterns"`
+	Plugins           []Plugin          `json:"plugins"`
+	Config            map[string]any    `json:"config"`
+	Branding          Branding          `json:"branding"`
+	SocialLinks       map[string]string `json:"social_links"`
+	ContentMapping    map[string]any    `json:"content_mapping"`
+	Navigation        Navigation        `json:"navigation,omitempty"`
+	ReferenceAnalysis map[string]any    `json:"reference_analysis,omitempty"`
+	DesignSystem      map[string]any    `json:"design_system,omitempty"`
+	Confidence        Confidence        `json:"confidence"`
 }
 
 type Business struct {
@@ -71,10 +71,10 @@ type Branding struct {
 }
 
 type Navigation struct {
-	PrimaryNav   []NavItem     `json:"primary_nav,omitempty"`
-	FooterMenus  []FooterMenu  `json:"footer_menus,omitempty"`
+	PrimaryNav    []NavItem      `json:"primary_nav,omitempty"`
+	FooterMenus   []FooterMenu   `json:"footer_menus,omitempty"`
 	FooterContent map[string]any `json:"footer_content,omitempty"`
-	CTABar       *CTABar       `json:"cta_bar,omitempty"`
+	CTABar        *CTABar        `json:"cta_bar,omitempty"`
 }
 
 type NavItem struct {
@@ -106,25 +106,25 @@ type Confidence struct {
 
 // ArchetypeMap maps slugs to archetypes.
 var ArchetypeMap = map[string]string{
-	"home":      "home",
-	"about":     "about",
-	"services":  "listing",
-	"products":  "listing",
-	"blog":      "listing",
-	"team":      "listing",
-	"portfolio": "listing",
-	"contact":   "detail",
-	"faq":       "detail",
-	"pricing":   "listing",
-	"features":  "listing",
-	"gallery":   "listing",
-	"careers":   "listing",
-	"news":      "listing",
-	"events":    "listing",
+	"home":         "home",
+	"about":        "about",
+	"services":     "listing",
+	"products":     "listing",
+	"blog":         "listing",
+	"team":         "listing",
+	"portfolio":    "listing",
+	"contact":      "detail",
+	"faq":          "detail",
+	"pricing":      "listing",
+	"features":     "listing",
+	"gallery":      "listing",
+	"careers":      "listing",
+	"news":         "listing",
+	"events":       "listing",
 	"case-studies": "listing",
 	"testimonials": "listing",
-	"privacy":   "detail",
-	"terms":     "detail",
+	"privacy":      "detail",
+	"terms":        "detail",
 }
 
 // InferArchetype returns the archetype for a page slug.

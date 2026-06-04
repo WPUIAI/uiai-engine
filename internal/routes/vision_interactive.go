@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
-	"github.com/philoveracity/uiai-engine/internal/config"
-	"github.com/philoveracity/uiai-engine/internal/vision"
 )
 
 // VisionState holds the current page state.

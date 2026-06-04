@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/config"
 )
 
 // MountToolsDiscovery serves tool definitions for LLM integration.

@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/WPUIAI/uiai-engine/internal/captcha"
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/captcha"
-	"github.com/philoveracity/uiai-engine/internal/config"
-	"github.com/philoveracity/uiai-engine/internal/vision"
 )
 
 // MountSessionRoutes registers the persistent browser session API.

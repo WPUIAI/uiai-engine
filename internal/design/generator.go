@@ -22,23 +22,23 @@ import (
 
 // DesignSystem is the complete generated token set.
 type DesignSystem struct {
-	Version         string              `json:"version"`
-	GeneratedAt     string              `json:"generated_at"`
-	Prefix          string              `json:"prefix"`
-	Colors          map[string]string   `json:"colors"`
-	ColorPartials   map[string]any      `json:"color_partials"`
-	Typography      map[string]any      `json:"typography"`
-	Spacing         map[string]string   `json:"spacing"`
-	SpacingTShirt   map[string]string   `json:"spacing_tshirt"`
-	SpacingContext  map[string]string   `json:"spacing_contextual"`
-	Shadows         map[string]string   `json:"shadows"`
-	Radii           map[string]string   `json:"radii"`
-	Transitions     map[string]string   `json:"transitions"`
-	Breakpoints     map[string]string   `json:"breakpoints"`
-	ZIndex          map[string]int      `json:"z_index"`
-	Cards           map[string]string   `json:"cards"`
-	DarkMode        map[string]string   `json:"dark_mode"`
-	Fundamentals    *FundamentalsAudit  `json:"_fundamentals,omitempty"`
+	Version        string             `json:"version"`
+	GeneratedAt    string             `json:"generated_at"`
+	Prefix         string             `json:"prefix"`
+	Colors         map[string]string  `json:"colors"`
+	ColorPartials  map[string]any     `json:"color_partials"`
+	Typography     map[string]any     `json:"typography"`
+	Spacing        map[string]string  `json:"spacing"`
+	SpacingTShirt  map[string]string  `json:"spacing_tshirt"`
+	SpacingContext map[string]string  `json:"spacing_contextual"`
+	Shadows        map[string]string  `json:"shadows"`
+	Radii          map[string]string  `json:"radii"`
+	Transitions    map[string]string  `json:"transitions"`
+	Breakpoints    map[string]string  `json:"breakpoints"`
+	ZIndex         map[string]int     `json:"z_index"`
+	Cards          map[string]string  `json:"cards"`
+	DarkMode       map[string]string  `json:"dark_mode"`
+	Fundamentals   *FundamentalsAudit `json:"_fundamentals,omitempty"`
 }
 
 // FundamentalsAudit records what was auto-fixed during generation.
@@ -61,20 +61,20 @@ func (f *Fundamentals) GenerateDesignSystem(sources Sources) DesignSystem {
 	prefix := determinePrefix(sources)
 
 	ds := DesignSystem{
-		Version:       "2.0",
-		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
-		Prefix:        prefix,
-		Colors:        f.generateColors(sources),
-		Typography:    generateTypography(sources),
-		Spacing:       generateSpacing(),
-		SpacingTShirt: generateSpacingTShirt(),
+		Version:        "2.0",
+		GeneratedAt:    time.Now().UTC().Format(time.RFC3339),
+		Prefix:         prefix,
+		Colors:         f.generateColors(sources),
+		Typography:     generateTypography(sources),
+		Spacing:        generateSpacing(),
+		SpacingTShirt:  generateSpacingTShirt(),
 		SpacingContext: generateSpacingContextual(),
-		Shadows:       make(map[string]string),
-		Radii:         generateRadii(),
-		Transitions:   generateTransitions(),
-		Breakpoints:   generateBreakpoints(),
-		ZIndex:        generateZIndex(),
-		Cards:         generateCardTokens(),
+		Shadows:        make(map[string]string),
+		Radii:          generateRadii(),
+		Transitions:    generateTransitions(),
+		Breakpoints:    generateBreakpoints(),
+		ZIndex:         generateZIndex(),
+		Cards:          generateCardTokens(),
 	}
 
 	// Color partials (HSL/RGB components for runtime manipulation)

@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/auth"
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/auth"
-	"github.com/philoveracity/uiai-engine/internal/config"
 )
 
 type extToken struct {
@@ -24,7 +24,7 @@ type extToken struct {
 }
 
 var (
-	extTokens   sync.Map // token string → *extToken
+	extTokens sync.Map // token string → *extToken
 )
 
 func MountExtensionReal(r chi.Router, cfg *config.Config, authenticator *auth.Authenticator) {

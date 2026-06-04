@@ -8,15 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/auth"
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/credits"
+	"github.com/WPUIAI/uiai-engine/internal/design"
+	"github.com/WPUIAI/uiai-engine/internal/jsonutil"
+	"github.com/WPUIAI/uiai-engine/internal/ratelimit"
+	"github.com/WPUIAI/uiai-engine/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/ai"
-	"github.com/philoveracity/uiai-engine/internal/auth"
-	"github.com/philoveracity/uiai-engine/internal/config"
-	"github.com/philoveracity/uiai-engine/internal/credits"
-	"github.com/philoveracity/uiai-engine/internal/design"
-	"github.com/philoveracity/uiai-engine/internal/jsonutil"
-	"github.com/philoveracity/uiai-engine/internal/ratelimit"
-	"github.com/philoveracity/uiai-engine/internal/storage"
 )
 
 type critiqueHandler struct {
@@ -35,10 +35,10 @@ type critiqueRequest struct {
 	PageType      string         `json:"pageType"`
 	ReferenceURL  string         `json:"referenceUrl"`
 	IncludeMemory bool           `json:"includeMemory"`
-	CritiqueMode  string         `json:"critiqueMode"`  // "mimic" or "public"
-	DesignTokens  map[string]any `json:"designTokens"`  // Design system for fundamentals audit
-	ImageBase64   string         `json:"imageBase64"`   // Screenshot for vision critique
-	ImageType     string         `json:"imageType"`     // image/jpeg, image/png, image/webp
+	CritiqueMode  string         `json:"critiqueMode"` // "mimic" or "public"
+	DesignTokens  map[string]any `json:"designTokens"` // Design system for fundamentals audit
+	ImageBase64   string         `json:"imageBase64"`  // Screenshot for vision critique
+	ImageType     string         `json:"imageType"`    // image/jpeg, image/png, image/webp
 }
 
 // UICrit dimensions — matches PHP UICRIT_DIMENSIONS constant exactly
@@ -183,11 +183,11 @@ func (h *critiqueHandler) critique(w http.ResponseWriter, r *http.Request) {
 	// Return the STRUCTURED response the plugin expects
 	writeJSON(w, 200, map[string]any{
 		// Plugin-expected fields (fixes uiai-790)
-		"critique":      critique,
-		"scores":        scores,
+		"critique":       critique,
+		"scores":         scores,
 		"priority_fixes": priorityFixes,
-		"summary":       summary,
-		"success":       true,
+		"summary":        summary,
+		"success":        true,
 
 		// Metadata
 		"model":        resp.Model,

@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/captcha"
+	visionPkg "github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/captcha"
-	visionPkg "github.com/philoveracity/uiai-engine/internal/vision"
 )
 
 // MountCaptchaRoutes registers captcha solver endpoints.
@@ -55,8 +55,8 @@ func MountCaptchaRoutes(r chi.Router, solver *captcha.Solver) {
 			URL     string               `json:"url"`
 			Width   int                  `json:"width"`
 			Height  int                  `json:"height"`
-			Fields  map[string]string    `json:"fields"`   // name→value to fill
-			Selects map[string]string    `json:"selects"`  // select name→value
+			Fields  map[string]string    `json:"fields"`  // name→value to fill
+			Selects map[string]string    `json:"selects"` // select name→value
 			Captcha captcha.SolveRequest `json:"captcha"`
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {

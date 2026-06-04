@@ -11,30 +11,30 @@ import (
 )
 
 type Config struct {
-	Server     ServerConfig     `yaml:"server"`
-	WordPress  WordPressConfig  `yaml:"wordpress"`
-	AI         AIConfig         `yaml:"ai"`
-	Vision     VisionConfig     `yaml:"vision"`
-	Credits    CreditsConfig    `yaml:"credits"`
-	RateLimits RateLimitConfig  `yaml:"rate_limits"`
-	Storage    StorageConfig    `yaml:"storage"`
-	Logging    LoggingConfig    `yaml:"logging"`
-	CORS       CORSConfig       `yaml:"cors"`
-	Media      MediaConfig      `yaml:"media"`
-	Captcha    CaptchaYAML      `yaml:"captcha"`
+	Server     ServerConfig    `yaml:"server"`
+	WordPress  WordPressConfig `yaml:"wordpress"`
+	AI         AIConfig        `yaml:"ai"`
+	Vision     VisionConfig    `yaml:"vision"`
+	Credits    CreditsConfig   `yaml:"credits"`
+	RateLimits RateLimitConfig `yaml:"rate_limits"`
+	Storage    StorageConfig   `yaml:"storage"`
+	Logging    LoggingConfig   `yaml:"logging"`
+	CORS       CORSConfig      `yaml:"cors"`
+	Media      MediaConfig     `yaml:"media"`
+	Captcha    CaptchaYAML     `yaml:"captcha"`
 }
 
 // CaptchaYAML mirrors the YAML structure for captcha config loading.
 // Converted to captcha.CaptchaConfig at runtime.
 type CaptchaYAML struct {
-	Enabled         bool              `yaml:"enabled"`
-	DefaultProvider string            `yaml:"default_provider"`
-	DefaultModel    string            `yaml:"default_model"`
-	Text            map[string]any    `yaml:"text"`
-	Recaptcha       map[string]any    `yaml:"recaptcha"`
-	Proxy           CaptchaProxyYAML  `yaml:"proxy"`
-	Stealth         map[string]any    `yaml:"stealth"`
-	Stats           map[string]any    `yaml:"stats"`
+	Enabled         bool             `yaml:"enabled"`
+	DefaultProvider string           `yaml:"default_provider"`
+	DefaultModel    string           `yaml:"default_model"`
+	Text            map[string]any   `yaml:"text"`
+	Recaptcha       map[string]any   `yaml:"recaptcha"`
+	Proxy           CaptchaProxyYAML `yaml:"proxy"`
+	Stealth         map[string]any   `yaml:"stealth"`
+	Stats           map[string]any   `yaml:"stats"`
 }
 
 type CaptchaProxyYAML struct {

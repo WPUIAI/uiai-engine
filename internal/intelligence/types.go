@@ -5,8 +5,8 @@ import "time"
 // Document matches the 22-field IndexDocument schema from INTELLIGENCE_LAYER.md.
 type Document struct {
 	// Core identification
-	ID    string `json:"id"`
-	RunID string `json:"runId"`
+	ID     string `json:"id"`
+	RunID  string `json:"runId"`
 	SiteID string `json:"siteId,omitempty"`
 
 	// Content
@@ -39,8 +39,8 @@ type Document struct {
 	UpdatedAt string `json:"updatedAt"`
 
 	// Search optimization
-	Boost              float64 `json:"boost,omitempty"`
-	ExcludeFromSearch  bool    `json:"excludeFromSearch,omitempty"`
+	Boost             float64 `json:"boost,omitempty"`
+	ExcludeFromSearch bool    `json:"excludeFromSearch,omitempty"`
 }
 
 // ValidSourceTypes are the allowed values for Document.SourceType.
@@ -130,16 +130,16 @@ type SearchRequest struct {
 
 // SearchResult is a single scored document match.
 type SearchResult struct {
-	ID          string            `json:"id"`
-	RunID       string            `json:"runId"`
-	Title       string            `json:"title"`
-	Summary     string            `json:"summary,omitempty"`
-	SourceType  string            `json:"sourceType"`
-	SourceURL   string            `json:"sourceUrl,omitempty"`
-	Score       float64           `json:"score"`
-	Matches     []string          `json:"matches"`
-	Snippet     string            `json:"snippet"`
-	Metadata    SearchResultMeta  `json:"metadata"`
+	ID         string           `json:"id"`
+	RunID      string           `json:"runId"`
+	Title      string           `json:"title"`
+	Summary    string           `json:"summary,omitempty"`
+	SourceType string           `json:"sourceType"`
+	SourceURL  string           `json:"sourceUrl,omitempty"`
+	Score      float64          `json:"score"`
+	Matches    []string         `json:"matches"`
+	Snippet    string           `json:"snippet"`
+	Metadata   SearchResultMeta `json:"metadata"`
 }
 
 // SearchResultMeta holds classification fields in search results.

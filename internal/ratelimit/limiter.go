@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/philoveracity/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/config"
 )
 
 type window struct {
@@ -14,9 +14,9 @@ type window struct {
 }
 
 type Limiter struct {
-	tiers   map[string]config.TierLimit
-	hourly  sync.Map // key → *window
-	daily   sync.Map // key → *window
+	tiers  map[string]config.TierLimit
+	hourly sync.Map // key → *window
+	daily  sync.Map // key → *window
 }
 
 func New(cfg *config.Config) *Limiter {

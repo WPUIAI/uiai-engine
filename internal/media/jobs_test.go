@@ -145,11 +145,11 @@ func TestJobStorePersistence(t *testing.T) {
 	// Create and save
 	s1 := NewJobStore(dir)
 	s1.Create(&Job{
-		ID:        "persist-001",
-		Type:      TypeAnimatedGIF,
-		Status:    StatusComplete,
+		ID:         "persist-001",
+		Type:       TypeAnimatedGIF,
+		Status:     StatusComplete,
 		ResultPath: "/tmp/out.gif",
-		CreatedAt: time.Now().UTC(),
+		CreatedAt:  time.Now().UTC(),
 	})
 
 	// Verify file exists

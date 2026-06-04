@@ -1,4 +1,4 @@
-module github.com/philoveracity/uiai-engine
+module github.com/WPUIAI/uiai-engine
 
 go 1.25.5
 

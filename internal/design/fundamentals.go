@@ -82,10 +82,10 @@ type SafePalette struct {
 
 // GradientResult describes a gradient build or validation.
 type GradientResult struct {
-	Gradient string          `json:"gradient"`
-	Stops    []GradientStop  `json:"stops"`
-	Safe     bool            `json:"safe"`
-	Issues   []string        `json:"issues"`
+	Gradient string         `json:"gradient"`
+	Stops    []GradientStop `json:"stops"`
+	Safe     bool           `json:"safe"`
+	Issues   []string       `json:"issues"`
 }
 
 // GradientStop is a single color stop in a gradient.

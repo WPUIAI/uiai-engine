@@ -3,7 +3,7 @@ package routes
 import (
 	"testing"
 
-	"github.com/philoveracity/uiai-engine/internal/vision"
+	"github.com/WPUIAI/uiai-engine/internal/vision"
 )
 
 func TestBrowserHealthPayloadUnavailableWhenPoolNil(t *testing.T) {

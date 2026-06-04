@@ -14,19 +14,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/philoveracity/uiai-engine/internal/ai"
-	"github.com/philoveracity/uiai-engine/internal/config"
 )
 
 // Layer is the Intelligence Layer service container.
 type Layer struct {
-	store   *Store
-	usage   *UsageTracker
-	github  *GitHubConfig
-	cfg     *config.Config
-	aiProv  *ai.Provider
+	store    *Store
+	usage    *UsageTracker
+	github   *GitHubConfig
+	cfg      *config.Config
+	aiProv   *ai.Provider
 	svcToken string // AI_API_TOKEN for service auth
 }
 
@@ -40,8 +40,8 @@ func NewLayer(cfg *config.Config, aiProv *ai.Provider) *Layer {
 	usagePath := filepath.Join(dataDir, "intelligence-usage.json")
 
 	return &Layer{
-		store:  NewStore(indexRoot),
-		usage:  NewUsageTracker(usagePath),
+		store: NewStore(indexRoot),
+		usage: NewUsageTracker(usagePath),
 		github: &GitHubConfig{
 			Token:       os.Getenv("GITHUB_TOKEN"),
 			Repo:        os.Getenv("GITHUB_REPO"),
@@ -118,9 +118,9 @@ func (l *Layer) handleIndexTrigger(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := doc.Validate(); err != nil {
 			writeJSON(w, 400, map[string]any{
-				"error":    fmt.Sprintf("document[%d] validation failed", i),
-				"field":    err.(*ValidationError).Field,
-				"message":  err.Error(),
+				"error":   fmt.Sprintf("document[%d] validation failed", i),
+				"field":   err.(*ValidationError).Field,
+				"message": err.Error(),
 			})
 			return
 		}

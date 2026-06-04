@@ -7,7 +7,7 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/philoveracity/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/ai"
 )
 
 // ─── Multi-model voting for text captchas ──────────────────────────────────
@@ -205,9 +205,9 @@ func DefaultVoters() []VoterModel {
 
 // MultiPassResult holds results from multiple preprocessing variants.
 type MultiPassResult struct {
-	Best         string
-	Confidence   float64
-	AllResults   []PassResult
+	Best       string
+	Confidence float64
+	AllResults []PassResult
 }
 
 type PassResult struct {

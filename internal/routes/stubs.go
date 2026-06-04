@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/ai"
-	"github.com/philoveracity/uiai-engine/internal/config"
 )
 
 // --- Health (implemented) ---

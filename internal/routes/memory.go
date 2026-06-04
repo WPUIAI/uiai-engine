@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/config"
 )
 
 type memoryEntry struct {

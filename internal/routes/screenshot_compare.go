@@ -8,27 +8,27 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/credits"
+	"github.com/WPUIAI/uiai-engine/internal/ratelimit"
+	"github.com/WPUIAI/uiai-engine/internal/storage"
+	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/ai"
-	"github.com/philoveracity/uiai-engine/internal/config"
-	"github.com/philoveracity/uiai-engine/internal/credits"
-	"github.com/philoveracity/uiai-engine/internal/ratelimit"
-	"github.com/philoveracity/uiai-engine/internal/storage"
-	"github.com/philoveracity/uiai-engine/internal/vision"
 )
 
 // MountScreenshotCompare registers the /api/screenshot/compare endpoint.
 func MountScreenshotCompare(r chi.Router, cfg *config.Config, pool *vision.Pool, aiProv *ai.Provider, creds *credits.Service, lim *ratelimit.Limiter, usage *storage.UsageStore) {
 	r.Post("/compare", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
-			URL1        string `json:"url1"`
-			URL2        string `json:"url2"`
-			Base64_1    string `json:"base64_1"`
-			Base64_2    string `json:"base64_2"`
-			Width       int    `json:"width"`
-			Height      int    `json:"height"`
-			Model       string `json:"model"`
-			Provider    string `json:"provider"`
+			URL1     string `json:"url1"`
+			URL2     string `json:"url2"`
+			Base64_1 string `json:"base64_1"`
+			Base64_2 string `json:"base64_2"`
+			Width    int    `json:"width"`
+			Height   int    `json:"height"`
+			Model    string `json:"model"`
+			Provider string `json:"provider"`
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
@@ -142,12 +142,12 @@ Return JSON: {
 		}
 
 		writeJSON(w, 200, map[string]any{
-			"comparison":  resp.Content,
-			"model":       resp.Model,
-			"inputTokens": resp.InputTokens,
+			"comparison":   resp.Content,
+			"model":        resp.Model,
+			"inputTokens":  resp.InputTokens,
 			"outputTokens": resp.OutputTokens,
-			"costUSD":     resp.CostUSD,
-			"duration_ms": time.Since(start).Milliseconds(),
+			"costUSD":      resp.CostUSD,
+			"duration_ms":  time.Since(start).Milliseconds(),
 		})
 	})
 }

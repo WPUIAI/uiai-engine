@@ -3,9 +3,9 @@ package routes
 import (
 	"net/http"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/config"
-	"github.com/philoveracity/uiai-engine/internal/storage"
 )
 
 func MountUsageReal(r chi.Router, _ *config.Config, usage *storage.UsageStore) {
@@ -30,8 +30,8 @@ func MountUsageReal(r chi.Router, _ *config.Config, usage *storage.UsageStore) {
 			totalCost += r.CostUSD
 		}
 		writeJSON(w, 200, map[string]any{
-			"total":     len(records),
-			"by_type":   byType,
+			"total":      len(records),
+			"by_type":    byType,
 			"total_cost": totalCost,
 		})
 	})

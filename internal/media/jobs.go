@@ -25,33 +25,33 @@ const (
 type JobType string
 
 const (
-	TypeDeviceMockup  JobType = "device_mockup"
-	TypeAnimatedGIF   JobType = "animated_gif"
-	TypeProductVideo  JobType = "product_video"
-	TypeIllustration  JobType = "ai_illustration"
+	TypeDeviceMockup JobType = "device_mockup"
+	TypeAnimatedGIF  JobType = "animated_gif"
+	TypeProductVideo JobType = "product_video"
+	TypeIllustration JobType = "ai_illustration"
 )
 
 // Job represents a media production job.
 type Job struct {
-	ID          string    `json:"id"`
-	Type        JobType   `json:"type"`
-	Status      JobStatus `json:"status"`
-	Device      string    `json:"device,omitempty"`       // macbook-pro, iphone-15, browser-window
-	URLs        []string  `json:"urls"`
-	Width       int       `json:"width,omitempty"`
-	Height      int       `json:"height,omitempty"`
-	Frames      int       `json:"frames,omitempty"`       // For GIF
-	Delay       int       `json:"delay,omitempty"`        // For GIF (centiseconds)
-	Mode        string    `json:"mode,omitempty"`         // scroll, pages
+	ID          string            `json:"id"`
+	Type        JobType           `json:"type"`
+	Status      JobStatus         `json:"status"`
+	Device      string            `json:"device,omitempty"` // macbook-pro, iphone-15, browser-window
+	URLs        []string          `json:"urls"`
+	Width       int               `json:"width,omitempty"`
+	Height      int               `json:"height,omitempty"`
+	Frames      int               `json:"frames,omitempty"` // For GIF
+	Delay       int               `json:"delay,omitempty"`  // For GIF (centiseconds)
+	Mode        string            `json:"mode,omitempty"`   // scroll, pages
 	Palette     map[string]string `json:"palette,omitempty"`
-	ResultURL   string    `json:"result_url,omitempty"`
-	ResultPath  string    `json:"result_path,omitempty"`  // Local file path
-	Error       string    `json:"error,omitempty"`
-	LicenseID   int       `json:"license_id,omitempty"`
-	Credits     float64   `json:"credits_charged,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	StartedAt   *time.Time `json:"started_at,omitempty"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	ResultURL   string            `json:"result_url,omitempty"`
+	ResultPath  string            `json:"result_path,omitempty"` // Local file path
+	Error       string            `json:"error,omitempty"`
+	LicenseID   int               `json:"license_id,omitempty"`
+	Credits     float64           `json:"credits_charged,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	StartedAt   *time.Time        `json:"started_at,omitempty"`
+	CompletedAt *time.Time        `json:"completed_at,omitempty"`
 }
 
 // JobStore manages media production jobs.

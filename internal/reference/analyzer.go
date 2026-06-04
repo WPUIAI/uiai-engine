@@ -22,8 +22,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/philoveracity/uiai-engine/internal/ai"
-	"github.com/philoveracity/uiai-engine/internal/jsonutil"
+	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/jsonutil"
 )
 
 // Analyzer performs multi-pass vision analysis of reference screenshots.

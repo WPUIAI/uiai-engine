@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/philoveracity/uiai-engine/internal/ai"
-	"github.com/philoveracity/uiai-engine/internal/vision"
+	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/vision"
 )
 
 // Solver is the main captcha solving engine.

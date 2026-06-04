@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/philoveracity/uiai-engine/internal/comparison"
-	"github.com/philoveracity/uiai-engine/internal/content"
-	"github.com/philoveracity/uiai-engine/internal/design"
-	"github.com/philoveracity/uiai-engine/internal/jsonutil"
-	"github.com/philoveracity/uiai-engine/internal/mimic"
+	"github.com/WPUIAI/uiai-engine/internal/comparison"
+	"github.com/WPUIAI/uiai-engine/internal/content"
+	"github.com/WPUIAI/uiai-engine/internal/design"
+	"github.com/WPUIAI/uiai-engine/internal/jsonutil"
+	"github.com/WPUIAI/uiai-engine/internal/mimic"
 )
 
 var fund = &design.Fundamentals{}

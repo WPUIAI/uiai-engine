@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/vision"
 )
 
 // MountBrowserHealth exposes browser-specific readiness and metrics without

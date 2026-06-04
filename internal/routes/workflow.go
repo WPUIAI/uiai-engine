@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/config"
 )
 
 var (
@@ -30,15 +30,15 @@ type registeredSite struct {
 }
 
 type workflowRun struct {
-	ID        string         `json:"id"`
-	SiteID    string         `json:"site_id"`
-	Status    string         `json:"status"` // pending, running, completed, failed
-	Step      int            `json:"step"`
-	TotalSteps int           `json:"total_steps"`
-	Log       []string       `json:"log"`
-	Result    map[string]any `json:"result,omitempty"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	ID         string         `json:"id"`
+	SiteID     string         `json:"site_id"`
+	Status     string         `json:"status"` // pending, running, completed, failed
+	Step       int            `json:"step"`
+	TotalSteps int            `json:"total_steps"`
+	Log        []string       `json:"log"`
+	Result     map[string]any `json:"result,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
 }
 
 func MountWorkflowReal(r chi.Router, cfg *config.Config) {

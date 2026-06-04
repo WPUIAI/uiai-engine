@@ -12,8 +12,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/philoveracity/uiai-engine/internal/config"
-	"github.com/philoveracity/uiai-engine/internal/server"
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/server"
 )
 
 var (

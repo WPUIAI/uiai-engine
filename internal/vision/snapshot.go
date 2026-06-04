@@ -24,10 +24,10 @@ import (
 
 // SnapshotOptions controls what the snapshot includes.
 type SnapshotOptions struct {
-	Interactive bool `json:"interactive"` // Only interactive elements (buttons, links, inputs)
-	Compact     bool `json:"compact"`     // Remove empty structural nodes
-	MaxDepth    int  `json:"max_depth"`   // 0 = unlimited
-	Selector    string `json:"selector"`  // Scope to CSS selector (default: body)
+	Interactive bool   `json:"interactive"` // Only interactive elements (buttons, links, inputs)
+	Compact     bool   `json:"compact"`     // Remove empty structural nodes
+	MaxDepth    int    `json:"max_depth"`   // 0 = unlimited
+	Selector    string `json:"selector"`    // Scope to CSS selector (default: body)
 }
 
 // SnapshotRef is a stored reference for an element found in the snapshot.

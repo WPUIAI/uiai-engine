@@ -16,10 +16,10 @@ import (
 // Store manages disk-backed document and metadata persistence.
 // Thread-safe via per-run mutexes + in-memory cache for hot reads.
 type Store struct {
-	root  string            // e.g. data/indexes
-	mu    sync.RWMutex      // protects the cache maps
-	docs  map[string][]Document
-	meta  map[string]*IndexMetadata
+	root string       // e.g. data/indexes
+	mu   sync.RWMutex // protects the cache maps
+	docs map[string][]Document
+	meta map[string]*IndexMetadata
 }
 
 // NewStore creates a Store rooted at the given directory.

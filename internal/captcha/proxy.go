@@ -18,7 +18,7 @@ import (
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 
-	"github.com/philoveracity/uiai-engine/internal/vision"
+	"github.com/WPUIAI/uiai-engine/internal/vision"
 )
 
 // ─── IP Pool for fleet-scale captcha solving ───────────────────────────────
@@ -39,13 +39,13 @@ type ProxyConfig struct {
 	Enabled            bool     `yaml:"enabled" json:"enabled"`
 	LocalIPs           []string `yaml:"local_ips" json:"local_ips"`
 	Proxies            []string `yaml:"proxies" json:"proxies"`
-	Strategy           string   `yaml:"strategy" json:"strategy"`     // "weighted" | "least_conn" | "round_robin" | "random"
+	Strategy           string   `yaml:"strategy" json:"strategy"`                           // "weighted" | "least_conn" | "round_robin" | "random"
 	MaxConcurrentPerIP int      `yaml:"max_concurrent_per_ip" json:"max_concurrent_per_ip"` // default 2
 	CooldownMinutes    int      `yaml:"cooldown_minutes" json:"cooldown_minutes"`           // default 60
 	HealthFile         string   `yaml:"health_file" json:"health_file"`
-	HealthProbeURL     string   `yaml:"health_probe_url" json:"health_probe_url"`           // URL to probe (default: https://www.google.com/recaptcha/api.js)
-	HealthProbeSeconds int      `yaml:"health_probe_seconds" json:"health_probe_seconds"`   // probe interval (default: 300 = 5min)
-	MaxRetries         int      `yaml:"max_retries" json:"max_retries"`                     // auto-retry on different IP (default: 2)
+	HealthProbeURL     string   `yaml:"health_probe_url" json:"health_probe_url"`         // URL to probe (default: https://www.google.com/recaptcha/api.js)
+	HealthProbeSeconds int      `yaml:"health_probe_seconds" json:"health_probe_seconds"` // probe interval (default: 300 = 5min)
+	MaxRetries         int      `yaml:"max_retries" json:"max_retries"`                   // auto-retry on different IP (default: 2)
 }
 
 // ─── IP Pool ───────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ type IPPool struct {
 	index    int // for round_robin
 	config   ProxyConfig
 	socksMap map[string]*socksProxy // local IP → running SOCKS5 listener
-	stopCh   chan struct{}           // stops the probe loop on shutdown
+	stopCh   chan struct{}          // stops the probe loop on shutdown
 }
 
 // IPNode is a single IP endpoint with health state.
@@ -290,14 +290,14 @@ func (p *IPPool) Status() IPPoolStatus {
 	defer p.mu.RUnlock()
 
 	s := IPPoolStatus{
-		TotalIPs:    len(p.nodes),
-		Strategy:    p.config.Strategy,
-		MaxPerIP:    p.config.MaxConcurrentPerIP,
-		CooldownMin: p.config.CooldownMinutes,
-		MaxRetries:  p.config.MaxRetries,
-		ProbeURL:    p.config.HealthProbeURL,
+		TotalIPs:      len(p.nodes),
+		Strategy:      p.config.Strategy,
+		MaxPerIP:      p.config.MaxConcurrentPerIP,
+		CooldownMin:   p.config.CooldownMinutes,
+		MaxRetries:    p.config.MaxRetries,
+		ProbeURL:      p.config.HealthProbeURL,
 		ProbeInterval: p.config.HealthProbeSeconds,
-		IPs:         make([]IPNodeStatus, 0, len(p.nodes)),
+		IPs:           make([]IPNodeStatus, 0, len(p.nodes)),
 	}
 
 	for _, n := range p.nodes {
@@ -503,10 +503,10 @@ func (p *IPPool) saveHealth() {
 
 // ProxiedBrowser is an ephemeral browser launched through an alternate IP.
 type ProxiedBrowser struct {
-	browser     *rod.Browser
-	launcher    *launcher.Launcher
-	socksClean  func() // cleanup in-process SOCKS5 (local IPs only)
-	label       string
+	browser    *rod.Browser
+	launcher   *launcher.Launcher
+	socksClean func() // cleanup in-process SOCKS5 (local IPs only)
+	label      string
 }
 
 // LaunchWithEndpoint starts Chrome bound to the given IP or proxy.
@@ -625,7 +625,7 @@ func (pb *ProxiedBrowser) OpenPage(targetURL string, width, height int, stealth 
 		page.Close()
 		return nil, fmt.Errorf("navigate: %w", err)
 	}
-	page.Timeout(5 * time.Second).WaitDOMStable(200*time.Millisecond, 0.15)
+	page.Timeout(5*time.Second).WaitDOMStable(200*time.Millisecond, 0.15)
 
 	return vision.WrapPage(page, targetURL, width, height), nil
 }

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/media/deviceframes"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/media/deviceframes"
 )
 
 var (

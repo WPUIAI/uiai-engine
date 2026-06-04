@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/philoveracity/uiai-engine/internal/ai"
-	"github.com/philoveracity/uiai-engine/internal/vision"
+	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/vision"
 )
 
 // ─── reCAPTCHA v2 solver ───────────────────────────────────────────────────

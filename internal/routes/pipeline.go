@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/auth"
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/credits"
+	"github.com/WPUIAI/uiai-engine/internal/ratelimit"
+	"github.com/WPUIAI/uiai-engine/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/philoveracity/uiai-engine/internal/ai"
-	"github.com/philoveracity/uiai-engine/internal/auth"
-	"github.com/philoveracity/uiai-engine/internal/config"
-	"github.com/philoveracity/uiai-engine/internal/credits"
-	"github.com/philoveracity/uiai-engine/internal/ratelimit"
-	"github.com/philoveracity/uiai-engine/internal/storage"
 )
 
 type pipelineDeps struct {
@@ -83,7 +83,7 @@ Sources: ` + toJSON(body.Sources)
 
 		writeJSON(w, 200, map[string]any{
 			"design_system": resp.Content,
-			"model": resp.Model, "inputTokens": resp.InputTokens,
+			"model":         resp.Model, "inputTokens": resp.InputTokens,
 			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD,
 			"duration_ms": time.Since(start).Milliseconds(),
 		})
@@ -147,7 +147,7 @@ Blueprint: ` + toJSON(body.Blueprint)
 
 		writeJSON(w, 200, map[string]any{
 			"content_map": resp.Content,
-			"model": resp.Model, "inputTokens": resp.InputTokens,
+			"model":       resp.Model, "inputTokens": resp.InputTokens,
 			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD,
 			"duration_ms": time.Since(start).Milliseconds(),
 		})
@@ -215,7 +215,7 @@ Content: ` + toJSON(body.ContentMap)
 
 		writeJSON(w, 200, map[string]any{
 			"blocks": resp.Content,
-			"model": resp.Model, "inputTokens": resp.InputTokens,
+			"model":  resp.Model, "inputTokens": resp.InputTokens,
 			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD,
 			"duration_ms": time.Since(start).Milliseconds(),
 		})
@@ -234,13 +234,13 @@ func MountComparisonRoute(r chi.Router, cfg *config.Config, aiProv *ai.Provider,
 		}
 
 		var body struct {
-			BuiltPageURL    string         `json:"built_page_url"`
-			BuiltImageB64   string         `json:"built_image_base64"`
-			DesignTokens    map[string]any `json:"design_tokens"`
-			ReferenceSections []any        `json:"reference_sections"`
-			ReferenceComponents []any      `json:"reference_components"`
-			Model           string         `json:"model"`
-			Provider        string         `json:"provider"`
+			BuiltPageURL        string         `json:"built_page_url"`
+			BuiltImageB64       string         `json:"built_image_base64"`
+			DesignTokens        map[string]any `json:"design_tokens"`
+			ReferenceSections   []any          `json:"reference_sections"`
+			ReferenceComponents []any          `json:"reference_components"`
+			Model               string         `json:"model"`
+			Provider            string         `json:"provider"`
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
@@ -289,7 +289,7 @@ Components: ` + toJSON(body.ReferenceComponents)
 
 		writeJSON(w, 200, map[string]any{
 			"comparison": resp.Content,
-			"model": resp.Model, "inputTokens": resp.InputTokens,
+			"model":      resp.Model, "inputTokens": resp.InputTokens,
 			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD,
 			"duration_ms": time.Since(start).Milliseconds(),
 		})

@@ -6,34 +6,34 @@ import "time"
 
 // SolveRequest is the JSON body for POST /api/session/{id}/captcha/solve
 type SolveRequest struct {
-	Type     string       `json:"type"`               // "text", "recaptcha_v2", "auto"
-	Profile  string       `json:"profile,omitempty"`   // per-site profile name from config
-	Config   SolveConfig  `json:"config,omitempty"`    // inline config (overrides profile)
-	Provider string       `json:"provider,omitempty"`  // AI provider override
-	Model    string       `json:"model,omitempty"`     // AI model override
+	Type     string        `json:"type"`               // "text", "recaptcha_v2", "auto"
+	Profile  string        `json:"profile,omitempty"`  // per-site profile name from config
+	Config   SolveConfig   `json:"config,omitempty"`   // inline config (overrides profile)
+	Provider string        `json:"provider,omitempty"` // AI provider override
+	Model    string        `json:"model,omitempty"`    // AI model override
 	Voting   *VotingConfig `json:"voting,omitempty"`   // multi-model voting
 }
 
 // SolveConfig provides captcha-specific parameters.
 type SolveConfig struct {
-	ImageSelector  string          `json:"image_selector,omitempty"`
-	AnswerSelector string          `json:"answer_selector,omitempty"`
-	SubmitSelector string          `json:"submit_selector,omitempty"`
-	AutoSubmit     bool            `json:"auto_submit,omitempty"`
-	MaxAttempts    int             `json:"max_attempts,omitempty"`
-	Hint           string          `json:"hint,omitempty"`
-	PromptTemplate string          `json:"prompt_template,omitempty"` // "blind_assistant" | "verification_code"
+	ImageSelector  string            `json:"image_selector,omitempty"`
+	AnswerSelector string            `json:"answer_selector,omitempty"`
+	SubmitSelector string            `json:"submit_selector,omitempty"`
+	AutoSubmit     bool              `json:"auto_submit,omitempty"`
+	MaxAttempts    int               `json:"max_attempts,omitempty"`
+	Hint           string            `json:"hint,omitempty"`
+	PromptTemplate string            `json:"prompt_template,omitempty"` // "blind_assistant" | "verification_code"
 	Preprocessing  *PreprocessConfig `json:"preprocessing,omitempty"`
-	Strategy       string          `json:"strategy,omitempty"` // reCAPTCHA: "full_grid" | "per_tile"
+	Strategy       string            `json:"strategy,omitempty"` // reCAPTCHA: "full_grid" | "per_tile"
 }
 
 // PreprocessConfig for image cleaning before OCR/VLM.
 type PreprocessConfig struct {
-	Upscale           int `json:"upscale,omitempty" yaml:"upscale,omitempty"`                         // 2-4x
-	MedianKernel      int `json:"median_kernel,omitempty" yaml:"median_kernel,omitempty"`             // odd, e.g. 5 — median filter to blur thin grid lines
-	Threshold         int `json:"threshold,omitempty" yaml:"threshold,omitempty"`                     // 0-255
-	MorphologyKernel  int `json:"morphology_kernel,omitempty" yaml:"morphology_kernel,omitempty"`     // odd, e.g. 3 or 5
-	ComponentMinArea  int `json:"component_min_area,omitempty" yaml:"component_min_area,omitempty"`   // min pixel area
+	Upscale            int `json:"upscale,omitempty" yaml:"upscale,omitempty"`                           // 2-4x
+	MedianKernel       int `json:"median_kernel,omitempty" yaml:"median_kernel,omitempty"`               // odd, e.g. 5 — median filter to blur thin grid lines
+	Threshold          int `json:"threshold,omitempty" yaml:"threshold,omitempty"`                       // 0-255
+	MorphologyKernel   int `json:"morphology_kernel,omitempty" yaml:"morphology_kernel,omitempty"`       // odd, e.g. 3 or 5
+	ComponentMinArea   int `json:"component_min_area,omitempty" yaml:"component_min_area,omitempty"`     // min pixel area
 	ComponentMaxAspect int `json:"component_max_aspect,omitempty" yaml:"component_max_aspect,omitempty"` // max w/h ratio
 }
 
@@ -45,16 +45,16 @@ type VotingConfig struct {
 
 // SolveResponse is returned from all solve endpoints.
 type SolveResponse struct {
-	Solved     bool              `json:"solved"`
-	Type       string            `json:"type"`
-	Answer     string            `json:"answer,omitempty"`
-	Token      string            `json:"token,omitempty"` // reCAPTCHA token
-	Attempts   int               `json:"attempts"`
-	Rounds     int               `json:"rounds,omitempty"` // reCAPTCHA rounds
-	Method     string            `json:"method"`
-	DurationMs int64             `json:"duration_ms"`
-	Error      string            `json:"error,omitempty"`
-	Debug      *SolveDebug       `json:"debug,omitempty"`
+	Solved     bool        `json:"solved"`
+	Type       string      `json:"type"`
+	Answer     string      `json:"answer,omitempty"`
+	Token      string      `json:"token,omitempty"` // reCAPTCHA token
+	Attempts   int         `json:"attempts"`
+	Rounds     int         `json:"rounds,omitempty"` // reCAPTCHA rounds
+	Method     string      `json:"method"`
+	DurationMs int64       `json:"duration_ms"`
+	Error      string      `json:"error,omitempty"`
+	Debug      *SolveDebug `json:"debug,omitempty"`
 }
 
 // SolveDebug contains diagnostic info on failure.
@@ -68,15 +68,15 @@ type SolveDebug struct {
 
 // ImageSolveRequest is the JSON body for POST /api/captcha/solve-image
 type ImageSolveRequest struct {
-	ImageBase64   string          `json:"image_base64"`
-	ImageType     string          `json:"image_type,omitempty"` // default "image/png"
-	Site          string          `json:"site,omitempty"`       // profile name (e.g. "prlog") — resolves preprocessing/hint/template
-	Hint          string          `json:"hint,omitempty"`
+	ImageBase64   string            `json:"image_base64"`
+	ImageType     string            `json:"image_type,omitempty"` // default "image/png"
+	Site          string            `json:"site,omitempty"`       // profile name (e.g. "prlog") — resolves preprocessing/hint/template
+	Hint          string            `json:"hint,omitempty"`
 	Preprocessing *PreprocessConfig `json:"preprocessing,omitempty"`
-	Provider      string          `json:"provider,omitempty"`
-	Model         string          `json:"model,omitempty"`
-	Voting        bool            `json:"voting,omitempty"`     // multi-model voting
-	MultiPass     bool            `json:"multipass,omitempty"`  // multi-pass preprocessing + voting
+	Provider      string            `json:"provider,omitempty"`
+	Model         string            `json:"model,omitempty"`
+	Voting        bool              `json:"voting,omitempty"`    // multi-model voting
+	MultiPass     bool              `json:"multipass,omitempty"` // multi-pass preprocessing + voting
 }
 
 // ImageSolveResponse is returned from solve-image.
@@ -92,9 +92,9 @@ type ImageSolveResponse struct {
 
 // StatusResponse is returned from GET /api/captcha/status
 type StatusResponse struct {
-	AvailableTypes []string            `json:"available_types"`
-	Backends       map[string]Backend  `json:"backends"`
-	Stats          *SolverStats        `json:"stats,omitempty"`
+	AvailableTypes []string           `json:"available_types"`
+	Backends       map[string]Backend `json:"backends"`
+	Stats          *SolverStats       `json:"stats,omitempty"`
 }
 
 type Backend struct {
@@ -113,7 +113,7 @@ type CaptchaConfig struct {
 	DefaultProvider string                   `yaml:"default_provider" json:"default_provider"`
 	DefaultModel    string                   `yaml:"default_model" json:"default_model"`
 	Text            TextConfig               `yaml:"text" json:"text"`
-	Recaptcha       RecaptchaConfig           `yaml:"recaptcha" json:"recaptcha"`
+	Recaptcha       RecaptchaConfig          `yaml:"recaptcha" json:"recaptcha"`
 	Voting          VotingConfig             `yaml:"voting" json:"voting"`
 	Stealth         StealthConfig            `yaml:"stealth" json:"stealth"`
 	Proxy           ProxyConfig              `yaml:"proxy" json:"proxy"`
@@ -122,11 +122,11 @@ type CaptchaConfig struct {
 }
 
 type TextConfig struct {
-	MaxAttempts    int           `yaml:"max_attempts" json:"max_attempts"`
-	RetryDelay     string        `yaml:"retry_delay" json:"retry_delay"`
-	PromptTemplate string        `yaml:"prompt_template" json:"prompt_template"`
-	FallbackChain  []string      `yaml:"fallback_chain" json:"fallback_chain"`
-	Voters         []VoterModel  `yaml:"voters" json:"voters"`
+	MaxAttempts    int          `yaml:"max_attempts" json:"max_attempts"`
+	RetryDelay     string       `yaml:"retry_delay" json:"retry_delay"`
+	PromptTemplate string       `yaml:"prompt_template" json:"prompt_template"`
+	FallbackChain  []string     `yaml:"fallback_chain" json:"fallback_chain"`
+	Voters         []VoterModel `yaml:"voters" json:"voters"`
 }
 
 type RecaptchaConfig struct {
@@ -154,25 +154,25 @@ type StatsConfig struct {
 }
 
 type ProfileConfig struct {
-	Type           string          `yaml:"type" json:"type"`
-	ImageSelector  string          `yaml:"image_selector" json:"image_selector"`
-	AnswerSelector string          `yaml:"answer_selector" json:"answer_selector"`
-	SubmitSelector string          `yaml:"submit_selector" json:"submit_selector"`
-	SiteKey        string          `yaml:"site_key" json:"site_key"`
-	Strategy       string          `yaml:"strategy" json:"strategy"`
-	VotingEnabled  bool            `yaml:"voting" json:"voting"`
-	Hint           string          `yaml:"hint" json:"hint"`
-	PromptTemplate string          `yaml:"prompt_template" json:"prompt_template"`
+	Type           string            `yaml:"type" json:"type"`
+	ImageSelector  string            `yaml:"image_selector" json:"image_selector"`
+	AnswerSelector string            `yaml:"answer_selector" json:"answer_selector"`
+	SubmitSelector string            `yaml:"submit_selector" json:"submit_selector"`
+	SiteKey        string            `yaml:"site_key" json:"site_key"`
+	Strategy       string            `yaml:"strategy" json:"strategy"`
+	VotingEnabled  bool              `yaml:"voting" json:"voting"`
+	Hint           string            `yaml:"hint" json:"hint"`
+	PromptTemplate string            `yaml:"prompt_template" json:"prompt_template"`
 	Preprocessing  *PreprocessConfig `yaml:"preprocessing" json:"preprocessing"`
 }
 
 // ─── Stats tracking ────────────────────────────────────────────────────────
 
 type SolverStats struct {
-	TotalAttempts int                      `json:"total_attempts"`
-	TotalSolved   int                      `json:"total_solved"`
-	SuccessRate   float64                  `json:"success_rate"`
-	ByType        map[string]*TypeStats    `json:"by_type"`
+	TotalAttempts int                   `json:"total_attempts"`
+	TotalSolved   int                   `json:"total_solved"`
+	SuccessRate   float64               `json:"success_rate"`
+	ByType        map[string]*TypeStats `json:"by_type"`
 }
 
 type TypeStats struct {
