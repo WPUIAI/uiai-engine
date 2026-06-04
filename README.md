@@ -58,6 +58,9 @@ Start here by task:
 |---|---|
 | HLT ledger and current trajectory | [`docs/HLT_LEDGER.md`](docs/HLT_LEDGER.md) |
 | Browser/session API, agent tools, MCP formats, security boundaries, portability helpers | [`docs/SESSION_API.md`](docs/SESSION_API.md) |
+| Cross-surface interoperability contracts, acceptance matrix, and proof gates | [`docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md`](docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md) |
+| Endpoint auth mode matrix and route update rules | [`docs/ENDPOINT_AUTH_MATRIX.md`](docs/ENDPOINT_AUTH_MATRIX.md) |
+| Existing WordPress plugin ↔ Go engine route parity matrix | [`docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md) |
 | Diagnostics contract: console/errors/network/failed requests/[Focusa](https://github.com/Startempire-Wire/focusa) evidence refs | [`docs/BROWSER_DIAGNOSTICS_SPEC.md`](docs/BROWSER_DIAGNOSTICS_SPEC.md) |
 | Browser reliability gates, soak/stress commands, CI expectations | [`docs/BROWSER_RELIABILITY_RUNBOOK.md`](docs/BROWSER_RELIABILITY_RUNBOOK.md) |
 | Captcha solver architecture, proxy/IP pool, preprocessing, status APIs | [`docs/CAPTCHA_SOLVER_SPEC.md`](docs/CAPTCHA_SOLVER_SPEC.md) |
@@ -426,7 +429,9 @@ Output modes: `--compact` (default), `--json`, `--pretty`.
 `browser_eval_async` returns a structured `eval_failed` error envelope for JS/runtime errors instead of a successful text payload; its next action points agents to browser_diagnostics console/exceptions and bounded direct-action retries.
  The Pi extension also uses compact-by-default rendering with Ctrl+O expansion to full JSON for representative success/error tool results. Exit codes: `0` success, `1` API/tool failure, `2` usage error, `3` missing dependency, `4` auth/config error. Auth/env vars match Pi/MCP: `UIAI_ENGINE_URL`, `UIAI_API_KEY`, `UIAI_BEARER_TOKEN`, `UIAI_CLI_TIMEOUT_SECONDS`.
 
-## Security/auth matrix
+## Interoperability and security matrices
+
+Use [`docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md`](docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md) as the top-level matrix for WordPress, Pi, MCP, Focusa, browser diagnostics/errors, CLI, search/providers, auth/security, and proof gates.
 
 Endpoint auth modes and update rules live in [`docs/ENDPOINT_AUTH_MATRIX.md`](docs/ENDPOINT_AUTH_MATRIX.md). Existing WordPress plugin route parity is inventoried in [`docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md).
 
