@@ -676,16 +676,24 @@ func isPrivateURL(rawURL string) bool {
 	return host == "localhost" || host == ""
 }
 
+// ValidateNavigationURL enforces the same URL safety policy for persistent
+// sessions as one-shot screenshots: HTTP/S only, with private/internal hosts
+// blocked unless allow_private_urls is enabled.
+func (p *Pool) ValidateNavigationURL(rawURL string) error {
+	if isDangerousScheme(rawURL) {
+		return fmt.Errorf("URL scheme not allowed: only http:// and https:// are supported")
+	}
+	if p.blockPrivateURLs && isPrivateURL(rawURL) {
+		return fmt.Errorf("URL not allowed: private/internal addresses blocked (set allow_private_urls to enable)")
+	}
+	return nil
+}
+
 func (p *Pool) screenshotInner(ctx context.Context, opts ScreenshotOpts) (*ScreenshotResult, error) {
 	start := time.Now()
 
-	// Always block dangerous schemes (file://, ftp://, data://, etc)
-	if isDangerousScheme(opts.URL) {
-		return nil, fmt.Errorf("URL scheme not allowed: only http:// and https:// are supported")
-	}
-	// SSRF protection: block private/internal URLs (configurable for commercial use)
-	if p.blockPrivateURLs && isPrivateURL(opts.URL) {
-		return nil, fmt.Errorf("URL not allowed: private/internal addresses blocked (set allow_private_urls to enable)")
+	if err := p.ValidateNavigationURL(opts.URL); err != nil {
+		return nil, err
 	}
 
 	page, err := p.getPage()

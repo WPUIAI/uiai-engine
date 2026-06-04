@@ -14,6 +14,8 @@ import (
 // GET /api/tools/openai    → OpenAI function calling format
 // GET /api/tools/mcp       → MCP tool definitions
 // GET /api/tools/search?q= → search tools by name/description (low-context discovery)
+// GET /api/tools/agent-card → compact bootstrap guide for local/remote agents
+// GET /api/tools/graph      → tool relationship graph and workflow routes
 //
 // Design: tools are NEVER auto-loaded into LLM context.
 // Agents discover via search, then call tools by name.
@@ -35,6 +37,14 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 
 	r.Get("/mcp", func(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, 200, mcpTools())
+	})
+
+	r.Get("/agent-card", func(w http.ResponseWriter, req *http.Request) {
+		writeJSON(w, 200, agentBootstrapCard())
+	})
+
+	r.Get("/graph", func(w http.ResponseWriter, req *http.Request) {
+		writeJSON(w, 200, toolGraph())
 	})
 
 	// Search — the key endpoint for context-efficient discovery.
@@ -72,6 +82,45 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 			"count": len(matches),
 		})
 	})
+}
+
+func agentBootstrapCard() map[string]any {
+	return map[string]any{
+		"service":  "uiai-engine",
+		"purpose":  "Lightweight browser, screenshot, visual QA, and diagnostics backend for local and remote agents.",
+		"base_url": "http://localhost:7456",
+		"discovery": map[string]string{
+			"agent_card": "/api/tools/agent-card",
+			"search":     "/api/tools/search?q=<keyword>",
+			"openai":     "/api/tools/openai",
+			"mcp":        "/api/tools/mcp",
+			"graph":      "/api/tools/graph",
+			"focusa":     "pass focusa_scope to browser_open; ingest diagnostics with focusa_browser_diagnostics_intake",
+			"health":     "/api/health/browser",
+			"metrics":    "/api/metrics/browser",
+		},
+		"recommended_workflows": []map[string]any{
+			{
+				"name":  "persistent_browser_loop",
+				"steps": []string{"browser_open", "browser_read for page text", "browser_snapshot for actions", "browser_click/browser_fill/browser_press", "browser_diagnostics on failure or visual mismatch", "browser_close"},
+			},
+			{
+				"name":  "single_screenshot_check",
+				"steps": []string{"screenshot", "frame_render when device framing is needed"},
+			},
+			{
+				"name":  "diagnostics_first_debugging",
+				"steps": []string{"reproduce with direct session actions", "browser_diagnostics", "classify console/exception/network/selector/timeout", "patch only after evidence"},
+			},
+		},
+		"search_hints": []string{"screenshot", "snapshot", "read", "extract", "click", "fill", "eval_async", "diagnostics", "console", "network", "error", "failed_request", "blank page", "visual failure"},
+		"reliability_rules": []string{
+			"Prefer browser_snapshot @refs over brittle CSS guessing.",
+			"Keep browser_eval synchronous and short; use browser_eval_async only for bounded awaits.",
+			"After any failed action, blank page, unexpected navigation, or API suspicion, read browser_diagnostics before patching.",
+			"Close sessions when done to free browser pages.",
+		},
+	}
 }
 
 func rankedToolSearch(tools []map[string]any, query string) []map[string]any {
@@ -133,9 +182,115 @@ func toolSearchScore(name, desc, query string) int {
 
 // containsCI is defined in intelligence.go (shared within routes package)
 
+func toolGraph() map[string]any {
+	return map[string]any{
+		"schema":    "uiai.tool_graph.v1",
+		"service":   "uiai-engine",
+		"principle": "Every primary tool advertises adjacent tools so agents can route from intent → action → evidence → Focusa handoff → cleanup.",
+		"focusa_integration": map[string]any{
+			"scope_input":            "browser_open accepts focusa_scope or flat workpoint_id/continuity_id/project_root/evidence_ref fields",
+			"scope_echo":             "session info, diagnostics, and failure envelopes echo focusa_scope when present",
+			"evidence_refs":          []string{"uiai-diagnostics:session=<id>:seq=<seq>", "uiai-screenshot:sha256:<prefix>", "uiai-share:<share_id>"},
+			"preferred_focusa_tools": []string{"focusa_browser_diagnostics_intake", "focusa_evidence_capture", "focusa_workpoint_link_evidence", "focusa_predict_record"},
+		},
+		"workflows": []map[string]any{
+			{"name": "web_surfing", "steps": []string{"browser_open", "browser_read", "browser_snapshot", "browser_click/browser_fill/browser_press", "browser_diagnostics", "browser_close"}},
+			{"name": "visual_debug", "steps": []string{"browser_open", "browser_screenshot", "browser_diagnostics", "browser_eval_async", "browser_close"}},
+			{"name": "single_capture", "steps": []string{"screenshot", "frame_catalog", "frame_render"}},
+			{"name": "focusa_evidence", "steps": []string{"browser_open with focusa_scope", "browser_diagnostics", "focusa_browser_diagnostics_intake", "browser_read", "focusa_evidence_capture/link", "screenshot/share evidence handles"}},
+		},
+		"related_tools": toolRelations(),
+	}
+}
+
+func toolRelations() map[string][]string {
+	return map[string][]string{
+		"uiai_agent_card":           {"uiai_tool_search", "browser_open", "browser_read", "browser_diagnostics", "focusa_browser_diagnostics_intake"},
+		"uiai_tool_search":          {"uiai_agent_card", "browser_open", "browser_read", "browser_diagnostics"},
+		"browser_open":              {"browser_read", "browser_snapshot", "browser_diagnostics", "focusa_browser_diagnostics_intake", "browser_close"},
+		"browser_read":              {"browser_snapshot", "browser_text", "browser_diagnostics", "browser_close"},
+		"browser_snapshot":          {"browser_click", "browser_fill", "browser_hover", "browser_text", "browser_diagnostics"},
+		"browser_click":             {"browser_snapshot", "browser_read", "browser_diagnostics", "browser_wait"},
+		"browser_fill":              {"browser_snapshot", "browser_press", "browser_diagnostics"},
+		"browser_type":              {"browser_snapshot", "browser_fill", "browser_diagnostics"},
+		"browser_press":             {"browser_snapshot", "browser_read", "browser_diagnostics"},
+		"browser_eval":              {"browser_eval_async", "browser_diagnostics", "browser_read"},
+		"browser_eval_async":        {"browser_diagnostics", "browser_read", "browser_snapshot"},
+		"browser_diagnostics":       {"focusa_browser_diagnostics_intake", "focusa_evidence_capture", "browser_read", "browser_snapshot", "browser_diagnostics_clear", "browser_close"},
+		"browser_diagnostics_clear": {"browser_diagnostics"},
+		"browser_screenshot":        {"browser_diagnostics", "frame_render", "browser_read"},
+		"browser_scroll":            {"browser_read", "browser_snapshot", "browser_screenshot"},
+		"browser_hover":             {"browser_snapshot", "browser_screenshot", "browser_diagnostics"},
+		"browser_dom":               {"browser_snapshot", "browser_read"},
+		"browser_navigate":          {"browser_read", "browser_snapshot", "browser_diagnostics"},
+		"browser_resize":            {"browser_screenshot", "browser_snapshot", "browser_diagnostics"},
+		"browser_css":               {"browser_screenshot", "browser_diagnostics"},
+		"browser_wait":              {"browser_snapshot", "browser_read", "browser_diagnostics"},
+		"browser_select":            {"browser_snapshot", "browser_diagnostics"},
+		"browser_back":              {"browser_read", "browser_snapshot", "browser_diagnostics"},
+		"browser_forward":           {"browser_read", "browser_snapshot", "browser_diagnostics"},
+		"browser_text":              {"browser_read", "browser_snapshot"},
+		"browser_cookies":           {"browser_diagnostics", "browser_read"},
+		"browser_close":             {"browser_open"},
+		"frame_catalog":             {"frame_render", "screenshot", "browser_screenshot"},
+		"frame_render":              {"frame_catalog", "screenshot", "browser_screenshot"},
+		"screenshot":                {"focusa_evidence_capture", "frame_render", "browser_open", "browser_diagnostics"},
+	}
+}
+
+func workflowHints(name string) []string {
+	if strings.HasPrefix(name, "browser_") {
+		return []string{"Open or reuse a session", "Prefer browser_read for text and browser_snapshot for actions", "Use browser_diagnostics after failures", "If focusa_scope is present, ingest diagnostics/evidence in Focusa", "Close sessions when done"}
+	}
+	if strings.HasPrefix(name, "frame_") || name == "screenshot" {
+		return []string{"Use one-shot screenshot for simple captures", "Use frame_catalog before frame_render", "Use sessions for multi-step browsing"}
+	}
+	return []string{"Use uiai_agent_card and uiai_tool_search for low-context routing"}
+}
+
+func enrichToolRelationships(tools []map[string]any) []map[string]any {
+	relations := toolRelations()
+	for _, tool := range tools {
+		name, _ := tool["name"].(string)
+		if related, ok := relations[name]; ok {
+			tool["related_tools"] = related
+		}
+		tool["workflow_hints"] = workflowHints(name)
+	}
+	return tools
+}
+
 // openAITools returns tool definitions in OpenAI function calling format.
 func openAITools() []map[string]any {
-	return []map[string]any{
+	tools := []map[string]any{
+		{
+			"name":        "uiai_agent_card",
+			"description": "Return a compact UIAI Engine agent card/bootstrap card for local/remote agents: discovery endpoints, health/metrics links, recommended browser workflows, diagnostics rules, and search hints. Prefer this before loading full tool schemas.",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "uiai_tool_search",
+			"description": "Search UIAI tools by keyword without loading all schemas. Useful queries: screenshot, snapshot, read, extract, click, fill, eval_async, diagnostics, console, network, error, failed_request, blank page, visual failure.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"q": map[string]string{"type": "string", "description": "Keyword or phrase to search"},
+				},
+				"required": []string{"q"},
+			},
+		},
+
+		{
+			"name":        "uiai_tool_graph",
+			"description": "Return UIAI tool relationship graph, workflow routes, and Focusa integration metadata. Use this when choosing adjacent tools or chaining UIAI evidence into Focusa.",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
 		{
 			"name":        "browser_open",
 			"description": "Open a persistent browser session on a URL. Retries transient page startup/navigation flakiness. Returns session_id and initial screenshot. For browser errors, console logs, JS exceptions, failed requests/failed_request, API failures, CORS, or network debugging, call browser_diagnostics next.",
@@ -145,6 +300,10 @@ func openAITools() []map[string]any {
 					"url":    map[string]string{"type": "string", "description": "URL to open"},
 					"width":  map[string]any{"type": "integer", "description": "Viewport width", "default": 1280},
 					"height": map[string]any{"type": "integer", "description": "Viewport height", "default": 800},
+					"focusa_scope": map[string]any{
+						"type":        "object",
+						"description": "Optional Focusa scope object echoed through diagnostics/evidence",
+					},
 				},
 				"required": []string{"url"},
 			},
@@ -410,6 +569,21 @@ func openAITools() []map[string]any {
 				"required": []string{"session_id", "selector"},
 			},
 		},
+
+		{
+			"name":        "browser_read",
+			"description": "Read compact page text for web surfing without a screenshot. Extracts main/article/body text, headings, optional links, and supports selector or @ref plus max_chars. Prefer this after browser_open/navigate when the agent needs page content, not pixels.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id":    map[string]string{"type": "string", "description": "Session ID"},
+					"selector":      map[string]string{"type": "string", "description": "Optional CSS selector or @ref region to read"},
+					"max_chars":     map[string]any{"type": "integer", "description": "Max text characters, capped at 30000", "default": 8000},
+					"include_links": map[string]any{"type": "boolean", "description": "Include up to 40 visible links", "default": false},
+				},
+				"required": []string{"session_id"},
+			},
+		},
 		{
 			"name":        "browser_cookies",
 			"description": "Get, set, or clear browser cookies. Actions: get (list all or by name), set (name+value), clear (all or by name).",
@@ -477,6 +651,7 @@ func openAITools() []map[string]any {
 			},
 		},
 	}
+	return enrichToolRelationships(tools)
 }
 
 // mcpTools returns tool definitions in MCP format.
@@ -484,9 +659,11 @@ func mcpTools() map[string]any {
 	tools := make([]map[string]any, 0)
 	for _, t := range openAITools() {
 		tools = append(tools, map[string]any{
-			"name":        t["name"],
-			"description": t["description"],
-			"inputSchema": t["parameters"],
+			"name":           t["name"],
+			"description":    t["description"],
+			"inputSchema":    t["parameters"],
+			"related_tools":  t["related_tools"],
+			"workflow_hints": t["workflow_hints"],
 		})
 	}
 	return map[string]any{"tools": tools}

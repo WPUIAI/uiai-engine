@@ -54,3 +54,40 @@ func TestQueueWaitSamplesAreBounded(t *testing.T) {
 		t.Fatalf("first retained sample=%d want=%d", got, want)
 	}
 }
+
+func TestValidateNavigationURLBlocksUnsafeSchemes(t *testing.T) {
+	p, err := NewPoolWithConfig(PoolConfig{MaxPages: 1, AllowPrivateURLs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{"file:///etc/passwd", "data:text/html,test", "ftp://example.com/file"} {
+		if err := p.ValidateNavigationURL(raw); err == nil {
+			t.Fatalf("expected unsafe scheme blocked for %s", raw)
+		}
+	}
+}
+
+func TestValidateNavigationURLBlocksPrivateWhenConfigured(t *testing.T) {
+	p, err := NewPoolWithConfig(PoolConfig{MaxPages: 1, AllowPrivateURLs: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{"http://localhost:7456", "http://127.0.0.1:7456", "http://10.0.0.5"} {
+		if err := p.ValidateNavigationURL(raw); err == nil {
+			t.Fatalf("expected private URL blocked for %s", raw)
+		}
+	}
+	if err := p.ValidateNavigationURL("https://example.com"); err != nil {
+		t.Fatalf("expected public https URL allowed: %v", err)
+	}
+}
+
+func TestValidateNavigationURLAllowsPrivateWhenConfigured(t *testing.T) {
+	p, err := NewPoolWithConfig(PoolConfig{MaxPages: 1, AllowPrivateURLs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.ValidateNavigationURL("http://127.0.0.1:7456"); err != nil {
+		t.Fatalf("expected private URL allowed with AllowPrivateURLs: %v", err)
+	}
+}

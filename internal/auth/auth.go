@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -49,8 +50,26 @@ func New(cfg *config.Config) *Authenticator {
 
 func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth on health/status/public info endpoints + routes that Bun serves without auth
+		// Skip auth on health/status/public info endpoints + routes that Bun serves without auth.
+		// Browser/session APIs are local tool APIs: loopback may use them without auth,
+		// but non-loopback callers must authenticate to avoid accidental remote exposure.
 		p := r.URL.Path
+		if isBrowserToolPath(p) {
+			if id, err := a.Authenticate(r); err == nil {
+				ctx := context.WithValue(r.Context(), ctxKey{}, id)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			if isLoopbackRequest(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(401)
+			json.NewEncoder(w).Encode(map[string]string{"error": "authentication required for remote browser/session API access"})
+			return
+		}
+
 		if p == "/" || p == "/health" || p == "/api/status" || p == "/dashboard" ||
 			// Health / metrics
 			p == "/api/health" || strings.HasPrefix(p, "/api/health/") || p == "/api/metrics/browser" ||
@@ -66,8 +85,6 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			strings.HasPrefix(p, "/api/workflow/") ||
 			strings.HasPrefix(p, "/api/training/") || // Has own service-token auth
 			strings.HasPrefix(p, "/api/intelligence/") || // Per-handler auth
-			p == "/api/screenshot" || strings.HasPrefix(p, "/api/screenshot/") || // Screenshot: internal use (Coach vision, share)
-			strings.HasPrefix(p, "/api/session") || // Browser sessions: LLM tool API (localhost only)
 			strings.HasPrefix(p, "/api/tools") || // Tool discovery: agents search/discover tools
 			p == "/api/media/jobs" || // Media job list: read-only
 			strings.HasPrefix(p, "/api/media/status/") || // Media status: read-only poll
@@ -93,6 +110,19 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), ctxKey{}, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func isBrowserToolPath(path string) bool {
+	return path == "/api/screenshot" || strings.HasPrefix(path, "/api/screenshot/") || strings.HasPrefix(path, "/api/session")
+}
+
+func isLoopbackRequest(r *http.Request) bool {
+	host := r.RemoteAddr
+	if splitHost, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		host = splitHost
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func (a *Authenticator) Authenticate(r *http.Request) (*Identity, error) {

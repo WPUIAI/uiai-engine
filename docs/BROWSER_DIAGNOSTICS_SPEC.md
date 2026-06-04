@@ -334,9 +334,9 @@ For full runbook, see [`BROWSER_RELIABILITY_RUNBOOK.md`](BROWSER_RELIABILITY_RUN
 - A page that throws an uncaught JS exception records one exception with source location when available.
 - A page that requests a missing URL records one failed request.
 - Existing screenshot/snapshot/click/type flows still pass.
-- `/api/tools` lists `browser_diagnostics` and `browser_diagnostics_clear`.
+- `/api/tools` lists `browser_diagnostics`, `browser_diagnostics_clear`, `uiai_agent_card`, `uiai_tool_search`, and `uiai_tool_graph`; `/api/tools/graph` exposes Focusa-aware tool adjacency.
 - Redaction test proves auth/cookie headers are not returned.
-- Focusa docs cross-reference this spec and define evidence ingestion shape.
+- Focusa docs cross-reference this spec and define evidence ingestion shape. MCP and Pi extension browser-open paths preserve optional `focusa_scope`.
 - Scoped sessions echo `focusa_scope` through diagnostics and session error envelopes.
 - Stress/soak reports include `focusa_evidence` when Focusa scope env vars are present.
 - Screenshot/share APIs return stable Focusa evidence handles instead of requiring raw image/share blobs in agent context.

@@ -64,7 +64,7 @@ Use the smallest tool that matches the task:
 
 - `/api/session/{id}/eval`: short synchronous DOM reads only.
 - `/api/session/{id}/eval_async`: small bounded awaits with `timeout_ms` default `5000`, max `15000`.
-- Direct session actions: multi-step UI workflows (`snapshot`, `click`, `type`, `wait`, `diagnostics`).
+- Direct session actions: multi-step UI workflows (`read`, `snapshot`, `click`, `type`, `wait`, `diagnostics`).
 
 Avoid hiding long browser workflows inside one Promise. If a long eval flakes or a Promise handle appears stale/collected, split into direct actions and read diagnostics before changing app code.
 
@@ -74,7 +74,7 @@ During browser troubleshooting:
 
 1. Open/reuse session.
 2. Reproduce issue with direct actions.
-3. Read `GET /api/session/{id}/diagnostics` or tool `browser_diagnostics`.
+3. Use `/read` or `browser_read` for page text, then read `GET /api/session/{id}/diagnostics` or tool `browser_diagnostics` for failures.
 4. Classify: console error, JS exception, failed request, selector not found, timeout, page crash, browser unavailable.
 5. Patch only after diagnostics or DOM/snapshot evidence supports the cause.
 6. Re-run diagnostics and soak/stress proof.

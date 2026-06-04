@@ -12,7 +12,7 @@ Session API is **persistent**: open once → snap/scroll/click/type/eval instant
 
 Session tools now expose lightweight DevTools-style diagnostics specified in [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md): bounded console logs, JS exceptions, network requests, failed requests, and summaries without adding Playwright/Puppeteer or taking screenshots on diagnostics reads.
 
-Agent discoverability rule: during browser troubleshooting, call `browser_diagnostics` after `browser_open` and after any failed/blank/broken screenshot, unexpected click/navigation, JS eval issue, failed wait, CORS/API/network suspicion, or console-error clue. Tool search terms that should find it: `diagnostics`, `console`, `network`, `error`, `exception`, `failed request`, `devtools`, `CORS`, `API failure`, `blank page`, `broken page`, `visual failure`.
+Agent discoverability rule: during browser troubleshooting, call `browser_diagnostics` after `browser_open` and after any failed/blank/broken screenshot, unexpected click/navigation, JS eval issue, failed wait, CORS/API/network suspicion, or console-error clue. Tool search terms that should find it: `diagnostics`, `console`, `network`, `error`, `exception`, `failed request`, `devtools`, `CORS`, `API failure`, `blank page`, `broken page`, `visual failure`. Agents that need a small bootstrap payload before loading tool schemas can read `GET /api/tools/agent-card`.
 
 Focusa ingestion for those diagnostics is specified in `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`. When a session is opened with `focusa_scope`, diagnostics and session error envelopes echo the scope so `focusa_browser_diagnostics_intake` can link evidence without guessing Workpoint/project identity.
 
@@ -63,6 +63,51 @@ curl -s -X POST http://localhost:7456/api/session/$SID/eval \
 curl -s -X DELETE http://localhost:7456/api/session/$SID
 ```
 
+## Agent Bootstrap + Tool Discovery
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/tools/agent-card` | Compact local/remote agent bootstrap card: discovery endpoints, health/metrics links, recommended workflows, search hints, and reliability rules. |
+| `GET` | `/api/tools/search?q=<keyword>` | Low-context tool search; use before loading full OpenAI/MCP schemas. |
+| `GET` | `/api/tools/openai` | Full OpenAI function-calling tool definitions. |
+| `GET` | `/api/tools/mcp` | MCP tool definitions for remote bridges. |
+| `GET` | `/api/tools/graph` | Tool relationship graph with workflow routes and Focusa integration metadata. |
+
+## Pi Extension
+
+This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.ts`. Pi auto-discovers it when launched from the UIAI Engine project root. It registers compact direct tools for agent bootstrap and reliable browser surfing:
+
+- `pi_uiai_agent_card` — read the compact bootstrap card without colliding with MCP tool names.
+- `pi_uiai_tool_search` — search UIAI tools without loading every schema.
+- `pi_uiai_tool_graph` — inspect related tools, workflow routes, and Focusa integration paths.
+- `uiai_health` — check browser readiness/pressure.
+- `uiai_browser_open` — open a persistent browser session; accepts optional `focusa_scope`.
+- `uiai_browser_snapshot` — get @ref accessibility tree for reliable actions.
+- `uiai_browser_read` — extract compact page/region text for web surfing.
+- `uiai_browser_diagnostics` — read console/exception/network evidence.
+- `uiai_browser_close` — free session resources.
+
+Command: `/uiai` displays a small status widget. Set `UIAI_ENGINE_URL` to target a remote tunnel or non-default port; default is `http://localhost:7456`. Set `UIAI_PI_TIMEOUT_MS` to tune Pi extension HTTP timeout; default is 30000 ms.
+
+
+## Interconnected Tool Graph + Focusa Routing
+
+UIAI tools are designed as a graph, not isolated calls. `GET /api/tools/graph` returns:
+
+- `workflows`: recommended sequences such as web surfing, visual debugging, single capture, and Focusa evidence.
+- `related_tools`: adjacency lists for every primary tool, including Focusa handoff tools where relevant.
+- `focusa_integration`: scope input/echo rules, stable evidence refs, and preferred Focusa intake/link/prediction tools.
+
+OpenAI and MCP tool definitions also include `related_tools` and `workflow_hints`, so agents can chain from intent → action → diagnostics/evidence → Focusa handoff → cleanup without rediscovering routes.
+
+Focusa-aware default route:
+
+1. `browser_open` with `focusa_scope` when project/workpoint context is known.
+2. `browser_read` for page text or `browser_snapshot` for action refs.
+3. `browser_diagnostics` after failures or visual/API uncertainty.
+4. `focusa_browser_diagnostics_intake` or `focusa_evidence_capture` with stable `uiai-*` evidence refs.
+5. `browser_close` when done.
+
 ## API Reference
 
 ### Session Management
@@ -96,6 +141,7 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `POST` | `/api/session/{id}/back` | Browser history back + screenshot | **1-2s** |
 | `POST` | `/api/session/{id}/forward` | Browser history forward + screenshot | **1-2s** |
 | `POST` | `/api/session/{id}/text` | Get element text content (no screenshot) | **instant** |
+| `POST` | `/api/session/{id}/read` | Compact page/region text extraction for web surfing (no screenshot) | **instant** |
 | `POST` | `/api/session/{id}/cookies` | Get/set/clear cookies (no screenshot) | **instant** |
 | `POST` | `/api/session/{id}/auth/save` | Save cookies + localStorage to JSON | **instant** |
 | `POST` | `/api/session/{id}/auth/load` | Restore auth state from saved JSON | **instant** |
@@ -403,6 +449,21 @@ No body required. Returns screenshot after navigating forward.
 ```
 
 No screenshot. Returns `{"text": "element text content", "selector": "@e12"}`.
+
+
+### `POST /api/session/{id}/read` — Read Page Text
+
+Extract compact readable text without a screenshot. Use this for agent web surfing after `browser_open` or `browser_navigate` when text content matters more than visual pixels.
+
+```json
+{
+  "selector": "main",       // optional CSS selector or @ref region
+  "max_chars": 8000,        // default 8000, capped by engine
+  "include_links": true     // include up to 40 visible links
+}
+```
+
+Response includes `url`, `title`, optional meta `description`, `text`, `chars`, `truncated`, `headings`, and optional `links`.
 
 ### `POST /api/session/{id}/cookies` — Cookie Management
 
@@ -866,6 +927,45 @@ Agent: "I need to click a button on a page"
 
 Cost: **~200 tokens** for tool discovery vs **~2000** if all 14 definitions were loaded upfront.
 
+
+
+## Portability Helpers
+
+This repo includes helper scripts for local and remote agent setup:
+
+```bash
+# Preview install actions without changing files
+DRY_RUN=1 scripts/install-agent-integrations.sh
+
+# Install project Pi extension and merge UIAI MCP server into ~/.pi/agent/mcp.json
+scripts/install-agent-integrations.sh
+
+# Smoke-check health, agent card, graph, search, MCP metadata, and bridge syntax
+scripts/smoke-agent-integrations.sh
+```
+
+Environment knobs:
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `UIAI_ENGINE_URL` | Engine base URL for Pi/MCP helpers; set to tunnel/remote URL for remote agents. | `http://localhost:7456` |
+| `UIAI_PI_EXTENSION_DEST` | Pi extension install destination. | `$HOME/.pi/agent/extensions/uiai-engine.ts` |
+| `UIAI_MCP_CONFIG_DEST` | MCP config destination. | `$HOME/.pi/agent/mcp.json` |
+| `UIAI_MCP_SERVER_NAME` | MCP server key to write. | `uiai-browser` |
+| `UIAI_PI_TIMEOUT_MS` | Pi extension request timeout. | `30000` |
+| `UIAI_MCP_TIMEOUT_MS` | MCP bridge request timeout. | `60000` |
+| `UIAI_SMOKE_TIMEOUT_SECONDS` | Smoke curl timeout. | `20` |
+
+Remote deployment reminder: browser/session endpoints require auth for non-loopback callers. Tool discovery remains public; use authenticated tunnels/proxies for remote agents.
+
+## Security + Remote Exposure Boundaries
+
+- Tool discovery (`/api/tools*`) is intentionally public and low-context.
+- Browser/session APIs (`/api/session*`) and screenshot APIs (`/api/screenshot*`) are loopback-public only. Remote callers must authenticate with normal UIAI credentials/headers.
+- Persistent sessions and one-shot screenshots share URL safety rules: only `http://`/`https://`; `file://`, `data:`, `ftp://`, and similar schemes are blocked.
+- Private/internal hosts (`localhost`, `127.*`, RFC1918 ranges, link-local, etc.) are blocked unless `vision.allow_private_urls: true` is configured for local development or explicitly trusted staging.
+- For remote agents, prefer an authenticated tunnel/proxy and set `UIAI_ENGINE_URL` in the Pi extension/MCP bridge.
+
 ## MCP Integration
 
 ### Pi (Recommended)
@@ -893,7 +993,7 @@ mcp({ tool: "browser_screenshot", args: '{"session_id": "abc123"}' })
 mcp({ tool: "browser_close", args: '{"session_id": "abc123"}' })
 ```
 
-The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once.
+The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP also exposes `uiai_agent_card`, `uiai_tool_search`, and `uiai_tool_graph`; `browser_open` forwards optional `focusa_scope` into UIAI sessions for Focusa evidence handoff. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
 
 ### Claude Desktop
 
@@ -920,8 +1020,9 @@ The bridge speaks MCP JSON-RPC over stdio:
 
 ## Port & Auth
 
-- **Port:** 7456 (localhost only, behind Cloudflare tunnel externally)
-- **Auth:** No auth required for localhost calls (auth bypass for `/api/session*`, `/api/tools*`)
+- **Port:** 7456 defaults to localhost. Browser/session APIs are unauthenticated only for loopback callers; non-loopback callers must provide normal UIAI auth headers.
+- **Auth:** `/api/tools*` discovery is public. `/api/session*` and `/api/screenshot*` require auth unless called from loopback.
+- **URL safety:** session navigation and screenshots allow only `http://` and `https://`. Private/internal targets are blocked unless `vision.allow_private_urls: true` is set for local/dev use.
 - **External:** Requires `X-Webhook-Secret` header through Cloudflare tunnel
 
 ## Captcha Solver (Session Action)

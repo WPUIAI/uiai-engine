@@ -122,6 +122,10 @@ func (s *Session) SetFocusaScope(scope *FocusaScope) {
 // with an initial screenshot. It retries one cold-page acquisition because
 // Rod/Chrome page creation can transiently race pool pressure or target startup.
 func (sm *SessionManager) Open(url string, width, height int) (*Session, *SnapResult, error) {
+	if err := sm.pool.ValidateNavigationURL(url); err != nil {
+		return nil, nil, err
+	}
+
 	sm.mu.Lock()
 	if len(sm.sessions) >= MaxSessions {
 		sm.mu.Unlock()
@@ -701,6 +705,10 @@ func (s *Session) EvalAsync(js string, timeoutMs int) (string, *SnapResult, erro
 
 // Navigate goes to a new URL within the same session.
 func (s *Session) Navigate(url string) (*SnapResult, error) {
+	if err := s.pool.ValidateNavigationURL(url); err != nil {
+		return nil, err
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.page == nil {
@@ -867,6 +875,107 @@ func (s *Session) DOMInfo() (map[string]any, error) {
 
 	s.touch()
 	return dom, nil
+}
+
+// ReadOptions controls bounded page text extraction for agent web surfing.
+type ReadOptions struct {
+	Selector     string `json:"selector,omitempty"`
+	MaxChars     int    `json:"max_chars,omitempty"`
+	IncludeLinks bool   `json:"include_links,omitempty"`
+}
+
+// PageReadResult is a compact, screenshot-free page reading payload.
+type PageReadResult struct {
+	URL         string           `json:"url"`
+	Title       string           `json:"title"`
+	Description string           `json:"description,omitempty"`
+	Selector    string           `json:"selector,omitempty"`
+	Text        string           `json:"text"`
+	Chars       int              `json:"chars"`
+	Truncated   bool             `json:"truncated"`
+	Headings    []map[string]any `json:"headings,omitempty"`
+	Links       []map[string]any `json:"links,omitempty"`
+}
+
+// ReadPage extracts bounded, readable page text without taking a screenshot.
+func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.page == nil {
+		return nil, fmt.Errorf("session closed")
+	}
+
+	if opts.MaxChars <= 0 {
+		opts.MaxChars = 8000
+	}
+	if opts.MaxChars > 30000 {
+		opts.MaxChars = 30000
+	}
+
+	selectorJSON, _ := json.Marshal(opts.Selector)
+	js := fmt.Sprintf(`() => {
+		const selector = %s;
+		const root = selector ? document.querySelector(selector) : (document.querySelector('main, article, [role="main"]') || document.body || document.documentElement);
+		if (!root) return JSON.stringify({ error: 'selector_not_found', selector });
+		const hidden = (el) => {
+			const style = window.getComputedStyle(el);
+			return style.display === 'none' || style.visibility === 'hidden' || el.getAttribute('aria-hidden') === 'true';
+		};
+		const clone = root.cloneNode(true);
+		clone.querySelectorAll('script,style,noscript,svg,canvas,iframe,template,nav,footer,header').forEach(e => e.remove());
+		clone.querySelectorAll('[hidden],[aria-hidden="true"]').forEach(e => e.remove());
+		const text = (clone.innerText || clone.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+		const headings = Array.from(root.querySelectorAll('h1,h2,h3')).filter(e => !hidden(e)).slice(0, 20).map(e => ({ level: e.tagName.toLowerCase(), text: (e.innerText || e.textContent || '').trim().substring(0, 160) })).filter(h => h.text);
+		const links = Array.from(root.querySelectorAll('a[href]')).filter(e => !hidden(e)).slice(0, 40).map(e => ({ text: (e.innerText || e.textContent || '').trim().substring(0, 120), href: e.href })).filter(l => l.href);
+		const description = document.querySelector('meta[name="description"], meta[property="og:description"]')?.content || '';
+		return JSON.stringify({ url: location.href, title: document.title, description, selector, text, headings, links });
+	}`, string(selectorJSON))
+
+	result, err := s.page.Timeout(5 * time.Second).Eval(js)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw struct {
+		Error       string           `json:"error"`
+		URL         string           `json:"url"`
+		Title       string           `json:"title"`
+		Description string           `json:"description"`
+		Selector    string           `json:"selector"`
+		Text        string           `json:"text"`
+		Headings    []map[string]any `json:"headings"`
+		Links       []map[string]any `json:"links"`
+	}
+	if err := json.Unmarshal([]byte(result.Value.Str()), &raw); err != nil {
+		return nil, err
+	}
+	if raw.Error != "" {
+		return nil, fmt.Errorf("%s: %s", raw.Error, opts.Selector)
+	}
+
+	text := strings.TrimSpace(raw.Text)
+	truncated := false
+	if len(text) > opts.MaxChars {
+		text = text[:opts.MaxChars]
+		truncated = true
+	}
+
+	out := &PageReadResult{
+		URL:         raw.URL,
+		Title:       raw.Title,
+		Description: raw.Description,
+		Selector:    raw.Selector,
+		Text:        text,
+		Chars:       len(text),
+		Truncated:   truncated,
+		Headings:    raw.Headings,
+	}
+	if opts.IncludeLinks {
+		out.Links = raw.Links
+	}
+
+	s.touch()
+	return out, nil
 }
 
 // WaitFor waits for a CSS selector to appear, then screenshots.

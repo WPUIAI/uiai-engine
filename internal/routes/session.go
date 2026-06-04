@@ -491,6 +491,26 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			writeJSON(w, 200, map[string]any{"text": text, "selector": body.Selector})
 		})
 
+		// Read — compact whole-page/region text extraction for agent web surfing (no screenshot)
+		r.Post("/read", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body vision.ReadOptions
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector != "" {
+				body.Selector = sess.ResolveRef(body.Selector)
+			}
+			result, err := sess.ReadPage(body)
+			if err != nil {
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "read", "selector": body.Selector})
+				return
+			}
+			writeJSON(w, 200, result)
+		})
+
 		// Cookies — get/set/clear
 		r.Post("/cookies", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
@@ -690,6 +710,9 @@ func resolveFocusaScope(scope *vision.FocusaScope, workpointID, continuityID, pr
 }
 
 func writeSessionError(w http.ResponseWriter, status int, class string, err error, sess *vision.Session, context ...map[string]any) {
+	if class == "url_not_allowed" && status >= 500 {
+		status = http.StatusBadRequest
+	}
 	resp := map[string]any{
 		"error":                 err.Error(),
 		"error_class":           class,
@@ -730,6 +753,8 @@ func suggestedNextSessionAction(class string) string {
 		return "Read diagnostics for console/network failures; retry once if transient, otherwise fix the page/navigation target."
 	case "page_unavailable":
 		return "Close the stale session and open a new session before retrying the action."
+	case "url_not_allowed":
+		return "Use an http:// or https:// URL allowed by the engine URL safety policy; private/internal URLs require allow_private_urls."
 	case "screenshot_failed":
 		return "Retry screenshot once, then reopen the session if the page target is unavailable."
 	default:
@@ -747,6 +772,8 @@ func classifySessionError(err error) string {
 		return "selector_not_found"
 	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline") || strings.Contains(msg, "timed out"):
 		return "timeout"
+	case strings.Contains(msg, "url scheme not allowed") || strings.Contains(msg, "url not allowed"):
+		return "url_not_allowed"
 	case strings.Contains(msg, "navigation") || strings.Contains(msg, "navigate"):
 		return "navigation_failed"
 	case strings.Contains(msg, "screenshot"):

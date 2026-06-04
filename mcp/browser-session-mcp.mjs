@@ -24,7 +24,33 @@
 
 import { createInterface } from "readline";
 
-const ENGINE = process.env.UIAI_ENGINE_URL || "http://localhost:7456";
+const ENGINE = (process.env.UIAI_ENGINE_URL || "http://localhost:7456").replace(/\/$/, "");
+const REQUEST_TIMEOUT_MS = Number(process.env.UIAI_MCP_TIMEOUT_MS || 60000);
+
+
+async function fetchJSON(url, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    const text = await res.text();
+    let data = text;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      // Keep text for non-JSON upstream errors.
+    }
+    return { res, data };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function formatError(data) {
+  if (!data) return "unknown error";
+  if (typeof data === "string") return data;
+  return data.error || data.message || JSON.stringify(data);
+}
 
 // ── MCP JSON-RPC stdio transport ──────────────────────────
 
@@ -82,9 +108,8 @@ let cachedTools = null;
 
 async function toolsList() {
   if (!cachedTools) {
-    const res = await fetch(`${ENGINE}/api/tools/mcp`);
-    if (!res.ok) throw new Error(`Engine tools fetch failed: ${res.status}`);
-    const data = await res.json();
+    const { res, data } = await fetchJSON(`${ENGINE}/api/tools/mcp`);
+    if (!res.ok) throw new Error(`Engine tools fetch failed: ${res.status} ${formatError(data)}`);
     cachedTools = data.tools || [];
   }
   return { tools: cachedTools };
@@ -96,10 +121,29 @@ async function toolsCall(name, args) {
   let url, method, body;
 
   switch (name) {
+    case "uiai_agent_card":
+      url = `${ENGINE}/api/tools/agent-card`;
+      method = "GET";
+      break;
+
+    case "uiai_tool_search": {
+      const q = new URLSearchParams();
+      if (args.q !== undefined) q.set("q", String(args.q));
+      url = `${ENGINE}/api/tools/search${q.toString() ? `?${q.toString()}` : ""}`;
+      method = "GET";
+      break;
+    }
+
+
+    case "uiai_tool_graph":
+      url = `${ENGINE}/api/tools/graph`;
+      method = "GET";
+      break;
+
     case "browser_open":
       url = `${ENGINE}/api/session`;
       method = "POST";
-      body = { url: args.url, width: args.width, height: args.height };
+      body = { url: args.url, width: args.width, height: args.height, focusa_scope: args.focusa_scope };
       break;
 
     case "browser_screenshot":
@@ -193,6 +237,13 @@ async function toolsCall(name, args) {
       body = { selector: args.selector };
       break;
 
+
+    case "browser_read":
+      url = `${ENGINE}/api/session/${args.session_id}/read`;
+      method = "POST";
+      body = { selector: args.selector, max_chars: args.max_chars, include_links: args.include_links };
+      break;
+
     case "browser_cookies":
       url = `${ENGINE}/api/session/${args.session_id}/cookies`;
       method = "POST";
@@ -249,12 +300,19 @@ async function toolsCall(name, args) {
   const fetchOpts = { method, headers: { "Content-Type": "application/json" } };
   if (body && method !== "GET") fetchOpts.body = JSON.stringify(body);
 
-  const res = await fetch(url, fetchOpts);
-  const data = await res.json();
+  let res, data;
+  try {
+    ({ res, data } = await fetchJSON(url, fetchOpts));
+  } catch (err) {
+    return {
+      content: [{ type: "text", text: `UIAI request failed: ${err.message}` }],
+      isError: true,
+    };
+  }
 
   if (!res.ok) {
     return {
-      content: [{ type: "text", text: `Error ${res.status}: ${data.error || JSON.stringify(data)}` }],
+      content: [{ type: "text", text: `Error ${res.status}: ${formatError(data)}` }],
       isError: true,
     };
   }
