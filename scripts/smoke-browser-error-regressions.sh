@@ -125,7 +125,7 @@ try:
     results.append(assert_envelope('wait_timeout', status, data, 408, 'timeout', 'Read diagnostics'))
 
     status, data = request('POST', f'/api/session/{sid}/eval_async', {'js': 'throw new Error("eval-regression-failure")', 'timeout_ms': 1000})
-    results.append(assert_envelope('eval_async_failure', status, data, 500, 'eval_failed', 'Inspect error_class'))
+    results.append(assert_envelope('eval_async_failure', status, data, 500, 'eval_failed', 'Read browser_diagnostics'))
 finally:
     request('DELETE', f'/api/session/{sid}')
 

@@ -788,6 +788,8 @@ func suggestedNextSessionAction(class string) string {
 		return "Use an http:// or https:// URL allowed by the engine URL safety policy; private/internal URLs require allow_private_urls."
 	case "screenshot_failed":
 		return "Retry screenshot once, then reopen the session if the page target is unavailable."
+	case "eval_failed":
+		return "Read browser_diagnostics console/exceptions, keep browser_eval_async bounded, and split long UI work into snapshot plus direct actions."
 	default:
 		return "Inspect error_class, diagnostics_summary, console, exceptions, and failed_requests before retrying."
 	}
