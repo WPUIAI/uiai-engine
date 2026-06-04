@@ -337,6 +337,7 @@ For full runbook, see [`BROWSER_RELIABILITY_RUNBOOK.md`](BROWSER_RELIABILITY_RUN
 - `/api/tools` lists `browser_diagnostics`, `browser_diagnostics_clear`, `uiai_agent_card`, `uiai_tool_search`, and `uiai_tool_graph`; `/api/tools/graph` exposes [Focusa](https://github.com/Startempire-Wire/focusa)-aware tool adjacency.
 - Redaction test proves auth/cookie headers are not returned.
 - [Focusa](https://github.com/Startempire-Wire/focusa) docs cross-reference this spec and define evidence ingestion shape. MCP and Pi extension browser-open paths preserve optional `focusa_scope`.
+- The Pi extension mirrors the live MCP/browser tool surface with Pi-safe names and uses supported Pi APIs (`pi.registerTool`, `pi.registerCommand`, `ctx.ui.select`, `ctx.ui.setWidget`); there is no `menu.items` API.
 - Scoped sessions echo `focusa_scope` through diagnostics and session error envelopes.
 - Stress/soak reports include `focusa_evidence` when [Focusa](https://github.com/Startempire-Wire/focusa) scope env vars are present.
 - Screenshot/share APIs return stable [Focusa](https://github.com/Startempire-Wire/focusa) evidence handles instead of requiring raw image/share blobs in agent context.

@@ -948,11 +948,13 @@ Environment knobs:
 | `UIAI_PI_EXTENSION_DEST` | Pi extension install destination. | `$HOME/.pi/agent/extensions/uiai-engine.ts` |
 | `UIAI_MCP_CONFIG_DEST` | MCP config destination. | `$HOME/.pi/agent/mcp.json` |
 | `UIAI_MCP_SERVER_NAME` | MCP server key to write. | `uiai-browser` |
+| `UIAI_API_KEY` | Optional API key sent by the Pi extension as `X-API-Key`; required for authenticated remote/media helpers. | unset |
+| `UIAI_BEARER_TOKEN` | Optional bearer token sent by the Pi extension as `Authorization: Bearer ...`; alternative to `UIAI_API_KEY`. | unset |
 | `UIAI_PI_TIMEOUT_MS` | Pi extension request timeout. | `30000` |
 | `UIAI_MCP_TIMEOUT_MS` | MCP bridge request timeout. | `60000` |
 | `UIAI_SMOKE_TIMEOUT_SECONDS` | Smoke curl timeout. | `20` |
 
-Remote deployment reminder: browser/session endpoints require auth for non-loopback callers. Tool discovery remains public; use authenticated tunnels/proxies for remote agents.
+Remote deployment reminder: browser/session and screenshot endpoints require auth for non-loopback callers; media/frame helpers also require auth unless the deployment explicitly opens them. Tool discovery remains public; use authenticated tunnels/proxies for remote agents.
 
 ## Security + Remote Exposure Boundaries
 
@@ -989,7 +991,7 @@ mcp({ tool: "browser_screenshot", args: '{"session_id": "abc123"}' })
 mcp({ tool: "browser_close", args: '{"session_id": "abc123"}' })
 ```
 
-The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP exposes and bridge-normalizes `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, and `browser_read` even if the running engine returns stale metadata; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
+The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP exposes and bridge-normalizes `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, and `browser_read` even if the running engine returns stale metadata; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. The project Pi extension mirrors the live MCP/browser surface with Pi-prefixed names (`browser_click` → `uiai_browser_click`, `frame_catalog` → `uiai_frame_catalog`, `uiai_agent_card` → `pi_uiai_agent_card`) plus `uiai_health`. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
 
 ### Claude Desktop
 
