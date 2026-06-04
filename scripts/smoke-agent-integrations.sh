@@ -47,5 +47,6 @@ bash -n "$CLI"
 "$CLI" --json tools mcp | jq -e '.tools[] | select(.name == "uiai_errors")' >/dev/null
 
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-extension-registration.sh" >/dev/null
+"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-rendering.sh" >/dev/null
 
 say "agent integration smoke ok"
