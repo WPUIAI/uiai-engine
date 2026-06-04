@@ -24,6 +24,16 @@ Agent discoverability rule: during browser troubleshooting, call `browser_diagno
 
 [Focusa](https://github.com/Startempire-Wire/focusa) ingestion for those diagnostics is specified in the [UIAI browser diagnostics Focusa integration spec](https://github.com/Startempire-Wire/focusa/blob/main/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md) (local checkout path: `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`). When a session is opened with `focusa_scope`, diagnostics and session error envelopes echo the scope so `focusa_browser_diagnostics_intake` can link evidence without guessing Workpoint/project identity.
 
+Stable evidence-handle patterns:
+
+| UIAI flow | Preferred handle | Capture target | Preferred Focusa tool | Notes |
+|---|---|---|---|---|
+| Browser diagnostics | `uiai-diagnostics:session=<id>:seq=<seq>` | `/api/session/{id}/diagnostics` or `browser_diagnostics` result | `focusa_browser_diagnostics_intake` | Include `focusa_scope` when opening the session so Workpoint/project scope is echoed. |
+| Engine/browser error | `uiai-error:<error_id>` | `/api/errors?limit=20&source=&class=` or `uiai_errors` result | `focusa_evidence_capture` or diagnostics intake when paired with session diagnostics | Cite `error_id`, `error_class`, and diagnostics URL instead of raw logs. |
+| Search result | `uiai-search:<provider>:<query-hash>:<rank>` | `browser_search`/`uiai_search` selected result URL + title/snippet | `focusa_evidence_capture` | Hash or summarize the query; capture the selected result URL/title/snippet, not the full SERP blob. |
+| Browser read/snapshot | `uiai-browser:session=<id>:read:<seq>` or `uiai-browser:session=<id>:snapshot:<seq>` | `/api/session/{id}/read` or snapshot/@ref output | `focusa_evidence_capture` | Store bounded text/snapshot summary and session id; avoid transcript-sized page dumps. |
+| Screenshot/share artifact | `uiai-screenshot:sha256:<prefix>` or `uiai-share:<share_id>` | screenshot/share response `focusa_evidence` | `focusa_evidence_capture` | Use the artifact handle/path; do not paste base64 image payloads into Focusa. |
+
 ## Quick Start
 
 ```bash

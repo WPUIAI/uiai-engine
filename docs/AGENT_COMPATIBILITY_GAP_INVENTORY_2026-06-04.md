@@ -20,6 +20,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - Pi extension exposes `uiai_search` and `/uiai off` / menu **Hide UIAI card**.
 - MCP bridge exposes and fallback-normalizes `browser_search`.
 - MCP metadata cache/reconnect behavior documented: restart/reconnect MCP clients and reload Pi MCP-adapter sessions after tool/schema/call-route changes.
+- Focusa evidence handles documented for diagnostics, errors, search results, browser read/snapshot, screenshot, and share artifacts.
 - Tool discovery and graph advertise `browser_search` and `search_then_browse`.
 - Search is loopback-public and remote-authenticated, aligned with browser/session/screenshot tool boundaries.
 - Public docs mention search flow, Pi/MCP surfaces, and auth boundaries.
@@ -66,7 +67,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 - Completed: scoped UIAI browser diagnostic session with `focusa_scope` ingested via `focusa_browser_diagnostics_intake`.
 - Remaining: link successful search/browser proof to a canonical Focusa Workpoint when evidence hot routes are stable.
-- Remaining: add docs for using UIAI search results as Focusa evidence handles without pasting raw SERP blobs.
+- Completed: docs specify `uiai-search:<provider>:<query-hash>:<rank>` handles so search evidence can cite selected result URL/title/snippet without raw SERP blobs.
 
 ### 5. Portability
 
