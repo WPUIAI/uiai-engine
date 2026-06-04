@@ -4,6 +4,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ## Current verified slice
 
+- Interoperability quality spec added: `docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md` defines cross-surface contracts, acceptance gates, and proof requirements.
 - Provider-neutral search route exists: `GET/POST /api/search`.
 - Brave provider is implemented behind the generic search contract.
 - Search provider metadata exists: `GET /api/search/providers`.

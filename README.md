@@ -369,6 +369,7 @@ Implementation anchors: [`internal/intelligence/`](internal/intelligence/), [`in
 - Security: remote browser/session API callers must authenticate; loopback remains frictionless for local agents.
 
 See [`docs/SESSION_API.md`](docs/SESSION_API.md), [`docs/BROWSER_DIAGNOSTICS_SPEC.md`](docs/BROWSER_DIAGNOSTICS_SPEC.md), and [`docs/BROWSER_RELIABILITY_RUNBOOK.md`](docs/BROWSER_RELIABILITY_RUNBOOK.md).
+- Interoperability quality spec: [`docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md`](docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md) covers WordPress, Pi, MCP, Focusa, browser diagnostics/errors, CLI, search/providers, auth/security, and proof gates.
 
 ## Quick setup for agents
 
