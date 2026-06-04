@@ -8,6 +8,8 @@
 - UIAI Engine: `/home/wpuiai/uiai-engine`
 - Focusa core/Pi extension: `/home/wirebot/focusa`
 
+**Schema decision companion:** [`RESEARCH_DIAGNOSTICS_PACKET_SCHEMA_DECISION_MATRIX.md`](RESEARCH_DIAGNOSTICS_PACKET_SCHEMA_DECISION_MATRIX.md)
+
 ## 1. Thesis
 
 UIAI is most valuable with Focusa and Pi when it behaves as the **agent browser + research + diagnostics + proof engine**:
@@ -430,7 +432,7 @@ Before implementation starts, answer these:
 
 ## 9. Proposed next beads
 
-1. `Decide: ResearchDiagnosticsPacket schema and response surfaces`.
+1. `Decide: ResearchDiagnosticsPacket schema and response surfaces` — companion matrix: [`RESEARCH_DIAGNOSTICS_PACKET_SCHEMA_DECISION_MATRIX.md`](RESEARCH_DIAGNOSTICS_PACKET_SCHEMA_DECISION_MATRIX.md).
 2. `Packet: add Focusa metadata object to browser_read/search/diagnostics responses`.
 3. `Smoke: compose packet from existing tools without new endpoint`.
 4. `Pi: add /uiai research and /uiai diagnose guided workflows`.
