@@ -21,6 +21,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - Loopback no-auth search smoke: `POST /api/search` returned `count=2`, `provider=brave`.
 - Provider metadata smoke: `/api/search/providers` returned `configured=true`.
 - MCP JSON-RPC smoke: `tools/list` includes `browser_search`; `tools/call browser_search` returned `provider=brave`.
+- Focusa handoff smoke: UIAI session opened with `focusa_scope`; diagnostics echoed scope; `focusa_browser_diagnostics_intake` completed with evidence `uiai-diagnostics:health-focusa-scope-smoke`.
 - Ownership check: no root-owned files under `/home/wpuiai/uiai-engine`.
 
 ## Remaining gaps by waypoint
@@ -45,9 +46,9 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ### 4. Focusa integration
 
-- Run a scoped UIAI browser diagnostic session with `focusa_scope` and ingest via `focusa_browser_diagnostics_intake`.
-- Link successful search/browser proof to a canonical Focusa Workpoint once Focusa evidence hot route is healthy.
-- Add docs for using UIAI search results as Focusa evidence handles without pasting raw SERP blobs.
+- Completed: scoped UIAI browser diagnostic session with `focusa_scope` ingested via `focusa_browser_diagnostics_intake`.
+- Remaining: link successful search/browser proof to a canonical Focusa Workpoint when evidence hot routes are stable.
+- Remaining: add docs for using UIAI search results as Focusa evidence handles without pasting raw SERP blobs.
 
 ### 5. Portability
 
@@ -70,4 +71,4 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ## Recommended next slice
 
-Focusa handoff proof: open a UIAI browser session with `focusa_scope`, trigger/read diagnostics, ingest with Focusa, and document any evidence-linking or hot-route gaps.
+Portability/security hardening: add installer/smoke coverage for `BRAVE_SEARCH_API_KEY`, remote-auth `/api/search*` checks, and documented MCP/Pi reconnect behavior after tool changes.
