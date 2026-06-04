@@ -8,6 +8,7 @@ import (
 
 	"github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/observability"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
@@ -723,8 +724,10 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 			resp[k] = v
 		}
 	}
+	var diag *vision.DiagnosticsSnapshot
 	if sess != nil {
-		diag := sess.Diagnostics(20, "all", false)
+		d := sess.Diagnostics(20, "all", false)
+		diag = &d
 		resp["session_id"] = diag.SessionID
 		resp["url"] = diag.URL
 		resp["title"] = diag.Title
@@ -742,6 +745,32 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 			resp["exceptions"] = diag.Exceptions
 		}
 	}
+	event := observability.ErrorEvent{
+		Source:              "browser_session",
+		Class:               class,
+		Status:              status,
+		Message:             err.Error(),
+		SuggestedNextAction: suggestedNextSessionAction(class),
+	}
+	if diag != nil {
+		event.SessionID = diag.SessionID
+		event.URL = diag.URL
+		event.Context = map[string]any{
+			"title":             diag.Title,
+			"console_errors":    diag.Summary.ConsoleErrors,
+			"console_warnings":  diag.Summary.ConsoleWarnings,
+			"exceptions":        diag.Summary.Exceptions,
+			"failed_requests":   diag.Summary.FailedRequests,
+			"diagnostics_seq":   diag.Seq,
+			"focusa_workpoint":  "",
+			"focusa_continuity": "",
+		}
+		if diag.FocusaScope != nil {
+			event.Context["focusa_workpoint"] = diag.FocusaScope.WorkpointID
+			event.Context["focusa_continuity"] = diag.FocusaScope.ContinuityID
+		}
+	}
+	observability.Record(event)
 	writeJSON(w, status, resp)
 }
 

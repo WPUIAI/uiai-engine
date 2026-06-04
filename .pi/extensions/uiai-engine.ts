@@ -1,4 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { keyHint } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 const DEFAULT_ENGINE_URL = "http://localhost:7456";
@@ -61,7 +63,51 @@ function post(path: string, body: Record<string, any>) {
 	return callEngine(path, { method: "POST", body: JSON.stringify(cleanBody(body)) });
 }
 
+function compactSummary(data: any, details: Record<string, any> = {}) {
+	const endpoint = details.endpoint ? `${details.endpoint}` : "UIAI";
+	if (data?.error || data?.error_class) {
+		return `${endpoint} error${data.error_class ? `:${data.error_class}` : ""} ${data.error || ""}`.trim();
+	}
+	if (Array.isArray(data?.events)) {
+		return `${endpoint} ${data.count ?? data.events.length} error events stored=${data.stored_count ?? "?"}`;
+	}
+	if (data?.session_id || data?.id) {
+		const id = data.session_id || data.id;
+		const url = data.url ? ` ${data.url}` : "";
+		return `${endpoint} ${id}${url}`;
+	}
+	if (data?.summary) {
+		return `${endpoint} summary ${JSON.stringify(data.summary)}`;
+	}
+	if (typeof data?.count === "number") return `${endpoint} count=${data.count}`;
+	if (data?.status) return `${endpoint} status=${data.status}`;
+	return `${endpoint} ok`;
+}
+
+function compactRenderResult(result: any, { expanded, isPartial }: { expanded?: boolean; isPartial?: boolean }, theme: any) {
+	if (isPartial) return new Text(theme.fg("warning", "UIAI running…"), 0, 0);
+	const textContent = result?.content?.find?.((c: any) => c.type === "text");
+	const raw = textContent?.type === "text" ? textContent.text : "";
+	let data: any = raw;
+	try { data = raw ? JSON.parse(raw) : {}; } catch { /* keep raw */ }
+	const details = result?.details || {};
+	const isError = Boolean(data?.error || data?.error_class || result?.isError);
+	let line = isError ? theme.fg("error", compactSummary(data, details)) : theme.fg("success", compactSummary(data, details));
+	if (!expanded) {
+		line += theme.fg("muted", ` (${keyHint("app.tools.expand", "expand")})`);
+		return new Text(line, 0, 0);
+	}
+	const body = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+	return new Text(`${line}\n${theme.fg("toolOutput", body)}`, 0, 0);
+}
+
 export default function uiaiEngineExtension(pi: ExtensionAPI) {
+	const registerTool = pi.registerTool.bind(pi);
+	pi.registerTool = ((definition: any) => registerTool({
+		...definition,
+		renderResult: definition.renderResult || compactRenderResult,
+	})) as typeof pi.registerTool;
+
 	pi.registerTool({
 		name: "pi_uiai_agent_card",
 		label: "UIAI Agent Card",
@@ -145,6 +191,24 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		parameters: Type.Object({}),
 		async execute() {
 			return textResult(await callEngine("/api/critique/dimensions"), { endpoint: "/api/critique/dimensions" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_errors",
+		label: "UIAI Error Events",
+		description: "Read bounded, redacted UIAI engine/browser error events after UIAI tool failures.",
+		parameters: Type.Object({
+			limit: Type.Optional(Type.Number({ description: "Recent event limit, max 500", default: 20 })),
+			source: Type.Optional(Type.String({ description: "Optional source filter: http, panic, browser_session" })),
+			class: Type.Optional(Type.String({ description: "Optional error class filter" })),
+		}),
+		async execute(_toolCallId, params) {
+			const q = new URLSearchParams();
+			if (params.limit !== undefined) q.set("limit", String(params.limit));
+			if (params.source !== undefined) q.set("source", params.source);
+			if (params.class !== undefined) q.set("class", params.class);
+			return textResult(await callEngine(`/api/errors${q.toString() ? `?${q.toString()}` : ""}`), { endpoint: "/api/errors" });
 		},
 	});
 

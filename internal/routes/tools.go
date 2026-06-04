@@ -216,6 +216,7 @@ func toolRelations() map[string][]string {
 		"uiai_status":               {"uiai_health", "uiai_agent_card", "uiai_tool_graph"},
 		"critique_models":           {"critique_dimensions", "uiai_status", "uiai_tool_graph"},
 		"critique_dimensions":       {"critique_models", "uiai_tool_graph"},
+		"uiai_errors":               {"browser_diagnostics", "uiai_health", "uiai_status", "uiai_tool_graph"},
 		"browser_search":            {"browser_open", "browser_read", "browser_diagnostics", "uiai_tool_search"},
 		"browser_open":              {"browser_read", "browser_snapshot", "browser_diagnostics", "focusa_browser_diagnostics_intake", "browser_close"},
 		"browser_read":              {"browser_snapshot", "browser_text", "browser_diagnostics", "browser_close"},
@@ -254,6 +255,9 @@ func workflowHints(name string) []string {
 	}
 	if name == "critique_models" || name == "critique_dimensions" {
 		return []string{"Read-only critique metadata", "Use before paid critique calls", "Pair with uiai_status when provider readiness is unclear"}
+	}
+	if name == "uiai_errors" {
+		return []string{"Use after UIAI engine/browser failures", "Events are bounded and redacted", "Pair browser_session events with browser_diagnostics for page-level evidence"}
 	}
 	if name == "browser_search" {
 		return []string{"Use provider-neutral search for discovery", "Open a selected result with browser_open", "Use browser_read for page text", "Use browser_diagnostics on navigation failures"}
@@ -340,6 +344,18 @@ func openAITools() []map[string]any {
 			"parameters": map[string]any{
 				"type":       "object",
 				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "uiai_errors",
+			"description": "Read bounded, redacted UIAI engine/browser error events. Use after browser failures, engine 4xx/5xx, or unexpected UIAI tool errors.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"limit":  map[string]any{"type": "integer", "default": 20, "description": "Recent event limit, max 500"},
+					"source": map[string]string{"type": "string", "description": "Optional source filter: http, panic, browser_session"},
+					"class":  map[string]string{"type": "string", "description": "Optional error class filter"},
+				},
 			},
 		},
 		{

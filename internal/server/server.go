@@ -20,6 +20,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/credits"
 	"github.com/WPUIAI/uiai-engine/internal/intelligence"
 	"github.com/WPUIAI/uiai-engine/internal/media"
+	"github.com/WPUIAI/uiai-engine/internal/observability"
 	"github.com/WPUIAI/uiai-engine/internal/ratelimit"
 	"github.com/WPUIAI/uiai-engine/internal/routes"
 	"github.com/WPUIAI/uiai-engine/internal/storage"
@@ -54,7 +55,7 @@ func New(cfg *config.Config) *Engine {
 	// Global middleware
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
-	r.Use(middleware.Recoverer)
+	r.Use(errorRecovery)
 	r.Use(middleware.Compress(5))        // gzip compression — reduces transfer size for JSON + screenshot data
 	r.Use(maxBodySize(10 * 1024 * 1024)) // 10MB max request body
 	r.Use(requestLogger)
@@ -271,6 +272,11 @@ func (e *Engine) mountRoutes() {
 		routes.MountSearchRoutes(r, e.cfg)
 	})
 
+	// Engine/browser error history — bounded and redacted for agent/operator troubleshooting
+	r.Route("/api/errors", func(r chi.Router) {
+		routes.MountErrorsRoutes(r)
+	})
+
 	// Tool Discovery — LLM agents search/discover tools without loading all definitions
 	// GET /api/tools/search?q=screenshot → find specific tools (minimal context)
 	// GET /api/tools/openai → OpenAI function calling format
@@ -411,8 +417,59 @@ func requestLogger(next http.Handler) http.Handler {
 		start := time.Now()
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 		next.ServeHTTP(ww, r)
-		log.Printf("%s %s %d %s", r.Method, r.URL.Path, ww.Status(), time.Since(start).Round(time.Millisecond))
+		duration := time.Since(start)
+		status := ww.Status()
+		log.Printf("%s %s %d %s", r.Method, r.URL.Path, status, duration.Round(time.Millisecond))
+		if status >= 400 {
+			observability.Record(observability.ErrorEvent{
+				Source:  "http",
+				Class:   httpErrorClass(status),
+				Status:  status,
+				Method:  r.Method,
+				Path:    r.URL.Path,
+				Message: http.StatusText(status),
+				Context: map[string]any{"duration_ms": duration.Milliseconds(), "request_id": middleware.GetReqID(r.Context())},
+			})
+		}
 	})
+}
+
+func errorRecovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				observability.Record(observability.ErrorEvent{
+					Source:  "panic",
+					Class:   "panic",
+					Status:  http.StatusInternalServerError,
+					Method:  r.Method,
+					Path:    r.URL.Path,
+					Message: fmt.Sprint(rec),
+					Context: map[string]any{"request_id": middleware.GetReqID(r.Context())},
+				})
+				log.Printf("[panic] %s %s: %v", r.Method, r.URL.Path, rec)
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func httpErrorClass(status int) string {
+	switch {
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		return "auth_failed"
+	case status == http.StatusNotFound:
+		return "not_found"
+	case status == http.StatusTooManyRequests:
+		return "rate_limited"
+	case status >= 500:
+		return "server_error"
+	case status >= 400:
+		return "client_error"
+	default:
+		return "unknown"
+	}
 }
 
 // maxBodySize limits request body size to prevent OOM from oversized POSTs.

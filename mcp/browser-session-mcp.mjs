@@ -150,6 +150,18 @@ const BRIDGE_CORE_TOOLS = [
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "uiai_errors",
+    description: "Read bounded, redacted UIAI engine/browser error events after UIAI tool failures.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", default: 20, description: "Recent event limit, max 500" },
+        source: { type: "string", description: "Optional source filter: http, panic, browser_session" },
+        class: { type: "string", description: "Optional error class filter" },
+      },
+    },
+  },
+  {
     name: "browser_search",
     description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with browser_open, then browser_read.",
     inputSchema: {
@@ -244,6 +256,16 @@ async function toolsCall(name, args) {
       url = `${ENGINE}/api/critique/dimensions`;
       method = "GET";
       break;
+
+    case "uiai_errors": {
+      const q = new URLSearchParams();
+      if (args.limit !== undefined) q.set("limit", String(args.limit));
+      if (args.source !== undefined) q.set("source", String(args.source));
+      if (args.class !== undefined) q.set("class", String(args.class));
+      url = `${ENGINE}/api/errors${q.toString() ? `?${q.toString()}` : ""}`;
+      method = "GET";
+      break;
+    }
 
     case "browser_search":
       url = `${ENGINE}/api/search`;
