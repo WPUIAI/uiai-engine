@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENGINE_URL="${UIAI_ENGINE_URL:-http://localhost:7456}"
+TIMEOUT_SECONDS="${UIAI_CLI_TIMEOUT_SECONDS:-${UIAI_SMOKE_TIMEOUT_SECONDS:-20}}"
+FORMAT="compact"
+AUTH_ARGS=()
+if [[ -n "${UIAI_API_KEY:-}" ]]; then
+  AUTH_ARGS=(-H "X-API-Key: ${UIAI_API_KEY}")
+elif [[ -n "${UIAI_BEARER_TOKEN:-}" ]]; then
+  AUTH_ARGS=(-H "Authorization: Bearer ${UIAI_BEARER_TOKEN}")
+fi
+
+usage() {
+  cat <<'EOF'
+UIAI CLI wrapper
+
+Usage:
+  scripts/uiai [--json|--compact|--pretty] <command> [args]
+
+Commands:
+  status                         Show engine runtime status
+  health                         Show browser/vision health
+  errors [opts]                  Show recent engine/browser errors
+    --limit N                    Recent error limit (default 20)
+    --source SOURCE              Filter source: http, panic, browser_session
+    --class CLASS                Filter error class
+  tools                          List tool names/descriptions
+  tools search <query>           Search tool discovery
+  tools mcp|openai|graph|agent-card
+  session open <url> [--width N] [--height N]
+  session read <sid> [--selector S] [--max-chars N]
+  session snapshot <sid>
+  session diagnostics <sid> [--limit N] [--failed-only]
+  session close <sid>
+  smoke agent                    Run scripts/smoke-agent-integrations.sh
+  smoke browser                  Run scripts/stress-browser-diagnostics.sh
+  install-agent-integrations     Run scripts/install-agent-integrations.sh
+
+Output:
+  --compact (default), --json, --pretty
+
+Environment:
+  UIAI_ENGINE_URL                Default: http://localhost:7456
+  UIAI_API_KEY                   Optional X-API-Key auth for remote/auth routes
+  UIAI_BEARER_TOKEN              Optional bearer auth alternative
+  UIAI_CLI_TIMEOUT_SECONDS       Default: UIAI_SMOKE_TIMEOUT_SECONDS or 20
+
+Exit codes:
+  0 success, 1 API/tool failure, 2 usage error, 3 dependency missing, 4 auth/config error
+EOF
+}
+
+err() { printf 'uiai: %s\n' "$*" >&2; }
+need() { command -v "$1" >/dev/null 2>&1 || { err "missing required command: $1"; exit 3; }; }
+need curl
+need jq
+
+api() {
+  local method="$1" path="$2" body="${3:-}"
+  local args=(-sS --max-time "$TIMEOUT_SECONDS" -X "$method" "${AUTH_ARGS[@]}" "$ENGINE_URL$path")
+  if [[ -n "$body" ]]; then
+    args+=(-H "Content-Type: application/json" -d "$body")
+  fi
+  local tmp status
+  tmp="$(mktemp)"
+  status="$(curl "${args[@]}" -w '%{http_code}' -o "$tmp" || true)"
+  if [[ ! "$status" =~ ^[0-9]+$ ]]; then
+    cat "$tmp" >&2 || true
+    rm -f "$tmp"
+    exit 1
+  fi
+  if (( status >= 400 )); then
+    if jq -e . >/dev/null 2>&1 <"$tmp"; then
+      format_error <"$tmp" >&2
+    else
+      cat "$tmp" >&2
+    fi
+    rm -f "$tmp"
+    if (( status == 401 || status == 403 )); then exit 4; fi
+    exit 1
+  fi
+  cat "$tmp"
+  rm -f "$tmp"
+}
+
+format_error() {
+  jq -r 'def v($x): if $x == null or $x == "" then empty else $x end;
+    "error: " + (.message // .error // "UIAI request failed"),
+    (v(.error_id) | "id: " + .),
+    (v(.error_class) | "class: " + .),
+    (v(.status) | "status: " + tostring),
+    (v(.suggested_next_action) | "next: " + .),
+    (v(.diagnostics) | "diagnostics: " + .)'
+}
+
+emit() {
+  case "$FORMAT" in
+    json) cat ;;
+    pretty) jq . ;;
+    compact) compact_emit ;;
+    *) err "unknown format: $FORMAT"; exit 2 ;;
+  esac
+}
+
+compact_emit() {
+  jq -r '
+    if has("type") and .type == "status" then
+      "status: " + (.services["uiai-engine"].health // "unknown") + " port=" + ((.services["uiai-engine"].port // "?")|tostring)
+    elif has("status") and has("service") then
+      "health: " + (.status|tostring) + " service=" + (.service|tostring)
+    elif has("browser") or has("pool") or has("health") then
+      "health: " + ((.status // .health // "ok")|tostring)
+    elif has("events") then
+      "errors: count=" + ((.count // (.events|length))|tostring) + " stored=" + ((.stored_count // "?")|tostring),
+      (.events[]? | "- " + (.id // "?") + " " + (.source // "?") + ":" + (.class // "?") + " " + ((.status // "")|tostring) + " " + (.message // "") + (if .suggested_next_action then " -> " + .suggested_next_action else "" end))
+    elif has("tools") then
+      "tools: count=" + ((.count // (.tools|length))|tostring),
+      (.tools[]? | "- " + .name + " — " + (.description // ""))
+    elif has("session") then
+      "session: " + (.session.id // .id // "?") + " " + (.session.url // .url // "")
+    elif has("tree") or has("stats") then
+      "snapshot: " + ((.stats.node_count // .stats.nodes // "?")|tostring) + " nodes", (.tree // "")
+    elif has("text") then
+      .text
+    elif has("summary") and has("session_id") then
+      "diagnostics: session=" + .session_id + " errors=" + ((.summary.console_errors // 0)|tostring) + " exceptions=" + ((.summary.exceptions // 0)|tostring) + " failed_requests=" + ((.summary.failed_requests // 0)|tostring)
+    elif has("status") then
+      "status: " + (.status|tostring)
+    else
+      .
+    end'
+}
+
+urlencode() { jq -rn --arg v "$1" '$v|@uri'; }
+
+parse_global() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) FORMAT="json"; shift ;;
+      --compact) FORMAT="compact"; shift ;;
+      --pretty) FORMAT="pretty"; shift ;;
+      -h|--help) usage; exit 0 ;;
+      *) break ;;
+    esac
+  done
+  CMD_ARGS=("$@")
+}
+
+cmd_errors() {
+  local limit=20 source="" class=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --limit) limit="${2:-}"; shift 2 ;;
+      --source) source="${2:-}"; shift 2 ;;
+      --class) class="${2:-}"; shift 2 ;;
+      *) err "unknown errors option: $1"; exit 2 ;;
+    esac
+  done
+  local q="limit=$limit"
+  [[ -n "$source" ]] && q="$q&source=$(urlencode "$source")"
+  [[ -n "$class" ]] && q="$q&class=$(urlencode "$class")"
+  api GET "/api/errors?$q" | emit
+}
+
+cmd_tools() {
+  local sub="${1:-list}"
+  case "$sub" in
+    list) api GET "/api/tools/search" | emit ;;
+    search) [[ $# -ge 2 ]] || { err "usage: uiai tools search <query>"; exit 2; }; api GET "/api/tools/search?q=$(urlencode "$2")" | emit ;;
+    mcp) api GET "/api/tools/mcp" | emit ;;
+    openai) api GET "/api/tools/openai" | emit ;;
+    graph) api GET "/api/tools/graph" | emit ;;
+    agent-card) api GET "/api/tools/agent-card" | emit ;;
+    *) err "unknown tools subcommand: $sub"; exit 2 ;;
+  esac
+}
+
+cmd_session() {
+  local sub="${1:-}"; shift || true
+  case "$sub" in
+    open)
+      [[ $# -ge 1 ]] || { err "usage: uiai session open <url> [--width N] [--height N]"; exit 2; }
+      local url="$1" width=1280 height=800; shift
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --width) width="${2:-}"; shift 2 ;;
+          --height) height="${2:-}"; shift 2 ;;
+          *) err "unknown session open option: $1"; exit 2 ;;
+        esac
+      done
+      jq -cn --arg url "$url" --argjson width "$width" --argjson height "$height" '{url:$url,width:$width,height:$height}' | { read -r body; api POST "/api/session" "$body"; } | emit
+      ;;
+    read)
+      [[ $# -ge 1 ]] || { err "usage: uiai session read <sid> [--selector S] [--max-chars N]"; exit 2; }
+      local sid="$1" selector="" max_chars=8000; shift
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --selector) selector="${2:-}"; shift 2 ;;
+          --max-chars) max_chars="${2:-}"; shift 2 ;;
+          *) err "unknown session read option: $1"; exit 2 ;;
+        esac
+      done
+      jq -cn --arg selector "$selector" --argjson max_chars "$max_chars" '{max_chars:$max_chars,include_links:true} + (if $selector == "" then {} else {selector:$selector} end)' | { read -r body; api POST "/api/session/$sid/read" "$body"; } | emit
+      ;;
+    snapshot) [[ $# -ge 1 ]] || { err "usage: uiai session snapshot <sid>"; exit 2; }; api POST "/api/session/$1/snapshot" '{}' | emit ;;
+    diagnostics)
+      [[ $# -ge 1 ]] || { err "usage: uiai session diagnostics <sid> [--limit N] [--failed-only]"; exit 2; }
+      local sid="$1" limit=100 failed=""; shift
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --limit) limit="${2:-}"; shift 2 ;;
+          --failed-only) failed="&failed_only=true"; shift ;;
+          *) err "unknown diagnostics option: $1"; exit 2 ;;
+        esac
+      done
+      api GET "/api/session/$sid/diagnostics?limit=$limit$failed" | emit
+      ;;
+    close) [[ $# -ge 1 ]] || { err "usage: uiai session close <sid>"; exit 2; }; api DELETE "/api/session/$1" | emit ;;
+    *) err "usage: uiai session open|read|snapshot|diagnostics|close"; exit 2 ;;
+  esac
+}
+
+parse_global "$@"
+set -- "${CMD_ARGS[@]}"
+cmd="${1:-}"; [[ $# -gt 0 ]] && shift || true
+case "$cmd" in
+  status) api GET "/api/status" | emit ;;
+  health) api GET "/api/health/browser" | emit ;;
+  errors) cmd_errors "$@" ;;
+  tools) cmd_tools "$@" ;;
+  session) cmd_session "$@" ;;
+  smoke)
+    sub="${1:-agent}"
+    case "$sub" in
+      agent) exec "$ROOT_DIR/scripts/smoke-agent-integrations.sh" ;;
+      browser) exec "$ROOT_DIR/scripts/stress-browser-diagnostics.sh" ;;
+      *) err "usage: uiai smoke agent|browser"; exit 2 ;;
+    esac
+    ;;
+  install-agent-integrations) exec "$ROOT_DIR/scripts/install-agent-integrations.sh" ;;
+  -h|--help|help|"") usage ;;
+  *) err "unknown command: $cmd"; usage >&2; exit 2 ;;
+esac

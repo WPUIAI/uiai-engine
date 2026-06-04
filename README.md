@@ -397,6 +397,27 @@ scripts/install-agent-integrations.sh
 scripts/smoke-agent-integrations.sh
 ```
 
+
+### CLI wrapper
+
+`scripts/uiai` is the lightweight unified CLI surface for operator/agent shell workflows. It wraps the HTTP API and existing smoke/install scripts before a full Go subcommand CLI is justified.
+
+Examples:
+
+```bash
+scripts/uiai status
+scripts/uiai health
+scripts/uiai errors --limit 10 --source browser_session
+scripts/uiai tools search diagnostics
+SID=$(scripts/uiai --json session open https://example.com | jq -r '.session.id')
+scripts/uiai session read "$SID" --max-chars 1000
+scripts/uiai session diagnostics "$SID"
+scripts/uiai session close "$SID"
+scripts/uiai smoke agent
+```
+
+Output modes: `--compact` (default), `--json`, `--pretty`. Exit codes: `0` success, `1` API/tool failure, `2` usage error, `3` missing dependency, `4` auth/config error. Auth/env vars match Pi/MCP: `UIAI_ENGINE_URL`, `UIAI_API_KEY`, `UIAI_BEARER_TOKEN`, `UIAI_CLI_TIMEOUT_SECONDS`.
+
 ## Build, test, and run
 
 ```bash
