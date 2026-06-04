@@ -23,6 +23,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - Focusa evidence handles documented for diagnostics, errors, search results, browser read/snapshot, screenshot, and share artifacts.
 - Tool discovery and graph advertise `browser_search` and `search_then_browse`.
 - Search is loopback-public and remote-authenticated, aligned with browser/session/screenshot tool boundaries.
+- Remote positive auth proof covers search, errors, media frame, session, and screenshot loopback-public route families with `X-API-Key` and Bearer local-token credentials.
 - Public docs mention search flow, Pi/MCP surfaces, and auth boundaries.
 
 ## Proof handles
@@ -77,7 +78,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ### 6. Security, performance, and stability
 
-- Add a remote-auth negative/positive test for `/api/search*`, parallel to browser/session boundaries.
+- Completed: remote-auth positive test covers `/api/search*`, `/api/errors*`, `/api/media/frame*`, `/api/session*`, and `/api/screenshot*` with API key and Bearer credentials.
 - Consider provider request timeout/rate-limit controls beyond the current 12s HTTP timeout.
 - Consider bounded response truncation/redaction if future providers return richer metadata.
 - Review service memory/CPU behavior under repeated search + browser workflows.

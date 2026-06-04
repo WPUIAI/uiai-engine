@@ -56,5 +56,5 @@ Local-token env support: `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_A
 
 ## Current verification
 
-- `go test ./internal/auth` covers loopback/remote boundaries for search, errors, media frame, loopback detection, and local-token auth.
+- `go test ./internal/auth` covers loopback/remote boundaries for search, errors, media frame, session, screenshot, loopback detection, local-token auth, and remote positive auth via `X-API-Key`/Bearer.
 - `scripts/smoke-agent-integrations.sh` exercises public discovery, loopback tool surfaces, MCP/Pi parity, and browser error smoke.

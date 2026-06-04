@@ -97,6 +97,48 @@ func TestMediaFrameToolPathLoopbackPublicRemoteAuth(t *testing.T) {
 	}
 }
 
+func TestLoopbackToolPathsRemoteAuthPositive(t *testing.T) {
+	t.Setenv("UIAI_LOCAL_API_TOKEN", "remote-smoke-token")
+	for _, path := range []string{
+		"/api/search/providers",
+		"/api/errors",
+		"/api/media/frame/catalog",
+		"/api/session",
+		"/api/screenshot",
+	} {
+		for _, tc := range []struct {
+			name   string
+			header string
+			value  string
+		}{
+			{name: "api_key", header: "X-API-Key", value: "remote-smoke-token"},
+			{name: "bearer", header: "Authorization", value: "Bearer remote-smoke-token"},
+		} {
+			t.Run(path+"/"+tc.name, func(t *testing.T) {
+				authenticator := New(&config.Config{})
+				hit := false
+				handler := authenticator.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					hit = true
+					id := FromContext(r.Context())
+					if id == nil || id.ClientID != "local-vps" || id.Tier != "internal" {
+						t.Fatalf("unexpected auth identity: %#v", id)
+					}
+					w.WriteHeader(http.StatusNoContent)
+				}))
+
+				req := httptest.NewRequest(http.MethodGet, "http://example.test"+path, nil)
+				req.RemoteAddr = "203.0.113.10:12345"
+				req.Header.Set(tc.header, tc.value)
+				res := httptest.NewRecorder()
+				handler.ServeHTTP(res, req)
+				if res.Code != http.StatusNoContent || !hit {
+					t.Fatalf("expected remote authenticated request through, path=%s code=%d hit=%v", path, res.Code, hit)
+				}
+			})
+		}
+	}
+}
+
 func TestLoopbackRequestDetection(t *testing.T) {
 	req, _ := http.NewRequest("GET", "http://example.test/api/session", nil)
 	req.RemoteAddr = "127.0.0.1:12345"
