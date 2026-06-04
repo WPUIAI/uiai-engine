@@ -8,6 +8,13 @@ function engineUrl(): string {
 	return (process.env.UIAI_ENGINE_URL || DEFAULT_ENGINE_URL).replace(/\/$/, "");
 }
 
+function authHeaders(): Record<string, string> {
+	const headers: Record<string, string> = {};
+	if (process.env.UIAI_API_KEY) headers["X-API-Key"] = process.env.UIAI_API_KEY;
+	if (process.env.UIAI_BEARER_TOKEN) headers.Authorization = `Bearer ${process.env.UIAI_BEARER_TOKEN}`;
+	return headers;
+}
+
 async function callEngine(path: string, init?: RequestInit): Promise<any> {
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -15,7 +22,7 @@ async function callEngine(path: string, init?: RequestInit): Promise<any> {
 		const res = await fetch(`${engineUrl()}${path}`, {
 			...init,
 			signal: controller.signal,
-			headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+			headers: { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers || {}) },
 		});
 		const text = await res.text();
 		let data: any = text;
@@ -40,6 +47,20 @@ function textResult(data: any, details: Record<string, any> = {}) {
 	};
 }
 
+function withoutScreenshot(data: any) {
+	const summary = { ...data };
+	delete summary.screenshot;
+	return summary;
+}
+
+function cleanBody(body: Record<string, any>) {
+	return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
+}
+
+function post(path: string, body: Record<string, any>) {
+	return callEngine(path, { method: "POST", body: JSON.stringify(cleanBody(body)) });
+}
+
 export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "pi_uiai_agent_card",
@@ -56,15 +77,12 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "pi_uiai_tool_search",
 		label: "UIAI Tool Search",
 		description: "Search UIAI tools by keyword without loading all schemas. Try diagnostics, screenshot, snapshot, click, fill, eval_async, console, network, visual failure.",
-		parameters: Type.Object({
-			q: Type.String({ description: "Keyword or phrase to search" }),
-		}),
+		parameters: Type.Object({ q: Type.String({ description: "Keyword or phrase to search" }) }),
 		async execute(_toolCallId, params) {
 			const q = encodeURIComponent(params.q);
 			return textResult(await callEngine(`/api/tools/search?q=${q}`), { endpoint: "/api/tools/search", query: params.q });
 		},
 	});
-
 
 	pi.registerTool({
 		name: "pi_uiai_tool_graph",
@@ -89,7 +107,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_browser_open",
 		label: "UIAI Browser Open",
-		description: "Open a persistent UIAI browser session. Prefer snapshot @refs and diagnostics-first debugging for reliable web surfing.",
+		description: "Open a persistent UIAI browser session. Prefer read/snapshot @refs and diagnostics-first debugging for reliable web surfing.",
 		parameters: Type.Object({
 			url: Type.String({ description: "URL to open" }),
 			width: Type.Optional(Type.Number({ description: "Viewport width", default: 1280 })),
@@ -97,13 +115,42 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 			focusa_scope: Type.Optional(Type.Any({ description: "Optional Focusa scope object echoed through diagnostics/evidence" })),
 		}),
 		async execute(_toolCallId, params) {
-			const data = await callEngine("/api/session", {
-				method: "POST",
-				body: JSON.stringify(params),
-			});
-			const summary = { ...data };
-			delete summary.screenshot;
-			return textResult(summary, { endpoint: "/api/session", has_screenshot: Boolean(data.screenshot) });
+			const data = await post("/api/session", params);
+			return textResult(withoutScreenshot(data), { endpoint: "/api/session", has_screenshot: Boolean(data.screenshot) });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_screenshot",
+		label: "UIAI Browser Screenshot",
+		description: "Capture the current session view without navigation. Use diagnostics if the page is blank or broken.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			format: Type.Optional(Type.String({ description: "Image format, jpeg or png" })),
+			quality: Type.Optional(Type.Number({ description: "JPEG quality 1-100" })),
+			fullPage: Type.Optional(Type.Boolean({ description: "Capture entire page" })),
+		}),
+		async execute(_toolCallId, params) {
+			const { session_id, ...body } = params;
+			const data = await post(`/api/session/${session_id}/screenshot`, body);
+			return textResult(withoutScreenshot(data), { endpoint: "/api/session/{id}/screenshot", has_screenshot: Boolean(data.screenshot) });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_scroll",
+		label: "UIAI Browser Scroll",
+		description: "Scroll a session by delta or absolute position and return page state.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			deltaX: Type.Optional(Type.Number({ description: "Horizontal scroll pixels" })),
+			deltaY: Type.Optional(Type.Number({ description: "Vertical scroll pixels", default: 600 })),
+			x: Type.Optional(Type.Number({ description: "Absolute x position" })),
+			y: Type.Optional(Type.Number({ description: "Absolute y position" })),
+		}),
+		async execute(_toolCallId, params) {
+			const { session_id, ...body } = params;
+			return textResult(withoutScreenshot(await post(`/api/session/${session_id}/scroll`, body)), { endpoint: "/api/session/{id}/scroll" });
 		},
 	});
 
@@ -120,27 +167,27 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			const { session_id, ...body } = params;
-			return textResult(await callEngine(`/api/session/${session_id}/snapshot`, {
-				method: "POST",
-				body: JSON.stringify(body),
-			}), { endpoint: "/api/session/{id}/snapshot" });
+			return textResult(await post(`/api/session/${session_id}/snapshot`, body), { endpoint: "/api/session/{id}/snapshot" });
 		},
 	});
 
+	pi.registerTool({
+		name: "uiai_browser_dom",
+		label: "UIAI Browser DOM",
+		description: "Get legacy structured DOM summary. Prefer uiai_browser_snapshot for @ref actions.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(await callEngine(`/api/session/${params.session_id}/dom`), { endpoint: "/api/session/{id}/dom" });
+		},
+	});
 
 	pi.registerTool({
 		name: "uiai_browser_navigate",
 		label: "UIAI Browser Navigate",
 		description: "Navigate an existing UIAI browser session to a new URL. Use read/snapshot after navigation, diagnostics on failures.",
-		parameters: Type.Object({
-			session_id: Type.String({ description: "UIAI browser session id" }),
-			url: Type.String({ description: "Destination URL" }),
-		}),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), url: Type.String({ description: "Destination URL" }) }),
 		async execute(_toolCallId, params) {
-			return textResult(await callEngine(`/api/session/${params.session_id}/navigate`, {
-				method: "POST",
-				body: JSON.stringify({ url: params.url }),
-			}), { endpoint: "/api/session/{id}/navigate" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/navigate`, { url: params.url })), { endpoint: "/api/session/{id}/navigate" });
 		},
 	});
 
@@ -148,15 +195,29 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "uiai_browser_click",
 		label: "UIAI Browser Click",
 		description: "Click a CSS selector or @ref from uiai_browser_snapshot. Read diagnostics after unexpected UI or failed actions.",
-		parameters: Type.Object({
-			session_id: Type.String({ description: "UIAI browser session id" }),
-			selector: Type.String({ description: "CSS selector or @ref, e.g. @e3" }),
-		}),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref, e.g. @e3" }) }),
 		async execute(_toolCallId, params) {
-			return textResult(await callEngine(`/api/session/${params.session_id}/click`, {
-				method: "POST",
-				body: JSON.stringify({ selector: params.selector }),
-			}), { endpoint: "/api/session/{id}/click" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/click`, { selector: params.selector })), { endpoint: "/api/session/{id}/click" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_hover",
+		label: "UIAI Browser Hover",
+		description: "Hover a CSS selector or @ref from uiai_browser_snapshot.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/hover`, { selector: params.selector })), { endpoint: "/api/session/{id}/hover" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_type",
+		label: "UIAI Browser Type",
+		description: "Type text into an input by selector or @ref. Use fill when replacing a value.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref" }), text: Type.String({ description: "Text to type" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/type`, { selector: params.selector, text: params.text })), { endpoint: "/api/session/{id}/type" });
 		},
 	});
 
@@ -164,16 +225,19 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "uiai_browser_fill",
 		label: "UIAI Browser Fill",
 		description: "Replace an input value using a CSS selector or @ref. Prefer this over type when setting form values.",
-		parameters: Type.Object({
-			session_id: Type.String({ description: "UIAI browser session id" }),
-			selector: Type.String({ description: "CSS selector or @ref" }),
-			text: Type.String({ description: "Text value to fill" }),
-		}),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref" }), text: Type.String({ description: "Text value to fill" }) }),
 		async execute(_toolCallId, params) {
-			return textResult(await callEngine(`/api/session/${params.session_id}/fill`, {
-				method: "POST",
-				body: JSON.stringify({ selector: params.selector, text: params.text }),
-			}), { endpoint: "/api/session/{id}/fill" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/fill`, { selector: params.selector, text: params.text })), { endpoint: "/api/session/{id}/fill" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_select",
+		label: "UIAI Browser Select",
+		description: "Select dropdown option values or visible text by selector or @ref.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref of select element" }), values: Type.Array(Type.String({ description: "Option value or text" })) }),
+		async execute(_toolCallId, params) {
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/select`, { selector: params.selector, values: params.values })), { endpoint: "/api/session/{id}/select" });
 		},
 	});
 
@@ -181,15 +245,69 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "uiai_browser_press",
 		label: "UIAI Browser Press",
 		description: "Press a keyboard key such as Enter, Tab, Escape, ArrowDown, or Backspace in the current session.",
-		parameters: Type.Object({
-			session_id: Type.String({ description: "UIAI browser session id" }),
-			key: Type.String({ description: "Keyboard key name" }),
-		}),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), key: Type.String({ description: "Keyboard key name" }) }),
 		async execute(_toolCallId, params) {
-			return textResult(await callEngine(`/api/session/${params.session_id}/press`, {
-				method: "POST",
-				body: JSON.stringify({ key: params.key }),
-			}), { endpoint: "/api/session/{id}/press" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/press`, { key: params.key })), { endpoint: "/api/session/{id}/press" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_back",
+		label: "UIAI Browser Back",
+		description: "Navigate browser history back in the current session.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/back`, {})), { endpoint: "/api/session/{id}/back" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_forward",
+		label: "UIAI Browser Forward",
+		description: "Navigate browser history forward in the current session.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/forward`, {})), { endpoint: "/api/session/{id}/forward" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_eval",
+		label: "UIAI Browser Eval",
+		description: "Execute short synchronous JavaScript on the page. Prefer direct actions for workflows; use diagnostics for errors.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), js: Type.String({ description: "Short JavaScript; use return for output" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/eval`, { js: params.js })), { endpoint: "/api/session/{id}/eval" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_eval_async",
+		label: "UIAI Browser Eval Async",
+		description: "Execute bounded async JavaScript with timeout_ms. Keep waits small; prefer direct actions for long workflows.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), js: Type.String({ description: "Async-capable JavaScript body" }), timeout_ms: Type.Optional(Type.Number({ description: "Timeout ms, max enforced by engine", default: 5000 })) }),
+		async execute(_toolCallId, params) {
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/eval_async`, { js: params.js, timeout_ms: params.timeout_ms })), { endpoint: "/api/session/{id}/eval_async" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_resize",
+		label: "UIAI Browser Resize",
+		description: "Resize viewport for responsive checks.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), width: Type.Number({ description: "Viewport width" }), height: Type.Number({ description: "Viewport height" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/resize`, { width: params.width, height: params.height })), { endpoint: "/api/session/{id}/resize" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_css",
+		label: "UIAI Browser CSS",
+		description: "Inject CSS into the active session to test visual changes live.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), css: Type.String({ description: "CSS rules to inject" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/css`, { css: params.css })), { endpoint: "/api/session/{id}/css" });
 		},
 	});
 
@@ -197,16 +315,19 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "uiai_browser_wait",
 		label: "UIAI Browser Wait",
 		description: "Wait for a selector before reading, snapshotting, clicking, or diagnosing a page.",
-		parameters: Type.Object({
-			session_id: Type.String({ description: "UIAI browser session id" }),
-			selector: Type.String({ description: "CSS selector to wait for" }),
-			timeout_ms: Type.Optional(Type.Number({ description: "Max wait time in ms", default: 5000 })),
-		}),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector to wait for" }), timeout_ms: Type.Optional(Type.Number({ description: "Max wait time in ms", default: 5000 })) }),
 		async execute(_toolCallId, params) {
-			return textResult(await callEngine(`/api/session/${params.session_id}/wait`, {
-				method: "POST",
-				body: JSON.stringify({ selector: params.selector, timeout_ms: params.timeout_ms }),
-			}), { endpoint: "/api/session/{id}/wait" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/wait`, { selector: params.selector, timeout_ms: params.timeout_ms })), { endpoint: "/api/session/{id}/wait" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_text",
+		label: "UIAI Browser Text",
+		description: "Get text content of one selector or @ref. Prefer read for broader page text.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(await post(`/api/session/${params.session_id}/text`, { selector: params.selector }), { endpoint: "/api/session/{id}/text" });
 		},
 	});
 
@@ -222,10 +343,24 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			const { session_id, ...body } = params;
-			return textResult(await callEngine(`/api/session/${session_id}/read`, {
-				method: "POST",
-				body: JSON.stringify(body),
-			}), { endpoint: "/api/session/{id}/read" });
+			return textResult(await post(`/api/session/${session_id}/read`, body), { endpoint: "/api/session/{id}/read" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_cookies",
+		label: "UIAI Browser Cookies",
+		description: "Get, set, or clear session cookies.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			action: Type.Optional(Type.String({ description: "get, set, or clear" })),
+			name: Type.Optional(Type.String({ description: "Cookie name" })),
+			value: Type.Optional(Type.String({ description: "Cookie value for set" })),
+			domain: Type.Optional(Type.String({ description: "Cookie domain" })),
+		}),
+		async execute(_toolCallId, params) {
+			const { session_id, ...body } = params;
+			return textResult(await post(`/api/session/${session_id}/cookies`, body), { endpoint: "/api/session/{id}/cookies" });
 		},
 	});
 
@@ -249,19 +384,72 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "uiai_browser_diagnostics_clear",
+		label: "UIAI Browser Diagnostics Clear",
+		description: "Clear diagnostic buffers for a browser session.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(await post(`/api/session/${params.session_id}/diagnostics/clear`, {}), { endpoint: "/api/session/{id}/diagnostics/clear" });
+		},
+	});
+
+	pi.registerTool({
 		name: "uiai_browser_close",
 		label: "UIAI Browser Close",
 		description: "Close a UIAI browser session and free its page.",
-		parameters: Type.Object({
-			session_id: Type.String({ description: "UIAI browser session id" }),
-		}),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }) }),
 		async execute(_toolCallId, params) {
 			return textResult(await callEngine(`/api/session/${params.session_id}`, { method: "DELETE" }), { endpoint: "/api/session/{id}" });
 		},
 	});
 
+	pi.registerTool({
+		name: "uiai_screenshot",
+		label: "UIAI Screenshot",
+		description: "One-shot screenshot: navigate, capture, forget. Use sessions for multi-step browsing.",
+		parameters: Type.Object({
+			url: Type.String({ description: "URL to screenshot" }),
+			width: Type.Optional(Type.Number({ description: "Viewport width", default: 1280 })),
+			height: Type.Optional(Type.Number({ description: "Viewport height", default: 800 })),
+			format: Type.Optional(Type.String({ description: "Image format" })),
+			quality: Type.Optional(Type.Number({ description: "JPEG quality" })),
+			fullPage: Type.Optional(Type.Boolean({ description: "Full page capture" })),
+		}),
+		async execute(_toolCallId, params) {
+			const data = await post("/api/screenshot", params);
+			return textResult(withoutScreenshot(data), { endpoint: "/api/screenshot", has_screenshot: Boolean(data.screenshot) });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_frame_catalog",
+		label: "UIAI Frame Catalog",
+		description: "List available device frames before rendering screenshots into device mockups.",
+		parameters: Type.Object({}),
+		async execute() {
+			return textResult(await callEngine("/api/media/frame/catalog"), { endpoint: "/api/media/frame/catalog" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_frame_render",
+		label: "UIAI Frame Render",
+		description: "Render a base64 screenshot into a selected device frame. Use uiai_frame_catalog first.",
+		parameters: Type.Object({
+			frameId: Type.String({ description: "Frame ID from catalog" }),
+			imageBase64: Type.String({ description: "Source screenshot base64" }),
+			fit: Type.Optional(Type.String({ description: "cover or contain" })),
+			format: Type.Optional(Type.String({ description: "png or jpeg" })),
+			quality: Type.Optional(Type.Number({ description: "JPEG quality" })),
+			scale: Type.Optional(Type.Number({ description: "Output scale" })),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await post("/api/media/frame/render", params), { endpoint: "/api/media/frame/render" });
+		},
+	});
+
 	pi.registerCommand("uiai", {
-		description: "Show UIAI Engine agent bootstrap card",
+		description: "Show UIAI Engine agent menu and bootstrap widget",
 		handler: async (_args, ctx) => {
 			try {
 				const card = await callEngine("/api/tools/agent-card");
@@ -269,8 +457,25 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 				ctx.ui.setWidget("uiai-engine", [
 					"UIAI Engine",
 					`Base: ${engineUrl()}`,
-					"Use tools: pi_uiai_agent_card, pi_uiai_tool_graph, pi_uiai_tool_search, uiai_browser_open, uiai_browser_read/snapshot/click/fill/press/wait, uiai_browser_diagnostics",
+					"Tools: agent_card/search/graph + full browser session, screenshot, frame catalog/render",
 				]);
+				const choice = await ctx.ui.select("UIAI action", [
+					"Show agent card",
+					"Search tools",
+					"Open browser session",
+					"Run diagnostics",
+					"One-shot screenshot",
+					"Show tool graph",
+				]);
+				const prompts: Record<string, string> = {
+					"Show agent card": "Use pi_uiai_agent_card to show the UIAI Engine bootstrap card.",
+					"Search tools": "Use pi_uiai_tool_search with q=diagnostics, read, click, screenshot, or frame.",
+					"Open browser session": "Use uiai_browser_open with a URL, then uiai_browser_read, uiai_browser_snapshot, and action tools.",
+					"Run diagnostics": "Use uiai_browser_diagnostics with a session_id after any failed or surprising browser action.",
+					"One-shot screenshot": "Use uiai_screenshot with a URL for a one-off capture.",
+					"Show tool graph": "Use pi_uiai_tool_graph to inspect UIAI workflows and Focusa handoff routes.",
+				};
+				if (choice && prompts[choice]) ctx.ui.setEditorText(prompts[choice]);
 			} catch (err) {
 				ctx.ui.notify(`UIAI unavailable: ${err instanceof Error ? err.message : String(err)}`, "warning");
 			}

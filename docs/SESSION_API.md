@@ -75,24 +75,15 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 
 ## Pi Extension
 
-This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.ts`. Pi auto-discovers it when launched from the UIAI Engine project root. It registers compact direct tools for agent bootstrap and reliable browser surfing:
+This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.ts`. Pi auto-discovers it when launched from the UIAI Engine project root. It registers a full Pi-facing mirror of the MCP/browser tool surface for agent bootstrap, reliable browser surfing, screenshots, and frame helpers:
 
-- `pi_uiai_agent_card` — read the compact bootstrap card without colliding with MCP tool names.
-- `pi_uiai_tool_search` — search UIAI tools without loading every schema.
-- `pi_uiai_tool_graph` — inspect related tools, workflow routes, and [Focusa](https://github.com/Startempire-Wire/focusa) integration paths.
-- `uiai_health` — check browser readiness/pressure.
-- `uiai_browser_open` — open a persistent browser session; accepts optional `focusa_scope`.
-- `uiai_browser_snapshot` — get @ref accessibility tree for reliable actions.
-- `uiai_browser_navigate` — navigate an existing session.
-- `uiai_browser_click` — click a CSS selector or snapshot @ref.
-- `uiai_browser_fill` — replace an input value by selector or @ref.
-- `uiai_browser_press` — press keyboard keys such as Enter, Tab, or Escape.
-- `uiai_browser_wait` — wait for a selector before reading or acting.
-- `uiai_browser_read` — extract compact page/region text for web surfing.
-- `uiai_browser_diagnostics` — read console/exception/network evidence.
-- `uiai_browser_close` — free session resources.
+- Bootstrap/discovery: `pi_uiai_agent_card`, `pi_uiai_tool_search`, `pi_uiai_tool_graph`, `uiai_health`.
+- Browser lifecycle/state: `uiai_browser_open`, `uiai_browser_close`, `uiai_browser_screenshot`, `uiai_browser_read`, `uiai_browser_snapshot`, `uiai_browser_dom`, `uiai_browser_diagnostics`, `uiai_browser_diagnostics_clear`.
+- Browser navigation/actions: `uiai_browser_navigate`, `uiai_browser_scroll`, `uiai_browser_click`, `uiai_browser_hover`, `uiai_browser_type`, `uiai_browser_fill`, `uiai_browser_select`, `uiai_browser_press`, `uiai_browser_back`, `uiai_browser_forward`, `uiai_browser_wait`.
+- Browser advanced operations: `uiai_browser_eval`, `uiai_browser_eval_async`, `uiai_browser_resize`, `uiai_browser_css`, `uiai_browser_text`, `uiai_browser_cookies`.
+- Capture/media helpers: `uiai_screenshot`, `uiai_frame_catalog`, `uiai_frame_render`.
 
-Command: `/uiai` displays a small status widget. Set `UIAI_ENGINE_URL` to target a remote tunnel or non-default port; default is `http://localhost:7456`. Set `UIAI_PI_TIMEOUT_MS` to tune Pi extension HTTP timeout; default is 30000 ms.
+Command: `/uiai` uses Pi's supported `ctx.ui.select()` menu/dialog API to prefill common UIAI workflows; it does not use a non-existent `menu.items` API. Set `UIAI_ENGINE_URL` to target a remote tunnel or non-default port; default is `http://localhost:7456`. Set `UIAI_PI_TIMEOUT_MS` to tune Pi extension HTTP timeout; default is 30000 ms. Set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` when calling authenticated routes such as media/frame helpers or remote deployments.
 
 
 ## Interconnected Tool Graph + [Focusa](https://github.com/Startempire-Wire/focusa) Routing

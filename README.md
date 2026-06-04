@@ -347,7 +347,7 @@ Implementation anchors: [`internal/intelligence/`](internal/intelligence/), [`in
 
 ## Agent integration highlights
 
-- Project-local Pi extension: [`.pi/extensions/uiai-engine.ts`](.pi/extensions/uiai-engine.ts) registers compact UIAI tools for Pi sessions, including direct session open/read/snapshot/navigate/click/fill/press/wait/diagnostics/close actions.
+- Project-local Pi extension: [`.pi/extensions/uiai-engine.ts`](.pi/extensions/uiai-engine.ts) registers a full Pi-facing mirror of the MCP/browser tool surface: agent card/search/graph, browser sessions/actions/diagnostics, one-shot screenshots, and frame catalog/render helpers.
 - MCP bridge: [`mcp/browser-session-mcp.mjs`](mcp/browser-session-mcp.mjs) exposes browser/session tools plus `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, and `browser_read`; `tools/list` normalizes these core tools even when a running engine returns stale metadata.
 - Agent web surfing: persistent sessions include `/api/session/{id}/read` / `browser_read` for bounded page text extraction plus @ref actions for navigation and forms.
 - Diagnostics-first debugging: `browser_diagnostics` exposes console/errors/network/failed requests without forcing screenshots.
@@ -374,6 +374,8 @@ Remote/tunnel setup:
 
 ```bash
 export UIAI_ENGINE_URL="https://your-authenticated-engine.example"
+export UIAI_API_KEY="..."              # optional; enables authenticated routes such as media/frame helpers
+export UIAI_BEARER_TOKEN="..."         # optional alternative to UIAI_API_KEY for Pi extension calls
 export UIAI_PI_TIMEOUT_MS=30000
 export UIAI_MCP_TIMEOUT_MS=60000
 scripts/install-agent-integrations.sh
