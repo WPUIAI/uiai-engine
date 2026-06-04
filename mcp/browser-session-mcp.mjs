@@ -404,6 +404,24 @@ async function toolsCall(name, args) {
       };
       break;
 
+    case "frame_catalog":
+      url = `${ENGINE}/api/media/frame/catalog`;
+      method = "GET";
+      break;
+
+    case "frame_render":
+      url = `${ENGINE}/api/media/frame/render`;
+      method = "POST";
+      body = {
+        frameId: args.frameId,
+        imageBase64: args.imageBase64,
+        fit: args.fit,
+        format: args.format,
+        quality: args.quality,
+        scale: args.scale,
+      };
+      break;
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

@@ -23,6 +23,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - MCP JSON-RPC smoke: `tools/list` includes `browser_search`; `tools/call browser_search` returned `provider=brave`.
 - MCP core smoke: `tools/call uiai_health` and `tools/call uiai_status` returned valid health/status payloads.
 - MCP critique metadata smoke: `tools/call critique_models` and `tools/call critique_dimensions` returned valid read-only metadata payloads.
+- MCP media-frame smoke: `tools/call frame_catalog` returned catalog metadata and `tools/call frame_render` rendered a valid PNG frame payload.
 - Focusa handoff smoke: UIAI session opened with `focusa_scope`; diagnostics echoed scope; `focusa_browser_diagnostics_intake` completed with evidence `uiai-diagnostics:health-focusa-scope-smoke`.
 - Ownership check: no root-owned files under `/home/wpuiai/uiai-engine`.
 
@@ -39,7 +40,8 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - Completed: MCP bridge exposes browser/session/search plus non-browser `uiai_health` and `uiai_status` core tools.
 - Completed: MCP smoke coverage verifies `uiai_health` and `uiai_status` calls.
 - Completed: read-only critique metadata tools are exposed through MCP/Pi (`critique_models`, `critique_dimensions`; Pi `uiai_critique_*`).
-- Remaining: inventory deeper non-browser APIs agents may need next: reference analysis, media/frame rendering beyond existing frame helpers, and usage-safe admin reads.
+- Completed: MCP bridge now routes existing frame helpers (`frame_catalog`, `frame_render`) with loopback-public/remote-auth parity.
+- Remaining: inventory deeper non-browser APIs agents may need next: reference analysis and usage-safe admin reads.
 - Remaining: document client reconnect requirements where MCP metadata is cached.
 
 ### 3. Agent web surfing
@@ -75,4 +77,4 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ## Recommended next slice
 
-Next agent-core expansion: evaluate reference-analysis and usage-safe media/admin helpers; avoid paid or mutating tools unless a clear agent workflow and smoke proof exist.
+Next agent-core expansion: evaluate reference-analysis and usage-safe admin helpers; avoid paid or mutating tools unless a clear agent workflow and smoke proof exist.

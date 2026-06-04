@@ -79,7 +79,7 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 
 This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.ts`. Pi auto-discovers it when launched from the UIAI Engine project root. It registers a full Pi-facing mirror of the MCP/browser tool surface for agent bootstrap, reliable browser surfing, screenshots, and frame helpers:
 
-- Bootstrap/discovery: `pi_uiai_agent_card`, `pi_uiai_tool_search`, `pi_uiai_tool_graph`, `uiai_search`, `uiai_health`, `uiai_status`, `uiai_critique_models`, `uiai_critique_dimensions`.
+- Bootstrap/discovery: `pi_uiai_agent_card`, `pi_uiai_tool_search`, `pi_uiai_tool_graph`, `uiai_search`, `uiai_health`, `uiai_status`, `uiai_critique_models`, `uiai_critique_dimensions`, `uiai_frame_catalog`, `uiai_frame_render`.
 - Browser lifecycle/state: `uiai_browser_open`, `uiai_browser_close`, `uiai_browser_screenshot`, `uiai_browser_read`, `uiai_browser_snapshot`, `uiai_browser_dom`, `uiai_browser_diagnostics`, `uiai_browser_diagnostics_clear`.
 - Browser navigation/actions: `uiai_browser_navigate`, `uiai_browser_scroll`, `uiai_browser_click`, `uiai_browser_hover`, `uiai_browser_type`, `uiai_browser_fill`, `uiai_browser_select`, `uiai_browser_press`, `uiai_browser_back`, `uiai_browser_forward`, `uiai_browser_wait`.
 - Browser advanced operations: `uiai_browser_eval`, `uiai_browser_eval_async`, `uiai_browser_resize`, `uiai_browser_css`, `uiai_browser_text`, `uiai_browser_cookies`.

@@ -32,6 +32,8 @@ fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_heal
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_status")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "critique_models")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "critique_dimensions")' >/dev/null
+fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "frame_catalog")' >/dev/null
+fetch "$ENGINE_URL/api/media/frame/catalog" | jq -e '.count > 0' >/dev/null
 fetch_auth "$ENGINE_URL/api/search/providers" | jq -e '.providers[] | select(.id == "brave") | has("configured")' >/dev/null
 fetch_auth -X POST "$ENGINE_URL/api/search" -H "Content-Type: application/json" -d '{"query":"UIAI Engine browser agents","limit":1}' | jq -e '.provider == "brave" and .count >= 1' >/dev/null
 node --check "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/mcp/browser-session-mcp.mjs" >/dev/null

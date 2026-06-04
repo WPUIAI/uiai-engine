@@ -45,6 +45,32 @@ func TestSearchToolPathLoopbackPublicRemoteAuth(t *testing.T) {
 	}
 }
 
+func TestMediaFrameToolPathLoopbackPublicRemoteAuth(t *testing.T) {
+	authenticator := New(&config.Config{})
+	hit := false
+	handler := authenticator.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	loopbackReq := httptest.NewRequest("GET", "http://example.test/api/media/frame/catalog", nil)
+	loopbackReq.RemoteAddr = "127.0.0.1:12345"
+	loopbackRes := httptest.NewRecorder()
+	handler.ServeHTTP(loopbackRes, loopbackReq)
+	if loopbackRes.Code != http.StatusNoContent || !hit {
+		t.Fatalf("expected loopback media frame request through, code=%d hit=%v", loopbackRes.Code, hit)
+	}
+
+	hit = false
+	remoteReq := httptest.NewRequest("GET", "http://example.test/api/media/frame/catalog", nil)
+	remoteReq.RemoteAddr = "203.0.113.10:12345"
+	remoteRes := httptest.NewRecorder()
+	handler.ServeHTTP(remoteRes, remoteReq)
+	if remoteRes.Code != http.StatusUnauthorized || hit {
+		t.Fatalf("expected remote media frame request unauthorized, code=%d hit=%v", remoteRes.Code, hit)
+	}
+}
+
 func TestLoopbackRequestDetection(t *testing.T) {
 	req, _ := http.NewRequest("GET", "http://example.test/api/session", nil)
 	req.RemoteAddr = "127.0.0.1:12345"
