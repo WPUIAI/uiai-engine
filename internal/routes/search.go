@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
@@ -18,6 +19,7 @@ import (
 
 const defaultSearchLimit = 5
 const maxSearchLimit = 20
+const defaultSearchCacheTTLSeconds = 60
 
 type searchRequest struct {
 	Query    string `json:"query"`
@@ -36,13 +38,25 @@ type searchResult struct {
 }
 
 type searchResponse struct {
-	Schema   string         `json:"schema"`
-	Provider string         `json:"provider"`
-	Query    string         `json:"query"`
-	Count    int            `json:"count"`
-	Results  []searchResult `json:"results"`
-	Next     []string       `json:"next"`
+	Schema          string         `json:"schema"`
+	Provider        string         `json:"provider"`
+	Query           string         `json:"query"`
+	Count           int            `json:"count"`
+	Cached          bool           `json:"cached"`
+	CacheTTLSeconds int            `json:"cache_ttl_seconds"`
+	Results         []searchResult `json:"results"`
+	Next            []string       `json:"next"`
 }
+
+type searchCacheEntry struct {
+	Results   []searchResult
+	ExpiresAt time.Time
+}
+
+var searchCache = struct {
+	sync.Mutex
+	entries map[string]searchCacheEntry
+}{entries: map[string]searchCacheEntry{}}
 
 type braveWebResponse struct {
 	Web struct {
@@ -81,12 +95,13 @@ func handleSearchProviders(w http.ResponseWriter, _ *http.Request) {
 		"default_provider": "brave",
 		"providers": []map[string]any{
 			{
-				"id":              "brave",
-				"name":            "Brave Search",
-				"configured":      braveConfigured,
-				"status":          braveStatus,
-				"degraded_reason": braveReason,
-				"capabilities":    []string{"web_search", "source_urls", "snippets"},
+				"id":                "brave",
+				"name":              "Brave Search",
+				"configured":        braveConfigured,
+				"status":            braveStatus,
+				"degraded_reason":   braveReason,
+				"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
+				"capabilities":      []string{"web_search", "source_urls", "snippets"},
 			},
 		},
 	})
@@ -123,6 +138,14 @@ func runSearch(w http.ResponseWriter, req searchRequest) {
 	}
 	limit := normalizeSearchLimit(req.Limit)
 
+	ttl := searchCacheTTL()
+	if ttl > 0 {
+		if cachedResults, ok := getCachedSearch(provider, query, limit, time.Now()); ok {
+			writeSearchResponse(w, provider, query, cachedResults, true, ttl)
+			return
+		}
+	}
+
 	var results []searchResult
 	var err error
 	switch provider {
@@ -137,14 +160,10 @@ func runSearch(w http.ResponseWriter, req searchRequest) {
 		return
 	}
 	annotateSearchEvidence(results, provider, query)
-	writeJSON(w, 200, searchResponse{
-		Schema:   "uiai.search_results.v1",
-		Provider: provider,
-		Query:    query,
-		Count:    len(results),
-		Results:  results,
-		Next:     []string{"browser_open a selected result URL", "browser_read page text", "browser_diagnostics on navigation failure", "cite selected result with evidence_ref"},
-	})
+	if ttl > 0 {
+		setCachedSearch(provider, query, limit, results, time.Now().Add(ttl))
+	}
+	writeSearchResponse(w, provider, query, results, false, ttl)
 }
 
 func normalizeSearchLimit(limit int) int {
@@ -155,6 +174,63 @@ func normalizeSearchLimit(limit int) int {
 		return maxSearchLimit
 	}
 	return limit
+}
+
+func searchCacheTTL() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("UIAI_SEARCH_CACHE_TTL_SECONDS"))
+	if raw == "" {
+		return time.Duration(defaultSearchCacheTTLSeconds) * time.Second
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds < 0 {
+		return time.Duration(defaultSearchCacheTTLSeconds) * time.Second
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func writeSearchResponse(w http.ResponseWriter, provider, query string, results []searchResult, cached bool, ttl time.Duration) {
+	writeJSON(w, 200, searchResponse{
+		Schema:          "uiai.search_results.v1",
+		Provider:        provider,
+		Query:           query,
+		Count:           len(results),
+		Cached:          cached,
+		CacheTTLSeconds: int(ttl / time.Second),
+		Results:         results,
+		Next:            []string{"browser_open a selected result URL", "browser_read page text", "browser_diagnostics on navigation failure", "cite selected result with evidence_ref"},
+	})
+}
+
+func searchCacheKey(provider, query string, limit int) string {
+	return fmt.Sprintf("%s:%s:%d", provider, searchQueryHash(query), limit)
+}
+
+func cloneSearchResults(results []searchResult) []searchResult {
+	cloned := make([]searchResult, len(results))
+	copy(cloned, results)
+	return cloned
+}
+
+func getCachedSearch(provider, query string, limit int, now time.Time) ([]searchResult, bool) {
+	key := searchCacheKey(provider, query, limit)
+	searchCache.Lock()
+	defer searchCache.Unlock()
+	entry, ok := searchCache.entries[key]
+	if !ok {
+		return nil, false
+	}
+	if !now.Before(entry.ExpiresAt) {
+		delete(searchCache.entries, key)
+		return nil, false
+	}
+	return cloneSearchResults(entry.Results), true
+}
+
+func setCachedSearch(provider, query string, limit int, results []searchResult, expiresAt time.Time) {
+	key := searchCacheKey(provider, query, limit)
+	searchCache.Lock()
+	defer searchCache.Unlock()
+	searchCache.entries[key] = searchCacheEntry{Results: cloneSearchResults(results), ExpiresAt: expiresAt}
 }
 
 func searchQueryHash(query string) string {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNormalizeSearchLimit(t *testing.T) {
@@ -18,6 +19,42 @@ func TestNormalizeSearchLimit(t *testing.T) {
 	}
 	if got := normalizeSearchLimit(3); got != 3 {
 		t.Fatalf("explicit limit = %d, want 3", got)
+	}
+}
+
+func TestSearchCacheTTLDefaultsAndEnv(t *testing.T) {
+	t.Setenv("UIAI_SEARCH_CACHE_TTL_SECONDS", "")
+	if got := searchCacheTTL(); got != time.Duration(defaultSearchCacheTTLSeconds)*time.Second {
+		t.Fatalf("default cache ttl = %s", got)
+	}
+	t.Setenv("UIAI_SEARCH_CACHE_TTL_SECONDS", "0")
+	if got := searchCacheTTL(); got != 0 {
+		t.Fatalf("disabled cache ttl = %s, want 0", got)
+	}
+	t.Setenv("UIAI_SEARCH_CACHE_TTL_SECONDS", "7")
+	if got := searchCacheTTL(); got != 7*time.Second {
+		t.Fatalf("explicit cache ttl = %s, want 7s", got)
+	}
+}
+
+func TestSearchCacheStoresClonesAndExpires(t *testing.T) {
+	searchCache.Lock()
+	searchCache.entries = map[string]searchCacheEntry{}
+	searchCache.Unlock()
+
+	now := time.Unix(100, 0)
+	setCachedSearch("brave", "agent browser", 2, []searchResult{{Title: "One"}}, now.Add(time.Minute))
+	got, ok := getCachedSearch("brave", "agent browser", 2, now)
+	if !ok || len(got) != 1 || got[0].Title != "One" {
+		t.Fatalf("expected cached result, got ok=%v results=%+v", ok, got)
+	}
+	got[0].Title = "mutated"
+	again, ok := getCachedSearch("brave", "agent browser", 2, now)
+	if !ok || again[0].Title != "One" {
+		t.Fatalf("cache should return clones, got ok=%v results=%+v", ok, again)
+	}
+	if _, ok := getCachedSearch("brave", "agent browser", 2, now.Add(2*time.Minute)); ok {
+		t.Fatal("expected expired cache miss")
 	}
 }
 

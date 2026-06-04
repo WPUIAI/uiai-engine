@@ -83,7 +83,7 @@ Current proof commands:
 
 - Search → open → read → snapshot → diagnostics workflow is now advertised and smoke-tested.
 - Evaluated in `uiai-engine-1if`: no `open_result` helper added yet; existing search → open → read workflow is advertised/smoke-tested, and Pi/MCP wrappers keep results compact. Revisit only with repeated workflow-friction evidence.
-- Deferred to `uiai-engine-r0d`: evaluate search result caching/rate limiting to reduce provider cost and protect Brave quota beyond the documented provider-account quota boundary.
+- Completed: `uiai-engine-r0d` added in-memory successful-result cache with `UIAI_SEARCH_CACHE_TTL_SECONDS` (`60` default, `0` disables), `cached` response metadata, and provider `cache_ttl_seconds`; explicit local rate limiting remains future-only if provider pressure appears.
 
 ### 4. Focusa integration
 
