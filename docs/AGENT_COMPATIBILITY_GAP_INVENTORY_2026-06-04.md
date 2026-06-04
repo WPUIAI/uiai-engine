@@ -15,6 +15,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - CLI wrapper slice added: `scripts/uiai` supports status, health, errors, tools, session open/read/diagnostics/close, smoke, install, output modes, and stable exit code conventions.
 - Interoperability quality spec added: `docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md` defines cross-surface contracts, acceptance gates, and proof requirements.
 - README now links the interoperability quality spec, endpoint auth matrix, and WordPress plugin route parity matrix from the task index and matrix section.
+- Agent-surface release proof checklist added: `docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md` lists HTTP/Pi/MCP/CLI/browser/search/auth/Focusa/doc gates and evidence handles.
 - Provider-neutral search route exists: `GET/POST /api/search`.
 - Brave provider is implemented behind the generic search contract.
 - Search provider metadata exists: `GET /api/search/providers`.
