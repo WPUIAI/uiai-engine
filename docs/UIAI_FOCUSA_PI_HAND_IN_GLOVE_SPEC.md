@@ -370,34 +370,74 @@ Packet field:
 }
 ```
 
-## 7. Gap analysis from current surfaces
+## 7. Second-pass audit gap analysis
 
-1. **Packet missing:** current tools expose handles and graph routes, but no single packet that bundles goal, scope, target refs, evidence refs, diagnostic summary, next Focusa tool, and cleanup.
-2. **Focusa tool arguments missing in UIAI metadata:** graph names preferred tools, but responses rarely include ready-to-call Focusa argument suggestions.
-3. **Pi workflow still manual:** tools are present, but research/diagnose/proof are not first-class guided Pi flows.
-4. **Active-object hints can improve:** diagnostics and search results can produce compact URL/endpoint/selector/source-location hints for Focusa.
-5. **Observability can deepen:** browser/search/cache/error trends are proven by smoke/soak, not yet surfaced as long-term paired Focusa/Pi health guidance.
-6. **External Focusa hot route reliability remains separate:** UIAI emits handles; Focusa evidence hot path should remain monitored/diagnosed when capture times out.
+This section captures the audit-only pass performed after the initial spec. It is intentionally a **certainty gate**: do not build from this list until the owning component, acceptance proof, and no-build constraints are clear.
+
+### 7.1 High-confidence gaps
+
+1. **ResearchDiagnosticsPacket missing:** current tools expose handles and graph routes, but no single packet bundles goal, scope, target refs, evidence refs, diagnostic summary, next Focusa tool, and cleanup.
+2. **Ready Focusa arguments missing in UIAI response metadata:** `/api/tools/graph` names preferred Focusa tools, but most evidence-bearing responses do not include ready-to-call `target_ref`, `evidence_ref`, `preferred_tool`, `summary`, and `next_tools` metadata.
+3. **Pi workflow still manual:** 37 UIAI Pi tools are present, but research/diagnose/proof are not first-class guided Pi flows.
+4. **Focusa packet intake broader than diagnostics is absent:** `focusa_browser_diagnostics_intake` is strong for diagnostics/failure envelopes, but there is no broader intake path for search/read/snapshot/error bundles.
+5. **Active-object hints are shallow:** diagnostics and search outputs can produce better compact hints for URL path, failed endpoint, selector label/ref, JS source location, and selected search-result source.
+6. **Observability can deepen:** browser health/metrics and smoke/soak proof exist, but browser/search/cache/error trend summaries are not yet surfaced as long-term paired Focusa/Pi health guidance.
+7. **Focusa project-card crosswire risk:** a project-card read returned stale-looking unrelated HLG text while `project_verify` and `trajectory_view` were correct; use trajectory + Workpoint + repo evidence as authority until card context is checked.
+8. **WordPress parity remains outside the packet path:** training service-token mismatch, structured-error preservation, and screenshot health route naming are still product-facing gaps.
+9. **Non-browser API exposure remains gated:** reference/admin/memory/workflow/intelligence/training/captcha routes still require workflow, auth, cost, redaction, and smoke proof before Pi/MCP/CLI exposure.
+10. **Search/provider future gaps remain:** Brave is the only implemented provider; explicit local provider rate limiting and future-provider parity are not yet proven.
+11. **Docs/proof automation missing:** README, Session API, gap inventory, tool graph, Pi/MCP/CLI surfaces are updated manually; no CI drift check enforces alignment.
+12. **Focusa/Pi hook maturity is relevant:** Focusa specs call out richer Pi lifecycle/provider/tool hooks; those may matter before automatic packet/proof capture during long Pi runs.
+
+### 7.2 Certainty matrix
+
+| Gap | Owner | Certainty | Build decision gate | Acceptance proof |
+|---|---|---:|---|---|
+| ResearchDiagnosticsPacket | UIAI first, Pi wrapper second | High | Exact schema accepted; no automatic paid/mutating actions | Harmless search/open/read/diagnostics packet smoke; bounded/redacted JSON |
+| Ready Focusa args in responses | UIAI | High | Decide field names and target responses before code | Unit/API smoke shows `focusa.target_ref/evidence_ref/preferred_tool/summary` |
+| Guided `/uiai research` / `/uiai diagnose` | Pi | Medium-high | Packet metadata exists or workflow can compose it without hidden state | Pi registration/runtime smoke; compact result includes evidence and next Focusa tool |
+| Broader Focusa packet intake | Focusa | Medium | Determine whether existing evidence/diagnostics tools are sufficient | Dry-run intake or evidence capture accepts packet summary without raw blobs |
+| Active-object hints | UIAI + Focusa | High | Define normalized hint fields and redaction rules | Focusa active-object resolve receives URL/endpoint/selector/source hints |
+| Observability summaries | UIAI + Focusa doctor/project-card | Medium | Define which metrics predict agent failure loops | Health/metrics expose pressure; Focusa doctor summarizes `uiai_browser` and trend risk |
+| Project-card crosswire risk | Focusa | Medium-high | Diagnose card HLG/context source before trusting card route for UIAI planning | Project card aligns with verified project/trajectory or marks advisory mismatch |
+| WordPress parity | WP plugin + UIAI | High | Separate product-flow plan; not part of packet MVP | Plugin preserves structured errors; service-token route either wired or disabled |
+| Non-browser exposure | UIAI/Pi/MCP | High | Concrete workflow + auth/cost/redaction proof per family | Exposure inventory updated; auth/redaction/smoke passes |
+| Provider expansion/rate limiting | UIAI | Medium | Evidence of provider pressure or second provider need | Degraded/cache/redaction/evidence contract passes for provider N |
+| Docs drift automation | UIAI CI | Medium | Choose drift assertions that avoid brittle docs tests | CI fails when surface changes lack README/Session API/gap inventory updates |
+| Pi hook maturity | Focusa/Pi | Medium | Decide if automatic packet capture needs lifecycle hooks | Hook telemetry proves capture points without raw message/tool blobs |
+
+### 7.3 No-build constraints before Iteration 1
+
+Before implementation starts, answer these:
+
+1. Which existing responses get Focusa metadata first: search, browser read, diagnostics, errors, screenshot/share, or all evidence-bearing responses?
+2. Is the packet composed in Pi first, or returned by a UIAI HTTP endpoint first?
+3. Does Focusa need a new packet intake tool, or should packet summaries route through `focusa_evidence_capture` and `focusa_browser_diagnostics_intake`?
+4. What is the exact stable packet schema and maximum size budget?
+5. Which proof path demonstrates value without paid/mutating calls?
+6. How should stale/cross-project project-card signals be detected and reported?
 
 ## 8. Acceptance matrix
 
 | Iteration | Must prove |
 |---|---|
-| 0 | Spec linked; authority/evidence contracts documented. |
-| 1 | Packet can be assembled from existing search/open/read/diagnostics without raw blobs. |
-| 2 | Pi guided workflow creates packet and recommends Focusa capture. |
-| 3 | Optional HTTP packet endpoint has auth/redaction/degraded smokes. |
-| 4 | Packet hints improve active-object/prediction flow. |
-| 5 | Health/metrics expose enough pressure to prevent browser/search failure loops. |
+| 0 | Spec linked; authority/evidence contracts documented; second-pass certainty matrix recorded. |
+| 1 | Packet can be assembled from existing search/open/read/diagnostics without raw blobs and with ready Focusa argument metadata. |
+| 2 | Pi guided workflow creates packet and recommends Focusa capture without becoming parallel memory. |
+| 3 | Optional HTTP packet endpoint has auth/redaction/degraded smokes and does not perform paid/mutating actions. |
+| 4 | Packet hints improve active-object/prediction flow with URL/endpoint/selector/source evidence. |
+| 5 | Health/metrics expose enough pressure to prevent browser/search/cache/error failure loops. |
 
 ## 9. Proposed next beads
 
-1. `Spec: link UIAI Focusa Pi hand-in-glove spec in README and Session API`.
+1. `Decide: ResearchDiagnosticsPacket schema and response surfaces`.
 2. `Packet: add Focusa metadata object to browser_read/search/diagnostics responses`.
-3. `Pi: add /uiai research and /uiai diagnose guided workflows`.
-4. `Smoke: verify research packet -> Focusa evidence capture path`.
-5. `Graph: expose packet workflow schema and ready Focusa argument hints`.
-6. `Observe: add browser/search/cache pressure summary for Focusa tool doctor/project card`.
+3. `Smoke: compose packet from existing tools without new endpoint`.
+4. `Pi: add /uiai research and /uiai diagnose guided workflows`.
+5. `Focusa: evaluate whether packet needs a dedicated intake tool`.
+6. `Graph: expose packet workflow schema and ready Focusa argument hints`.
+7. `Observe: add browser/search/cache pressure summary for Focusa tool doctor/project card`.
+8. `CI: add docs/surface drift check after packet metadata lands`.
 
 ## 10. Decision rule
 
@@ -407,3 +447,4 @@ Prefer the smallest iteration that reduces agent friction while preserving the F
 - If it creates durable browser/search/diagnostics evidence, implement in UIAI.
 - If it changes memory, Workpoint, trajectory, prediction, or lessons, implement in Focusa.
 - If it crosses boundaries, expose stable handles and ready-to-call arguments, not raw blobs or hidden writes.
+- If a gap lacks owner, schema, proof, or safety boundary, keep it in audit/spec mode instead of building.
