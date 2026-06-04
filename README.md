@@ -8,7 +8,7 @@ UIAI Engine serves as a single local or remote API surface for:
 
 - **WPUIAI plugin cloud calls:** critique, UI reverse/reference analysis, section detection, layout comparison, style enhancement, copilot chat, intake, workflow orchestration, and usage reporting.
 - **Visual automation:** one-shot screenshots, persistent browser sessions, DOM snapshots, page text extraction, click/type/fill/select/press actions, CSS injection, viewport changes, cookies/auth save-load, diagnostics, and shareable artifacts.
-- **Agent integrations:** Pi extension tools, MCP browser-session bridge, OpenAI/MCP tool schemas, compact agent cards, tool search, tool graph metadata, and [Focusa](https://github.com/Startempire-Wire/focusa)-aware evidence routes.
+- **Agent integrations:** Pi extension tools, MCP browser-session bridge, OpenAI/MCP tool schemas, compact agent cards, provider-neutral web search, tool search, tool graph metadata, and [Focusa](https://github.com/Startempire-Wire/focusa)-aware evidence routes.
 - **Design/build pipelines:** design-system extraction, content mapping, block recipes, five-way comparison, migration helpers, and SSE events.
 - **Media and device output:** device-frame catalog/rendering, media job production, screenshot compare, share viewers, and artifact handles.
 - **Reliability and safety:** browser pool metrics, diagnostics without screenshots, URL allow/deny rules, loopback-public browser APIs, authenticated remote exposure, rate limits, credit deduction, and secret-safe deployment conventions.
@@ -48,6 +48,7 @@ Main entry points:
 - Default config: [`config.yaml`](config.yaml)
 - MCP bridge: [`mcp/browser-session-mcp.mjs`](mcp/browser-session-mcp.mjs)
 - Pi extension: [`.pi/extensions/uiai-engine.ts`](.pi/extensions/uiai-engine.ts)
+- Search flow: call `uiai_search`/`browser_search`, open a selected result with `browser_open`, then use `browser_read` and diagnostics as needed.
 
 ## Documentation map
 
@@ -195,6 +196,8 @@ Cross-links: [`docs/SESSION_API.md`](docs/SESSION_API.md), [`docs/BROWSER_RELIAB
 | `GET` | `/api/tools/agent-card` | Compact bootstrap card for agents. |
 | `GET` | `/api/tools/graph` | Tool relationship graph, workflows, [Focusa](https://github.com/Startempire-Wire/focusa) integration metadata. |
 | `GET` | `/api/tools/search?q=...` | Low-context search for relevant tools. |
+| `GET`/`POST` | `/api/search` | Provider-neutral web search for browser agents; Brave is the default provider. |
+| `GET` | `/api/search/providers` | Search provider metadata/configuration status. |
 
 Agent surfaces:
 
@@ -348,8 +351,8 @@ Implementation anchors: [`internal/intelligence/`](internal/intelligence/), [`in
 
 ## Agent integration highlights
 
-- Project-local Pi extension: [`.pi/extensions/uiai-engine.ts`](.pi/extensions/uiai-engine.ts) registers a full Pi-facing mirror of the MCP/browser tool surface: agent card/search/graph, browser sessions/actions/diagnostics, one-shot screenshots, and frame catalog/render helpers.
-- MCP bridge: [`mcp/browser-session-mcp.mjs`](mcp/browser-session-mcp.mjs) exposes browser/session tools plus `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, and `browser_read`; `tools/list` normalizes these core tools even when a running engine returns stale metadata.
+- Project-local Pi extension: [`.pi/extensions/uiai-engine.ts`](.pi/extensions/uiai-engine.ts) registers a full Pi-facing mirror of the MCP/browser tool surface: agent card/tool search/graph, provider web search, browser sessions/actions/diagnostics, one-shot screenshots, and frame catalog/render helpers. `/uiai off` clears the UIAI widget.
+- MCP bridge: [`mcp/browser-session-mcp.mjs`](mcp/browser-session-mcp.mjs) exposes browser/session tools plus `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, `browser_search`, and `browser_read`; `tools/list` normalizes these core tools even when a running engine returns stale metadata.
 - Agent web surfing: persistent sessions include `/api/session/{id}/read` / `browser_read` for bounded page text extraction plus @ref actions for navigation and forms.
 - Diagnostics-first debugging: `browser_diagnostics` exposes console/errors/network/failed requests without forcing screenshots.
 - [Focusa](https://github.com/Startempire-Wire/focusa) handoff: `browser_open` accepts `focusa_scope`; diagnostics and evidence flows preserve project/workpoint scope; `/api/tools/graph` exposes [Focusa](https://github.com/Startempire-Wire/focusa)-aware related-tool routes.
@@ -433,12 +436,12 @@ Security notes:
 
 - Secrets should be referenced through environment variables, not committed literal values.
 - `vision.allow_private_urls: true` is appropriate for local/dev; remote deployment should review URL safety rules in [`docs/SESSION_API.md`](docs/SESSION_API.md).
-- Browser/session and screenshot APIs are loopback-public only; remote callers must authenticate. The Pi extension can send `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` for authenticated remote/media helpers. Local VPS deployments may configure an eternal env-backed `UIAI_LOCAL_API_TOKEN` accepted as `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`.
+- Browser/session, screenshot, and provider search APIs are loopback-public only; remote callers must authenticate. The Pi extension can send `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` for authenticated remote/media helpers. Local VPS deployments may configure an eternal env-backed `UIAI_LOCAL_API_TOKEN` accepted as `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`.
 
 ## Security and exposure model
 
 - `/api/tools*` discovery is intentionally public and low-context.
-- `/api/session*` and `/api/screenshot*` are unauthenticated only for loopback callers.
+- `/api/session*`, `/api/screenshot*`, and `/api/search*` are unauthenticated only for loopback callers.
 - Remote browser/session/screenshot callers require normal UIAI auth headers; Pi extension callers can set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`. The local VPS eternal token is configured server-side with `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_API_TOKENS`.
 - Browser navigation accepts `http://` and `https://` only.
 - `file://`, `data:`, `ftp://`, and similar schemes are blocked.

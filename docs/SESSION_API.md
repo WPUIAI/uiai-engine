@@ -72,18 +72,20 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `GET` | `/api/tools/openai` | Full OpenAI function-calling tool definitions. |
 | `GET` | `/api/tools/mcp` | MCP tool definitions for remote bridges. |
 | `GET` | `/api/tools/graph` | Tool relationship graph with workflow routes and [Focusa](https://github.com/Startempire-Wire/focusa) integration metadata. |
+| `GET`/`POST` | `/api/search` | Provider-neutral web search for agents; Brave is the default provider. |
+| `GET` | `/api/search/providers` | Search provider metadata and configured status. |
 
 ## Pi Extension
 
 This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.ts`. Pi auto-discovers it when launched from the UIAI Engine project root. It registers a full Pi-facing mirror of the MCP/browser tool surface for agent bootstrap, reliable browser surfing, screenshots, and frame helpers:
 
-- Bootstrap/discovery: `pi_uiai_agent_card`, `pi_uiai_tool_search`, `pi_uiai_tool_graph`, `uiai_health`.
+- Bootstrap/discovery: `pi_uiai_agent_card`, `pi_uiai_tool_search`, `pi_uiai_tool_graph`, `uiai_search`, `uiai_health`.
 - Browser lifecycle/state: `uiai_browser_open`, `uiai_browser_close`, `uiai_browser_screenshot`, `uiai_browser_read`, `uiai_browser_snapshot`, `uiai_browser_dom`, `uiai_browser_diagnostics`, `uiai_browser_diagnostics_clear`.
 - Browser navigation/actions: `uiai_browser_navigate`, `uiai_browser_scroll`, `uiai_browser_click`, `uiai_browser_hover`, `uiai_browser_type`, `uiai_browser_fill`, `uiai_browser_select`, `uiai_browser_press`, `uiai_browser_back`, `uiai_browser_forward`, `uiai_browser_wait`.
 - Browser advanced operations: `uiai_browser_eval`, `uiai_browser_eval_async`, `uiai_browser_resize`, `uiai_browser_css`, `uiai_browser_text`, `uiai_browser_cookies`.
 - Capture/media helpers: `uiai_screenshot`, `uiai_frame_catalog`, `uiai_frame_render`.
 
-Command: `/uiai` uses Pi's supported `ctx.ui.select()` menu/dialog API to prefill common UIAI workflows; it does not use a non-existent `menu.items` API. Set `UIAI_ENGINE_URL` to target a remote tunnel or non-default port; default is `http://localhost:7456`. Set `UIAI_PI_TIMEOUT_MS` to tune Pi extension HTTP timeout; default is 30000 ms. Set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` when calling authenticated routes such as media/frame helpers or remote deployments.
+Command: `/uiai` uses Pi's supported `ctx.ui.select()` menu/dialog API to prefill common UIAI workflows; it includes **Hide UIAI card**, and `/uiai off` (also `hide`, `clear`, `disable`) clears the persistent UIAI widget. It does not use a non-existent `menu.items` API. Set `UIAI_ENGINE_URL` to target a remote tunnel or non-default port; default is `http://localhost:7456`. Set `UIAI_PI_TIMEOUT_MS` to tune Pi extension HTTP timeout; default is 30000 ms. Set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` when calling authenticated routes such as media/frame helpers or remote deployments.
 
 
 ## Interconnected Tool Graph + [Focusa](https://github.com/Startempire-Wire/focusa) Routing
@@ -961,7 +963,7 @@ Remote deployment reminder: browser/session and screenshot endpoints require aut
 ## Security + Remote Exposure Boundaries
 
 - Tool discovery (`/api/tools*`) is intentionally public and low-context.
-- Browser/session APIs (`/api/session*`) and screenshot APIs (`/api/screenshot*`) are loopback-public only. Remote callers must authenticate with normal UIAI credentials/headers.
+- Browser/session APIs (`/api/session*`), screenshot APIs (`/api/screenshot*`), and provider search (`/api/search*`) are loopback-public only. Remote callers must authenticate with normal UIAI credentials/headers.
 - Persistent sessions and one-shot screenshots share URL safety rules: only `http://`/`https://`; `file://`, `data:`, `ftp://`, and similar schemes are blocked.
 - Private/internal hosts (`localhost`, `127.*`, RFC1918 ranges, link-local, etc.) are blocked unless `vision.allow_private_urls: true` is configured for local development or explicitly trusted staging.
 - For remote agents, prefer an authenticated tunnel/proxy and set `UIAI_ENGINE_URL` in the Pi extension/MCP bridge.
@@ -993,7 +995,7 @@ mcp({ tool: "browser_screenshot", args: '{"session_id": "abc123"}' })
 mcp({ tool: "browser_close", args: '{"session_id": "abc123"}' })
 ```
 
-The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP exposes and bridge-normalizes `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, and `browser_read` even if the running engine returns stale metadata; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. The project Pi extension mirrors the live MCP/browser surface with Pi-prefixed names (`browser_click` → `uiai_browser_click`, `frame_catalog` → `uiai_frame_catalog`, `uiai_agent_card` → `pi_uiai_agent_card`) plus `uiai_health`. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
+The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP exposes and bridge-normalizes `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, `browser_search`, and `browser_read` even if the running engine returns stale metadata; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. The project Pi extension mirrors the live MCP/browser surface with Pi-prefixed names (`browser_click` → `uiai_browser_click`, `frame_catalog` → `uiai_frame_catalog`, `uiai_agent_card` → `pi_uiai_agent_card`) plus `uiai_health`. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
 
 ### Claude Desktop
 

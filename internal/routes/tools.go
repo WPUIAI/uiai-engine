@@ -67,7 +67,7 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 			writeJSON(w, 200, map[string]any{
 				"tools": brief,
 				"count": len(brief),
-				"hint":  "Add ?q=keyword to search. Try q=screenshot, q=console, q=network, q=error, q=exception, q=devtools, q=retry, q=flakiness, or q=failed_request. Full definitions at /api/tools/openai or /api/tools/mcp",
+				"hint":  "Add ?q=keyword to search. Try q=search, q=screenshot, q=console, q=network, q=error, q=exception, q=devtools, q=retry, q=flakiness, or q=failed_request. Full definitions at /api/tools/openai or /api/tools/mcp",
 			})
 			return
 		}
@@ -87,7 +87,7 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 func agentBootstrapCard() map[string]any {
 	return map[string]any{
 		"service":  "uiai-engine",
-		"purpose":  "Lightweight browser, screenshot, visual QA, and diagnostics backend for local and remote agents.",
+		"purpose":  "Lightweight browser, web search, screenshot, visual QA, and diagnostics backend for local and remote agents.",
 		"base_url": "http://localhost:7456",
 		"discovery": map[string]string{
 			"agent_card": "/api/tools/agent-card",
@@ -101,6 +101,10 @@ func agentBootstrapCard() map[string]any {
 		},
 		"recommended_workflows": []map[string]any{
 			{
+				"name":  "search_then_browse",
+				"steps": []string{"browser_search", "browser_open selected result", "browser_read for page text", "browser_snapshot for actions", "browser_diagnostics on failure", "browser_close"},
+			},
+			{
 				"name":  "persistent_browser_loop",
 				"steps": []string{"browser_open", "browser_read for page text", "browser_snapshot for actions", "browser_click/browser_fill/browser_press", "browser_diagnostics on failure or visual mismatch", "browser_close"},
 			},
@@ -113,7 +117,7 @@ func agentBootstrapCard() map[string]any {
 				"steps": []string{"reproduce with direct session actions", "browser_diagnostics", "classify console/exception/network/selector/timeout", "patch only after evidence"},
 			},
 		},
-		"search_hints": []string{"screenshot", "snapshot", "read", "extract", "click", "fill", "eval_async", "diagnostics", "console", "network", "error", "failed_request", "blank page", "visual failure"},
+		"search_hints": []string{"search", "web search", "screenshot", "snapshot", "read", "extract", "click", "fill", "eval_async", "diagnostics", "console", "network", "error", "failed_request", "blank page", "visual failure"},
 		"reliability_rules": []string{
 			"Prefer browser_snapshot @refs over brittle CSS guessing.",
 			"Keep browser_eval synchronous and short; use browser_eval_async only for bounded awaits.",
@@ -194,6 +198,7 @@ func toolGraph() map[string]any {
 			"preferred_focusa_tools": []string{"focusa_browser_diagnostics_intake", "focusa_evidence_capture", "focusa_workpoint_link_evidence", "focusa_predict_record"},
 		},
 		"workflows": []map[string]any{
+			{"name": "search_then_browse", "steps": []string{"browser_search", "browser_open selected result", "browser_read", "browser_snapshot", "browser_diagnostics", "browser_close"}},
 			{"name": "web_surfing", "steps": []string{"browser_open", "browser_read", "browser_snapshot", "browser_click/browser_fill/browser_press", "browser_diagnostics", "browser_close"}},
 			{"name": "visual_debug", "steps": []string{"browser_open", "browser_screenshot", "browser_diagnostics", "browser_eval_async", "browser_close"}},
 			{"name": "single_capture", "steps": []string{"screenshot", "frame_catalog", "frame_render"}},
@@ -206,7 +211,8 @@ func toolGraph() map[string]any {
 func toolRelations() map[string][]string {
 	return map[string][]string{
 		"uiai_agent_card":           {"uiai_tool_search", "browser_open", "browser_read", "browser_diagnostics", "focusa_browser_diagnostics_intake"},
-		"uiai_tool_search":          {"uiai_agent_card", "browser_open", "browser_read", "browser_diagnostics"},
+		"uiai_tool_search":          {"uiai_agent_card", "browser_search", "browser_open", "browser_read", "browser_diagnostics"},
+		"browser_search":            {"browser_open", "browser_read", "browser_diagnostics", "uiai_tool_search"},
 		"browser_open":              {"browser_read", "browser_snapshot", "browser_diagnostics", "focusa_browser_diagnostics_intake", "browser_close"},
 		"browser_read":              {"browser_snapshot", "browser_text", "browser_diagnostics", "browser_close"},
 		"browser_snapshot":          {"browser_click", "browser_fill", "browser_hover", "browser_text", "browser_diagnostics"},
@@ -239,6 +245,9 @@ func toolRelations() map[string][]string {
 }
 
 func workflowHints(name string) []string {
+	if name == "browser_search" {
+		return []string{"Use provider-neutral search for discovery", "Open a selected result with browser_open", "Use browser_read for page text", "Use browser_diagnostics on navigation failures"}
+	}
 	if strings.HasPrefix(name, "browser_") {
 		return []string{"Open or reuse a session", "Prefer browser_read for text and browser_snapshot for actions", "Use browser_diagnostics after failures", "If focusa_scope is present, ingest diagnostics/evidence in Focusa", "Close sessions when done"}
 	}
@@ -289,6 +298,19 @@ func openAITools() []map[string]any {
 			"parameters": map[string]any{
 				"type":       "object",
 				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "browser_search",
+			"description": "Provider-neutral web search for browser agents. Returns result titles, snippets, and source URLs; open selected URLs with browser_open, then browser_read. Brave is the default provider but not baked into browser semantics.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"query":    map[string]string{"type": "string", "description": "Search query"},
+					"provider": map[string]any{"type": "string", "description": "Search provider id; default brave", "default": "brave"},
+					"limit":    map[string]any{"type": "integer", "description": "Result limit, max 20", "default": 5},
+				},
+				"required": []string{"query"},
 			},
 		},
 		{

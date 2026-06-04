@@ -123,6 +123,19 @@ const BRIDGE_CORE_TOOLS = [
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "browser_search",
+    description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with browser_open, then browser_read.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" },
+        provider: { type: "string", default: "brave", description: "Search provider id" },
+        limit: { type: "integer", default: 5, description: "Result limit, max 20" },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "browser_read",
     description: "Extract compact readable page/region text without taking a screenshot. Use for agent web surfing after open/navigate.",
     inputSchema: {
@@ -183,6 +196,12 @@ async function toolsCall(name, args) {
     case "uiai_tool_graph":
       url = `${ENGINE}/api/tools/graph`;
       method = "GET";
+      break;
+
+    case "browser_search":
+      url = `${ENGINE}/api/search`;
+      method = "POST";
+      body = { query: args.query, provider: args.provider, limit: args.limit };
       break;
 
     case "browser_open":

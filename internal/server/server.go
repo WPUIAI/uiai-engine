@@ -266,6 +266,11 @@ func (e *Engine) mountRoutes() {
 		routes.MountCaptchaRoutes(r, e.captcha)
 	})
 
+	// Provider-neutral web search/discovery for browser agents
+	r.Route("/api/search", func(r chi.Router) {
+		routes.MountSearchRoutes(r, e.cfg)
+	})
+
 	// Tool Discovery — LLM agents search/discover tools without loading all definitions
 	// GET /api/tools/search?q=screenshot → find specific tools (minimal context)
 	// GET /api/tools/openai → OpenAI function calling format
@@ -329,6 +334,7 @@ func (e *Engine) handleRoot(w http.ResponseWriter, r *http.Request) {
 			"screenshot":    "/api/screenshot",
 			"media":         "/api/media",
 			"share":         "/api/share",
+			"search":        "/api/search",
 		},
 	})
 }

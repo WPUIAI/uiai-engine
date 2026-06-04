@@ -56,7 +56,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		// Browser/session APIs are local tool APIs: loopback may use them without auth,
 		// but non-loopback callers must authenticate to avoid accidental remote exposure.
 		p := r.URL.Path
-		if isBrowserToolPath(p) {
+		if isLoopbackToolPath(p) {
 			if id, err := a.Authenticate(r); err == nil {
 				ctx := context.WithValue(r.Context(), ctxKey{}, id)
 				next.ServeHTTP(w, r.WithContext(ctx))
@@ -68,7 +68,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(401)
-			json.NewEncoder(w).Encode(map[string]string{"error": "authentication required for remote browser/session API access"})
+			json.NewEncoder(w).Encode(map[string]string{"error": "authentication required for remote browser/session/search API access"})
 			return
 		}
 
@@ -114,8 +114,8 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func isBrowserToolPath(path string) bool {
-	return path == "/api/screenshot" || strings.HasPrefix(path, "/api/screenshot/") || strings.HasPrefix(path, "/api/session")
+func isLoopbackToolPath(path string) bool {
+	return path == "/api/screenshot" || strings.HasPrefix(path, "/api/screenshot/") || strings.HasPrefix(path, "/api/session") || path == "/api/search" || strings.HasPrefix(path, "/api/search/")
 }
 
 func isLoopbackRequest(r *http.Request) bool {

@@ -7,14 +7,14 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/config"
 )
 
-func TestBrowserToolPathClassification(t *testing.T) {
-	for _, path := range []string{"/api/session", "/api/session/abc/read", "/api/screenshot", "/api/screenshot/share"} {
-		if !isBrowserToolPath(path) {
-			t.Fatalf("expected browser tool path: %s", path)
+func TestLoopbackToolPathClassification(t *testing.T) {
+	for _, path := range []string{"/api/session", "/api/session/abc/read", "/api/screenshot", "/api/screenshot/share", "/api/search", "/api/search/providers"} {
+		if !isLoopbackToolPath(path) {
+			t.Fatalf("expected loopback tool path: %s", path)
 		}
 	}
-	if isBrowserToolPath("/api/tools/graph") {
-		t.Fatal("/api/tools should remain discovery, not browser tool path")
+	if isLoopbackToolPath("/api/tools/graph") {
+		t.Fatal("/api/tools should remain discovery, not loopback tool path")
 	}
 }
 

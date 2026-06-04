@@ -95,6 +95,20 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "uiai_search",
+		label: "UIAI Web Search",
+		description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with uiai_browser_open, then uiai_browser_read.",
+		parameters: Type.Object({
+			query: Type.String({ description: "Search query" }),
+			provider: Type.Optional(Type.String({ description: "Search provider id; default brave" })),
+			limit: Type.Optional(Type.Number({ description: "Result limit, max 20", default: 5 })),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await post("/api/search", params), { endpoint: "/api/search" });
+		},
+	});
+
+	pi.registerTool({
 		name: "uiai_health",
 		label: "UIAI Browser Health",
 		description: "Check UIAI browser health/readiness and pressure before remote or long browser workflows.",
@@ -449,8 +463,14 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("uiai", {
-		description: "Show UIAI Engine agent menu and bootstrap widget",
-		handler: async (_args, ctx) => {
+		description: "Show UIAI Engine agent menu and bootstrap widget; use /uiai off to hide the widget",
+		handler: async (args, ctx) => {
+			const action = String(args || "").trim().toLowerCase();
+			if (["off", "hide", "clear", "disable"].includes(action)) {
+				ctx.ui.setWidget("uiai-engine", undefined);
+				ctx.ui.notify("UIAI card hidden", "info");
+				return;
+			}
 			try {
 				const card = await callEngine("/api/tools/agent-card");
 				ctx.ui.notify(`UIAI ready: ${card.purpose || "agent card loaded"}`, "info");
@@ -460,6 +480,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 					"Tools: agent_card/search/graph + full browser session, screenshot, frame catalog/render",
 				]);
 				const choice = await ctx.ui.select("UIAI action", [
+					"Hide UIAI card",
 					"Show agent card",
 					"Search tools",
 					"Open browser session",
@@ -467,6 +488,11 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 					"One-shot screenshot",
 					"Show tool graph",
 				]);
+				if (choice === "Hide UIAI card") {
+					ctx.ui.setWidget("uiai-engine", undefined);
+					ctx.ui.notify("UIAI card hidden", "info");
+					return;
+				}
 				const prompts: Record<string, string> = {
 					"Show agent card": "Use pi_uiai_agent_card to show the UIAI Engine bootstrap card.",
 					"Search tools": "Use pi_uiai_tool_search with q=diagnostics, read, click, screenshot, or frame.",
