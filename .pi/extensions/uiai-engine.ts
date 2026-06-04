@@ -119,6 +119,16 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "uiai_status",
+		label: "UIAI Engine Status",
+		description: "Read UIAI engine runtime status and service metadata.",
+		parameters: Type.Object({}),
+		async execute() {
+			return textResult(await callEngine("/api/status"), { endpoint: "/api/status" });
+		},
+	});
+
+	pi.registerTool({
 		name: "uiai_browser_open",
 		label: "UIAI Browser Open",
 		description: "Open a persistent UIAI browser session. Prefer read/snapshot @refs and diagnostics-first debugging for reliable web surfing.",

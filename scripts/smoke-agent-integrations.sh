@@ -28,6 +28,8 @@ fetch "$ENGINE_URL/api/tools/search?q=read" | jq -e '.tools[] | select(.name == 
 fetch "$ENGINE_URL/api/tools/search?q=search" | jq -e '.tools[] | select(.name == "browser_search")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "browser_open") | .related_tools | index("focusa_browser_diagnostics_intake")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "browser_search")' >/dev/null
+fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_health")' >/dev/null
+fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_status")' >/dev/null
 fetch_auth "$ENGINE_URL/api/search/providers" | jq -e '.providers[] | select(.id == "brave") | has("configured")' >/dev/null
 fetch_auth -X POST "$ENGINE_URL/api/search" -H "Content-Type: application/json" -d '{"query":"UIAI Engine browser agents","limit":1}' | jq -e '.provider == "brave" and .count >= 1' >/dev/null
 node --check "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/mcp/browser-session-mcp.mjs" >/dev/null

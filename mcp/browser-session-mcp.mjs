@@ -130,6 +130,16 @@ const BRIDGE_CORE_TOOLS = [
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "uiai_health",
+    description: "Return UIAI browser/vision health and readiness before long browser workflows.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "uiai_status",
+    description: "Return UIAI engine runtime status and service metadata.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
     name: "browser_search",
     description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with browser_open, then browser_read.",
     inputSchema: {
@@ -202,6 +212,16 @@ async function toolsCall(name, args) {
 
     case "uiai_tool_graph":
       url = `${ENGINE}/api/tools/graph`;
+      method = "GET";
+      break;
+
+    case "uiai_health":
+      url = `${ENGINE}/api/health/browser`;
+      method = "GET";
+      break;
+
+    case "uiai_status":
+      url = `${ENGINE}/api/status`;
       method = "GET";
       break;
 
