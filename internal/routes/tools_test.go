@@ -104,8 +104,13 @@ func TestToolGraphIncludesFocusaAndRelations(t *testing.T) {
 	if graph["schema"] != "uiai.tool_graph.v1" {
 		t.Fatalf("unexpected graph schema: %v", graph["schema"])
 	}
-	if _, ok := graph["focusa_integration"].(map[string]any); !ok {
+	focusa, ok := graph["focusa_integration"].(map[string]any)
+	if !ok {
 		t.Fatal("expected focusa_integration metadata")
+	}
+	evidenceRefs, ok := focusa["evidence_refs"].([]string)
+	if !ok || !containsString(evidenceRefs, "uiai-search:<provider>:<query-hash>:<rank>") {
+		t.Fatalf("expected search evidence ref in Focusa graph metadata: %#v", focusa["evidence_refs"])
 	}
 	relations := toolRelations()
 	if !containsString(relations["browser_diagnostics"], "focusa_browser_diagnostics_intake") {

@@ -24,7 +24,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - MCP bridge exposes and fallback-normalizes `browser_search`.
 - MCP metadata cache/reconnect behavior documented: restart/reconnect MCP clients and reload Pi MCP-adapter sessions after tool/schema/call-route changes.
 - Focusa evidence handles documented for diagnostics, errors, search results, browser read/snapshot, screenshot, and share artifacts.
-- Search results now include deterministic `rank` and `evidence_ref` fields shaped as `uiai-search:<provider>:<query-hash>:<rank>`.
+- Search results now include deterministic `rank` and `evidence_ref` fields shaped as `uiai-search:<provider>:<query-hash>:<rank>`; tool graph Focusa metadata advertises the same handle.
 - Screenshot and share artifact evidence now echoes request `focusa_scope`, extending scope propagation beyond browser-session diagnostics.
 - Tool discovery and graph advertise `browser_search` and `search_then_browse`.
 - Search is loopback-public and remote-authenticated, aligned with browser/session/screenshot tool boundaries.
@@ -51,7 +51,7 @@ Current proof commands:
 
 - `go test ./...` passed.
 - `node --check mcp/browser-session-mcp.mjs` passed.
-- `uiai-engine.service` active after rebuild/restart.
+- `uiai-engine.service` active after rebuild/restart; public deploy unit template now mirrors the live secret-safe env-file/resource-limit pattern without literal secrets.
 - Loopback no-auth search smoke: `POST /api/search` returned `count=2`, `provider=brave`.
 - Provider metadata smoke: `/api/search/providers` returns `configured`, `status`, and `degraded_reason`; missing Brave key is covered by a degraded-mode unit test.
 - MCP JSON-RPC smoke: `tools/list` includes `browser_search`; `tools/call browser_search` returned `provider=brave`.
@@ -107,7 +107,7 @@ Current proof commands:
 
 ### 7. Public and related documentation
 
-- README and Session API are updated for search, `/uiai off`, Focusa evidence handles, MCP reconnect behavior, auth matrices, and interoperability matrix discoverability.
+- README and Session API are updated for search, `/uiai off`, Focusa evidence handles, MCP reconnect behavior, auth matrices, deployment env-file redaction, and interoperability matrix discoverability.
 - Add a dedicated search API section if the route gains more providers or parameters.
 - Update MCP/Pi install smoke docs after adding broader non-browser MCP tools.
 

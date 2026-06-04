@@ -2,6 +2,8 @@
 Description=UIAI AI Engine (Go)
 After=network.target
 Wants=network-online.target
+StartLimitBurst=5
+StartLimitIntervalSec=60
 
 [Service]
 Type=simple
@@ -12,12 +14,35 @@ ExecStart=/home/wpuiai/uiai-engine/uiai-engine
 Restart=always
 RestartSec=3
 Environment=HOME=/home/wpuiai
+# Optional secret/env file; keep actual values out of git and public docs.
+EnvironmentFile=-/etc/wpuiai/ai-api.env
 
-# Resource limits (should use ~50MB vs old 1.5GB)
-MemoryMax=512M
-CPUQuota=200%
+# Resource limits — Chrome uses hundreds of MB RSS under browser/session workflows.
+MemoryMax=1G
+MemoryHigh=800M
+CPUQuota=300%
+IOWeight=50
+# Chrome can spawn many processes/threads; keep high enough for browser workflows.
+TasksMax=200
 
-# Logging
+# OOM: prefer killing engine before database/web server.
+OOMScoreAdjust=300
+
+# Graceful shutdown: SIGTERM drain, then SIGKILL if needed.
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# File descriptor + core dump limits.
+LimitNOFILE=4096
+LimitCORE=0
+
+# Security hardening (Chrome-safe subset).
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+RestrictSUIDSGID=true
+
+# Logging.
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=uiai-engine

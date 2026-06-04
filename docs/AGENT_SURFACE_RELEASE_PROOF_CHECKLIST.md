@@ -4,7 +4,7 @@ Use this checklist before claiming a UIAI Engine release that changes HTTP, Pi, 
 
 ## Required proof commands
 
-Run from `/home/wpuiai/uiai-engine` unless noted.
+Run from `/home/wpuiai/uiai-engine` unless noted. For live release claims, build/deploy the current commit to `uiai-engine.service` first, wait for `/health`, then run localhost proof against the live service.
 
 ```bash
 go test ./...
@@ -36,7 +36,7 @@ make release-browser-reliability
 | MCP bridge | `node --check`, route parity smoke, structured failure smoke pass | `scripts/smoke-mcp-tool-routes.sh`, `scripts/smoke-mcp-structured-failure.sh` |
 | Pi extension | registration, rendering, and `/uiai off` smokes pass | `scripts/smoke-pi-extension-registration.sh`, `scripts/smoke-pi-rendering.sh`, `scripts/smoke-pi-uiai-off.sh` |
 | CLI | `scripts/uiai` smoke paths in `scripts/smoke-agent-integrations.sh` pass | CLI JSON/status/errors/tools proof |
-| Search/providers | provider metadata and search smoke pass; missing-key degraded-mode test passes | `go test ./internal/routes`, `scripts/smoke-agent-integrations.sh` |
+| Search/providers | provider metadata and search smoke pass; missing-key degraded-mode test passes; search results include `uiai-search:<provider>:<query-hash>:<rank>` refs | `go test ./internal/routes`, `scripts/smoke-agent-integrations.sh` |
 | Auth/security | loopback/remote negative and remote positive tests pass; redaction tests pass | `go test ./internal/auth ./internal/observability ./internal/vision` |
 | Focusa evidence | diagnostics/error evidence handles and smoke pass | `/tmp/uiai-error-focusa-evidence.json` plus docs handle refs |
 | WordPress plugin parity | Existing plugin route/auth/error docs updated; plugin changes committed separately if needed | `docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`; WPUIAI commit hash if plugin changed |
@@ -58,4 +58,5 @@ make release-browser-reliability
 
 - Add a checklist row when a new agent-facing surface or smoke family is added.
 - Keep proof handles bounded: cite commit hashes, artifact paths, and stable `uiai-*` handles instead of raw logs/base64 blobs.
+- Keep deployment docs secret-safe: reference env file paths and variable names only, never literal provider/API/token values.
 - If a gate is intentionally skipped, record why in `docs/AGENT_COMPATIBILITY_GAP_INVENTORY_2026-06-04.md` before release.

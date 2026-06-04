@@ -116,7 +116,7 @@ A feature is not considered interoperable until proof exists in at least one sta
 | Status/health | `/api/status`, `/api/health/browser` | `uiai_status`, `uiai_health` | `uiai_status`, `uiai_health` | `uiai status`, `uiai health` planned | advisory evidence | health/status smoke |
 | Errors | `/api/errors` | `uiai_errors` | `uiai_errors` | `uiai errors` planned | error evidence candidate | forced harmless error + MCP proof |
 | Browser sessions | `/api/session/*` | `uiai_browser_*` | `browser_*` | `uiai session *` planned | `focusa_scope` echo | browser open/read/diag smoke |
-| Search | `/api/search*` | `uiai_search` | `browser_search` | `uiai search` optional/planned | search evidence handles planned | Brave provider smoke |
+| Search | `/api/search*` | `uiai_search` | `browser_search` | `uiai search` optional/planned | `uiai-search:<provider>:<query-hash>:<rank>` result evidence refs | Brave provider + evidence-ref smoke |
 | Tool discovery | `/api/tools/*` | `pi_uiai_tool_*` | `uiai_tool_*` | `uiai tools *` planned | graph includes Focusa routing | tool search/MCP smoke |
 | Critique metadata | `/api/critique/models`, `/dimensions` | `uiai_critique_*` | `critique_*` | optional tools route | none | metadata smoke |
 | Frame helpers | `/api/media/frame/*` | `uiai_frame_*` | `frame_*` | optional media route | screenshot evidence | catalog/render smoke |
@@ -239,7 +239,7 @@ Current route contract inventory: [`WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](WO
    - `uiai-diagnostics:session=<id>:seq=<seq>`
    - `uiai-error:<error_id>`
    - `uiai-screenshot:sha256:<prefix>`
-   - `uiai-search:<provider>:<hash>` where appropriate
+   - `uiai-search:<provider>:<query-hash>:<rank>` for search results
 4. Docs should show Focusa workflow:
    - open with scope
    - read/snapshot

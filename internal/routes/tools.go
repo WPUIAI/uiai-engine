@@ -194,7 +194,7 @@ func toolGraph() map[string]any {
 		"focusa_integration": map[string]any{
 			"scope_input":            "browser_open accepts focusa_scope or flat workpoint_id/continuity_id/project_root/evidence_ref fields",
 			"scope_echo":             "session info, diagnostics, and failure envelopes echo focusa_scope when present",
-			"evidence_refs":          []string{"uiai-diagnostics:session=<id>:seq=<seq>", "uiai-screenshot:sha256:<prefix>", "uiai-share:<share_id>"},
+			"evidence_refs":          []string{"uiai-diagnostics:session=<id>:seq=<seq>", "uiai-search:<provider>:<query-hash>:<rank>", "uiai-screenshot:sha256:<prefix>", "uiai-share:<share_id>"},
 			"preferred_focusa_tools": []string{"focusa_browser_diagnostics_intake", "focusa_evidence_capture", "focusa_workpoint_link_evidence", "focusa_predict_record"},
 		},
 		"workflows": []map[string]any{
@@ -202,7 +202,7 @@ func toolGraph() map[string]any {
 			{"name": "web_surfing", "steps": []string{"browser_open", "browser_read", "browser_snapshot", "browser_click/browser_fill/browser_press", "browser_diagnostics", "browser_close"}},
 			{"name": "visual_debug", "steps": []string{"browser_open", "browser_screenshot", "browser_diagnostics", "browser_eval_async", "browser_close"}},
 			{"name": "single_capture", "steps": []string{"screenshot", "frame_catalog", "frame_render"}},
-			{"name": "focusa_evidence", "steps": []string{"browser_open with focusa_scope", "browser_diagnostics", "focusa_browser_diagnostics_intake", "browser_read", "focusa_evidence_capture/link", "screenshot/share evidence handles"}},
+			{"name": "focusa_evidence", "steps": []string{"browser_open with focusa_scope", "browser_diagnostics", "focusa_browser_diagnostics_intake", "browser_search result evidence_ref", "browser_read", "focusa_evidence_capture/link", "screenshot/share evidence handles"}},
 		},
 		"related_tools": toolRelations(),
 	}

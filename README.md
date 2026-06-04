@@ -486,7 +486,7 @@ Default config lives in [`config.yaml`](config.yaml). Important sections:
 
 Security notes:
 
-- Secrets should be referenced through environment variables, not committed literal values.
+- Secrets should be referenced through environment variables or an external systemd environment file such as `/etc/wpuiai/ai-api.env`, not committed literal values.
 - `vision.allow_private_urls: true` is appropriate for local/dev; remote deployment should review URL safety rules in [`docs/SESSION_API.md`](docs/SESSION_API.md).
 - Browser/session, screenshot, and provider search APIs are loopback-public only; remote callers must authenticate. The Pi extension can send `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` for authenticated remote/media helpers. Local VPS deployments may configure an eternal env-backed `UIAI_LOCAL_API_TOKEN` accepted as `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`.
 
@@ -506,7 +506,7 @@ Cross-link: [`docs/SESSION_API.md#security--remote-exposure-boundaries`](docs/SE
 
 | Path | Purpose |
 |---|---|
-| [`deploy/uiai-engine.service`](deploy/uiai-engine.service) | systemd service unit. |
+| [`deploy/uiai-engine.service`](deploy/uiai-engine.service) | secret-safe systemd service unit template aligned with browser/session resource needs. |
 | [`deploy/uiai-log-trim.service`](deploy/uiai-log-trim.service) | log trimming service. |
 | [`deploy/uiai-log-trim.timer`](deploy/uiai-log-trim.timer) | log trimming timer. |
 | [`.github/workflows/browser-reliability.yml`](.github/workflows/browser-reliability.yml) | browser reliability CI. |
