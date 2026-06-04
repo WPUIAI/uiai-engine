@@ -51,6 +51,7 @@ bash -n "$CLI"
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-extension-registration.sh" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-rendering.sh" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-uiai-off.sh" >/dev/null
+"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-failed-network-diagnostics.sh" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-browser-error-regressions.sh" >/dev/null
 
 say "agent integration smoke ok"
