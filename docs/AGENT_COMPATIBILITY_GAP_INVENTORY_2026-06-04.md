@@ -4,6 +4,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 
 ## Current verified slice
 
+- Pi registration smoke added: `scripts/smoke-pi-extension-registration.sh` verifies required Pi tool registrations, `/uiai` command, compact wrapper, and MCP mirrors.
 - MCP route parity smoke added: `scripts/smoke-mcp-tool-routes.sh` verifies all advertised MCP tools have bridge call routes and caught/fixed `browser_eval_async`.
 - CLI wrapper slice added: `scripts/uiai` supports status, health, errors, tools, session open/read/diagnostics/close, smoke, install, output modes, and stable exit code conventions.
 - Interoperability quality spec added: `docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md` defines cross-surface contracts, acceptance gates, and proof requirements.

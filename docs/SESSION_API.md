@@ -970,6 +970,7 @@ scripts/install-agent-integrations.sh
 # Smoke-check health, agent card, graph, search, MCP metadata, and bridge syntax
 scripts/smoke-agent-integrations.sh
 scripts/smoke-mcp-tool-routes.sh
+scripts/smoke-pi-extension-registration.sh
 ```
 
 Environment knobs:
