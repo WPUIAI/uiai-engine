@@ -140,6 +140,16 @@ const BRIDGE_CORE_TOOLS = [
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "critique_models",
+    description: "List supported critique models/providers. Read-only metadata; use before paid critique calls.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "critique_dimensions",
+    description: "List UI critique scoring dimensions. Read-only metadata for critique workflows.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
     name: "browser_search",
     description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with browser_open, then browser_read.",
     inputSchema: {
@@ -222,6 +232,16 @@ async function toolsCall(name, args) {
 
     case "uiai_status":
       url = `${ENGINE}/api/status`;
+      method = "GET";
+      break;
+
+    case "critique_models":
+      url = `${ENGINE}/api/critique/models`;
+      method = "GET";
+      break;
+
+    case "critique_dimensions":
+      url = `${ENGINE}/api/critique/dimensions`;
       method = "GET";
       break;
 

@@ -129,6 +129,26 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "uiai_critique_models",
+		label: "UIAI Critique Models",
+		description: "List supported critique models/providers. Read-only metadata; use before paid critique calls.",
+		parameters: Type.Object({}),
+		async execute() {
+			return textResult(await callEngine("/api/critique/models"), { endpoint: "/api/critique/models" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_critique_dimensions",
+		label: "UIAI Critique Dimensions",
+		description: "List UI critique scoring dimensions. Read-only metadata for critique workflows.",
+		parameters: Type.Object({}),
+		async execute() {
+			return textResult(await callEngine("/api/critique/dimensions"), { endpoint: "/api/critique/dimensions" });
+		},
+	});
+
+	pi.registerTool({
 		name: "uiai_browser_open",
 		label: "UIAI Browser Open",
 		description: "Open a persistent UIAI browser session. Prefer read/snapshot @refs and diagnostics-first debugging for reliable web surfing.",

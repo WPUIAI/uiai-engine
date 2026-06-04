@@ -214,6 +214,8 @@ func toolRelations() map[string][]string {
 		"uiai_tool_search":          {"uiai_agent_card", "browser_search", "browser_open", "browser_read", "browser_diagnostics"},
 		"uiai_health":               {"uiai_status", "browser_open", "browser_diagnostics"},
 		"uiai_status":               {"uiai_health", "uiai_agent_card", "uiai_tool_graph"},
+		"critique_models":           {"critique_dimensions", "uiai_status", "uiai_tool_graph"},
+		"critique_dimensions":       {"critique_models", "uiai_tool_graph"},
 		"browser_search":            {"browser_open", "browser_read", "browser_diagnostics", "uiai_tool_search"},
 		"browser_open":              {"browser_read", "browser_snapshot", "browser_diagnostics", "focusa_browser_diagnostics_intake", "browser_close"},
 		"browser_read":              {"browser_snapshot", "browser_text", "browser_diagnostics", "browser_close"},
@@ -249,6 +251,9 @@ func toolRelations() map[string][]string {
 func workflowHints(name string) []string {
 	if name == "uiai_health" || name == "uiai_status" {
 		return []string{"Use for readiness checks before long workflows", "Pair with uiai_tool_graph for route planning", "Use browser_diagnostics for session-specific failures"}
+	}
+	if name == "critique_models" || name == "critique_dimensions" {
+		return []string{"Read-only critique metadata", "Use before paid critique calls", "Pair with uiai_status when provider readiness is unclear"}
 	}
 	if name == "browser_search" {
 		return []string{"Use provider-neutral search for discovery", "Open a selected result with browser_open", "Use browser_read for page text", "Use browser_diagnostics on navigation failures"}
@@ -316,6 +321,22 @@ func openAITools() []map[string]any {
 		{
 			"name":        "uiai_status",
 			"description": "Return UIAI engine runtime status and service metadata.",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "critique_models",
+			"description": "List supported critique models/providers. Read-only metadata; use before paid critique calls.",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			"name":        "critique_dimensions",
+			"description": "List UI critique scoring dimensions. Read-only metadata useful for agents explaining or preparing critique workflows.",
 			"parameters": map[string]any{
 				"type":       "object",
 				"properties": map[string]any{},

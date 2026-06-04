@@ -30,6 +30,8 @@ fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "browser_o
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "browser_search")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_health")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_status")' >/dev/null
+fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "critique_models")' >/dev/null
+fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "critique_dimensions")' >/dev/null
 fetch_auth "$ENGINE_URL/api/search/providers" | jq -e '.providers[] | select(.id == "brave") | has("configured")' >/dev/null
 fetch_auth -X POST "$ENGINE_URL/api/search" -H "Content-Type: application/json" -d '{"query":"UIAI Engine browser agents","limit":1}' | jq -e '.provider == "brave" and .count >= 1' >/dev/null
 node --check "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/mcp/browser-session-mcp.mjs" >/dev/null
@@ -41,6 +43,9 @@ for tool in \
   pi_uiai_tool_graph \
   uiai_search \
   uiai_health \
+  uiai_status \
+  uiai_critique_models \
+  uiai_critique_dimensions \
   uiai_browser_open \
   uiai_browser_screenshot \
   uiai_browser_scroll \
@@ -90,6 +95,8 @@ for tool in mcp:
     candidates = {name, 'uiai_' + name}
     if name == 'browser_search':
         candidates.add('uiai_search')
+    if name.startswith('critique_'):
+        candidates.add('uiai_' + name)
     if name.startswith('browser_'):
         candidates.add('uiai_' + name)
     elif name.startswith('frame_'):
