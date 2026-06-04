@@ -14,7 +14,7 @@ Session tools now expose lightweight DevTools-style diagnostics specified in [`B
 
 Agent discoverability rule: during browser troubleshooting, call `browser_diagnostics` after `browser_open` and after any failed/blank/broken screenshot, unexpected click/navigation, JS eval issue, failed wait, CORS/API/network suspicion, or console-error clue. Tool search terms that should find it: `diagnostics`, `console`, `network`, `error`, `exception`, `failed request`, `devtools`, `CORS`, `API failure`, `blank page`, `broken page`, `visual failure`. Agents that need a small bootstrap payload before loading tool schemas can read `GET /api/tools/agent-card`.
 
-Focusa ingestion for those diagnostics is specified in `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`. When a session is opened with `focusa_scope`, diagnostics and session error envelopes echo the scope so `focusa_browser_diagnostics_intake` can link evidence without guessing Workpoint/project identity.
+[Focusa](https://github.com/Startempire-Wire/focusa) ingestion for those diagnostics is specified in the [UIAI browser diagnostics Focusa integration spec](https://github.com/Startempire-Wire/focusa/blob/main/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md) (local checkout path: `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`). When a session is opened with `focusa_scope`, diagnostics and session error envelopes echo the scope so `focusa_browser_diagnostics_intake` can link evidence without guessing Workpoint/project identity.
 
 ## Quick Start
 
@@ -71,7 +71,7 @@ curl -s -X DELETE http://localhost:7456/api/session/$SID
 | `GET` | `/api/tools/search?q=<keyword>` | Low-context tool search; use before loading full OpenAI/MCP schemas. |
 | `GET` | `/api/tools/openai` | Full OpenAI function-calling tool definitions. |
 | `GET` | `/api/tools/mcp` | MCP tool definitions for remote bridges. |
-| `GET` | `/api/tools/graph` | Tool relationship graph with workflow routes and Focusa integration metadata. |
+| `GET` | `/api/tools/graph` | Tool relationship graph with workflow routes and [Focusa](https://github.com/Startempire-Wire/focusa) integration metadata. |
 
 ## Pi Extension
 
@@ -79,7 +79,7 @@ This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.
 
 - `pi_uiai_agent_card` — read the compact bootstrap card without colliding with MCP tool names.
 - `pi_uiai_tool_search` — search UIAI tools without loading every schema.
-- `pi_uiai_tool_graph` — inspect related tools, workflow routes, and Focusa integration paths.
+- `pi_uiai_tool_graph` — inspect related tools, workflow routes, and [Focusa](https://github.com/Startempire-Wire/focusa) integration paths.
 - `uiai_health` — check browser readiness/pressure.
 - `uiai_browser_open` — open a persistent browser session; accepts optional `focusa_scope`.
 - `uiai_browser_snapshot` — get @ref accessibility tree for reliable actions.
@@ -90,17 +90,17 @@ This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.
 Command: `/uiai` displays a small status widget. Set `UIAI_ENGINE_URL` to target a remote tunnel or non-default port; default is `http://localhost:7456`. Set `UIAI_PI_TIMEOUT_MS` to tune Pi extension HTTP timeout; default is 30000 ms.
 
 
-## Interconnected Tool Graph + Focusa Routing
+## Interconnected Tool Graph + [Focusa](https://github.com/Startempire-Wire/focusa) Routing
 
 UIAI tools are designed as a graph, not isolated calls. `GET /api/tools/graph` returns:
 
-- `workflows`: recommended sequences such as web surfing, visual debugging, single capture, and Focusa evidence.
-- `related_tools`: adjacency lists for every primary tool, including Focusa handoff tools where relevant.
-- `focusa_integration`: scope input/echo rules, stable evidence refs, and preferred Focusa intake/link/prediction tools.
+- `workflows`: recommended sequences such as web surfing, visual debugging, single capture, and [Focusa](https://github.com/Startempire-Wire/focusa) evidence.
+- `related_tools`: adjacency lists for every primary tool, including [Focusa](https://github.com/Startempire-Wire/focusa) handoff tools where relevant.
+- `focusa_integration`: scope input/echo rules, stable evidence refs, and preferred [Focusa](https://github.com/Startempire-Wire/focusa) intake/link/prediction tools.
 
 OpenAI and MCP tool definitions also include `related_tools` and `workflow_hints`, so agents can chain from intent → action → diagnostics/evidence → Focusa handoff → cleanup without rediscovering routes.
 
-Focusa-aware default route:
+[Focusa](https://github.com/Startempire-Wire/focusa)-aware default route:
 
 1. `browser_open` with `focusa_scope` when project/workpoint context is known.
 2. `browser_read` for page text or `browser_snapshot` for action refs.
@@ -993,7 +993,7 @@ mcp({ tool: "browser_screenshot", args: '{"session_id": "abc123"}' })
 mcp({ tool: "browser_close", args: '{"session_id": "abc123"}' })
 ```
 
-The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP also exposes `uiai_agent_card`, `uiai_tool_search`, and `uiai_tool_graph`; `browser_open` forwards optional `focusa_scope` into UIAI sessions for Focusa evidence handoff. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
+The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP also exposes `uiai_agent_card`, `uiai_tool_search`, and `uiai_tool_graph`; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
 
 ### Claude Desktop
 

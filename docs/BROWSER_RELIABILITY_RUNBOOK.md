@@ -7,7 +7,7 @@ Current local runbook for UIAI browser/session reliability gates.
 - Catch diagnostics/session regressions before release.
 - Keep browser QA fast enough for agent loops.
 - Prefer direct browser actions over fragile long async eval chains.
-- Preserve proof as JSON/log artifacts and, when available, Focusa-ready `focusa_evidence` packets.
+- Preserve proof as JSON/log artifacts and, when available, [Focusa](https://github.com/Startempire-Wire/focusa)-ready `focusa_evidence` packets.
 
 ## Commands
 
@@ -30,7 +30,7 @@ Override example:
 DURATION_SECONDS=600 CONCURRENCY=3 OUT=/tmp/uiai-soak-10m.json make browser-soak
 ```
 
-Focusa scoped proof example:
+[Focusa](https://github.com/Startempire-Wire/focusa) scoped proof example:
 
 ```bash
 FOCUSA_WORKPOINT_ID="019..." \
@@ -91,7 +91,7 @@ Typical local artifacts:
 - `/tmp/uiai-soak-engine.log`
 - `/tmp/uiai-soak-site.log`
 
-Focusa-ready handles:
+[Focusa](https://github.com/Startempire-Wire/focusa)-ready handles:
 
 - Stress/soak JSON: `.focusa_evidence` contains `target_ref`, `result`, `evidence_ref`, `diagnostics_ref`, `focusa_scope`, and suggested intake tool.
 - Screenshot JSON responses: `.focusa_evidence.evidence_ref` uses `uiai-screenshot:sha256:<prefix>`.

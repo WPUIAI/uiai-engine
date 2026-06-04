@@ -2,7 +2,7 @@
 
 **Status:** implemented baseline for local UIAI Engine session API.  
 **Scope:** `localhost:7456` browser sessions backed by the existing Rod/Chrome pool.  
-**Companion Focusa spec:** `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`.
+**Companion [Focusa](https://github.com/Startempire-Wire/focusa) spec:** [UIAI browser diagnostics Focusa integration spec](https://github.com/Startempire-Wire/focusa/blob/main/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md) (local checkout path: `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`).
 
 ## 1. Problem
 
@@ -18,7 +18,7 @@ This closes the main flake-debugging gap: agents can inspect browser evidence in
 - Expose bounded network request/response/failure data per browser session.
 - Improve flake diagnosis without adding Playwright/Puppeteer or a second browser runtime.
 - Keep diagnostics lightweight enough for agent loops.
-- Return model-friendly, redacted, bounded JSON suitable for Focusa evidence ingestion.
+- Return model-friendly, redacted, bounded JSON suitable for [Focusa](https://github.com/Startempire-Wire/focusa) evidence ingestion.
 
 ## 3. Non-goals
 
@@ -256,26 +256,26 @@ Requirements:
 - Agent loops should prefer session reuse and diagnostics reads over repeated full navigation.
 - Default screenshots for agent loops should prefer JPEG with modest quality unless full-fidelity proof is needed.
 
-## 11. Focusa integration contract
+## 11. [Focusa](https://github.com/Startempire-Wire/focusa) integration contract
 
-UIAI diagnostics are evidence, not authority. Focusa should ingest bounded diagnostic snapshots through its existing evidence/prediction/Workpoint flow:
+UIAI diagnostics are evidence, not authority. [Focusa](https://github.com/Startempire-Wire/focusa) should ingest bounded diagnostic snapshots through its existing evidence/prediction/Workpoint flow:
 
 1. Agent opens or reuses a UIAI browser session, passing `focusa_scope` when `workpoint_id`, `continuity_id`, `project_root`, or `evidence_ref` are known.
 2. Agent reproduces the page issue.
 3. Agent reads `browser_diagnostics`; diagnostics echo `focusa_scope` when the session was scoped.
-4. Agent captures a stable evidence reference in Focusa, preferably through `focusa_browser_diagnostics_intake` so embedded scope is reused.
-5. Focusa active object resolution maps URL/stack/API routes to likely project files.
-6. Focusa prediction records the likely cause/fix path.
+4. Agent captures a stable evidence reference in [Focusa](https://github.com/Startempire-Wire/focusa), preferably through `focusa_browser_diagnostics_intake` so embedded scope is reused.
+5. [Focusa](https://github.com/Startempire-Wire/focusa) active object resolution maps URL/stack/API routes to likely project files.
+6. [Focusa](https://github.com/Startempire-Wire/focusa) prediction records the likely cause/fix path.
 7. Fix verification captures a second diagnostics snapshot proving console/network clean or improved.
 
-Session, diagnostics, share, and screenshot responses now carry Focusa-friendly handles:
+Session, diagnostics, share, and screenshot responses now carry [Focusa](https://github.com/Startempire-Wire/focusa)-friendly handles:
 
 - `focusa_scope` on scoped sessions and diagnostics.
 - `focusa_evidence` in reliability stress/soak reports.
 - `focusa_evidence` in `/api/screenshot` JSON responses with `uiai-screenshot:sha256:*` refs.
 - `focusa_evidence` in `/api/share/create` and `/api/share/multi` responses with `uiai-share:*` refs.
 
-See companion spec: `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`.
+See companion spec: [UIAI browser diagnostics Focusa integration spec](https://github.com/Startempire-Wire/focusa/blob/main/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md) (local checkout path: `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`).
 
 ## 12. Agent discoverability requirements
 
@@ -334,12 +334,12 @@ For full runbook, see [`BROWSER_RELIABILITY_RUNBOOK.md`](BROWSER_RELIABILITY_RUN
 - A page that throws an uncaught JS exception records one exception with source location when available.
 - A page that requests a missing URL records one failed request.
 - Existing screenshot/snapshot/click/type flows still pass.
-- `/api/tools` lists `browser_diagnostics`, `browser_diagnostics_clear`, `uiai_agent_card`, `uiai_tool_search`, and `uiai_tool_graph`; `/api/tools/graph` exposes Focusa-aware tool adjacency.
+- `/api/tools` lists `browser_diagnostics`, `browser_diagnostics_clear`, `uiai_agent_card`, `uiai_tool_search`, and `uiai_tool_graph`; `/api/tools/graph` exposes [Focusa](https://github.com/Startempire-Wire/focusa)-aware tool adjacency.
 - Redaction test proves auth/cookie headers are not returned.
-- Focusa docs cross-reference this spec and define evidence ingestion shape. MCP and Pi extension browser-open paths preserve optional `focusa_scope`.
+- [Focusa](https://github.com/Startempire-Wire/focusa) docs cross-reference this spec and define evidence ingestion shape. MCP and Pi extension browser-open paths preserve optional `focusa_scope`.
 - Scoped sessions echo `focusa_scope` through diagnostics and session error envelopes.
-- Stress/soak reports include `focusa_evidence` when Focusa scope env vars are present.
-- Screenshot/share APIs return stable Focusa evidence handles instead of requiring raw image/share blobs in agent context.
+- Stress/soak reports include `focusa_evidence` when [Focusa](https://github.com/Startempire-Wire/focusa) scope env vars are present.
+- Screenshot/share APIs return stable [Focusa](https://github.com/Startempire-Wire/focusa) evidence handles instead of requiring raw image/share blobs in agent context.
 
 ---
 

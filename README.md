@@ -1,6 +1,6 @@
 # UIAI Engine
 
-UIAI Engine is the Go backend for WPUIAI cloud features, visual/browser automation, persistent agent browsing, AI-powered design analysis, workflow orchestration, usage/credit accounting, and agent tool discovery. It is the successor/rewrite path for the older `WPUIAI/ai-api` Bun/PHP/vision-daemon stack, with expanded Go-native browser sessions, MCP/Pi integrations, Focusa evidence handoff, captcha support, media jobs, training/data APIs, and operational tooling.
+UIAI Engine is the Go backend for WPUIAI cloud features, visual/browser automation, persistent agent browsing, AI-powered design analysis, workflow orchestration, usage/credit accounting, and agent tool discovery. It is the successor/rewrite path for the older `WPUIAI/ai-api` Bun/PHP/vision-daemon stack, with expanded Go-native browser sessions, MCP/Pi integrations, [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff, captcha support, media jobs, training/data APIs, and operational tooling.
 
 ## What this engine does
 
@@ -8,7 +8,7 @@ UIAI Engine serves as a single local or remote API surface for:
 
 - **WPUIAI plugin cloud calls:** critique, UI reverse/reference analysis, section detection, layout comparison, style enhancement, copilot chat, intake, workflow orchestration, and usage reporting.
 - **Visual automation:** one-shot screenshots, persistent browser sessions, DOM snapshots, page text extraction, click/type/fill/select/press actions, CSS injection, viewport changes, cookies/auth save-load, diagnostics, and shareable artifacts.
-- **Agent integrations:** Pi extension tools, MCP browser-session bridge, OpenAI/MCP tool schemas, compact agent cards, tool search, tool graph metadata, and Focusa-aware evidence routes.
+- **Agent integrations:** Pi extension tools, MCP browser-session bridge, OpenAI/MCP tool schemas, compact agent cards, tool search, tool graph metadata, and [Focusa](https://github.com/Startempire-Wire/focusa)-aware evidence routes.
 - **Design/build pipelines:** design-system extraction, content mapping, block recipes, five-way comparison, migration helpers, and SSE events.
 - **Media and device output:** device-frame catalog/rendering, media job production, screenshot compare, share viewers, and artifact handles.
 - **Reliability and safety:** browser pool metrics, diagnostics without screenshots, URL allow/deny rules, loopback-public browser APIs, authenticated remote exposure, rate limits, credit deduction, and secret-safe deployment conventions.
@@ -56,7 +56,7 @@ Start here by task:
 | Need | Read |
 |---|---|
 | Browser/session API, agent tools, MCP formats, security boundaries, portability helpers | [`docs/SESSION_API.md`](docs/SESSION_API.md) |
-| Diagnostics contract: console/errors/network/failed requests/Focusa evidence refs | [`docs/BROWSER_DIAGNOSTICS_SPEC.md`](docs/BROWSER_DIAGNOSTICS_SPEC.md) |
+| Diagnostics contract: console/errors/network/failed requests/[Focusa](https://github.com/Startempire-Wire/focusa) evidence refs | [`docs/BROWSER_DIAGNOSTICS_SPEC.md`](docs/BROWSER_DIAGNOSTICS_SPEC.md) |
 | Browser reliability gates, soak/stress commands, CI expectations | [`docs/BROWSER_RELIABILITY_RUNBOOK.md`](docs/BROWSER_RELIABILITY_RUNBOOK.md) |
 | Captcha solver architecture, proxy/IP pool, preprocessing, status APIs | [`docs/CAPTCHA_SOLVER_SPEC.md`](docs/CAPTCHA_SOLVER_SPEC.md) |
 | Device frame catalog/rendering and media integration | [`docs/DEVICE_FRAME_INTEGRATION.md`](docs/DEVICE_FRAME_INTEGRATION.md) |
@@ -184,7 +184,7 @@ Cross-links: [`docs/SESSION_API.md`](docs/SESSION_API.md), [`docs/BROWSER_DIAGNO
 
 Cross-links: [`docs/SESSION_API.md`](docs/SESSION_API.md), [`docs/BROWSER_RELIABILITY_RUNBOOK.md`](docs/BROWSER_RELIABILITY_RUNBOOK.md), [`docs/FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md`](docs/FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md)
 
-### Agent tool discovery, MCP, Pi, and Focusa handoff
+### Agent tool discovery, MCP, Pi, and [Focusa](https://github.com/Startempire-Wire/focusa) handoff
 
 | Method | Route | Purpose |
 |---|---|---|
@@ -192,7 +192,7 @@ Cross-links: [`docs/SESSION_API.md`](docs/SESSION_API.md), [`docs/BROWSER_RELIAB
 | `GET` | `/api/tools/openai` | OpenAI function-calling schema. |
 | `GET` | `/api/tools/mcp` | MCP tool definitions. |
 | `GET` | `/api/tools/agent-card` | Compact bootstrap card for agents. |
-| `GET` | `/api/tools/graph` | Tool relationship graph, workflows, Focusa integration metadata. |
+| `GET` | `/api/tools/graph` | Tool relationship graph, workflows, [Focusa](https://github.com/Startempire-Wire/focusa) integration metadata. |
 | `GET` | `/api/tools/search?q=...` | Low-context search for relevant tools. |
 
 Agent surfaces:
@@ -203,12 +203,12 @@ Agent surfaces:
 - Installer: [`scripts/install-agent-integrations.sh`](scripts/install-agent-integrations.sh)
 - Smoke test: [`scripts/smoke-agent-integrations.sh`](scripts/smoke-agent-integrations.sh)
 
-Focusa integration highlights:
+[Focusa](https://github.com/Startempire-Wire/focusa) integration highlights:
 
 - `browser_open` accepts `focusa_scope` metadata.
 - Diagnostics/screenshot/share responses can include `focusa_evidence` handles.
-- `/api/tools/graph` advertises related Focusa handoff tools such as diagnostics intake and evidence capture.
-- Browser diagnostics are intended to be linked through Focusa rather than pasted as raw transcript blobs.
+- `/api/tools/graph` advertises related [Focusa](https://github.com/Startempire-Wire/focusa) handoff tools such as diagnostics intake and evidence capture.
+- Browser diagnostics are intended to be linked through [Focusa](https://github.com/Startempire-Wire/focusa) rather than pasted as raw transcript blobs.
 
 Cross-links: [`docs/SESSION_API.md`](docs/SESSION_API.md), [`docs/BROWSER_DIAGNOSTICS_SPEC.md`](docs/BROWSER_DIAGNOSTICS_SPEC.md), [`docs/BROWSER_RELIABILITY_RUNBOOK.md`](docs/BROWSER_RELIABILITY_RUNBOOK.md)
 
@@ -351,7 +351,7 @@ Implementation anchors: [`internal/intelligence/`](internal/intelligence/), [`in
 - MCP bridge: [`mcp/browser-session-mcp.mjs`](mcp/browser-session-mcp.mjs) exposes browser/session tools plus `uiai_agent_card` and `uiai_tool_search`.
 - Agent web surfing: persistent sessions include `/api/session/{id}/read` / `browser_read` for bounded page text extraction.
 - Diagnostics-first debugging: `browser_diagnostics` exposes console/errors/network/failed requests without forcing screenshots.
-- Focusa handoff: `browser_open` accepts `focusa_scope`; diagnostics and evidence flows preserve project/workpoint scope; `/api/tools/graph` exposes Focusa-aware related-tool routes.
+- [Focusa](https://github.com/Startempire-Wire/focusa) handoff: `browser_open` accepts `focusa_scope`; diagnostics and evidence flows preserve project/workpoint scope; `/api/tools/graph` exposes [Focusa](https://github.com/Startempire-Wire/focusa)-aware related-tool routes.
 - Portability: set `UIAI_ENGINE_URL`, `UIAI_PI_TIMEOUT_MS`, or `UIAI_MCP_TIMEOUT_MS` for remote/tunnel deployments.
 - Security: remote browser/session API callers must authenticate; loopback remains frictionless for local agents.
 
