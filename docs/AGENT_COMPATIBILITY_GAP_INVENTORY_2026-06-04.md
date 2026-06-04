@@ -68,7 +68,7 @@ Current proof commands:
 
 - Completed: `scripts/smoke-pi-uiai-off.sh` verifies `/uiai off|hide|clear|disable` clears the widget before engine fetch in freshly loaded extension source.
 - Completed: `scripts/smoke-pi-extension-registration.sh` statically verifies Pi tool registrations, `/uiai` command registration, compact wrapper, and MCP mirrors.
-- Consider a persistent user setting for showing/hiding the UIAI widget by default, instead of command-only clearing.
+- Deferred to `uiai-engine-dfm`: evaluate persistent user setting for showing/hiding the UIAI widget by default, instead of command-only clearing.
 
 ### 2. MCP access to core features
 
@@ -82,19 +82,19 @@ Current proof commands:
 ### 3. Agent web surfing
 
 - Search → open → read → snapshot → diagnostics workflow is now advertised and smoke-tested.
-- Add optional `open_result` helper only if repeated agent workflows show the separate search/open/read sequence is too verbose.
-- Consider search result caching/rate limiting to reduce provider cost and protect Brave quota beyond the documented provider-account quota boundary.
+- Deferred to `uiai-engine-1if`: add optional `open_result` helper only if repeated agent workflows show the separate search/open/read sequence is too verbose.
+- Deferred to `uiai-engine-r0d`: evaluate search result caching/rate limiting to reduce provider cost and protect Brave quota beyond the documented provider-account quota boundary.
 
 ### 4. Focusa integration
 
 - Completed: scoped UIAI browser diagnostic session with `focusa_scope` ingested via `focusa_browser_diagnostics_intake`.
-- Remaining: link successful search/browser proof to a canonical Focusa Workpoint when evidence hot routes are stable.
+- Completed: successful search/browser/release proof linked to canonical Focusa evidence handles and Workpoint evidence after live deploy.
 - Completed: API responses and docs specify `uiai-search:<provider>:<query-hash>:<rank>` handles so search evidence can cite selected result URL/title/snippet without raw SERP blobs.
 - Completed: screenshot/share evidence packets echo `focusa_scope` when provided.
 
 ### 5. Portability
 
-- Ensure installer/smoke scripts mention `BRAVE_SEARCH_API_KEY`, `UIAI_ENGINE_URL`, `UIAI_API_KEY`, `UIAI_BEARER_TOKEN`, and MCP config location.
+- Completed: installer/smoke/docs mention `BRAVE_SEARCH_API_KEY`, `UIAI_ENGINE_URL`, `UIAI_API_KEY`, `UIAI_BEARER_TOKEN`, and MCP config location; auth values stay redacted.
 - Completed: degraded-mode check shows `/api/search/providers` reports `configured=false`, `status=degraded`, and `degraded_reason=missing_key` when Brave is missing.
 - Keep provider-specific secrets out of repo and public docs.
 
@@ -102,8 +102,8 @@ Current proof commands:
 
 - Completed: remote-auth positive test covers `/api/search*`, `/api/errors*`, `/api/media/frame*`, `/api/session*`, and `/api/screenshot*` with API key and Bearer credentials.
 - Completed: provider timeout/quota behavior is documented; future work remains optional caching/rate-limit controls beyond the current 12s HTTP timeout.
-- Consider bounded response truncation/redaction if future providers return richer metadata.
-- Review service memory/CPU behavior under repeated search + browser workflows.
+- Deferred to `uiai-engine-jh1`: plan bounded response truncation/redaction if future providers return richer metadata.
+- Completed: live release browser soak reviewed repeated browser workflow behavior (`/tmp/uiai-browser-flakiness-soak-5m.json`, 96/96 passed over 300s).
 
 ### 7. Public and related documentation
 
