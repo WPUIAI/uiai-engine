@@ -22,6 +22,28 @@ func TestNormalizeSearchLimit(t *testing.T) {
 	}
 }
 
+func TestSanitizeSearchResultBoundsFieldsAndRedactsURLSecrets(t *testing.T) {
+	result := sanitizeSearchResult(searchResult{
+		Title:       strings.Repeat("t", maxSearchTitleChars+10),
+		URL:         "https://example.test/path?api_key=secret&ok=1&token=abc#fragment",
+		Description: strings.Repeat("d", maxSearchDescriptionChars+10),
+		Source:      strings.Repeat("s", maxSearchSourceChars+10),
+		Age:         strings.Repeat("a", maxSearchAgeChars+10),
+	})
+	if len([]rune(result.Title)) != maxSearchTitleChars || !strings.HasSuffix(result.Title, "…") {
+		t.Fatalf("title not bounded: len=%d value=%q", len([]rune(result.Title)), result.Title)
+	}
+	if len([]rune(result.Description)) != maxSearchDescriptionChars || !strings.HasSuffix(result.Description, "…") {
+		t.Fatalf("description not bounded: len=%d", len([]rune(result.Description)))
+	}
+	if strings.Contains(result.URL, "secret") || strings.Contains(result.URL, "abc") || strings.Contains(result.URL, "fragment") {
+		t.Fatalf("url secret/fragment not redacted: %s", result.URL)
+	}
+	if !strings.Contains(result.URL, "api_key=REDACTED") || !strings.Contains(result.URL, "token=REDACTED") || !strings.Contains(result.URL, "ok=1") {
+		t.Fatalf("url query not preserved/redacted as expected: %s", result.URL)
+	}
+}
+
 func TestSearchCacheTTLDefaultsAndEnv(t *testing.T) {
 	t.Setenv("UIAI_SEARCH_CACHE_TTL_SECONDS", "")
 	if got := searchCacheTTL(); got != time.Duration(defaultSearchCacheTTLSeconds)*time.Second {

@@ -20,6 +20,10 @@ import (
 const defaultSearchLimit = 5
 const maxSearchLimit = 20
 const defaultSearchCacheTTLSeconds = 60
+const maxSearchTitleChars = 200
+const maxSearchDescriptionChars = 500
+const maxSearchSourceChars = 120
+const maxSearchAgeChars = 80
 
 type searchRequest struct {
 	Query    string `json:"query"`
@@ -233,6 +237,64 @@ func setCachedSearch(provider, query string, limit int, results []searchResult, 
 	searchCache.entries[key] = searchCacheEntry{Results: cloneSearchResults(results), ExpiresAt: expiresAt}
 }
 
+func truncateSearchField(value string, maxChars int) string {
+	value = strings.TrimSpace(value)
+	if maxChars <= 0 {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) <= maxChars {
+		return value
+	}
+	if maxChars <= 1 {
+		return string(runes[:maxChars])
+	}
+	return string(runes[:maxChars-1]) + "…"
+}
+
+func isSecretQueryKey(key string) bool {
+	key = strings.ToLower(key)
+	secretParts := []string{"key", "token", "secret", "password", "passwd", "auth", "signature", "sig", "credential", "session", "api_key", "apikey", "access_token", "refresh_token"}
+	for _, part := range secretParts {
+		if strings.Contains(key, part) {
+			return true
+		}
+	}
+	return false
+}
+
+func sanitizeSearchURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return truncateSearchField(raw, 2048)
+	}
+	u.Fragment = ""
+	q := u.Query()
+	for key := range q {
+		if isSecretQueryKey(key) {
+			q.Set(key, "REDACTED")
+		}
+	}
+	u.RawQuery = q.Encode()
+	return truncateSearchField(u.String(), 2048)
+}
+
+func sanitizeSearchResult(result searchResult) searchResult {
+	return searchResult{
+		Title:       truncateSearchField(result.Title, maxSearchTitleChars),
+		URL:         sanitizeSearchURL(result.URL),
+		Description: truncateSearchField(result.Description, maxSearchDescriptionChars),
+		Source:      truncateSearchField(result.Source, maxSearchSourceChars),
+		Age:         truncateSearchField(result.Age, maxSearchAgeChars),
+		Rank:        result.Rank,
+		EvidenceRef: result.EvidenceRef,
+	}
+}
+
 func searchQueryHash(query string) string {
 	normalized := strings.ToLower(strings.Join(strings.Fields(query), " "))
 	sum := sha256.Sum256([]byte(normalized))
@@ -295,13 +357,13 @@ func searchBrave(query string, limit int) ([]searchResult, error) {
 		if strings.TrimSpace(item.URL) == "" {
 			continue
 		}
-		results = append(results, searchResult{
+		results = append(results, sanitizeSearchResult(searchResult{
 			Title:       item.Title,
 			URL:         item.URL,
 			Description: item.Description,
 			Source:      item.Profile.Name,
 			Age:         item.Age,
-		})
+		}))
 		if len(results) >= limit {
 			break
 		}

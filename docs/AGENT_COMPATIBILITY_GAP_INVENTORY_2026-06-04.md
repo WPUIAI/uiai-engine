@@ -102,7 +102,7 @@ Current proof commands:
 
 - Completed: remote-auth positive test covers `/api/search*`, `/api/errors*`, `/api/media/frame*`, `/api/session*`, and `/api/screenshot*` with API key and Bearer credentials.
 - Completed: provider timeout/quota behavior is documented; future work remains optional caching/rate-limit controls beyond the current 12s HTTP timeout.
-- Deferred to `uiai-engine-jh1`: plan bounded response truncation/redaction if future providers return richer metadata.
+- Completed: `uiai-engine-jh1` adds bounded search result sanitization before agent exposure: capped text fields, stripped URL fragments, and `REDACTED` secret-like query parameters for richer provider metadata.
 - Completed: live release browser soak reviewed repeated browser workflow behavior (`/tmp/uiai-browser-flakiness-soak-5m.json`, 96/96 passed over 300s).
 
 ### 7. Public and related documentation
