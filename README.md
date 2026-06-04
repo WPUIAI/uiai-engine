@@ -379,7 +379,8 @@ Remote/tunnel setup:
 ```bash
 export UIAI_ENGINE_URL="https://your-authenticated-engine.example"
 export UIAI_API_KEY="..."              # optional; enables authenticated routes such as media/frame helpers
-export UIAI_BEARER_TOKEN="..."         # optional alternative to UIAI_API_KEY for Pi extension calls
+export UIAI_BEARER_TOKEN="..."         # optional alternative to UIAI_API_KEY for Pi/MCP calls
+# Server-side only: set BRAVE_SEARCH_API_KEY in the uiai-engine service environment to enable /api/search.
 export UIAI_PI_TIMEOUT_MS=30000
 export UIAI_MCP_TIMEOUT_MS=60000
 scripts/install-agent-integrations.sh

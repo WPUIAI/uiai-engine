@@ -953,10 +953,11 @@ Environment knobs:
 | `UIAI_LOCAL_API_TOKEN` | Server-side eternal local token accepted as `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`; store only in protected env files. | unset |
 | `UIAI_LOCAL_API_TOKENS` | Optional comma-separated server-side local tokens for rotation/overlap. | unset |
 | `UIAI_API_KEY` | Client-side API key sent by the Pi extension as `X-API-Key`; for the local VPS this may match `UIAI_LOCAL_API_TOKEN`. | unset |
-| `UIAI_BEARER_TOKEN` | Client-side bearer token sent by the Pi extension as `Authorization: Bearer ...`; alternative to `UIAI_API_KEY`. | unset |
+| `UIAI_BEARER_TOKEN` | Client-side bearer token sent by the Pi extension and MCP bridge as `Authorization: Bearer ...`; alternative to `UIAI_API_KEY`. | unset |
 | `UIAI_PI_TIMEOUT_MS` | Pi extension request timeout. | `30000` |
 | `UIAI_MCP_TIMEOUT_MS` | MCP bridge request timeout. | `60000` |
 | `UIAI_SMOKE_TIMEOUT_SECONDS` | Smoke curl timeout. | `20` |
+| `BRAVE_SEARCH_API_KEY` | Server-side Brave Search key used by `/api/search`; never commit literal values. | unset |
 
 Remote deployment reminder: browser/session and screenshot endpoints require auth for non-loopback callers; media/frame helpers also require auth unless the deployment explicitly opens them. Tool discovery remains public; use authenticated tunnels/proxies for remote agents. On the local VPS, an eternal env-backed token can be configured as `UIAI_LOCAL_API_TOKEN` and then supplied by clients through either `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`.
 

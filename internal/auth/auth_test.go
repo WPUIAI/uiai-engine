@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
@@ -15,6 +16,32 @@ func TestLoopbackToolPathClassification(t *testing.T) {
 	}
 	if isLoopbackToolPath("/api/tools/graph") {
 		t.Fatal("/api/tools should remain discovery, not loopback tool path")
+	}
+}
+
+func TestSearchToolPathLoopbackPublicRemoteAuth(t *testing.T) {
+	authenticator := New(&config.Config{})
+	hit := false
+	handler := authenticator.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	loopbackReq := httptest.NewRequest("GET", "http://example.test/api/search/providers", nil)
+	loopbackReq.RemoteAddr = "127.0.0.1:12345"
+	loopbackRes := httptest.NewRecorder()
+	handler.ServeHTTP(loopbackRes, loopbackReq)
+	if loopbackRes.Code != http.StatusNoContent || !hit {
+		t.Fatalf("expected loopback search request through, code=%d hit=%v", loopbackRes.Code, hit)
+	}
+
+	hit = false
+	remoteReq := httptest.NewRequest("GET", "http://example.test/api/search/providers", nil)
+	remoteReq.RemoteAddr = "203.0.113.10:12345"
+	remoteRes := httptest.NewRecorder()
+	handler.ServeHTTP(remoteRes, remoteReq)
+	if remoteRes.Code != http.StatusUnauthorized || hit {
+		t.Fatalf("expected remote search request unauthorized, code=%d hit=%v", remoteRes.Code, hit)
 	}
 }
 

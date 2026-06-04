@@ -15,6 +15,9 @@ run(){ if [[ "$DRY_RUN" == "1" ]]; then printf "DRY_RUN "; printf "%q " "$@"; pr
 say "UIAI agent integration installer"
 say "root=$ROOT_DIR"
 say "engine_url=$ENGINE_URL"
+if [[ -n "${UIAI_API_KEY:-}" || -n "${UIAI_BEARER_TOKEN:-}" ]]; then
+  say "auth_env=client credentials will be passed to MCP config (values redacted)"
+fi
 
 if [[ ! -f "$PI_EXT_SRC" ]]; then
   say "missing Pi extension source: $PI_EXT_SRC" >&2
@@ -35,8 +38,8 @@ elif command -v jq >/dev/null 2>&1; then
   else
     printf '{"mcpServers":{}}' > "$tmp"
   fi
-  jq --arg name "$MCP_SERVER_NAME" --arg script "$ROOT_DIR/mcp/browser-session-mcp.mjs" --arg url "$ENGINE_URL" \
-    '.mcpServers[$name] = {"command":"node","args":[$script],"env":{"UIAI_ENGINE_URL":$url},"lifecycle":"lazy","idleTimeout":60,"description":"UIAI Engine browser/session tools with Focusa-aware graph metadata"}' \
+  jq --arg name "$MCP_SERVER_NAME" --arg script "$ROOT_DIR/mcp/browser-session-mcp.mjs" --arg url "$ENGINE_URL" --arg api_key "${UIAI_API_KEY:-}" --arg bearer "${UIAI_BEARER_TOKEN:-}" \
+    '.mcpServers[$name] = {"command":"node","args":[$script],"env":({"UIAI_ENGINE_URL":$url} + (if $api_key != "" then {"UIAI_API_KEY":$api_key} else {} end) + (if $bearer != "" then {"UIAI_BEARER_TOKEN":$bearer} else {} end)),"lifecycle":"lazy","idleTimeout":60,"description":"UIAI Engine browser/session/search tools with Focusa-aware graph metadata"}' \
     "$tmp" > "$tmp.out"
   mv "$tmp.out" "$MCP_CONFIG_DEST"
   rm -f "$tmp"
@@ -52,7 +55,7 @@ else
       "env": { "UIAI_ENGINE_URL": "$ENGINE_URL" },
       "lifecycle": "lazy",
       "idleTimeout": 60,
-      "description": "UIAI Engine browser/session tools with Focusa-aware graph metadata"
+      "description": "UIAI Engine browser/session/search tools with Focusa-aware graph metadata"
     }
   }
 }

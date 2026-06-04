@@ -28,11 +28,18 @@ const ENGINE = (process.env.UIAI_ENGINE_URL || "http://localhost:7456").replace(
 const REQUEST_TIMEOUT_MS = Number(process.env.UIAI_MCP_TIMEOUT_MS || 60000);
 
 
+function authHeaders() {
+  const headers = {};
+  if (process.env.UIAI_API_KEY) headers["X-API-Key"] = process.env.UIAI_API_KEY;
+  if (process.env.UIAI_BEARER_TOKEN) headers.Authorization = `Bearer ${process.env.UIAI_BEARER_TOKEN}`;
+  return headers;
+}
+
 async function fetchJSON(url, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
+    const res = await fetch(url, { ...options, signal: controller.signal, headers: { ...authHeaders(), ...(options.headers || {}) } });
     const text = await res.text();
     let data = text;
     try {
