@@ -420,7 +420,10 @@ scripts/uiai session close "$SID"
 scripts/uiai smoke agent
 ```
 
-Output modes: `--compact` (default), `--json`, `--pretty`. The Pi extension also uses compact-by-default rendering with Ctrl+O expansion to full JSON for representative success/error tool results. Exit codes: `0` success, `1` API/tool failure, `2` usage error, `3` missing dependency, `4` auth/config error. Auth/env vars match Pi/MCP: `UIAI_ENGINE_URL`, `UIAI_API_KEY`, `UIAI_BEARER_TOKEN`, `UIAI_CLI_TIMEOUT_SECONDS`.
+Output modes: `--compact` (default), `--json`, `--pretty`.
+
+`browser_eval_async` returns a structured `eval_failed` error envelope for JS/runtime errors instead of a successful text payload, so agents can use the normal diagnostics/error flow.
+ The Pi extension also uses compact-by-default rendering with Ctrl+O expansion to full JSON for representative success/error tool results. Exit codes: `0` success, `1` API/tool failure, `2` usage error, `3` missing dependency, `4` auth/config error. Auth/env vars match Pi/MCP: `UIAI_ENGINE_URL`, `UIAI_API_KEY`, `UIAI_BEARER_TOKEN`, `UIAI_CLI_TIMEOUT_SECONDS`.
 
 ## Build, test, and run
 
@@ -443,6 +446,7 @@ Useful smoke/reliability scripts:
 ```bash
 scripts/smoke-agent-integrations.sh
 scripts/stress-browser-diagnostics.sh
+scripts/smoke-browser-error-regressions.sh
 scripts/soak-browser-flakiness.sh
 scripts/sync-device-frames.sh
 scripts/trim-runtime-logs.sh

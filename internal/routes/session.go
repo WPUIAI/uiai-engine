@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -305,6 +306,10 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 			jsResult, snap, err := sess.EvalAsync(body.JS, body.TimeoutMs)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "eval_async", "timeout_ms": body.TimeoutMs})
+				return
+			}
+			if strings.HasPrefix(jsResult, "error:") {
+				writeSessionError(w, 500, "eval_failed", fmt.Errorf("%s", jsResult), sess, map[string]any{"action": "eval_async", "timeout_ms": body.TimeoutMs})
 				return
 			}
 			resp := map[string]any{"result": jsResult, "bounded_async": true}
