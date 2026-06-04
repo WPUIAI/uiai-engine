@@ -82,7 +82,7 @@ Current proof commands:
 ### 3. Agent web surfing
 
 - Search → open → read → snapshot → diagnostics workflow is now advertised and smoke-tested.
-- Deferred to `uiai-engine-1if`: add optional `open_result` helper only if repeated agent workflows show the separate search/open/read sequence is too verbose.
+- Evaluated in `uiai-engine-1if`: no `open_result` helper added yet; existing search → open → read workflow is advertised/smoke-tested, and Pi/MCP wrappers keep results compact. Revisit only with repeated workflow-friction evidence.
 - Deferred to `uiai-engine-r0d`: evaluate search result caching/rate limiting to reduce provider cost and protect Brave quota beyond the documented provider-account quota boundary.
 
 ### 4. Focusa integration
