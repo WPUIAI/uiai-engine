@@ -62,17 +62,21 @@ func persistShare(entry *shareEntry) {
 	os.WriteFile(filepath.Join(shareDataDir, entry.ID+".json"), data, 0644)
 }
 
-func shareEvidence(id, targetURL, title string) map[string]any {
+func shareEvidence(id, targetURL, title string, scope *vision.FocusaScope) map[string]any {
 	result := "UIAI share artifact created"
 	if title != "" {
 		result += ": " + title
 	}
-	return map[string]any{
+	evidence := map[string]any{
 		"target_ref":   targetURL,
 		"result":       result,
 		"evidence_ref": "uiai-share:" + id,
 		"artifact_ref": "/api/share/" + id,
 	}
+	if scope != nil {
+		evidence["focusa_scope"] = scope
+	}
+	return evidence
 }
 
 func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
@@ -99,10 +103,11 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
 	// Create share
 	r.Post("/create", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
-			URL       string         `json:"url"`
-			Title     string         `json:"title"`
-			ExpiresIn int            `json:"expiresIn"` // minutes
-			Data      map[string]any `json:"data"`
+			URL         string              `json:"url"`
+			Title       string              `json:"title"`
+			ExpiresIn   int                 `json:"expiresIn"` // minutes
+			Data        map[string]any      `json:"data"`
+			FocusaScope *vision.FocusaScope `json:"focusa_scope"`
 		}
 		json.NewDecoder(req.Body).Decode(&body)
 		if body.URL == "" {
@@ -126,7 +131,7 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
 			Data:           body.Data,
 			CreatedAt:      time.Now(),
 			ExpiresAt:      time.Now().Add(time.Duration(expiresIn) * time.Minute),
-			FocusaEvidence: shareEvidence(id, body.URL, body.Title),
+			FocusaEvidence: shareEvidence(id, body.URL, body.Title, body.FocusaScope),
 		}
 		shareStore.Store(id, entry)
 		persistShare(entry)
@@ -142,10 +147,11 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
 	// Create multi-page share
 	r.Post("/multi", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
-			URLs      []string       `json:"urls"`
-			Title     string         `json:"title"`
-			ExpiresIn int            `json:"expiresIn"`
-			Data      map[string]any `json:"data"`
+			URLs        []string            `json:"urls"`
+			Title       string              `json:"title"`
+			ExpiresIn   int                 `json:"expiresIn"`
+			Data        map[string]any      `json:"data"`
+			FocusaScope *vision.FocusaScope `json:"focusa_scope"`
 		}
 		json.NewDecoder(req.Body).Decode(&body)
 		if len(body.URLs) == 0 {
@@ -173,7 +179,7 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
 			},
 			CreatedAt:      time.Now(),
 			ExpiresAt:      time.Now().Add(time.Duration(expiresIn) * time.Minute),
-			FocusaEvidence: shareEvidence(id, body.URLs[0], body.Title),
+			FocusaEvidence: shareEvidence(id, body.URLs[0], body.Title, body.FocusaScope),
 		}
 		shareStore.Store(id, entry)
 		persistShare(entry)

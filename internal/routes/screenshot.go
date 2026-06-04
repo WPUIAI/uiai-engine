@@ -23,17 +23,18 @@ func screenshotEvidenceRef(data []byte) string {
 func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usage *storage.UsageStore) {
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
-			URL      string `json:"url"`
-			Width    int    `json:"width"`
-			Height   int    `json:"height"`
-			FullPage bool   `json:"fullPage"`
-			Format   string `json:"format"`
-			Quality  int    `json:"quality"`
-			WaitFor  string `json:"waitFor"`
-			Delay    int    `json:"delay"`
-			Cookies  string `json:"cookies"` // "name=value; name2=value2"
-			Timeout  int    `json:"timeout"` // overall timeout in seconds (default: 30)
-			NoCache  bool   `json:"nocache"` // skip cache, always take fresh screenshot
+			URL         string              `json:"url"`
+			Width       int                 `json:"width"`
+			Height      int                 `json:"height"`
+			FullPage    bool                `json:"fullPage"`
+			Format      string              `json:"format"`
+			Quality     int                 `json:"quality"`
+			WaitFor     string              `json:"waitFor"`
+			Delay       int                 `json:"delay"`
+			Cookies     string              `json:"cookies"` // "name=value; name2=value2"
+			Timeout     int                 `json:"timeout"` // overall timeout in seconds (default: 30)
+			NoCache     bool                `json:"nocache"` // skip cache, always take fresh screenshot
+			FocusaScope *vision.FocusaScope `json:"focusa_scope"`
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
@@ -87,21 +88,25 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usag
 		}
 
 		artifactRef := screenshotEvidenceRef(result.Data)
+		focusaEvidence := map[string]any{
+			"target_ref":   body.URL,
+			"result":       "UIAI screenshot captured",
+			"evidence_ref": artifactRef,
+			"artifact_ref": artifactRef,
+			"mime_type":    "image/" + result.Format,
+			"bytes":        len(result.Data),
+		}
+		if body.FocusaScope != nil {
+			focusaEvidence["focusa_scope"] = body.FocusaScope
+		}
 		resp := map[string]any{
-			"screenshot": base64.StdEncoding.EncodeToString(result.Data),
-			"width":      result.Width,
-			"height":     result.Height,
-			"format":     result.Format,
-			"size":       len(result.Data),
-			"duration":   result.Duration.Milliseconds(),
-			"focusa_evidence": map[string]any{
-				"target_ref":   body.URL,
-				"result":       "UIAI screenshot captured",
-				"evidence_ref": artifactRef,
-				"artifact_ref": artifactRef,
-				"mime_type":    "image/" + result.Format,
-				"bytes":        len(result.Data),
-			},
+			"screenshot":      base64.StdEncoding.EncodeToString(result.Data),
+			"width":           result.Width,
+			"height":          result.Height,
+			"format":          result.Format,
+			"size":            len(result.Data),
+			"duration":        result.Duration.Milliseconds(),
+			"focusa_evidence": focusaEvidence,
 		}
 		if result.DOMReport != "" {
 			resp["dom_report"] = result.DOMReport

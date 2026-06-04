@@ -272,8 +272,8 @@ Session, diagnostics, share, and screenshot responses now carry [Focusa](https:/
 
 - `focusa_scope` on scoped sessions and diagnostics.
 - `focusa_evidence` in reliability stress/soak reports.
-- `focusa_evidence` in `/api/screenshot` JSON responses with `uiai-screenshot:sha256:*` refs.
-- `focusa_evidence` in `/api/share/create` and `/api/share/multi` responses with `uiai-share:*` refs.
+- `focusa_evidence` in `/api/screenshot` JSON responses with `uiai-screenshot:sha256:*` refs; when the request includes `focusa_scope`, the evidence packet echoes it.
+- `focusa_evidence` in `/api/share/create` and `/api/share/multi` responses with `uiai-share:*` refs; when the request includes `focusa_scope`, the evidence packet echoes it.
 
 See companion spec: [UIAI browser diagnostics Focusa integration spec](https://github.com/Startempire-Wire/focusa/blob/main/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md) (local checkout path: `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`).
 
@@ -340,7 +340,7 @@ For full runbook, see [`BROWSER_RELIABILITY_RUNBOOK.md`](BROWSER_RELIABILITY_RUN
 - The Pi extension mirrors the live MCP/browser tool surface with Pi-safe names and uses supported Pi APIs (`pi.registerTool`, `pi.registerCommand`, `ctx.ui.select`, `ctx.ui.setWidget`); there is no `menu.items` API.
 - Scoped sessions echo `focusa_scope` through diagnostics and session error envelopes.
 - Stress/soak reports include `focusa_evidence` when [Focusa](https://github.com/Startempire-Wire/focusa) scope env vars are present.
-- Screenshot/share APIs return stable [Focusa](https://github.com/Startempire-Wire/focusa) evidence handles instead of requiring raw image/share blobs in agent context.
+- Screenshot/share APIs return stable [Focusa](https://github.com/Startempire-Wire/focusa) evidence handles and echo request `focusa_scope` in `focusa_evidence` instead of requiring raw image/share blobs in agent context.
 
 ---
 

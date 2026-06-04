@@ -23,6 +23,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - MCP bridge exposes and fallback-normalizes `browser_search`.
 - MCP metadata cache/reconnect behavior documented: restart/reconnect MCP clients and reload Pi MCP-adapter sessions after tool/schema/call-route changes.
 - Focusa evidence handles documented for diagnostics, errors, search results, browser read/snapshot, screenshot, and share artifacts.
+- Screenshot and share artifact evidence now echoes request `focusa_scope`, extending scope propagation beyond browser-session diagnostics.
 - Tool discovery and graph advertise `browser_search` and `search_then_browse`.
 - Search is loopback-public and remote-authenticated, aligned with browser/session/screenshot tool boundaries.
 - Remote positive auth proof covers search, errors, media frame, session, and screenshot loopback-public route families with `X-API-Key` and Bearer local-token credentials.
@@ -87,6 +88,7 @@ Current proof commands:
 - Completed: scoped UIAI browser diagnostic session with `focusa_scope` ingested via `focusa_browser_diagnostics_intake`.
 - Remaining: link successful search/browser proof to a canonical Focusa Workpoint when evidence hot routes are stable.
 - Completed: docs specify `uiai-search:<provider>:<query-hash>:<rank>` handles so search evidence can cite selected result URL/title/snippet without raw SERP blobs.
+- Completed: screenshot/share evidence packets echo `focusa_scope` when provided.
 
 ### 5. Portability
 
