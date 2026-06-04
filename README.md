@@ -58,6 +58,7 @@ Start here by task:
 |---|---|
 | HLT ledger and current trajectory | [`docs/HLT_LEDGER.md`](docs/HLT_LEDGER.md) |
 | Browser/session API, agent tools, MCP formats, security boundaries, portability helpers | [`docs/SESSION_API.md`](docs/SESSION_API.md) |
+| UIAI × Focusa × Pi hand-in-glove research/diagnostics/evidence packet spec | [`docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md) |
 | Cross-surface interoperability contracts, acceptance matrix, and proof gates | [`docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md`](docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md) |
 | Agent-surface release proof checklist | [`docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md`](docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md) |
 | Non-browser agent API exposure inventory | [`docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md`](docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md) |
@@ -370,7 +371,7 @@ Implementation anchors: [`internal/intelligence/`](internal/intelligence/), [`in
 - Agent web surfing: persistent sessions include `/api/session/{id}/read` / `browser_read` for bounded page text extraction plus @ref actions for navigation and forms.
 - Search provider behavior: `/api/search/providers` reports configured/degraded readiness and `cache_ttl_seconds` without secrets; Brave calls use a bounded 12s provider timeout, successful results are cached in memory for `UIAI_SEARCH_CACHE_TTL_SECONDS` (default `60`, `0` disables), result fields are bounded/redacted before agent exposure, and upstream quota/rate limits remain provider-account concerns.
 - Diagnostics-first debugging: `browser_diagnostics` exposes console/errors/network/failed requests without forcing screenshots.
-- [Focusa](https://github.com/Startempire-Wire/focusa) handoff: `browser_open` accepts `focusa_scope`; diagnostics and evidence flows preserve project/workpoint scope; `/api/tools/graph` exposes [Focusa](https://github.com/Startempire-Wire/focusa)-aware related-tool routes. Stable evidence handles are documented for diagnostics, errors, search results, browser reads/snapshots, screenshots, and shares.
+- [Focusa](https://github.com/Startempire-Wire/focusa) handoff: `browser_open` accepts `focusa_scope`; diagnostics and evidence flows preserve project/workpoint scope; `/api/tools/graph` exposes [Focusa](https://github.com/Startempire-Wire/focusa)-aware related-tool routes. Stable evidence handles are documented for diagnostics, errors, search results, browser reads/snapshots, screenshots, and shares. The iterative hand-in-glove roadmap is in [`docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md).
 - Portability: set `UIAI_ENGINE_URL`, `UIAI_PI_TIMEOUT_MS`, or `UIAI_MCP_TIMEOUT_MS` for remote/tunnel deployments.
 - Security: remote browser/session API callers must authenticate; loopback remains frictionless for local agents.
 

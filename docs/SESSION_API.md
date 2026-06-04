@@ -146,6 +146,8 @@ UIAI tools are designed as a graph, not isolated calls. `GET /api/tools/graph` r
 
 OpenAI and MCP tool definitions also include `related_tools` and `workflow_hints`, so agents can chain from intent → action → diagnostics/evidence → Focusa handoff → cleanup without rediscovering routes.
 
+The iterative product/engineering roadmap for making UIAI feel hand-in-glove with Focusa and Pi is [`UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md). It defines the proposed ResearchDiagnosticsPacket, authority split, scope/evidence contracts, guided Pi workflows, and rollout iterations.
+
 [Focusa](https://github.com/Startempire-Wire/focusa)-aware default route:
 
 1. `browser_open` with `focusa_scope` when project/workpoint context is known.
