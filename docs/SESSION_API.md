@@ -1032,7 +1032,9 @@ mcp({ tool: "browser_screenshot", args: '{"session_id": "abc123"}' })
 mcp({ tool: "browser_close", args: '{"session_id": "abc123"}' })
 ```
 
-The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter caches tool metadata, so `tools/list` is called once. MCP exposes and bridge-normalizes `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, `browser_search`, and `browser_read` even if the running engine returns stale metadata; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. The project Pi extension mirrors the live MCP/browser surface with Pi-prefixed names (`browser_click` → `uiai_browser_click`, `frame_catalog` → `uiai_frame_catalog`, `uiai_agent_card` → `pi_uiai_agent_card`) plus `uiai_health`. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
+The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter and many MCP clients cache tool metadata, so `tools/list` is usually called once per stdio process/session. MCP exposes and bridge-normalizes `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, `browser_search`, and `browser_read` even if the running engine returns stale metadata; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. The project Pi extension mirrors the live MCP/browser surface with Pi-prefixed names (`browser_click` → `uiai_browser_click`, `frame_catalog` → `uiai_frame_catalog`, `uiai_agent_card` → `pi_uiai_agent_card`) plus `uiai_health`. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
+
+Metadata refresh rule: after adding, removing, renaming, or changing MCP tool schemas, restart/reconnect the MCP server/client process and reload any Pi session using the MCP adapter before treating `tools/list` as fresh. Pure `tools/call` handler fixes in `mcp/browser-session-mcp.mjs` also require reconnect because the stdio Node process keeps the old bridge code loaded until restarted.
 
 ### Claude Desktop
 
@@ -1053,8 +1055,8 @@ Add to Claude Desktop MCP config:
 
 The bridge speaks MCP JSON-RPC over stdio:
 - `initialize` → returns server capabilities
-- `tools/list` → fetches tool definitions from Go engine
-- `tools/call` → routes to session HTTP endpoints
+- `tools/list` → fetches tool definitions from Go engine, caches/normalizes them in the bridge process, and may be cached again by the MCP client
+- `tools/call` → routes to session HTTP endpoints using the bridge code loaded when the stdio process started
 - Screenshots returned as MCP `image` content blocks
 
 ## Port & Auth

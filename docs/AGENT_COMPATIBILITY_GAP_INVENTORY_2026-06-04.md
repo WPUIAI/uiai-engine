@@ -19,6 +19,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - Search provider metadata exists: `GET /api/search/providers`.
 - Pi extension exposes `uiai_search` and `/uiai off` / menu **Hide UIAI card**.
 - MCP bridge exposes and fallback-normalizes `browser_search`.
+- MCP metadata cache/reconnect behavior documented: restart/reconnect MCP clients and reload Pi MCP-adapter sessions after tool/schema/call-route changes.
 - Tool discovery and graph advertise `browser_search` and `search_then_browse`.
 - Search is loopback-public and remote-authenticated, aligned with browser/session/screenshot tool boundaries.
 - Public docs mention search flow, Pi/MCP surfaces, and auth boundaries.
@@ -53,7 +54,7 @@ Purpose: track remaining work under the operator HLT: improve UIAI Engine as an 
 - Completed: read-only critique metadata tools are exposed through MCP/Pi (`critique_models`, `critique_dimensions`; Pi `uiai_critique_*`).
 - Completed: MCP bridge now routes existing frame helpers (`frame_catalog`, `frame_render`) with loopback-public/remote-auth parity.
 - Remaining: inventory deeper non-browser APIs agents may need next: reference analysis and usage-safe admin reads.
-- Remaining: document client reconnect requirements where MCP metadata is cached.
+- Completed: client reconnect requirements are documented for cached MCP metadata and loaded bridge code.
 
 ### 3. Agent web surfing
 
