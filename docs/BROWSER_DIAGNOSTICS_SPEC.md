@@ -340,3 +340,13 @@ For full runbook, see [`BROWSER_RELIABILITY_RUNBOOK.md`](BROWSER_RELIABILITY_RUN
 - Scoped sessions echo `focusa_scope` through diagnostics and session error envelopes.
 - Stress/soak reports include `focusa_evidence` when Focusa scope env vars are present.
 - Screenshot/share APIs return stable Focusa evidence handles instead of requiring raw image/share blobs in agent context.
+
+---
+
+## Related documentation
+
+- Project overview and feature map: [README](../README.md)
+- Session API routes and MCP/OpenAI tool schemas: [Session API](SESSION_API.md)
+- Reliability workflow and CI gates: [Browser Reliability Runbook](BROWSER_RELIABILITY_RUNBOOK.md)
+- Captcha diagnostics context for session-scoped solves: [Captcha Solver Spec](CAPTCHA_SOLVER_SPEC.md)
+- Screenshot/share parity caveats: [Full API Parity Evaluation](FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md)

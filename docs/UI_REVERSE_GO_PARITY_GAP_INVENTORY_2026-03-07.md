@@ -197,3 +197,12 @@ What is NOT yet proven:
 3. Add explicit operation normalization / compatibility tests for UI Reverse caller names
 4. Add end-to-end parity tests comparing local analyzer output contracts vs Go output contracts for all passes
 5. Re-run parity audit and only then mark old UI Reverse dependency cleanup safe
+
+---
+
+## Related documentation
+
+- Project overview and route inventory: [README](../README.md)
+- Full API parity/retirement decision matrix: [Full API Parity Evaluation](FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md)
+- Workflow/capability-router cloud call mapping: [Workflow API Orchestration](WORKFLOW_API_ORCHESTRATION.md)
+- Session and screenshot capture APIs that feed reference analysis: [Session API](SESSION_API.md)

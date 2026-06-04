@@ -265,3 +265,14 @@ As of 2026-03-07:
 - only portions of the API have been evaluated deeply
 - **no broad retirement of old AI API dependency code should happen yet**
 - the correct next step is documentation + bead-driven evaluation across every API domain
+
+---
+
+## Related documentation
+
+- Project overview and successor relationship to `WPUIAI/ai-api`: [README](../README.md)
+- UI Reverse function-level parity details: [UI Reverse Go Parity Gap Inventory](UI_REVERSE_GO_PARITY_GAP_INVENTORY_2026-03-07.md)
+- Workflow/cloud caller mapping: [Workflow API Orchestration](WORKFLOW_API_ORCHESTRATION.md)
+- Browser/session API surfaces added beyond the old API: [Session API](SESSION_API.md)
+- Screenshot diagnostics and evidence refs: [Browser Diagnostics Spec](BROWSER_DIAGNOSTICS_SPEC.md)
+- Device-frame and media integration: [Device Frame Integration](DEVICE_FRAME_INTEGRATION.md)

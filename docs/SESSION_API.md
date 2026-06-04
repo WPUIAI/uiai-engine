@@ -1060,3 +1060,15 @@ The pool runs 3 clean server IPs with weighted rotation, active health probes ev
 
 - [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — Complete captcha solver reference: IP pool, accuracy data, config, cost model, design decisions
 - [`WORKFLOW_API_ORCHESTRATION.md`](WORKFLOW_API_ORCHESTRATION.md) — Full endpoint map and OCR routing
+
+---
+
+## Related documentation
+
+- Project overview and full feature map: [README](../README.md)
+- Diagnostics response contract and evidence handles: [Browser Diagnostics Spec](BROWSER_DIAGNOSTICS_SPEC.md)
+- Reliability gates and browser stress/soak workflow: [Browser Reliability Runbook](BROWSER_RELIABILITY_RUNBOOK.md)
+- Captcha actions available from browser sessions: [Captcha Solver Spec](CAPTCHA_SOLVER_SPEC.md)
+- Device-frame rendering used by screenshot/media flows: [Device Frame Integration](DEVICE_FRAME_INTEGRATION.md)
+- API parity and retirement caveats: [Full API Parity Evaluation](FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md)
+- Workflow caller mapping: [Workflow API Orchestration](WORKFLOW_API_ORCHESTRATION.md)

@@ -383,3 +383,15 @@ After uiai-791/797 fixes, ALL 8 critique callers route through Capability Router
 6. `class-copilot-executor.php` — critique execution
 7. `class-copilot-batch.php` — `batch_critique()` loop
 8. `class-copilot-mcp.php` — `tool_critique_page()` MCP tool
+
+---
+
+## Related documentation
+
+- Project overview and complete feature map: [README](../README.md)
+- Full old-API-to-Go parity status: [Full API Parity Evaluation](FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md)
+- UI Reverse/reference analyzer parity gaps: [UI Reverse Go Parity Gap Inventory](UI_REVERSE_GO_PARITY_GAP_INVENTORY_2026-03-07.md)
+- Browser/session APIs used by workflow and visual QA agents: [Session API](SESSION_API.md)
+- Diagnostics contract for failed workflow/browser steps: [Browser Diagnostics Spec](BROWSER_DIAGNOSTICS_SPEC.md)
+- Captcha support for workflow automation: [Captcha Solver Spec](CAPTCHA_SOLVER_SPEC.md)
+- Device-frame output for media workflows: [Device Frame Integration](DEVICE_FRAME_INTEGRATION.md)

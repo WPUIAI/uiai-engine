@@ -214,3 +214,12 @@ Migration:
 - The Wire capture shows useful app context (not empty/broken slice).
 - Output files are retina-ready and non-pixelated.
 - Rebuilds are deterministic from manifest + source commit.
+
+---
+
+## Related documentation
+
+- Project overview and media route map: [README](../README.md)
+- Screenshot/session capture sources for frame rendering: [Session API](SESSION_API.md)
+- Browser reliability checks for screenshot artifacts: [Browser Reliability Runbook](BROWSER_RELIABILITY_RUNBOOK.md)
+- Screenshot/share parity caveats: [Full API Parity Evaluation](FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md)

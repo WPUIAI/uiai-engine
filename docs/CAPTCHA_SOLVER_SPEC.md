@@ -519,3 +519,13 @@ Server IPs: $0/mo (existing). External: $1/IP/mo if needed.
 
 - [`SESSION_API.md`](SESSION_API.md) — Session API reference, captcha solver section
 - [`WORKFLOW_API_ORCHESTRATION.md`](WORKFLOW_API_ORCHESTRATION.md) — Full endpoint map including captcha routes
+
+---
+
+## Related documentation
+
+- Project overview and API surface map: [README](../README.md)
+- Session-scoped captcha endpoint and browser action flow: [Session API](SESSION_API.md)
+- Diagnostics to inspect failed captcha/browser flows: [Browser Diagnostics Spec](BROWSER_DIAGNOSTICS_SPEC.md)
+- Reliability gates for browser/captcha-adjacent changes: [Browser Reliability Runbook](BROWSER_RELIABILITY_RUNBOOK.md)
+- Workflow API context for WPUIAI automation: [Workflow API Orchestration](WORKFLOW_API_ORCHESTRATION.md)

@@ -106,3 +106,13 @@ Focusa-ready handles:
 - browser action failures return typed error classes plus diagnostics summary when available.
 - scoped stress/soak runs include `focusa_evidence` in the output report.
 - screenshot/share artifact endpoints return stable Focusa evidence refs.
+
+---
+
+## Related documentation
+
+- Project overview and operational file map: [README](../README.md)
+- Browser/session API and security boundaries: [Session API](SESSION_API.md)
+- Diagnostics schema used by reliability triage: [Browser Diagnostics Spec](BROWSER_DIAGNOSTICS_SPEC.md)
+- Captcha solver behavior that can affect browser flake triage: [Captcha Solver Spec](CAPTCHA_SOLVER_SPEC.md)
+- Device-frame screenshot/media workflow: [Device Frame Integration](DEVICE_FRAME_INTEGRATION.md)
