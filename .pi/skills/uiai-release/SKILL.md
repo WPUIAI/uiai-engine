@@ -144,6 +144,7 @@ gh run watch <run-id> --exit-status
 If CI fails, load `/skill:uiai-ci-debug` when available or follow `docs/CI_FAILURE_DIAGNOSTICS_GUIDE.md`:
 
 ```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/ci-log-summary.py <run-id>'
 gh run view <run-id> --log-failed | sed -n '1,320p'
 OUT=/tmp/uiai-ci-artifacts-<run-id>
 rm -rf "$OUT" && mkdir -p "$OUT"

@@ -162,6 +162,7 @@ gh run watch <run-id> --exit-status
 If the run fails, inspect logs and artifacts before guessing. Use [CI Failure Diagnostics Guide](CI_FAILURE_DIAGNOSTICS_GUIDE.md) for the focused failure-class playbook:
 
 ```bash
+scripts/ci-log-summary.py <run-id>
 gh run view <run-id> --log-failed | sed -n '1,320p'
 rm -rf /tmp/uiai-ci-artifacts-<run-id>
 mkdir -p /tmp/uiai-ci-artifacts-<run-id>

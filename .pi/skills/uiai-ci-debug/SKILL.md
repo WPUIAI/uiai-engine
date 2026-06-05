@@ -35,7 +35,16 @@ Watch active run:
 gh run watch <run-id> --exit-status
 ```
 
-## 2. Read failed logs first
+## 2. Summarize failed logs/artifacts first
+
+```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/ci-log-summary.py <run-id>'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/ci-log-summary.py --latest-failed --branch main'
+```
+
+The helper downloads artifacts, redacts likely secrets, classifies common UIAI failures, and prints recommended next action.
+
+Manual log read:
 
 ```bash
 gh run view <run-id> --log-failed | sed -n '1,320p'

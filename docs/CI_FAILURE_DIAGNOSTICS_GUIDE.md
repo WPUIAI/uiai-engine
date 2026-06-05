@@ -24,7 +24,23 @@ Watch an active run:
 gh run watch <run-id> --exit-status
 ```
 
-## 2. Read failed step logs first
+## 2. Summarize failed logs and artifacts
+
+Use the helper first when available:
+
+```bash
+scripts/ci-log-summary.py <run-id>
+scripts/ci-log-summary.py --latest-failed --branch main
+scripts/ci-log-summary.py <run-id> --json > /tmp/uiai-ci-summary.json
+```
+
+It runs `gh run view --log-failed`, downloads artifacts to `/tmp/uiai-ci-artifacts-<run-id>`, redacts likely secrets, classifies common UIAI failure causes, and prints the next recommended fix. Offline fixture/debug mode:
+
+```bash
+scripts/ci-log-summary.py --log-file /tmp/failed.log --artifact-dir /tmp/uiai-ci-artifacts --json
+```
+
+## 3. Read failed step logs manually
 
 ```bash
 gh run view <run-id> --log-failed | sed -n '1,320p'
@@ -39,7 +55,7 @@ Look for:
 
 If failed logs only show a timeout or `curl` error, continue to artifact download before guessing.
 
-## 3. Download and inspect artifacts
+## 4. Download and inspect artifacts
 
 ```bash
 RUN_ID=<run-id>
@@ -70,7 +86,7 @@ uiai-soak-site.log
 browser-flakiness-soak.json
 ```
 
-## 4. Browser Reliability workflow anatomy
+## 5. Browser Reliability workflow anatomy
 
 Workflow file:
 
@@ -103,7 +119,7 @@ For full local release reliability:
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && make browser-reliability'
 ```
 
-## 5. Failure classes and fixes
+## 6. Failure classes and fixes
 
 ### A. VPS-only path in CI temp config
 
@@ -267,7 +283,7 @@ Then run full suite:
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && go test ./...'
 ```
 
-## 6. CI logging requirements for scripts
+## 7. CI logging requirements for scripts
 
 Every CI script that starts a temp engine should:
 
@@ -281,7 +297,7 @@ Every CI script that starts a temp engine should:
 
 Do not rely only on uploaded artifacts. The failed step should include enough log context to diagnose startup failures immediately.
 
-## 7. Fix and push loop
+## 8. Fix and push loop
 
 ```bash
 # after patching
