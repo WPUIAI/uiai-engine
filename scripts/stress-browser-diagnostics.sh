@@ -43,6 +43,9 @@ p = Path(sys.argv[1])
 port = sys.argv[2]
 s = p.read_text()
 s = s.replace('port: 7456', f'port: {port}', 1)
+s = s.replace('data_dir: "/home/wpuiai/uiai-engine/data"', f'data_dir: "{p.parent / "data"}"', 1)
+s = s.replace('share_dir: "/home/wpuiai/ai-api/shares"', f'share_dir: "{p.parent / "shares"}"', 1)
+s = s.replace('script_dir: "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"', f'script_dir: "{p.parent / "device-templates"}"', 1)
 s = s.replace('vision_pool_size: 2', 'vision_pool_size: 2', 1)
 s = s.replace('pool_size: 2', 'pool_size: 2', 1)
 s = s.replace('max_pool: 2', 'max_pool: 2', 1)
@@ -72,7 +75,14 @@ for _ in $(seq 1 60); do
   if curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null 2>&1; then break; fi
   sleep 1
 done
-curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null
+if ! curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null; then
+  echo "uiai diagnostics stress startup failed: engine health unavailable on port $ENGINE_PORT" >&2
+  echo "--- engine log (/tmp/uiai-diag-stress-engine.log) ---" >&2
+  sed -n '1,220p' /tmp/uiai-diag-stress-engine.log >&2 || true
+  echo "--- site log (/tmp/uiai-diag-stress-site.log) ---" >&2
+  sed -n '1,120p' /tmp/uiai-diag-stress-site.log >&2 || true
+  exit 7
+fi
 
 export ENGINE_PORT SITE_PORT WIDTH HEIGHT FOCUSA_WORKPOINT_ID="${FOCUSA_WORKPOINT_ID:-}" FOCUSA_CONTINUITY_ID="${FOCUSA_CONTINUITY_ID:-}" FOCUSA_PROJECT_ROOT="${FOCUSA_PROJECT_ROOT:-}" FOCUSA_EVIDENCE_REF="${FOCUSA_EVIDENCE_REF:-uiai-browser-diagnostics-stress:$OUT}"
 python3 - "$SESSIONS" "$ROUNDS" "$OUT" <<'PY'

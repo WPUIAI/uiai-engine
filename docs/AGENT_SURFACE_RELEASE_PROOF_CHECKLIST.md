@@ -57,6 +57,8 @@ make release-browser-reliability
 ## Update rules
 
 - Add a checklist row when a new agent-facing surface or smoke family is added.
+- Browser reliability scripts must rewrite VPS-only config paths (`data_dir`, `share_dir`, device template `script_dir`) into temp directories before CI starts an isolated engine.
+- CI startup failures must print bounded engine/site logs before exiting; artifact upload is useful, but logs should be visible in the failing step.
 - Keep proof handles bounded: cite commit hashes, artifact paths, and stable `uiai-*` handles instead of raw logs/base64 blobs.
 - Keep deployment docs secret-safe: reference env file paths and variable names only, never literal provider/API/token values.
 - If a gate is intentionally skipped, record why in `docs/AGENT_COMPATIBILITY_GAP_INVENTORY_2026-06-04.md` before release.

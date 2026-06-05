@@ -31,6 +31,9 @@ p = Path(sys.argv[1])
 port = sys.argv[2]
 s = p.read_text()
 s = s.replace('port: 7456', f'port: {port}', 1)
+s = s.replace('data_dir: "/home/wpuiai/uiai-engine/data"', f'data_dir: "{p.parent / "data"}"', 1)
+s = s.replace('share_dir: "/home/wpuiai/ai-api/shares"', f'share_dir: "{p.parent / "shares"}"', 1)
+s = s.replace('script_dir: "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"', f'script_dir: "{p.parent / "device-templates"}"', 1)
 p.write_text(s)
 PY
 
@@ -53,7 +56,14 @@ for _ in $(seq 1 60); do
   if curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null 2>&1; then break; fi
   sleep 1
 done
-curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null
+if ! curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null; then
+  echo "uiai browser error regression startup failed: engine health unavailable on port $ENGINE_PORT" >&2
+  echo "--- engine log (/tmp/uiai-browser-errors-engine.log) ---" >&2
+  sed -n '1,220p' /tmp/uiai-browser-errors-engine.log >&2 || true
+  echo "--- site log (/tmp/uiai-browser-errors-site.log) ---" >&2
+  sed -n '1,120p' /tmp/uiai-browser-errors-site.log >&2 || true
+  exit 7
+fi
 
 export ENGINE_PORT SITE_PORT OUT
 python3 - <<'PY'
