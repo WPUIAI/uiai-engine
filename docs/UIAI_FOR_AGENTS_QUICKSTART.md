@@ -42,6 +42,7 @@ Useful project skills:
 /skill:uiai-agent
 /skill:uiai-focusa-packet
 /skill:uiai-release
+/skill:uiai-ci-debug
 /skill:vision
 ```
 
