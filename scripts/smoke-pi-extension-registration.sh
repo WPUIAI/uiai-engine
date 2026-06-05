@@ -40,6 +40,7 @@ required_tools = {
     "pi_uiai_tool_graph",
     "uiai_search",
     "uiai_focusa_packet_build",
+    "uiai_focusa_packet_compose",
     "uiai_health",
     "uiai_status",
     "uiai_errors",

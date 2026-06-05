@@ -170,6 +170,23 @@ const BRIDGE_CORE_TOOLS = [
     },
   },
   {
+    name: "uiai_focusa_packet_compose",
+    description: "Compose a bounded uiai.focusa_research_diagnostics_packet.v1 through POST /api/agent/research-packet from existing UIAI responses.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        goal: { type: "string", description: "Bounded research/diagnostics/proof goal" },
+        mode: { type: "string", default: "research", enum: ["research", "diagnose", "proof"] },
+        responses: { type: "array", description: "Existing UIAI responses with focusa/focusa_evidence metadata" },
+        focusa_scope: { type: "object", description: "Optional project_root/continuity_id/workpoint_id/evidence_ref scope" },
+        recommended_next_action: { type: "string", description: "Optional bounded next action" },
+        cleanup_session_id: { type: "string", description: "Optional session id to close after capture" },
+        expandable_json_ref: { type: "string", description: "Optional external artifact/ref for larger JSON" },
+      },
+      required: ["goal", "responses"],
+    },
+  },
+  {
     name: "browser_search",
     description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with browser_open, then browser_read.",
     inputSchema: {
@@ -274,6 +291,20 @@ async function toolsCall(name, args) {
       method = "GET";
       break;
     }
+
+    case "uiai_focusa_packet_compose":
+      url = `${ENGINE}/api/agent/research-packet`;
+      method = "POST";
+      body = {
+        goal: args.goal,
+        mode: args.mode,
+        responses: args.responses,
+        focusa_scope: args.focusa_scope,
+        recommended_next_action: args.recommended_next_action,
+        cleanup_session_id: args.cleanup_session_id,
+        expandable_json_ref: args.expandable_json_ref,
+      };
+      break;
 
     case "browser_search":
       url = `${ENGINE}/api/search`;

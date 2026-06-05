@@ -26,7 +26,7 @@ The winning product shape is not “more tools.” It is a deterministic route f
 
 **STG:** turn UIAI's existing search/browser/diagnostics surfaces and Focusa's existing ProjectIdentity/Trajectory/Workpoint/evidence/prediction/metacog tools into a Pi-native guided workflow that produces bounded ResearchDiagnosticsPackets, renders compactly in Pi, survives compaction through Workpoints, and remains usable through Pi RPC/JSON/MCP/CLI without TUI-only assumptions.
 
-This STG deliberately avoids a big-bang endpoint-first build. The first useful iteration is to add metadata and workflow composition where the source-backed systems already have affordance:
+This STG deliberately avoids a big-bang autonomous endpoint build. The implemented iteration adds metadata and packet composition where the source-backed systems already have affordance:
 
 1. Pi extension commands/renderers orchestrate the UX.
 2. UIAI Engine emits stable evidence handles and Focusa-ready metadata.
@@ -259,7 +259,7 @@ Acceptance:
 
 Deliverables:
 
-- Add a lightweight packet builder in Pi extension first, backed by `/api/tools/graph` workflow metadata.
+- Add a lightweight packet builder in the Pi extension and a composer-only HTTP endpoint backed by `/api/tools/graph` workflow metadata.
 - For existing search/read/snapshot/diagnostics/error/screenshot/share responses, include:
   - `focusa.target_ref`
   - `focusa.evidence_ref`

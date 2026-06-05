@@ -421,7 +421,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_focusa_packet_build",
 		label: "UIAI Focusa Packet Build",
-		description: "Compose a bounded uiai.focusa_research_diagnostics_packet.v1 from existing UIAI search/read/diagnostics/error responses. Does not call Focusa or create durable memory.",
+		description: "Compose a bounded uiai.focusa_research_diagnostics_packet.v1 locally from existing UIAI search/read/diagnostics/error responses. Does not call Focusa or create durable memory.",
 		parameters: Type.Object({
 			goal: Type.String({ description: "Bounded user-visible goal for the packet" }),
 			mode: Type.Optional(Type.String({ description: "research, diagnose, or proof", default: "research" })),
@@ -432,6 +432,24 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			return textResult(buildResearchDiagnosticsPacket(params), { endpoint: "pi:uiai_focusa_packet_build" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_focusa_packet_compose",
+		label: "UIAI Focusa Packet Compose",
+		description: "Compose a bounded uiai.focusa_research_diagnostics_packet.v1 through POST /api/agent/research-packet from existing UIAI responses. Use for HTTP/MCP/CLI parity with the engine composer.",
+		parameters: Type.Object({
+			goal: Type.String({ description: "Bounded user-visible goal for the packet" }),
+			mode: Type.Optional(Type.String({ description: "research, diagnose, or proof", default: "research" })),
+			responses: Type.Array(Type.Any({ description: "Existing UIAI responses containing focusa/focusa_evidence metadata" })),
+			focusa_scope: Type.Optional(Type.Any({ description: "Optional Focusa scope to echo into the packet" })),
+			recommended_next_action: Type.Optional(Type.String({ description: "Exact next browser/source/proof step" })),
+			cleanup_session_id: Type.Optional(Type.String({ description: "Browser session id to recommend closing when done" })),
+			expandable_json_ref: Type.Optional(Type.String({ description: "Optional external artifact/ref for larger JSON" })),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await post("/api/agent/research-packet", params), { endpoint: "/api/agent/research-packet" });
 		},
 	});
 
@@ -868,9 +886,9 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 				return;
 			}
 			const guidedPrompts: Record<string, string> = {
-				research: "Run UIAI research: call uiai_search with a query, open one selected result with uiai_browser_open, read it with uiai_browser_read max_chars<=2000, run uiai_browser_diagnostics, then call uiai_focusa_packet_build with the search/read/diagnostics responses and cleanup_session_id.",
-				diagnose: "Run UIAI diagnose: call uiai_browser_diagnostics for a session_id, then call uiai_focusa_packet_build mode=diagnose with the diagnostics response and copy recommended_focusa.args_preview to focusa_browser_diagnostics_intake if scope is canonical.",
-				proof: "Run UIAI proof: open or reuse a URL/session, verify with uiai_browser_read max_chars<=2000 and uiai_browser_diagnostics, call uiai_focusa_packet_build mode=proof with cleanup_session_id, then capture Focusa evidence using args_preview.",
+				research: "Run UIAI research: call uiai_search with a query, open one selected result with uiai_browser_open, read it with uiai_browser_read max_chars<=2000, run uiai_browser_diagnostics, then call uiai_focusa_packet_compose (or local uiai_focusa_packet_build) with the search/read/diagnostics responses and cleanup_session_id.",
+				diagnose: "Run UIAI diagnose: call uiai_browser_diagnostics for a session_id, then call uiai_focusa_packet_compose mode=diagnose with the diagnostics response and copy recommended_focusa.args_preview to focusa_browser_diagnostics_intake if scope is canonical.",
+				proof: "Run UIAI proof: open or reuse a URL/session, verify with uiai_browser_read max_chars<=2000 and uiai_browser_diagnostics, call uiai_focusa_packet_compose mode=proof with cleanup_session_id, then capture Focusa evidence using args_preview.",
 			};
 			if (guidedPrompts[action]) {
 				renderUiaiWidget(ctx);

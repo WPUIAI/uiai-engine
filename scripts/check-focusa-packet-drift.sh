@@ -6,7 +6,7 @@ python3 - <<'PY'
 from pathlib import Path
 schema='uiai.focusa_research_diagnostics_packet.v1'
 checks={
- '.pi/extensions/uiai-engine.ts':[schema,'uiai_focusa_packet_build','buildResearchDiagnosticsPacket','args_preview','headless_next_action'],
+ '.pi/extensions/uiai-engine.ts':[schema,'uiai_focusa_packet_build','uiai_focusa_packet_compose','buildResearchDiagnosticsPacket','args_preview','headless_next_action'],
  'internal/focusapacket/packet.go':[schema,'DefaultMaxPacketBytes','MaxCaptureSummaryChars','SanitizeURL'],
  'internal/routes/screenshot.go':['screenshotFocusaMetadata','uiai-screenshot:sha256:','focusa_evidence_capture'],
  'internal/routes/share.go':['shareEvidence','uiai-share:','focusa_evidence_capture'],

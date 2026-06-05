@@ -1017,7 +1017,7 @@ Environment knobs:
 | `UIAI_SMOKE_TIMEOUT_SECONDS` | Smoke curl timeout. | `20` |
 | `BRAVE_SEARCH_API_KEY` | Server-side Brave Search key used by `/api/search`; never commit literal values. | unset |
 
-Remote deployment reminder: browser/session and screenshot endpoints require auth for non-loopback callers; media/frame helpers also require auth unless the deployment explicitly opens them. Tool discovery remains public; use authenticated tunnels/proxies for remote agents. On the local VPS, an eternal env-backed token can be configured as `UIAI_LOCAL_API_TOKEN` and then supplied by clients through either `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`.
+Remote deployment reminder: browser/session, screenshot, and `/api/agent/research-packet` endpoints require auth for non-loopback callers; media/frame helpers also require auth unless the deployment explicitly opens them. Tool discovery remains public; use authenticated tunnels/proxies for remote agents. On the local VPS, an eternal env-backed token can be configured as `UIAI_LOCAL_API_TOKEN` and then supplied by clients through either `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`.
 
 ## Security + Remote Exposure Boundaries
 
