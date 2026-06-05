@@ -62,6 +62,7 @@ Start here by task:
 | UIAI × Focusa × Pi hand-in-glove research/diagnostics/evidence packet spec | [`docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md) |
 | Cross-surface interoperability contracts, acceptance matrix, and proof gates | [`docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md`](docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md) |
 | Agent-surface release proof checklist | [`docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md`](docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md) |
+| Release/deploy/push/watch-CI runbook | [`docs/RELEASE_DEPLOY_RUNBOOK.md`](docs/RELEASE_DEPLOY_RUNBOOK.md) |
 | Non-browser agent API exposure inventory | [`docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md`](docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md) |
 | Endpoint auth mode matrix and route update rules | [`docs/ENDPOINT_AUTH_MATRIX.md`](docs/ENDPOINT_AUTH_MATRIX.md) |
 | Existing WordPress plugin ↔ Go engine route parity matrix | [`docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md) |

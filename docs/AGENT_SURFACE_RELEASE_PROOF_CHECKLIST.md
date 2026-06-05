@@ -4,7 +4,7 @@ Use this checklist before claiming a UIAI Engine release that changes HTTP, Pi, 
 
 ## Required proof commands
 
-Run from `/home/wpuiai/uiai-engine` unless noted. For live release claims, build/deploy the current commit to `uiai-engine.service` first, wait for `/health`, then run localhost proof against the live service.
+Run from `/home/wpuiai/uiai-engine` unless noted. For live release claims, build/deploy the current commit to `uiai-engine.service` first, wait for `/health`, then run localhost proof against the live service. Use [Release Deploy Runbook](RELEASE_DEPLOY_RUNBOOK.md) for the full rebuild, restart, push, CI-watch, failure-triage, and proof loop.
 
 ```bash
 go test ./...
