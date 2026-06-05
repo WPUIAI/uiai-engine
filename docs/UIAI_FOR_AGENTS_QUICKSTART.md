@@ -21,6 +21,7 @@ scripts/uiai tools graph --json
 ```bash
 curl -s http://127.0.0.1:7456/health | jq .
 curl -s http://127.0.0.1:7456/api/tools/agent-card | jq .
+curl -s http://127.0.0.1:7456/api/tools/docs | jq .
 curl -s 'http://127.0.0.1:7456/api/tools/search?q=diagnostics' | jq .
 curl -s http://127.0.0.1:7456/api/tools/graph | jq .
 ```

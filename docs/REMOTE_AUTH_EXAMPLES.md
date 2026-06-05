@@ -46,6 +46,7 @@ curl -s "$ENGINE_URL/api/health" | jq
 curl -s "$ENGINE_URL/api/status" | jq
 curl -s "$ENGINE_URL/api/tools" | jq '.tools | length'
 curl -s "$ENGINE_URL/api/tools/mcp" | jq '.tools | length'
+curl -s "$ENGINE_URL/api/tools/docs" | jq
 curl -s "$ENGINE_URL/api/tools/search?q=diagnostics" | jq
 curl -s "$ENGINE_URL/api/search/providers" | jq
 curl -s "$ENGINE_URL/api/metrics/browser" | jq '.agent_pressure'

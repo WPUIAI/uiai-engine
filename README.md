@@ -210,6 +210,7 @@ Cross-links: [`docs/SESSION_API.md`](docs/SESSION_API.md), [`docs/BROWSER_RELIAB
 | `GET` | `/api/tools/openai` | OpenAI function-calling schema. |
 | `GET` | `/api/tools/mcp` | MCP tool definitions. |
 | `GET` | `/api/tools/agent-card` | Compact bootstrap card for agents. |
+| `GET` | `/api/tools/docs` | Lightweight docs/examples metadata for agents. |
 | `GET` | `/api/tools/graph` | Tool relationship graph, workflows, [Focusa](https://github.com/Startempire-Wire/focusa) integration metadata. |
 | `GET` | `/api/tools/search?q=...` | Low-context search for relevant tools. |
 | `GET`/`POST` | `/api/search` | Provider-neutral web search for browser agents; Brave is the default provider. |
@@ -434,6 +435,7 @@ scripts/uiai status
 scripts/uiai health
 scripts/uiai errors --limit 10 --source browser_session
 scripts/uiai tools search diagnostics
+scripts/uiai tools docs
 SID=$(scripts/uiai --json session open https://example.com | jq -r '.session.id')
 scripts/uiai session read "$SID" --max-chars 1000
 scripts/uiai session diagnostics "$SID"

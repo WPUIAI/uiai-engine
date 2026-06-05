@@ -1,6 +1,13 @@
 package routes
 
-import "testing"
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/go-chi/chi/v5"
+)
 
 func TestRankedToolSearchPrefersExactNameOverDescription(t *testing.T) {
 	matches := rankedToolSearch(openAITools(), "eval_async")
@@ -56,6 +63,56 @@ func TestAgentBootstrapCardOrientsLocalAndRemoteAgents(t *testing.T) {
 	}
 	if !foundDiagnostics {
 		t.Fatal("expected diagnostics search hint")
+	}
+}
+
+func TestMountToolsDiscoveryServesDocsEndpoint(t *testing.T) {
+	r := chi.NewRouter()
+	MountToolsDiscovery(r, nil)
+	req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+	res := httptest.NewRecorder()
+	r.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", res.Code, res.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	if body["schema"] != "uiai.agent_docs.v1" {
+		t.Fatalf("unexpected schema: %#v", body)
+	}
+}
+
+func TestAgentDocsExamplesShape(t *testing.T) {
+	docs := agentDocsExamples()
+	if docs["schema"] != "uiai.agent_docs.v1" {
+		t.Fatalf("unexpected docs schema: %v", docs["schema"])
+	}
+	links, ok := docs["doc_links"].([]map[string]string)
+	if !ok || len(links) == 0 {
+		t.Fatalf("expected doc links, got %#v", docs["doc_links"])
+	}
+	foundRemoteAuth := false
+	for _, link := range links {
+		if link["path"] == "docs/REMOTE_AUTH_EXAMPLES.md" {
+			foundRemoteAuth = true
+		}
+	}
+	if !foundRemoteAuth {
+		t.Fatalf("expected remote auth doc link in %#v", links)
+	}
+	examples, ok := docs["quick_examples"].([]map[string]any)
+	if !ok || len(examples) < 3 {
+		t.Fatalf("expected quick examples, got %#v", docs["quick_examples"])
+	}
+	auth := docs["auth_classification"].(map[string]string)
+	if auth["endpoint"] != "/api/tools/docs" || auth["mode"] != "public" {
+		t.Fatalf("unexpected auth classification: %#v", auth)
+	}
+	tools := docs["relevant_tools"].([]string)
+	if !containsString(tools, "uiai_focusa_packet_compose") {
+		t.Fatalf("expected packet composer in relevant tools: %#v", tools)
 	}
 }
 

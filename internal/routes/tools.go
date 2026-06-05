@@ -16,6 +16,7 @@ import (
 // GET /api/tools/search?q= → search tools by name/description (low-context discovery)
 // GET /api/tools/agent-card → compact bootstrap guide for local/remote agents
 // GET /api/tools/graph      → tool relationship graph and workflow routes
+// GET /api/tools/docs       → lightweight docs/examples metadata for agents
 //
 // Design: tools are NEVER auto-loaded into LLM context.
 // Agents discover via search, then call tools by name.
@@ -45,6 +46,10 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 
 	r.Get("/graph", func(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, 200, toolGraph())
+	})
+
+	r.Get("/docs", func(w http.ResponseWriter, req *http.Request) {
+		writeJSON(w, 200, agentDocsExamples())
 	})
 
 	// Search — the key endpoint for context-efficient discovery.
@@ -95,6 +100,7 @@ func agentBootstrapCard() map[string]any {
 			"openai":     "/api/tools/openai",
 			"mcp":        "/api/tools/mcp",
 			"graph":      "/api/tools/graph",
+			"docs":       "/api/tools/docs",
 			"focusa":     "pass focusa_scope to browser_open; compose packets with /api/agent/research-packet; ingest diagnostics with focusa_browser_diagnostics_intake",
 			"health":     "/api/health/browser",
 			"metrics":    "/api/metrics/browser",
@@ -125,6 +131,39 @@ func agentBootstrapCard() map[string]any {
 			"After any failed action, blank page, unexpected navigation, or API suspicion, read browser_diagnostics before patching.",
 			"Close sessions when done to free browser pages.",
 		},
+	}
+}
+
+func agentDocsExamples() map[string]any {
+	return map[string]any{
+		"schema":  "uiai.agent_docs.v1",
+		"version": "2026-06-05",
+		"service": "uiai-engine",
+		"purpose": "Lightweight public docs and copy-safe examples for agents without loading full markdown files.",
+		"doc_links": []map[string]string{
+			{"title": "Agent quickstart", "path": "docs/UIAI_FOR_AGENTS_QUICKSTART.md", "summary": "Pi, MCP, CLI, HTTP, browser workflow, and Focusa packet handoff."},
+			{"title": "Agent UX cookbook", "path": "docs/AGENT_UX_COOKBOOK.md", "summary": "Search/read, @refs, diagnostics-first debugging, packets, visual QA, release proof."},
+			{"title": "Session API", "path": "docs/SESSION_API.md", "summary": "Browser/session API, discovery endpoints, auth, and MCP/Pi notes."},
+			{"title": "Public API parity matrix", "path": "docs/PUBLIC_API_PARITY_MATRIX.md", "summary": "HTTP, Pi, MCP, CLI, auth, evidence handles, and smoke coverage."},
+			{"title": "Endpoint auth matrix", "path": "docs/ENDPOINT_AUTH_MATRIX.md", "summary": "Public, loopback-public remote-auth, authenticated, service-token, and handler-auth route families."},
+			{"title": "Remote auth examples", "path": "docs/REMOTE_AUTH_EXAMPLES.md", "summary": "Copy-safe curl, scripts/uiai, Pi, and MCP examples with placeholders only."},
+			{"title": "MCP cache/reconnect troubleshooting", "path": "docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md", "summary": "tools/list cache symptoms, causes, reconnect steps, and route parity proof."},
+			{"title": "Focusa packet examples gallery", "path": "docs/FOCUSA_PACKET_EXAMPLES_GALLERY.md", "summary": "Redacted research, diagnose, and proof packet fixtures."},
+		},
+		"quick_examples": []map[string]any{
+			{"name": "discover_tools", "surface": "http", "command": "curl -s http://127.0.0.1:7456/api/tools/search?q=diagnostics | jq", "related_tools": []string{"uiai_tool_search", "uiai_agent_card", "uiai_tool_graph"}},
+			{"name": "search_then_read", "surface": "pi_or_mcp", "steps": []string{"browser_search query=<query>", "browser_open selected result", "browser_read max_chars=2000", "browser_snapshot interactive=true", "browser_diagnostics on failure", "browser_close"}, "related_tools": []string{"browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics"}},
+			{"name": "focusa_packet", "surface": "http_cli_pi_mcp", "command": "scripts/uiai research packet --url https://example.com --goal 'Proof packet' --out /tmp/uiai-research-packet.json", "related_tools": []string{"uiai_focusa_packet_compose", "focusa_evidence_capture", "focusa_browser_diagnostics_intake"}},
+			{"name": "remote_auth", "surface": "env", "command": "export UIAI_ENGINE_URL=https://uiai.example.invalid; export UIAI_API_KEY=REDACTED_API_KEY_VALUE", "related_docs": []string{"docs/REMOTE_AUTH_EXAMPLES.md", "docs/ENDPOINT_AUTH_MATRIX.md"}},
+			{"name": "mcp_refresh", "surface": "shell", "command": "node --check mcp/browser-session-mcp.mjs && scripts/smoke-mcp-tool-routes.sh", "related_docs": []string{"docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md"}},
+		},
+		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render"},
+		"auth_classification": map[string]string{
+			"endpoint": "/api/tools/docs",
+			"mode":     "public",
+			"reason":   "Read-only documentation metadata with placeholder-only examples and no secrets.",
+		},
+		"verification": []string{"scripts/check-docs-completeness.py", "scripts/check-tool-parity.sh", "go test ./internal/routes", "scripts/smoke-agent-integrations.sh"},
 	}
 }
 

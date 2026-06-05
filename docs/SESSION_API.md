@@ -120,6 +120,7 @@ Output modes: `--compact` (default), `--json`, `--pretty`.
 | `GET` | `/api/tools/search?q=<keyword>` | Low-context tool search; use before loading full OpenAI/MCP schemas. |
 | `GET` | `/api/tools/openai` | Full OpenAI function-calling tool definitions. |
 | `GET` | `/api/tools/mcp` | MCP tool definitions for remote bridges. |
+| `GET` | `/api/tools/docs` | Lightweight docs/examples metadata for agents. |
 | `GET` | `/api/tools/graph` | Tool relationship graph with workflow routes and [Focusa](https://github.com/Startempire-Wire/focusa) integration metadata. |
 | `GET`/`POST` | `/api/search` | Provider-neutral web search for agents; Brave is the default provider. |
 | `GET` | `/api/search/providers` | Search provider metadata and configured status. |
@@ -569,7 +570,7 @@ Returns `{"status": "loaded"}`. Navigate after loading to trigger auth.
 
 ## LLM Tool Definitions
 
-Live tool definitions are served by `GET /api/tools`, `GET /api/tools/mcp`, and `GET /api/tools/search?q=diagnostics`. Those generated definitions are authoritative. The examples below show the main shape; current live tools include `browser_diagnostics` and `browser_diagnostics_clear`. Discoverability checks should pass for `q=console`, `q=network`, `q=error`, `q=exception`, and `q=devtools`.
+Live tool definitions and lightweight docs are served by `GET /api/tools`, `GET /api/tools/mcp`, `GET /api/tools/docs`, and `GET /api/tools/search?q=diagnostics`. Those generated definitions are authoritative. The examples below show the main shape; current live tools include `browser_diagnostics` and `browser_diagnostics_clear`. Discoverability checks should pass for `q=console`, `q=network`, `q=error`, `q=exception`, and `q=devtools`.
 
 ### OpenAI Function Calling Format
 

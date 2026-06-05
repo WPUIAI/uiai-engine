@@ -28,7 +28,7 @@ Commands:
     --class CLASS                Filter error class
   tools                          List tool names/descriptions
   tools search <query>           Search tool discovery
-  tools mcp|openai|graph|agent-card
+  tools mcp|openai|graph|agent-card|docs
   packet compose <json-file|->    Compose Focusa research diagnostics packet
   research packet [--query Q|--url URL] [--goal G] [--out PATH]
                                   One-command search/open/read/diagnose/packet/cleanup proof
@@ -177,6 +177,7 @@ cmd_tools() {
     openai) api GET "/api/tools/openai" | emit ;;
     graph) api GET "/api/tools/graph" | emit ;;
     agent-card) api GET "/api/tools/agent-card" | emit ;;
+    docs) api GET "/api/tools/docs" | emit ;;
     *) err "unknown tools subcommand: $sub"; exit 2 ;;
   esac
 }

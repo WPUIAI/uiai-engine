@@ -23,6 +23,7 @@ say "engine_url=$ENGINE_URL"
 
 fetch "$ENGINE_URL/api/health" | jq -e '.status == "healthy" or .status == "ok"' >/dev/null
 fetch "$ENGINE_URL/api/tools/agent-card" | jq -e '.service == "uiai-engine"' >/dev/null
+fetch "$ENGINE_URL/api/tools/docs" | jq -e '.schema == "uiai.agent_docs.v1" and (.doc_links[] | select(.path == "docs/REMOTE_AUTH_EXAMPLES.md")) and (.quick_examples[] | select(.name == "focusa_packet"))' >/dev/null
 fetch "$ENGINE_URL/api/tools/graph" | jq -e '.focusa_integration.preferred_focusa_tools | index("focusa_browser_diagnostics_intake")' >/dev/null
 fetch "$ENGINE_URL/api/tools/graph" | jq -e '.focusa_integration.evidence_refs[] | select(. == "uiai-search:<provider>:<query-hash>:<rank>")' >/dev/null
 fetch "$ENGINE_URL/api/tools/search?q=read" | jq -e '.tools[] | select(.name == "browser_read")' >/dev/null

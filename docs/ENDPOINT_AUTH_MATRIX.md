@@ -22,7 +22,7 @@ Local-token env support: `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_A
 |---|---|---|---|
 | `/`, `/dashboard` | public | `internal/auth/auth.go` public list; `internal/server/server.go` root/dashboard routes | Service info and local dashboard shell. |
 | `/health`, `/api/health`, `/api/health/*`, `/api/status`, `/api/metrics/browser` | public | `internal/auth/auth.go` public list | Operational status/readiness only. |
-| `/api/tools`, `/api/tools/*` | public | `internal/auth/auth.go` `strings.HasPrefix(p, "/api/tools")` | Agent discovery metadata; no secrets. |
+| `/api/tools`, `/api/tools/*` | public | `internal/auth/auth.go` `strings.HasPrefix(p, "/api/tools")` | Agent discovery metadata, including `/api/tools/docs`; no secrets. |
 | `/api/critique/models`, `/api/critique/dimensions` | public | `internal/auth/auth.go` public list | Metadata only; `/api/critique` write path remains authenticated. |
 | `/api/ui-reverse/models`, `/api/ui-reverse/operations` | public | `internal/auth/auth.go` public list | Metadata only. |
 | `/api/copilot/health`, `/api/intelligence/health` | public | `internal/auth/auth.go` public list | Health/readiness only. |
