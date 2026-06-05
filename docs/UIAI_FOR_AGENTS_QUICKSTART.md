@@ -64,9 +64,9 @@ scripts/smoke-agent-integrations.sh
 scripts/smoke-mcp-tool-routes.sh
 ```
 
-MCP clients can call `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, `browser_search`, `browser_open`, `browser_read`, `browser_snapshot`, `browser_diagnostics`, and `uiai_focusa_packet_compose`.
+MCP clients can call `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, `source_to_markdown`, `browser_search`, `browser_open`, `browser_read`, `browser_snapshot`, `browser_diagnostics`, and `uiai_focusa_packet_compose`.
 
-Draft roadmap note: Source-to-Markdown is specified in [`SOURCE_TO_MARKDOWN_AGENT_SPEC.md`](SOURCE_TO_MARKDOWN_AGENT_SPEC.md) for future `source_to_markdown` / `uiai_to_markdown` / CLI `uiai md` discovery across HTTP, Pi, MCP, CLI, Focusa, and WPUIAI surfaces.
+Source-to-Markdown MVP is implemented for generic webpages through `POST /api/markdown`, Pi `uiai_source_to_markdown`, MCP `source_to_markdown`, CLI `scripts/uiai markdown <url>`, and `browser_read format=markdown`; adapter/product roadmap remains in [`SOURCE_TO_MARKDOWN_AGENT_SPEC.md`](SOURCE_TO_MARKDOWN_AGENT_SPEC.md).
 
 ## 2. Search, open, read, snapshot, diagnose
 

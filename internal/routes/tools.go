@@ -92,7 +92,7 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 func agentBootstrapCard() map[string]any {
 	return map[string]any{
 		"service":  "uiai-engine",
-		"purpose":  "Lightweight browser, web search, screenshot, visual QA, and diagnostics backend for local and remote agents.",
+		"purpose":  "Lightweight browser, web search, Source-to-Markdown, screenshot, visual QA, and diagnostics backend for local and remote agents.",
 		"base_url": "http://localhost:7456",
 		"discovery": map[string]string{
 			"agent_card": "/api/tools/agent-card",
@@ -105,8 +105,13 @@ func agentBootstrapCard() map[string]any {
 			"health":     "/api/health/browser",
 			"metrics":    "/api/metrics/browser",
 			"packet":     "/api/agent/research-packet",
+			"markdown":   "/api/markdown",
 		},
 		"recommended_workflows": []map[string]any{
+			{
+				"name":  "source_to_markdown",
+				"steps": []string{"source_to_markdown url=<public-url>", "capture focusa evidence if needed", "use browser_open/browser_read only for follow-up interactions"},
+			},
 			{
 				"name":  "search_then_browse",
 				"steps": []string{"browser_search", "browser_open selected result", "browser_read for page text", "browser_snapshot for actions", "browser_diagnostics on failure", "browser_close"},
@@ -124,7 +129,7 @@ func agentBootstrapCard() map[string]any {
 				"steps": []string{"reproduce with direct session actions", "browser_diagnostics", "classify console/exception/network/selector/timeout", "patch only after evidence"},
 			},
 		},
-		"search_hints": []string{"search", "web search", "screenshot", "snapshot", "read", "extract", "click", "fill", "eval_async", "diagnostics", "console", "network", "error", "failed_request", "blank page", "visual failure"},
+		"search_hints": []string{"search", "web search", "markdown", "source to markdown", "webpage markdown", "screenshot", "snapshot", "read", "extract", "click", "fill", "eval_async", "diagnostics", "console", "network", "error", "failed_request", "blank page", "visual failure"},
 		"reliability_rules": []string{
 			"Prefer browser_snapshot @refs over brittle CSS guessing.",
 			"Keep browser_eval synchronous and short; use browser_eval_async only for bounded awaits.",
@@ -141,7 +146,8 @@ func agentDocsExamples() map[string]any {
 		"service": "uiai-engine",
 		"purpose": "Lightweight public docs and copy-safe examples for agents without loading full markdown files.",
 		"doc_links": []map[string]string{
-			{"title": "Agent quickstart", "path": "docs/UIAI_FOR_AGENTS_QUICKSTART.md", "summary": "Pi, MCP, CLI, HTTP, browser workflow, and Focusa packet handoff."},
+			{"title": "Agent quickstart", "path": "docs/UIAI_FOR_AGENTS_QUICKSTART.md", "summary": "Pi, MCP, CLI, HTTP, browser workflow, Source-to-Markdown, and Focusa packet handoff."},
+			{"title": "Source-to-Markdown spec", "path": "docs/SOURCE_TO_MARKDOWN_AGENT_SPEC.md", "summary": "Implemented generic browser_read markdown and one-shot /api/markdown MVP plus adapter roadmap."},
 			{"title": "Agent UX cookbook", "path": "docs/AGENT_UX_COOKBOOK.md", "summary": "Search/read, @refs, diagnostics-first debugging, packets, visual QA, release proof."},
 			{"title": "Session API", "path": "docs/SESSION_API.md", "summary": "Browser/session API, discovery endpoints, auth, and MCP/Pi notes."},
 			{"title": "Public API parity matrix", "path": "docs/PUBLIC_API_PARITY_MATRIX.md", "summary": "HTTP, Pi, MCP, CLI, auth, evidence handles, and smoke coverage."},
@@ -152,12 +158,13 @@ func agentDocsExamples() map[string]any {
 		},
 		"quick_examples": []map[string]any{
 			{"name": "discover_tools", "surface": "http", "command": "curl -s http://127.0.0.1:7456/api/tools/search?q=diagnostics | jq", "related_tools": []string{"uiai_tool_search", "uiai_agent_card", "uiai_tool_graph"}},
+			{"name": "source_to_markdown", "surface": "http_cli_pi_mcp", "command": "scripts/uiai markdown https://example.com --max-chars 4000", "related_tools": []string{"source_to_markdown", "uiai_source_to_markdown", "browser_read", "focusa_evidence_capture"}},
 			{"name": "search_then_read", "surface": "pi_or_mcp", "steps": []string{"browser_search query=<query>", "browser_open selected result", "browser_read max_chars=2000", "browser_snapshot interactive=true", "browser_diagnostics on failure", "browser_close"}, "related_tools": []string{"browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics"}},
 			{"name": "focusa_packet", "surface": "http_cli_pi_mcp", "command": "scripts/uiai research packet --url https://example.com --goal 'Proof packet' --out /tmp/uiai-research-packet.json", "related_tools": []string{"uiai_focusa_packet_compose", "focusa_evidence_capture", "focusa_browser_diagnostics_intake"}},
 			{"name": "remote_auth", "surface": "env", "command": "export UIAI_ENGINE_URL=https://uiai.example.invalid; export UIAI_API_KEY=REDACTED_API_KEY_VALUE", "related_docs": []string{"docs/REMOTE_AUTH_EXAMPLES.md", "docs/ENDPOINT_AUTH_MATRIX.md"}},
 			{"name": "mcp_refresh", "surface": "shell", "command": "node --check mcp/browser-session-mcp.mjs && scripts/smoke-mcp-tool-routes.sh", "related_docs": []string{"docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md"}},
 		},
-		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render"},
+		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render"},
 		"auth_classification": map[string]string{
 			"endpoint": "/api/tools/docs",
 			"mode":     "public",
@@ -235,8 +242,8 @@ func toolGraph() map[string]any {
 			"scope_input":              "browser_open accepts focusa_scope or flat workpoint_id/continuity_id/project_root/evidence_ref fields",
 			"scope_echo":               "session info, diagnostics, read results, search results, and failure envelopes expose Focusa-ready metadata when present",
 			"packet_schema":            "uiai.focusa_research_diagnostics_packet.v1",
-			"packet_metadata_surfaces": []string{"search", "browser_read", "browser_snapshot", "browser_diagnostics", "structured_errors", "screenshot", "share"},
-			"evidence_refs":            []string{"uiai-diagnostics:session=<id>:seq=<seq>", "uiai-search:<provider>:<query-hash>:<rank>", "uiai-browser:session=<id>:read:<seq>", "uiai-error:<error_id>", "uiai-screenshot:sha256:<prefix>", "uiai-share:<share_id>"},
+			"packet_metadata_surfaces": []string{"search", "source_markdown", "browser_read", "browser_snapshot", "browser_diagnostics", "structured_errors", "screenshot", "share"},
+			"evidence_refs":            []string{"uiai-diagnostics:session=<id>:seq=<seq>", "uiai-search:<provider>:<query-hash>:<rank>", "uiai-source-markdown:sha256:<prefix>", "uiai-browser:session=<id>:read:<seq>", "uiai-error:<error_id>", "uiai-screenshot:sha256:<prefix>", "uiai-share:<share_id>"},
 			"preferred_focusa_tools":   []string{"focusa_browser_diagnostics_intake", "focusa_evidence_capture", "focusa_workpoint_link_evidence", "focusa_predict_record"},
 			"packet_args_preview": map[string]any{
 				"target_ref":          "primary packet target_ref",
@@ -246,6 +253,7 @@ func toolGraph() map[string]any {
 			},
 		},
 		"workflows": []map[string]any{
+			{"name": "source_to_markdown", "schema": "uiai.source_markdown.v1", "steps": []string{"source_to_markdown or POST /api/markdown", "receive Markdown plus diagnostics and focusa evidence", "focusa_evidence_capture when scoped", "browser_open/browser_read only for follow-up interactions"}, "preferred_focusa_tools": []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"}},
 			{"name": "focusa_research_packet", "schema": "uiai.focusa_research_diagnostics_packet.v1", "steps": []string{"focusa_workpoint_resume or project identity when scoped", "browser_search/uiai_search", "browser_open selected result with focusa_scope", "browser_read max_chars<=2000", "browser_diagnostics", "uiai_focusa_packet_build", "focusa_evidence_capture or focusa_browser_diagnostics_intake", "browser_close when cleanup recommends"}, "preferred_focusa_tools": []string{"focusa_evidence_capture", "focusa_browser_diagnostics_intake"}},
 			{"name": "search_then_browse", "steps": []string{"browser_search", "browser_open selected result", "browser_read", "browser_snapshot", "browser_diagnostics", "browser_close"}},
 			{"name": "web_surfing", "steps": []string{"browser_open", "browser_read", "browser_snapshot", "browser_click/browser_fill/browser_press", "browser_diagnostics", "browser_close"}},
@@ -259,14 +267,15 @@ func toolGraph() map[string]any {
 
 func toolRelations() map[string][]string {
 	return map[string][]string{
-		"uiai_agent_card":            {"uiai_tool_search", "browser_open", "browser_read", "browser_diagnostics", "focusa_browser_diagnostics_intake"},
-		"uiai_tool_search":           {"uiai_agent_card", "uiai_focusa_packet_compose", "browser_search", "browser_open", "browser_read", "browser_diagnostics"},
+		"uiai_agent_card":            {"uiai_tool_search", "source_to_markdown", "browser_open", "browser_read", "browser_diagnostics", "focusa_browser_diagnostics_intake"},
+		"uiai_tool_search":           {"uiai_agent_card", "source_to_markdown", "uiai_focusa_packet_compose", "browser_search", "browser_open", "browser_read", "browser_diagnostics"},
 		"uiai_health":                {"uiai_status", "browser_open", "browser_diagnostics"},
 		"uiai_status":                {"uiai_health", "uiai_agent_card", "uiai_tool_graph"},
 		"critique_models":            {"critique_dimensions", "uiai_status", "uiai_tool_graph"},
 		"critique_dimensions":        {"critique_models", "uiai_tool_graph"},
 		"uiai_errors":                {"browser_diagnostics", "uiai_health", "uiai_status", "uiai_tool_graph"},
-		"browser_search":             {"browser_open", "browser_read", "browser_diagnostics", "uiai_focusa_packet_build", "uiai_tool_search"},
+		"source_to_markdown":         {"browser_open", "browser_read", "browser_diagnostics", "uiai_focusa_packet_compose", "focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
+		"browser_search":             {"source_to_markdown", "browser_open", "browser_read", "browser_diagnostics", "uiai_focusa_packet_build", "uiai_tool_search"},
 		"browser_open":               {"browser_read", "browser_snapshot", "browser_diagnostics", "uiai_focusa_packet_build", "focusa_browser_diagnostics_intake", "browser_close"},
 		"browser_read":               {"browser_snapshot", "browser_text", "browser_diagnostics", "uiai_focusa_packet_build", "browser_close"},
 		"browser_snapshot":           {"browser_click", "browser_fill", "browser_hover", "browser_text", "browser_diagnostics"},
@@ -309,6 +318,9 @@ func workflowHints(name string) []string {
 	}
 	if name == "uiai_errors" {
 		return []string{"Use after UIAI engine/browser failures", "Events are bounded and redacted", "Pair browser_session events with browser_diagnostics for page-level evidence"}
+	}
+	if name == "source_to_markdown" {
+		return []string{"Use for one-shot public URL to Markdown evidence", "Prefer browser_open/browser_read when follow-up interaction is needed", "Capture focusa.evidence_ref with Focusa when scoped"}
 	}
 	if name == "browser_search" {
 		return []string{"Use provider-neutral search for discovery", "Open a selected result with browser_open", "Use browser_read for page text", "Use browser_diagnostics on navigation failures"}

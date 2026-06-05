@@ -50,24 +50,25 @@ Cleanup:
 - Always close the browser session when the page is no longer needed.
 
 
-## Planned Recipe: Source → Markdown / JSONL
+## Recipe: Source → Markdown / JSONL
 
 Use when an agent needs a public webpage, social thread, GitHub issue/PR, Reddit thread, YouTube transcript, or similar source converted into clean, cited, agent-ready Markdown or JSONL.
 
-This workflow is specified but not yet implemented. See [`SOURCE_TO_MARKDOWN_AGENT_SPEC.md`](SOURCE_TO_MARKDOWN_AGENT_SPEC.md).
+Generic webpage Markdown is implemented; source-specific adapters and JSONL chunking remain roadmap items in [`SOURCE_TO_MARKDOWN_AGENT_SPEC.md`](SOURCE_TO_MARKDOWN_AGENT_SPEC.md).
 
-Planned surfaces:
+Implemented MVP surfaces:
 
 ```text
-uiai_to_markdown url="<public-url>" format="markdown|jsonl" source="auto"
-source_to_markdown url="<public-url>" format="markdown|jsonl" source="auto"
-scripts/uiai md <public-url> --format markdown
+uiai_source_to_markdown url="<public-url>"
+source_to_markdown url="<public-url>"
+scripts/uiai markdown <public-url> --max-chars 4000
+scripts/uiai session read <sid> --format markdown --selector main
 ```
 
-Planned evidence handles:
+Evidence handles:
 
-- `uiai-md:sha256:<prefix>`
-- source-specific record refs for JSONL chunks
+- `uiai-source-markdown:sha256:<prefix>`
+- source-specific record refs for future JSONL chunks
 
 Rules:
 
