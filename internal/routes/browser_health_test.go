@@ -26,3 +26,27 @@ func TestBrowserHealthStandbyWhenPoolLazyIdle(t *testing.T) {
 		t.Fatalf("status code=%d want=%d", got, want)
 	}
 }
+
+func TestBrowserHealthPayloadIncludesAgentPressure(t *testing.T) {
+	pool := &vision.Pool{}
+	payload := browserHealthPayload(pool)
+	pressure, ok := payload["agent_pressure"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected agent_pressure map: %#v", payload)
+	}
+	packet := pressure["packet"].(map[string]any)
+	if packet["schema"] != "uiai.focusa_research_diagnostics_packet.v1" {
+		t.Fatalf("missing packet pressure schema: %#v", packet)
+	}
+	search := pressure["search"].(map[string]any)
+	if search["packet_surface"] != "search" {
+		t.Fatalf("missing search pressure surface: %#v", search)
+	}
+	browser := pressure["browser"].(map[string]any)
+	if browser["pressure"] == "" {
+		t.Fatalf("missing browser pressure: %#v", browser)
+	}
+	if pressure["recommended_action"] == "" {
+		t.Fatalf("missing recommended action: %#v", pressure)
+	}
+}

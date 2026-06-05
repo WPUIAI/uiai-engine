@@ -6,6 +6,76 @@ import { Type } from "typebox";
 const DEFAULT_ENGINE_URL = "http://localhost:7456";
 const REQUEST_TIMEOUT_MS = Number(process.env.UIAI_PI_TIMEOUT_MS || 30000);
 const UIAI_WIDGET_STATE_ENTRY = "uiai-widget-visibility";
+const RESEARCH_DIAGNOSTICS_PACKET_SCHEMA = "uiai.focusa_research_diagnostics_packet.v1";
+const MAX_PACKET_BYTES = 8 * 1024;
+const MAX_CAPTURE_SUMMARY_CHARS = 500;
+const MAX_GOAL_CHARS = 240;
+const MAX_NEXT_ACTION_CHARS = 240;
+const MAX_DIAGNOSTICS_SUMMARY_BYTES = 2 * 1024;
+const MAX_ARGS_PREVIEW_BYTES = 2 * 1024;
+const MAX_CAPTURES = 8;
+const MAX_TARGET_REFS = 16;
+const MAX_EVIDENCE_REFS = 32;
+const MAX_ACTIVE_OBJECT_HINTS = 16;
+
+type PacketMode = "research" | "diagnose" | "proof";
+type ScopeStatus = "present" | "missing" | "partial" | "mismatch_candidate";
+
+type FocusaScope = {
+	project_root?: string;
+	continuity_id?: string;
+	workpoint_id?: string;
+	evidence_ref?: string;
+};
+
+type PacketCapture = {
+	type: "search" | "read" | "diagnostics" | "error" | string;
+	evidence_ref: string;
+	target_ref: string;
+	title?: string;
+	summary: string;
+};
+
+type PacketDiagnosticsSummary = {
+	console_errors: number;
+	failed_requests: number;
+	top_findings: string[];
+};
+
+type PacketActiveObjectHint = {
+	kind: "url" | "endpoint" | "selector" | "source" | "search_result" | string;
+	hint: string;
+};
+
+type ResearchDiagnosticsPacket = {
+	schema: typeof RESEARCH_DIAGNOSTICS_PACKET_SCHEMA;
+	mode: PacketMode;
+	goal: string;
+	scope_status: ScopeStatus;
+	focusa_scope?: FocusaScope;
+	target_refs: string[];
+	evidence_refs: string[];
+	captures: PacketCapture[];
+	diagnostics_summary?: PacketDiagnosticsSummary;
+	active_object_hints?: PacketActiveObjectHint[];
+	recommended_focusa: {
+		preferred_tool: "focusa_evidence_capture" | "focusa_browser_diagnostics_intake" | string;
+		fallback_tool?: string;
+		args_preview?: Record<string, any>;
+		next_tools?: string[];
+	};
+	recommended_next_action: string;
+	render: {
+		summary_line: string;
+		expandable_json_ref?: string;
+	};
+	headless_next_action: string;
+	cleanup?: {
+		session_id?: string;
+		recommended_action: "close_when_done" | "keep_for_followup" | "none" | string;
+		tool?: "uiai_browser_close" | string;
+	};
+};
 
 function engineUrl(): string {
 	return (process.env.UIAI_ENGINE_URL || DEFAULT_ENGINE_URL).replace(/\/$/, "");
@@ -76,6 +146,170 @@ function post(path: string, body: Record<string, any>) {
 	return callEngine(path, { method: "POST", body: JSON.stringify(cleanBody(body)) });
 }
 
+function truncateText(value: any, maxChars: number): string {
+	const text = String(value ?? "").trim();
+	if (maxChars <= 0) return "";
+	const chars = Array.from(text);
+	if (chars.length <= maxChars) return text;
+	return `${chars.slice(0, Math.max(0, maxChars - 1)).join("")}…`;
+}
+
+function packetByteSize(value: any): number {
+	return new TextEncoder().encode(JSON.stringify(value)).length;
+}
+
+function isSecretQueryKey(key: string): boolean {
+	const lower = key.toLowerCase();
+	return ["token", "key", "secret", "auth", "session", "password", "passwd", "code", "sig", "signature", "jwt", "credential", "authorization", "cookie", "api_key", "apikey", "access_token", "refresh_token"].some((part) => lower.includes(part));
+}
+
+function sanitizeUrl(raw: string): string {
+	const value = String(raw || "").trim();
+	if (!value) return "";
+	try {
+		const parsed = new URL(value);
+		parsed.hash = "";
+		for (const key of Array.from(parsed.searchParams.keys())) {
+			if (isSecretQueryKey(key)) parsed.searchParams.set(key, "REDACTED");
+		}
+		return truncateText(parsed.toString(), 2048);
+	} catch {
+		return truncateText(value, 2048);
+	}
+}
+
+function sanitizeTargetRef(ref: any): string {
+	const value = String(ref || "").trim();
+	if (!value) return "";
+	if (value.startsWith("browser:http://") || value.startsWith("browser:https://")) return `browser:${sanitizeUrl(value.slice("browser:".length))}`;
+	if (value.startsWith("http://") || value.startsWith("https://")) return sanitizeUrl(value);
+	return truncateText(value, 500);
+}
+
+function boundedStrings(values: any[], maxItems: number, maxChars = 500): string[] {
+	return (Array.isArray(values) ? values : []).slice(0, maxItems).map((value) => truncateText(value, maxChars)).filter(Boolean);
+}
+
+function scopeStatus(scope: any): ScopeStatus {
+	if (!scope || typeof scope !== "object") return "missing";
+	if (scope.project_root && scope.continuity_id) return "present";
+	if (scope.project_root || scope.continuity_id || scope.workpoint_id || scope.evidence_ref) return "partial";
+	return "missing";
+}
+
+function primaryFocusaTool(captures: PacketCapture[]): string {
+	return captures.some((capture) => capture.type === "diagnostics" || capture.type === "error") ? "focusa_browser_diagnostics_intake" : "focusa_evidence_capture";
+}
+
+function captureFromResponse(response: any): PacketCapture | undefined {
+	const focusa = response?.focusa;
+	if (!focusa || typeof focusa !== "object") return undefined;
+	let type = "search";
+	if (String(focusa.evidence_ref || "").includes("diagnostics")) type = "diagnostics";
+	else if (String(focusa.evidence_ref || "").includes("error")) type = "error";
+	else if (String(focusa.evidence_ref || "").includes(":read:")) type = "read";
+	return {
+		type,
+		evidence_ref: truncateText(focusa.evidence_ref || "", 240),
+		target_ref: sanitizeTargetRef(focusa.target_ref || response?.url || ""),
+		title: truncateText(response?.title || response?.results?.[0]?.title || "", 200) || undefined,
+		summary: truncateText(focusa.summary || response?.message || response?.description || "UIAI evidence capture", MAX_CAPTURE_SUMMARY_CHARS),
+	};
+}
+
+function diagnosticsSummaryFromResponses(responses: any[]): PacketDiagnosticsSummary | undefined {
+	const findings: string[] = [];
+	let consoleErrors = 0;
+	let failedRequests = 0;
+	for (const response of responses) {
+		const summary = response?.summary || response?.diagnostics_summary || response?.details?.diagnostics_summary;
+		if (!summary) continue;
+		consoleErrors += Number(summary.console_errors || 0);
+		failedRequests += Number(summary.failed_requests || 0);
+		if (Number(summary.exceptions || 0) > 0) findings.push(`exceptions=${summary.exceptions}`);
+		if (Number(summary.http_4xx || 0) > 0) findings.push(`http_4xx=${summary.http_4xx}`);
+		if (Number(summary.http_5xx || 0) > 0) findings.push(`http_5xx=${summary.http_5xx}`);
+	}
+	if (!consoleErrors && !failedRequests && findings.length === 0) return undefined;
+	let out: PacketDiagnosticsSummary = { console_errors: consoleErrors, failed_requests: failedRequests, top_findings: boundedStrings(findings, 12, 240) };
+	while (packetByteSize(out) > MAX_DIAGNOSTICS_SUMMARY_BYTES && out.top_findings.length > 0) out.top_findings.pop();
+	return out;
+}
+
+function sanitizeArgsPreview(args: Record<string, any>): Record<string, any> | undefined {
+	const out: Record<string, any> = {};
+	for (const [key, value] of Object.entries(args || {})) {
+		if (isSecretQueryKey(key)) continue;
+		if (typeof value === "string") out[truncateText(key, 80)] = key.includes("ref") || value.startsWith("http") || value.startsWith("browser:http") ? sanitizeTargetRef(value) : truncateText(value, 500);
+		else if (typeof value === "boolean" || typeof value === "number") out[truncateText(key, 80)] = value;
+		else if (Array.isArray(value)) out[truncateText(key, 80)] = boundedStrings(value, 16, 240);
+		else if (value && typeof value === "object") out[truncateText(key, 80)] = sanitizeArgsPreview(value as Record<string, any>);
+	}
+	while (packetByteSize(out) > MAX_ARGS_PREVIEW_BYTES) {
+		const first = Object.keys(out)[0];
+		if (!first) break;
+		delete out[first];
+	}
+	return Object.keys(out).length ? out : undefined;
+}
+
+export function buildResearchDiagnosticsPacket(input: {
+	mode?: string;
+	goal: string;
+	responses: any[];
+	focusa_scope?: FocusaScope;
+	recommended_next_action?: string;
+	cleanup_session_id?: string;
+	expandable_json_ref?: string;
+}): ResearchDiagnosticsPacket {
+	const mode: PacketMode = input.mode === "diagnose" || input.mode === "proof" ? input.mode : "research";
+	const captures = input.responses.map(captureFromResponse).filter(Boolean).slice(0, MAX_CAPTURES) as PacketCapture[];
+	const targetRefs = boundedStrings(captures.map((capture) => capture.target_ref), MAX_TARGET_REFS).map(sanitizeTargetRef);
+	const evidenceRefs = boundedStrings(captures.map((capture) => capture.evidence_ref), MAX_EVIDENCE_REFS, 240);
+	const preferredTool = primaryFocusaTool(captures);
+	const primaryCapture = captures[0];
+	const recommendedNext = truncateText(input.recommended_next_action || (mode === "diagnose" ? "Call focusa_browser_diagnostics_intake with args_preview or inspect failed requests." : "Call focusa_evidence_capture with args_preview, then resolve active object if needed."), MAX_NEXT_ACTION_CHARS);
+	let packet: ResearchDiagnosticsPacket = {
+		schema: RESEARCH_DIAGNOSTICS_PACKET_SCHEMA,
+		mode,
+		goal: truncateText(input.goal, MAX_GOAL_CHARS),
+		scope_status: scopeStatus(input.focusa_scope),
+		focusa_scope: input.focusa_scope,
+		target_refs: targetRefs,
+		evidence_refs: evidenceRefs,
+		captures,
+		diagnostics_summary: diagnosticsSummaryFromResponses(input.responses),
+		active_object_hints: targetRefs.slice(0, MAX_ACTIVE_OBJECT_HINTS).map((hint) => ({ kind: hint.startsWith("browser:") ? "url" : "source", hint })),
+		recommended_focusa: {
+			preferred_tool: preferredTool,
+			fallback_tool: "focusa_evidence_capture",
+			args_preview: sanitizeArgsPreview({
+				target_ref: primaryCapture?.target_ref || targetRefs[0] || "uiai:packet",
+				result: primaryCapture?.summary || truncateText(input.goal, MAX_CAPTURE_SUMMARY_CHARS),
+				evidence_ref: primaryCapture?.evidence_ref || evidenceRefs[0] || "uiai-packet:manual",
+				attach_to_workpoint: false,
+			}),
+			next_tools: preferredTool === "focusa_browser_diagnostics_intake" ? ["focusa_browser_diagnostics_intake", "focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"] : ["focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"],
+		},
+		recommended_next_action: recommendedNext,
+		render: {
+			summary_line: `UIAI packet evidence=${evidenceRefs.length} target=${targetRefs[0] || "none"} scope=${scopeStatus(input.focusa_scope)} tool=${preferredTool} next=${recommendedNext}`,
+			expandable_json_ref: truncateText(input.expandable_json_ref || "", 240) || undefined,
+		},
+		headless_next_action: recommendedNext,
+		cleanup: input.cleanup_session_id ? { session_id: truncateText(input.cleanup_session_id, 120), recommended_action: "close_when_done", tool: "uiai_browser_close" } : undefined,
+	};
+	while (packetByteSize(packet) > MAX_PACKET_BYTES) {
+		if (packet.diagnostics_summary?.top_findings?.length) packet.diagnostics_summary.top_findings.pop();
+		else if (packet.active_object_hints?.length) packet.active_object_hints.pop();
+		else if (packet.captures.length) packet.captures.pop();
+		else if (packet.evidence_refs.length) packet.evidence_refs.pop();
+		else if (packet.target_refs.length) packet.target_refs.pop();
+		else { delete packet.recommended_focusa.args_preview; break; }
+	}
+	return packet;
+}
+
 function renderUiaiWidget(ctx: any) {
 	ctx.ui.setWidget("uiai-engine", [
 		"UIAI Engine",
@@ -101,6 +335,9 @@ function compactSummary(data: any, details: Record<string, any> = {}) {
 		const id = data.error_id ? ` id=${data.error_id}` : "";
 		const next = data.suggested_next_action ? ` → ${data.suggested_next_action}` : "";
 		return `${endpoint} error${data.error_class ? `:${data.error_class}` : ""}${id} ${data.message || data.error || ""}${next}`.trim();
+	}
+	if (data?.schema === RESEARCH_DIAGNOSTICS_PACKET_SCHEMA) {
+		return data?.render?.summary_line || `UIAI packet evidence=${data?.evidence_refs?.length ?? 0}`;
 	}
 	if (Array.isArray(data?.events)) {
 		return `${endpoint} ${data.count ?? data.events.length} error events stored=${data.stored_count ?? "?"}`;
@@ -175,6 +412,23 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		parameters: Type.Object({}),
 		async execute() {
 			return textResult(await callEngine("/api/tools/graph"), { endpoint: "/api/tools/graph" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_focusa_packet_build",
+		label: "UIAI Focusa Packet Build",
+		description: "Compose a bounded uiai.focusa_research_diagnostics_packet.v1 from existing UIAI search/read/diagnostics/error responses. Does not call Focusa or create durable memory.",
+		parameters: Type.Object({
+			goal: Type.String({ description: "Bounded user-visible goal for the packet" }),
+			mode: Type.Optional(Type.String({ description: "research, diagnose, or proof", default: "research" })),
+			responses: Type.Array(Type.Any({ description: "Existing UIAI responses containing focusa metadata" })),
+			focusa_scope: Type.Optional(Type.Any({ description: "Optional Focusa scope to echo into the packet" })),
+			recommended_next_action: Type.Optional(Type.String({ description: "Exact next browser/source/proof step" })),
+			cleanup_session_id: Type.Optional(Type.String({ description: "Browser session id to recommend closing when done" })),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(buildResearchDiagnosticsPacket(params), { endpoint: "pi:uiai_focusa_packet_build" });
 		},
 	});
 
@@ -610,6 +864,18 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 				ctx.ui.notify("UIAI card shown", "info");
 				return;
 			}
+			const guidedPrompts: Record<string, string> = {
+				research: "Run UIAI research: call uiai_search with a query, open one selected result with uiai_browser_open, read it with uiai_browser_read max_chars<=2000, run uiai_browser_diagnostics, then call uiai_focusa_packet_build with the search/read/diagnostics responses and cleanup_session_id.",
+				diagnose: "Run UIAI diagnose: call uiai_browser_diagnostics for a session_id, then call uiai_focusa_packet_build mode=diagnose with the diagnostics response and copy recommended_focusa.args_preview to focusa_browser_diagnostics_intake if scope is canonical.",
+				proof: "Run UIAI proof: open or reuse a URL/session, verify with uiai_browser_read max_chars<=2000 and uiai_browser_diagnostics, call uiai_focusa_packet_build mode=proof with cleanup_session_id, then capture Focusa evidence using args_preview.",
+			};
+			if (guidedPrompts[action]) {
+				renderUiaiWidget(ctx);
+				pi.appendEntry(UIAI_WIDGET_STATE_ENTRY, { visible: true });
+				ctx.ui.setEditorText(guidedPrompts[action]);
+				ctx.ui.notify(`UIAI ${action} workflow prompt inserted`, "info");
+				return;
+			}
 			try {
 				const card = await callEngine("/api/tools/agent-card");
 				ctx.ui.notify(`UIAI ready: ${card.purpose || "agent card loaded"}`, "info");
@@ -620,6 +886,9 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 					"Show agent card",
 					"Search tools",
 					"Open browser session",
+					"Run research packet",
+					"Run diagnostics packet",
+					"Run proof packet",
 					"Run diagnostics",
 					"One-shot screenshot",
 					"Show tool graph",
@@ -634,6 +903,9 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 					"Show agent card": "Use pi_uiai_agent_card to show the UIAI Engine bootstrap card.",
 					"Search tools": "Use pi_uiai_tool_search with q=diagnostics, read, click, screenshot, or frame.",
 					"Open browser session": "Use uiai_browser_open with a URL, then uiai_browser_read, uiai_browser_snapshot, and action tools.",
+					"Run research packet": guidedPrompts.research,
+					"Run diagnostics packet": guidedPrompts.diagnose,
+					"Run proof packet": guidedPrompts.proof,
 					"Run diagnostics": "Use uiai_browser_diagnostics with a session_id after any failed or surprising browser action.",
 					"One-shot screenshot": "Use uiai_screenshot with a URL for a one-off capture.",
 					"Show tool graph": "Use pi_uiai_tool_graph to inspect UIAI workflows and Focusa handoff routes.",

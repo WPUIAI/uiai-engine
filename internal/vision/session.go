@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 )
@@ -47,6 +48,7 @@ type Session struct {
 	LastUsed    time.Time    `json:"last_used"`
 	NavCount    int          `json:"nav_count"`
 	SnapCount   int          `json:"snap_count"`
+	ReadCount   int          `json:"read_count"`
 	FocusaScope *FocusaScope `json:"focusa_scope,omitempty"`
 
 	page              *rod.Page
@@ -886,15 +888,25 @@ type ReadOptions struct {
 
 // PageReadResult is a compact, screenshot-free page reading payload.
 type PageReadResult struct {
-	URL         string           `json:"url"`
-	Title       string           `json:"title"`
-	Description string           `json:"description,omitempty"`
-	Selector    string           `json:"selector,omitempty"`
-	Text        string           `json:"text"`
-	Chars       int              `json:"chars"`
-	Truncated   bool             `json:"truncated"`
-	Headings    []map[string]any `json:"headings,omitempty"`
-	Links       []map[string]any `json:"links,omitempty"`
+	URL         string              `json:"url"`
+	Title       string              `json:"title"`
+	Description string              `json:"description,omitempty"`
+	Selector    string              `json:"selector,omitempty"`
+	Text        string              `json:"text"`
+	Chars       int                 `json:"chars"`
+	Truncated   bool                `json:"truncated"`
+	Headings    []map[string]any    `json:"headings,omitempty"`
+	Links       []map[string]any    `json:"links,omitempty"`
+	Focusa      *ReadFocusaMetadata `json:"focusa,omitempty"`
+}
+
+type ReadFocusaMetadata struct {
+	TargetRef         string   `json:"target_ref"`
+	EvidenceRef       string   `json:"evidence_ref"`
+	PreferredTool     string   `json:"preferred_tool"`
+	Summary           string   `json:"summary"`
+	NextTools         []string `json:"next_tools"`
+	FocusaScopeStatus string   `json:"focusa_scope_status"`
 }
 
 // ReadPage extracts bounded, readable page text without taking a screenshot.
@@ -960,6 +972,8 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 		truncated = true
 	}
 
+	s.ReadCount++
+	readSeq := s.ReadCount
 	out := &PageReadResult{
 		URL:         raw.URL,
 		Title:       raw.Title,
@@ -969,6 +983,7 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 		Chars:       len(text),
 		Truncated:   truncated,
 		Headings:    raw.Headings,
+		Focusa:      buildReadFocusaMetadata(s.ID, readSeq, raw.URL, raw.Title, raw.Selector, len(text), truncated, s.FocusaScope),
 	}
 	if opts.IncludeLinks {
 		out.Links = raw.Links
@@ -976,6 +991,50 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 
 	s.touch()
 	return out, nil
+}
+
+func buildReadFocusaMetadata(sessionID string, readSeq int, pageURL, title, selector string, chars int, truncated bool, scope *FocusaScope) *ReadFocusaMetadata {
+	if readSeq <= 0 {
+		readSeq = 1
+	}
+	targetRef := "browser:" + focusapacket.SanitizeURL(pageURL)
+	if pageURL == "" {
+		targetRef = "browser:session=" + focusapacket.Truncate(sessionID, 80)
+	}
+	summary := fmt.Sprintf("Read %d chars from %s", chars, focusapacket.Truncate(firstNonEmpty(title, pageURL, sessionID), 160))
+	if selector != "" {
+		summary += " selector=" + focusapacket.Truncate(selector, 80)
+	}
+	if truncated {
+		summary += " (truncated)"
+	}
+	return &ReadFocusaMetadata{
+		TargetRef:         targetRef,
+		EvidenceRef:       fmt.Sprintf("uiai-browser:session=%s:read:%d", focusapacket.Truncate(sessionID, 80), readSeq),
+		PreferredTool:     "focusa_evidence_capture",
+		Summary:           focusapacket.Truncate(summary, focusapacket.MaxCaptureSummaryChars),
+		NextTools:         []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
+		FocusaScopeStatus: readFocusaScopeStatus(scope),
+	}
+}
+
+func readFocusaScopeStatus(scope *FocusaScope) string {
+	if scope == nil {
+		return string(focusapacket.ScopeMissing)
+	}
+	if scope.ProjectRoot != "" && scope.ContinuityID != "" {
+		return string(focusapacket.ScopePresent)
+	}
+	return string(focusapacket.ScopePartial)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // WaitFor waits for a CSS selector to appear, then screenshots.

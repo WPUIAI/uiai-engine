@@ -186,3 +186,49 @@ func TestSearchBraveRequiresKey(t *testing.T) {
 		t.Fatalf("expected missing key error")
 	}
 }
+
+func TestWriteSearchResponseIncludesFocusaMetadata(t *testing.T) {
+	results := []searchResult{{
+		Title:       "One",
+		URL:         "https://example.com/one?token=secret#frag",
+		Description: "first",
+	}}
+	annotateSearchEvidence(results, "brave", "agent browser")
+	results[0] = sanitizeSearchResult(results[0])
+
+	res := httptest.NewRecorder()
+	writeSearchResponse(res, "brave", "agent browser", results, false, time.Minute)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status=%d", res.Code)
+	}
+	var body struct {
+		Focusa struct {
+			TargetRef         string   `json:"target_ref"`
+			EvidenceRef       string   `json:"evidence_ref"`
+			PreferredTool     string   `json:"preferred_tool"`
+			Summary           string   `json:"summary"`
+			NextTools         []string `json:"next_tools"`
+			FocusaScopeStatus string   `json:"focusa_scope_status"`
+		} `json:"focusa"`
+		Results []searchResult `json:"results"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode search response: %v", err)
+	}
+	if body.Focusa.TargetRef == "" || !strings.HasPrefix(body.Focusa.TargetRef, "search:brave:") {
+		t.Fatalf("missing target_ref: %+v", body.Focusa)
+	}
+	if body.Focusa.EvidenceRef != results[0].EvidenceRef {
+		t.Fatalf("evidence_ref = %q, want %q", body.Focusa.EvidenceRef, results[0].EvidenceRef)
+	}
+	if body.Focusa.PreferredTool != "focusa_evidence_capture" || body.Focusa.FocusaScopeStatus != "missing" {
+		t.Fatalf("unexpected focusa metadata: %+v", body.Focusa)
+	}
+	if len(body.Focusa.NextTools) == 0 || body.Focusa.Summary == "" {
+		t.Fatalf("incomplete focusa metadata: %+v", body.Focusa)
+	}
+	encoded := res.Body.String()
+	if strings.Contains(encoded, "secret") || strings.Contains(encoded, "#frag") {
+		t.Fatalf("search response leaked secret/fragment: %s", encoded)
+	}
+}

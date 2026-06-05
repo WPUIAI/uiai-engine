@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/go-rod/rod/lib/proto"
 )
 
@@ -61,17 +62,27 @@ type DiagnosticsSummary struct {
 }
 
 type DiagnosticsSnapshot struct {
-	SessionID      string             `json:"session_id"`
-	URL            string             `json:"url"`
-	Title          string             `json:"title"`
-	Seq            uint64             `json:"seq"`
-	GeneratedAt    string             `json:"generated_at"`
-	FocusaScope    *FocusaScope       `json:"focusa_scope,omitempty"`
-	Console        []ConsoleEvent     `json:"console"`
-	Exceptions     []ExceptionEvent   `json:"exceptions"`
-	Network        []NetworkEvent     `json:"network"`
-	FailedRequests []NetworkEvent     `json:"failed_requests"`
-	Summary        DiagnosticsSummary `json:"summary"`
+	SessionID      string                     `json:"session_id"`
+	URL            string                     `json:"url"`
+	Title          string                     `json:"title"`
+	Seq            uint64                     `json:"seq"`
+	GeneratedAt    string                     `json:"generated_at"`
+	FocusaScope    *FocusaScope               `json:"focusa_scope,omitempty"`
+	Console        []ConsoleEvent             `json:"console"`
+	Exceptions     []ExceptionEvent           `json:"exceptions"`
+	Network        []NetworkEvent             `json:"network"`
+	FailedRequests []NetworkEvent             `json:"failed_requests"`
+	Summary        DiagnosticsSummary         `json:"summary"`
+	Focusa         *DiagnosticsFocusaMetadata `json:"focusa,omitempty"`
+}
+
+type DiagnosticsFocusaMetadata struct {
+	TargetRef         string   `json:"target_ref"`
+	EvidenceRef       string   `json:"evidence_ref"`
+	PreferredTool     string   `json:"preferred_tool"`
+	Summary           string   `json:"summary"`
+	NextTools         []string `json:"next_tools"`
+	FocusaScopeStatus string   `json:"focusa_scope_status"`
 }
 
 type diagnosticsRecorder struct {
@@ -146,18 +157,37 @@ func (s *Session) Diagnostics(limit int, level string, failedOnly bool) Diagnost
 	network := filterNetwork(s.diagnostics.network, limit, failedOnly)
 	failed := filterNetwork(s.diagnostics.network, limit, true)
 
+	summary := summarizeDiagnostics(s.diagnostics.console, s.diagnostics.exceptions, s.diagnostics.network)
+	seq := s.diagnostics.seq
 	return DiagnosticsSnapshot{
 		SessionID:      s.ID,
 		URL:            s.URL,
 		Title:          s.Title,
-		Seq:            s.diagnostics.seq,
+		Seq:            seq,
 		GeneratedAt:    time.Now().UTC().Format(time.RFC3339),
 		FocusaScope:    s.FocusaScope,
 		Console:        console,
 		Exceptions:     exceptions,
 		Network:        network,
 		FailedRequests: failed,
-		Summary:        summarizeDiagnostics(s.diagnostics.console, s.diagnostics.exceptions, s.diagnostics.network),
+		Summary:        summary,
+		Focusa:         buildDiagnosticsFocusaMetadata(s.ID, seq, s.URL, s.Title, summary, s.FocusaScope),
+	}
+}
+
+func buildDiagnosticsFocusaMetadata(sessionID string, seq uint64, pageURL, title string, summary DiagnosticsSummary, scope *FocusaScope) *DiagnosticsFocusaMetadata {
+	targetRef := "browser:" + focusapacket.SanitizeURL(pageURL)
+	if pageURL == "" {
+		targetRef = "browser:session=" + focusapacket.Truncate(sessionID, 80)
+	}
+	result := fmt.Sprintf("Diagnostics for %s: console_errors=%d exceptions=%d failed_requests=%d http_4xx=%d http_5xx=%d", focusapacket.Truncate(firstNonEmpty(title, pageURL, sessionID), 160), summary.ConsoleErrors, summary.Exceptions, summary.FailedRequests, summary.HTTP4xx, summary.HTTP5xx)
+	return &DiagnosticsFocusaMetadata{
+		TargetRef:         targetRef,
+		EvidenceRef:       fmt.Sprintf("uiai-diagnostics:session=%s:seq=%d", focusapacket.Truncate(sessionID, 80), seq),
+		PreferredTool:     "focusa_browser_diagnostics_intake",
+		Summary:           focusapacket.Truncate(result, focusapacket.MaxCaptureSummaryChars),
+		NextTools:         []string{"focusa_browser_diagnostics_intake", "focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
+		FocusaScopeStatus: readFocusaScopeStatus(scope),
 	}
 }
 

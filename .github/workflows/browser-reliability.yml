@@ -32,6 +32,8 @@ jobs:
           sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
       - name: Go tests
         run: go test ./...
+      - name: Focusa packet drift check
+        run: scripts/check-focusa-packet-drift.sh
       - name: Diagnostics stress 40/40
         run: |
           mkdir -p "$OUT_DIR"

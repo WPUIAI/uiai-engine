@@ -139,3 +139,40 @@ func containsString(values []string, want string) bool {
 	}
 	return false
 }
+
+func TestToolGraphIncludesFocusaPacketWorkflow(t *testing.T) {
+	graph := toolGraph()
+	focusa := graph["focusa_integration"].(map[string]any)
+	if focusa["packet_schema"] != "uiai.focusa_research_diagnostics_packet.v1" {
+		t.Fatalf("missing packet schema: %#v", focusa)
+	}
+	surfaces := focusa["packet_metadata_surfaces"].([]string)
+	for _, want := range []string{"search", "browser_read", "browser_diagnostics", "structured_errors"} {
+		if !containsString(surfaces, want) {
+			t.Fatalf("missing packet surface %s in %#v", want, surfaces)
+		}
+	}
+	workflows := graph["workflows"].([]map[string]any)
+	found := false
+	for _, workflow := range workflows {
+		if workflow["name"] == "focusa_research_packet" {
+			found = true
+			if workflow["schema"] != "uiai.focusa_research_diagnostics_packet.v1" {
+				t.Fatalf("workflow schema mismatch: %#v", workflow)
+			}
+			steps := workflow["steps"].([]string)
+			for _, want := range []string{"uiai_focusa_packet_build", "focusa_evidence_capture or focusa_browser_diagnostics_intake"} {
+				if !containsString(steps, want) {
+					t.Fatalf("missing workflow step %s in %#v", want, steps)
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatal("missing focusa_research_packet workflow")
+	}
+	relations := toolRelations()
+	if !containsString(relations["browser_read"], "uiai_focusa_packet_build") || !containsString(relations["browser_diagnostics"], "uiai_focusa_packet_build") {
+		t.Fatalf("missing packet builder relations: %#v", relations)
+	}
+}

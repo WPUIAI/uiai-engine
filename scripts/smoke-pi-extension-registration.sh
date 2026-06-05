@@ -39,6 +39,7 @@ required_tools = {
     "pi_uiai_tool_search",
     "pi_uiai_tool_graph",
     "uiai_search",
+    "uiai_focusa_packet_build",
     "uiai_health",
     "uiai_status",
     "uiai_errors",
@@ -58,6 +59,9 @@ if missing_required:
 
 if "uiai" not in registered_commands:
     raise SystemExit("Pi extension missing /uiai command registration")
+for phrase in ["Run research packet", "Run diagnostics packet", "Run proof packet", "guidedPrompts"]:
+    if phrase not in src:
+        raise SystemExit(f"Pi extension missing guided workflow phrase: {phrase}")
 
 missing_mirrors = []
 for tool in mcp_tools:

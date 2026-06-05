@@ -1,6 +1,9 @@
 package vision
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestAppendBoundedKeepsTail(t *testing.T) {
 	items := []int{}
@@ -107,5 +110,49 @@ func TestClearDiagnosticsResetsRecorder(t *testing.T) {
 	s.ClearDiagnostics()
 	if s.diagnostics.seq != 0 || len(s.diagnostics.console) != 0 || len(s.diagnostics.exceptions) != 0 || len(s.diagnostics.network) != 0 || len(s.diagnostics.requests) != 0 {
 		t.Fatalf("diagnostics not cleared: %+v", s.diagnostics)
+	}
+}
+
+func TestBuildReadFocusaMetadata(t *testing.T) {
+	meta := buildReadFocusaMetadata("sess1", 2, "https://example.com/page?token=secret&ok=1#frag", "Example", "main", 1234, true, &FocusaScope{ProjectRoot: "/repo", ContinuityID: "cont"})
+	if meta == nil {
+		t.Fatal("expected metadata")
+	}
+	if meta.TargetRef != "browser:https://example.com/page?ok=1&token=REDACTED" {
+		t.Fatalf("target_ref not sanitized: %s", meta.TargetRef)
+	}
+	if meta.EvidenceRef != "uiai-browser:session=sess1:read:2" {
+		t.Fatalf("evidence_ref = %s", meta.EvidenceRef)
+	}
+	if meta.PreferredTool != "focusa_evidence_capture" || meta.FocusaScopeStatus != "present" {
+		t.Fatalf("unexpected metadata: %+v", meta)
+	}
+	if len(meta.NextTools) == 0 || meta.Summary == "" || !strings.Contains(meta.Summary, "truncated") {
+		t.Fatalf("incomplete summary/next tools: %+v", meta)
+	}
+	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") {
+		t.Fatalf("secret leaked: %+v", meta)
+	}
+}
+
+func TestBuildDiagnosticsFocusaMetadata(t *testing.T) {
+	meta := buildDiagnosticsFocusaMetadata("sess1", 7, "https://example.com/app?jwt=secret#frag", "App", DiagnosticsSummary{ConsoleErrors: 1, Exceptions: 2, FailedRequests: 3, HTTP4xx: 4, HTTP5xx: 5}, &FocusaScope{ContinuityID: "cont"})
+	if meta == nil {
+		t.Fatal("expected metadata")
+	}
+	if meta.TargetRef != "browser:https://example.com/app?jwt=REDACTED" {
+		t.Fatalf("target_ref not sanitized: %s", meta.TargetRef)
+	}
+	if meta.EvidenceRef != "uiai-diagnostics:session=sess1:seq=7" {
+		t.Fatalf("evidence_ref = %s", meta.EvidenceRef)
+	}
+	if meta.PreferredTool != "focusa_browser_diagnostics_intake" || meta.FocusaScopeStatus != "partial" {
+		t.Fatalf("unexpected metadata: %+v", meta)
+	}
+	if len(meta.NextTools) == 0 || !strings.Contains(meta.Summary, "failed_requests=3") {
+		t.Fatalf("incomplete metadata: %+v", meta)
+	}
+	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") {
+		t.Fatalf("secret leaked: %+v", meta)
 	}
 }

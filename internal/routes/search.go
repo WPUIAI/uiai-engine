@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -42,14 +43,24 @@ type searchResult struct {
 }
 
 type searchResponse struct {
-	Schema          string         `json:"schema"`
-	Provider        string         `json:"provider"`
-	Query           string         `json:"query"`
-	Count           int            `json:"count"`
-	Cached          bool           `json:"cached"`
-	CacheTTLSeconds int            `json:"cache_ttl_seconds"`
-	Results         []searchResult `json:"results"`
-	Next            []string       `json:"next"`
+	Schema          string               `json:"schema"`
+	Provider        string               `json:"provider"`
+	Query           string               `json:"query"`
+	Count           int                  `json:"count"`
+	Cached          bool                 `json:"cached"`
+	CacheTTLSeconds int                  `json:"cache_ttl_seconds"`
+	Results         []searchResult       `json:"results"`
+	Next            []string             `json:"next"`
+	Focusa          searchFocusaMetadata `json:"focusa"`
+}
+
+type searchFocusaMetadata struct {
+	TargetRef         string   `json:"target_ref"`
+	EvidenceRef       string   `json:"evidence_ref,omitempty"`
+	PreferredTool     string   `json:"preferred_tool"`
+	Summary           string   `json:"summary"`
+	NextTools         []string `json:"next_tools"`
+	FocusaScopeStatus string   `json:"focusa_scope_status"`
 }
 
 type searchCacheEntry struct {
@@ -180,6 +191,23 @@ func normalizeSearchLimit(limit int) int {
 	return limit
 }
 
+func searchPressureSummary() map[string]any {
+	searchCache.Lock()
+	entries := len(searchCache.entries)
+	searchCache.Unlock()
+	providersStatus := "degraded"
+	if strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")) != "" {
+		providersStatus = "ready"
+	}
+	return map[string]any{
+		"provider":          "brave",
+		"provider_status":   providersStatus,
+		"cache_entries":     entries,
+		"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
+		"packet_surface":    "search",
+	}
+}
+
 func searchCacheTTL() time.Duration {
 	raw := strings.TrimSpace(os.Getenv("UIAI_SEARCH_CACHE_TTL_SECONDS"))
 	if raw == "" {
@@ -202,7 +230,23 @@ func writeSearchResponse(w http.ResponseWriter, provider, query string, results 
 		CacheTTLSeconds: int(ttl / time.Second),
 		Results:         results,
 		Next:            []string{"browser_open a selected result URL", "browser_read page text", "browser_diagnostics on navigation failure", "cite selected result with evidence_ref"},
+		Focusa:          buildSearchFocusaMetadata(provider, query, results),
 	})
+}
+
+func buildSearchFocusaMetadata(provider, query string, results []searchResult) searchFocusaMetadata {
+	evidenceRef := ""
+	if len(results) > 0 {
+		evidenceRef = results[0].EvidenceRef
+	}
+	return searchFocusaMetadata{
+		TargetRef:         fmt.Sprintf("search:%s:%s", provider, searchQueryHash(query)),
+		EvidenceRef:       evidenceRef,
+		PreferredTool:     "focusa_evidence_capture",
+		Summary:           focusapacket.Truncate(fmt.Sprintf("Search %q via %s returned %d result(s); cite selected result evidence_ref instead of raw SERP.", query, provider, len(results)), focusapacket.MaxCaptureSummaryChars),
+		NextTools:         []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
+		FocusaScopeStatus: string(focusapacket.ScopeMissing),
+	}
 }
 
 func searchCacheKey(provider, query string, limit int) string {

@@ -1,6 +1,10 @@
 package observability
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 func TestErrorStoreRedactsAndBounds(t *testing.T) {
 	store := &ErrorStore{}
@@ -87,5 +91,39 @@ func TestErrorStoreFiltersRecent(t *testing.T) {
 	items := store.Recent(10, "browser_session", "selector_not_found")
 	if len(items) != 1 || items[0].Source != "browser_session" {
 		t.Fatalf("unexpected filter result: %+v", items)
+	}
+}
+
+func TestNewErrorEnvelopeIncludesFocusaMetadata(t *testing.T) {
+	event := ErrorEvent{
+		ID:                  "uiai-error-7",
+		Source:              "browser_session",
+		Class:               "navigation_failed",
+		Status:              500,
+		URL:                 "https://example.com/app?token=secret#frag",
+		Message:             "navigation failed",
+		SessionID:           "sess1",
+		SuggestedNextAction: "read diagnostics",
+		Context:             map[string]any{"focusa_continuity": "cont"},
+	}
+	env := NewErrorEnvelope(event, "fallback", nil)
+	if env.Focusa == nil {
+		t.Fatal("expected focusa metadata")
+	}
+	if env.Focusa.TargetRef != "browser:https://example.com/app?token=REDACTED" {
+		t.Fatalf("target_ref not sanitized: %s", env.Focusa.TargetRef)
+	}
+	if env.Focusa.EvidenceRef != "uiai-error:uiai-error-7" {
+		t.Fatalf("evidence_ref = %s", env.Focusa.EvidenceRef)
+	}
+	if env.Focusa.PreferredTool != "focusa_browser_diagnostics_intake" || env.Focusa.FocusaScopeStatus != "partial" {
+		t.Fatalf("unexpected focusa metadata: %+v", env.Focusa)
+	}
+	if len(env.Focusa.NextTools) == 0 || !strings.Contains(env.Focusa.Summary, "navigation_failed") {
+		t.Fatalf("incomplete metadata: %+v", env.Focusa)
+	}
+	encoded, _ := json.Marshal(env)
+	if strings.Contains(string(encoded), "secret") || strings.Contains(string(encoded), "#frag") {
+		t.Fatalf("secret leaked: %s", string(encoded))
 	}
 }

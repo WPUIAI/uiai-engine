@@ -8,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 )
 
 const maxErrorEvents = 500
@@ -29,14 +31,24 @@ type ErrorEvent struct {
 }
 
 type ErrorEnvelope struct {
-	Error               string         `json:"error"`
-	Message             string         `json:"message"`
-	ErrorID             string         `json:"error_id,omitempty"`
-	ErrorClass          string         `json:"error_class,omitempty"`
-	Status              int            `json:"status,omitempty"`
-	SuggestedNextAction string         `json:"suggested_next_action,omitempty"`
-	Diagnostics         string         `json:"diagnostics,omitempty"`
-	Details             map[string]any `json:"details,omitempty"`
+	Error               string               `json:"error"`
+	Message             string               `json:"message"`
+	ErrorID             string               `json:"error_id,omitempty"`
+	ErrorClass          string               `json:"error_class,omitempty"`
+	Status              int                  `json:"status,omitempty"`
+	SuggestedNextAction string               `json:"suggested_next_action,omitempty"`
+	Diagnostics         string               `json:"diagnostics,omitempty"`
+	Details             map[string]any       `json:"details,omitempty"`
+	Focusa              *ErrorFocusaMetadata `json:"focusa,omitempty"`
+}
+
+type ErrorFocusaMetadata struct {
+	TargetRef         string   `json:"target_ref"`
+	EvidenceRef       string   `json:"evidence_ref"`
+	PreferredTool     string   `json:"preferred_tool"`
+	Summary           string   `json:"summary"`
+	NextTools         []string `json:"next_tools"`
+	FocusaScopeStatus string   `json:"focusa_scope_status"`
 }
 
 type ErrorStore struct {
@@ -71,7 +83,60 @@ func NewErrorEnvelope(event ErrorEvent, fallbackMessage string, details map[stri
 		SuggestedNextAction: event.SuggestedNextAction,
 		Diagnostics:         "/api/errors?limit=20" + diagnosticsFilter(event),
 		Details:             sanitizeContext(details),
+		Focusa:              buildErrorFocusaMetadata(event, message),
 	}
+}
+
+func buildErrorFocusaMetadata(event ErrorEvent, message string) *ErrorFocusaMetadata {
+	if strings.TrimSpace(event.ID) == "" {
+		return nil
+	}
+	preferred := "focusa_evidence_capture"
+	nextTools := []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"}
+	if event.Source == "browser_session" && event.SessionID != "" {
+		preferred = "focusa_browser_diagnostics_intake"
+		nextTools = []string{"focusa_browser_diagnostics_intake", "focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"}
+	}
+	targetRef := "engine:error"
+	if event.URL != "" {
+		targetRef = "browser:" + focusapacket.SanitizeURL(event.URL)
+	} else if event.Path != "" {
+		targetRef = "endpoint:" + sanitizePath(event.Path)
+	}
+	summary := fmt.Sprintf("%s error %s status=%d: %s", firstNonEmpty(event.Source, "engine"), firstNonEmpty(event.Class, "unknown"), event.Status, message)
+	return &ErrorFocusaMetadata{
+		TargetRef:         targetRef,
+		EvidenceRef:       "uiai-error:" + event.ID,
+		PreferredTool:     preferred,
+		Summary:           focusapacket.Truncate(summary, focusapacket.MaxCaptureSummaryChars),
+		NextTools:         nextTools,
+		FocusaScopeStatus: errorFocusaScopeStatus(event.Context),
+	}
+}
+
+func errorFocusaScopeStatus(ctx map[string]any) string {
+	if len(ctx) == 0 {
+		return string(focusapacket.ScopeMissing)
+	}
+	projectRoot, hasProject := ctx["focusa_project_root"].(string)
+	continuity, hasContinuity := ctx["focusa_continuity"].(string)
+	workpoint, hasWorkpoint := ctx["focusa_workpoint"].(string)
+	if hasProject && projectRoot != "" && hasContinuity && continuity != "" {
+		return string(focusapacket.ScopePresent)
+	}
+	if (hasContinuity && continuity != "") || (hasWorkpoint && workpoint != "") || (hasProject && projectRoot != "") {
+		return string(focusapacket.ScopePartial)
+	}
+	return string(focusapacket.ScopeMissing)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func diagnosticsFilter(event ErrorEvent) string {
