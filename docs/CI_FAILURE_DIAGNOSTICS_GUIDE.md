@@ -78,6 +78,8 @@ done
 Common artifact files:
 
 ```text
+focusa-packet-smoke.json
+uiai-packet-smoke-engine.log
 uiai-diag-stress-engine.log
 uiai-diag-stress-site.log
 diagnostics-4x10.json
@@ -99,6 +101,7 @@ Main steps:
 1. `go test ./...`
 2. `scripts/check-tool-parity.sh`
 3. `scripts/check-focusa-packet-drift.sh`
+4. `scripts/smoke-focusa-packet-ci.sh`
 3. `SESSIONS=4 ROUNDS=10 scripts/stress-browser-diagnostics.sh`
 4. `scripts/soak-browser-flakiness.sh`
 5. artifact upload

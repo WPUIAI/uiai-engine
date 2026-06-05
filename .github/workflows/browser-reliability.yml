@@ -34,6 +34,10 @@ jobs:
         run: go test ./...
       - name: Focusa packet drift check
         run: scripts/check-focusa-packet-drift.sh
+      - name: Focusa packet endpoint smoke
+        run: |
+          mkdir -p "$OUT_DIR"
+          OUT="$OUT_DIR/focusa-packet-smoke.json" scripts/smoke-focusa-packet-ci.sh
       - name: Diagnostics stress 40/40
         run: |
           mkdir -p "$OUT_DIR"
@@ -51,6 +55,7 @@ jobs:
           name: uiai-browser-reliability-${{ github.run_id }}
           path: |
             /tmp/uiai-browser-reliability/*.json
+            /tmp/uiai-packet-smoke-engine.log
             /tmp/uiai-diag-stress-engine.log
             /tmp/uiai-diag-stress-site.log
             /tmp/uiai-soak-engine.log

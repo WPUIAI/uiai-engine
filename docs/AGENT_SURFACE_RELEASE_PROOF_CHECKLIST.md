@@ -11,6 +11,7 @@ go test ./...
 node --check mcp/browser-session-mcp.mjs
 scripts/smoke-agent-integrations.sh
 scripts/release-service-smoke.sh --check-only
+scripts/smoke-focusa-packet-ci.sh
 scripts/check-tool-parity.sh
 scripts/smoke-mcp-tool-routes.sh
 scripts/smoke-mcp-structured-failure.sh
@@ -41,7 +42,7 @@ make release-browser-reliability
 | Service/live proof | Current service answers `/health` and bundled live smokes pass | `scripts/release-service-smoke.sh --check-only`; systemd status for real restarts |
 | Search/providers | provider metadata and search smoke pass; missing-key degraded-mode test passes; search results include `uiai-search:<provider>:<query-hash>:<rank>` refs | `go test ./internal/routes`, `scripts/smoke-agent-integrations.sh` |
 | Auth/security | loopback/remote negative and remote positive tests pass; redaction tests pass | `go test ./internal/auth ./internal/observability ./internal/vision` |
-| Focusa evidence | diagnostics/error evidence handles and smoke pass | `/tmp/uiai-error-focusa-evidence.json` plus docs handle refs |
+| Focusa evidence | diagnostics/error evidence handles and packet endpoint smoke pass | `/tmp/uiai-error-focusa-evidence.json`, `/tmp/uiai-browser-reliability/focusa-packet-smoke.json`, docs handle refs |
 | WordPress plugin parity | Existing plugin route/auth/error docs updated; plugin changes committed separately if needed | `docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`; WPUIAI commit hash if plugin changed |
 | Public docs | README, Session API, gap inventory, and matrices updated when surface behavior changes | doc commit hash |
 

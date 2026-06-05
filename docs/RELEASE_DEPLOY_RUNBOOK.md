@@ -66,6 +66,7 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && make browser-reliability'
 For packet changes:
 
 ```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-focusa-packet-ci.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-focusa-packet.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai smoke packet'
 ```

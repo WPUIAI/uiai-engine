@@ -21,6 +21,7 @@ checks={
  'docs/SESSION_API.md':['Packet parity status','agent_pressure','/api/agent/research-packet',schema],
  'README.md':['uiai_focusa_packet_build',schema],
  'scripts/smoke-focusa-packet.sh':[schema,'packet_bytes','focusa_browser_diagnostics_intake'],
+ 'scripts/smoke-focusa-packet-ci.sh':[schema,'packet endpoint ci smoke ok','uiai-packet-smoke-engine.log'],
 }
 missing=[]
 for rel, needles in checks.items():
