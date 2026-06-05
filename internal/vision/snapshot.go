@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 )
 
 // ═══════════════════════════════════════════════════════
@@ -40,9 +42,19 @@ type SnapshotRef struct {
 
 // SnapshotResult is returned by the Snapshot method.
 type SnapshotResult struct {
-	Tree  string                 `json:"tree"`
-	Refs  map[string]SnapshotRef `json:"refs"`
-	Stats SnapshotStats          `json:"stats"`
+	Tree   string                  `json:"tree"`
+	Refs   map[string]SnapshotRef  `json:"refs"`
+	Stats  SnapshotStats           `json:"stats"`
+	Focusa *SnapshotFocusaMetadata `json:"focusa,omitempty"`
+}
+
+type SnapshotFocusaMetadata struct {
+	TargetRef         string   `json:"target_ref"`
+	EvidenceRef       string   `json:"evidence_ref"`
+	PreferredTool     string   `json:"preferred_tool"`
+	Summary           string   `json:"summary"`
+	NextTools         []string `json:"next_tools"`
+	FocusaScopeStatus string   `json:"focusa_scope_status"`
 }
 
 // SnapshotStats provides token-cost estimates.
@@ -386,19 +398,45 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 		tree = "(empty page)"
 	}
 
+	s.SnapshotCount++
+	snapshotSeq := s.SnapshotCount
+	stats := SnapshotStats{
+		Lines:       len(lines),
+		Chars:       len(tree),
+		Tokens:      len(tree) / 4,
+		RefCount:    len(store.refs),
+		Interactive: interactiveCount,
+	}
 	s.touch()
 
 	return &SnapshotResult{
-		Tree: tree,
-		Refs: store.refs,
-		Stats: SnapshotStats{
-			Lines:       len(lines),
-			Chars:       len(tree),
-			Tokens:      len(tree) / 4,
-			RefCount:    len(store.refs),
-			Interactive: interactiveCount,
-		},
+		Tree:   tree,
+		Refs:   store.refs,
+		Stats:  stats,
+		Focusa: buildSnapshotFocusaMetadata(s.ID, snapshotSeq, s.URL, s.Title, opts.Selector, stats, s.FocusaScope),
 	}, nil
+}
+
+func buildSnapshotFocusaMetadata(sessionID string, snapshotSeq int, pageURL, title, selector string, stats SnapshotStats, scope *FocusaScope) *SnapshotFocusaMetadata {
+	if snapshotSeq <= 0 {
+		snapshotSeq = 1
+	}
+	targetRef := "browser:" + focusapacket.SanitizeURL(pageURL)
+	if pageURL == "" {
+		targetRef = "browser:session=" + focusapacket.Truncate(sessionID, 80)
+	}
+	summary := fmt.Sprintf("Snapshot %d refs (%d interactive, %d lines) from %s", stats.RefCount, stats.Interactive, stats.Lines, focusapacket.Truncate(firstNonEmpty(title, pageURL, sessionID), 160))
+	if selector != "" {
+		summary += " selector=" + focusapacket.Truncate(selector, 80)
+	}
+	return &SnapshotFocusaMetadata{
+		TargetRef:         targetRef,
+		EvidenceRef:       fmt.Sprintf("uiai-browser:session=%s:snapshot:%d", focusapacket.Truncate(sessionID, 80), snapshotSeq),
+		PreferredTool:     "focusa_evidence_capture",
+		Summary:           focusapacket.Truncate(summary, focusapacket.MaxCaptureSummaryChars),
+		NextTools:         []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
+		FocusaScopeStatus: readFocusaScopeStatus(scope),
+	}
 }
 
 // StoreRefs saves snapshot refs into the session for later use by Click/Type/Hover.

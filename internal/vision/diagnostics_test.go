@@ -156,3 +156,25 @@ func TestBuildDiagnosticsFocusaMetadata(t *testing.T) {
 		t.Fatalf("secret leaked: %+v", meta)
 	}
 }
+
+func TestBuildSnapshotFocusaMetadata(t *testing.T) {
+	meta := buildSnapshotFocusaMetadata("sess1", 3, "https://example.com/page?token=secret#frag", "Example", "main", SnapshotStats{Lines: 5, RefCount: 2, Interactive: 1}, &FocusaScope{ProjectRoot: "/repo", ContinuityID: "cont"})
+	if meta == nil {
+		t.Fatal("expected metadata")
+	}
+	if meta.TargetRef != "browser:https://example.com/page?token=REDACTED" {
+		t.Fatalf("target_ref not sanitized: %s", meta.TargetRef)
+	}
+	if meta.EvidenceRef != "uiai-browser:session=sess1:snapshot:3" {
+		t.Fatalf("evidence_ref = %s", meta.EvidenceRef)
+	}
+	if meta.PreferredTool != "focusa_evidence_capture" || meta.FocusaScopeStatus != "present" {
+		t.Fatalf("unexpected metadata: %+v", meta)
+	}
+	if len(meta.NextTools) == 0 || !strings.Contains(meta.Summary, "Snapshot 2 refs") {
+		t.Fatalf("incomplete metadata: %+v", meta)
+	}
+	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") {
+		t.Fatalf("secret leaked: %+v", meta)
+	}
+}

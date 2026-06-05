@@ -66,3 +66,14 @@ describe("buildResearchDiagnosticsPacket", () => {
 		expect(packet.captures.length).toBeLessThanOrEqual(8);
 	});
 });
+
+
+test("buildResearchDiagnosticsPacket recognizes snapshot packet capture", async () => {
+	const { buildResearchDiagnosticsPacket } = await import("./uiai-engine");
+	const packet = buildResearchDiagnosticsPacket({
+		goal: "snapshot proof",
+		responses: [{ focusa: { target_ref: "browser:https://example.com", evidence_ref: "uiai-browser:session=s:snapshot:1", summary: "Snapshot 2 refs" } }],
+	});
+	expect(packet.captures[0].type).toBe("snapshot");
+	expect(packet.recommended_focusa.preferred_tool).toBe("focusa_evidence_capture");
+});

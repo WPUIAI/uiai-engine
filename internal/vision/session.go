@@ -39,17 +39,18 @@ type FocusaScope struct {
 }
 
 type Session struct {
-	ID          string       `json:"id"`
-	URL         string       `json:"url"`
-	Title       string       `json:"title"`
-	Width       int          `json:"width"`
-	Height      int          `json:"height"`
-	CreatedAt   time.Time    `json:"created_at"`
-	LastUsed    time.Time    `json:"last_used"`
-	NavCount    int          `json:"nav_count"`
-	SnapCount   int          `json:"snap_count"`
-	ReadCount   int          `json:"read_count"`
-	FocusaScope *FocusaScope `json:"focusa_scope,omitempty"`
+	ID            string       `json:"id"`
+	URL           string       `json:"url"`
+	Title         string       `json:"title"`
+	Width         int          `json:"width"`
+	Height        int          `json:"height"`
+	CreatedAt     time.Time    `json:"created_at"`
+	LastUsed      time.Time    `json:"last_used"`
+	NavCount      int          `json:"nav_count"`
+	SnapCount     int          `json:"snap_count"`
+	ReadCount     int          `json:"read_count"`
+	SnapshotCount int          `json:"snapshot_count"`
+	FocusaScope   *FocusaScope `json:"focusa_scope,omitempty"`
 
 	page              *rod.Page
 	pool              *Pool

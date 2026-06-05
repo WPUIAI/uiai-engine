@@ -147,7 +147,7 @@ func TestToolGraphIncludesFocusaPacketWorkflow(t *testing.T) {
 		t.Fatalf("missing packet schema: %#v", focusa)
 	}
 	surfaces := focusa["packet_metadata_surfaces"].([]string)
-	for _, want := range []string{"search", "browser_read", "browser_diagnostics", "structured_errors"} {
+	for _, want := range []string{"search", "browser_read", "browser_snapshot", "browser_diagnostics", "structured_errors"} {
 		if !containsString(surfaces, want) {
 			t.Fatalf("missing packet surface %s in %#v", want, surfaces)
 		}

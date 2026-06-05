@@ -208,6 +208,7 @@ function captureFromResponse(response: any): PacketCapture | undefined {
 	if (String(focusa.evidence_ref || "").includes("diagnostics")) type = "diagnostics";
 	else if (String(focusa.evidence_ref || "").includes("error")) type = "error";
 	else if (String(focusa.evidence_ref || "").includes(":read:")) type = "read";
+	else if (String(focusa.evidence_ref || "").includes(":snapshot:")) type = "snapshot";
 	return {
 		type,
 		evidence_ref: truncateText(focusa.evidence_ref || "", 240),

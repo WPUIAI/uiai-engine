@@ -481,7 +481,7 @@ This section captures the audit-only pass performed after the initial spec. It i
 
 This section resolves the previous no-build questions. Iteration 1 may start when these choices are accepted by the implementation owner.
 
-1. **First response surfaces:** start with `search`, browser `read`, browser `diagnostics`, and structured `errors`. Defer `snapshot`, `screenshot`, and `share` to Iteration 1.5/2 unless they are already returned by the chosen proof path.
+1. **First response surfaces:** start with `search`, browser `read`, browser `snapshot`, browser `diagnostics`, and structured `errors`. Defer `screenshot` and `share` to Iteration 1.5/2 unless they are already returned by the chosen proof path.
 2. **Packet composition location:** compose in the Pi extension first, using existing UIAI calls and `/api/tools/graph` workflow metadata. Defer `POST /api/agent/research-packet` until the Pi-composed packet proves the schema and UX.
 3. **Focusa intake path:** do not add a new Focusa packet intake tool for Iteration 1. Route research/read/search summaries through `focusa_evidence_capture`; route diagnostics/failure envelopes through `focusa_browser_diagnostics_intake`; use `focusa_active_object_resolve` and `focusa_predict_record` as explicit follow-up tools.
 4. **Packet size budget:** packet JSON should stay under 8 KB by default. Individual capture summaries max 500 chars; `goal` and `recommended_next_action` max 240 chars; `diagnostics_summary` max 2 KB; `args_preview` max 2 KB; max 8 captures, 16 target refs, 32 evidence refs, and 16 active-object hints.
@@ -597,7 +597,7 @@ A dedicated Focusa packet intake tool becomes justified only if at least two of 
 4. Active-object/prediction follow-up is consistently skipped because the route is too manual.
 5. Packet summaries regularly exceed 8 KB after normal trimming.
 
-Current evaluation from `/tmp/uiai-focusa-packet-smoke.json` (2026-06-04): no new intake tool needed; packet size was 2922 bytes, `args_preview` was present, search/read/diagnostics captures were included, and existing `focusa_evidence_capture` / `focusa_browser_diagnostics_intake` routing was enough for the proof artifact.
+Current evaluation from `/tmp/uiai-focusa-packet-smoke.json` (2026-06-04): no new intake tool needed; packet size was 2922 bytes, `args_preview` was present, search/read/snapshot/diagnostics captures were included, and existing `focusa_evidence_capture` / `focusa_browser_diagnostics_intake` routing was enough for the proof artifact.
 
 ## 8. Acceptance matrix
 
