@@ -272,6 +272,11 @@ func (e *Engine) mountRoutes() {
 		routes.MountSearchRoutes(r, e.cfg)
 	})
 
+	// One-shot Source-to-Markdown API for agent research/citation workflows
+	r.Route("/api/markdown", func(r chi.Router) {
+		routes.MountMarkdownRoutes(r, e.cfg, e.sessions)
+	})
+
 	// Agent packet composer — bounded Focusa-compatible packet from existing UIAI responses
 	r.Route("/api/agent", func(r chi.Router) {
 		routes.MountAgentPacketRoutes(r)

@@ -529,6 +529,24 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "uiai_source_to_markdown",
+		label: "UIAI Source to Markdown",
+		description: "One-shot Source-to-Markdown conversion for public URLs. Returns uiai.source_markdown.v1 with Markdown, metadata, diagnostics, Focusa-ready evidence, and auto-closes the temporary session.",
+		parameters: Type.Object({
+			url: Type.String({ description: "Public URL to convert" }),
+			selector: Type.Optional(Type.String({ description: "Optional CSS selector region" })),
+			max_chars: Type.Optional(Type.Number({ description: "Max Markdown characters, capped by engine", default: 30000 })),
+			mode: Type.Optional(Type.String({ description: "Read mode: main_content or full", default: "main_content" })),
+			include_links: Type.Optional(Type.Boolean({ description: "Include visible link metadata", default: true })),
+			include_images: Type.Optional(Type.Boolean({ description: "Include Markdown image tags", default: false })),
+			focusa_scope: Type.Optional(Type.Any({ description: "Optional Focusa scope to echo into metadata" })),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await post("/api/markdown", params), { endpoint: "/api/markdown" });
+		},
+	});
+
+	pi.registerTool({
 		name: "uiai_health",
 		label: "UIAI Browser Health",
 		description: "Check UIAI browser health/readiness and pressure before remote or long browser workflows.",
@@ -816,12 +834,15 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_browser_read",
 		label: "UIAI Browser Read",
-		description: "Read compact page or region text for web surfing without taking a screenshot. Use after open/navigate when content matters more than pixels.",
+		description: "Read compact page or region text/Markdown for web surfing without taking a screenshot. Use after open/navigate when content matters more than pixels.",
 		parameters: Type.Object({
 			session_id: Type.String({ description: "UIAI browser session id" }),
 			selector: Type.Optional(Type.String({ description: "Optional CSS selector or @ref region" })),
 			max_chars: Type.Optional(Type.Number({ description: "Max text characters, capped by engine", default: 8000 })),
 			include_links: Type.Optional(Type.Boolean({ description: "Include visible links" })),
+			format: Type.Optional(Type.String({ description: "Output format: text or markdown", default: "text" })),
+			mode: Type.Optional(Type.String({ description: "Read mode: main_content or full", default: "main_content" })),
+			include_images: Type.Optional(Type.Boolean({ description: "Include Markdown image tags when format=markdown", default: false })),
 		}),
 		async execute(_toolCallId, params) {
 			const { session_id, ...body } = params;

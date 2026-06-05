@@ -439,6 +439,23 @@ func openAITools() []map[string]any {
 			},
 		},
 		{
+			"name":        "source_to_markdown",
+			"description": "One-shot Source-to-Markdown conversion for public URLs. Opens a temporary browser session, reads main/full content as Markdown, returns uiai.source_markdown.v1 with metadata, diagnostics, Focusa-ready evidence fields, and closes the session.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"url":            map[string]string{"type": "string", "description": "Public URL to convert"},
+					"selector":       map[string]string{"type": "string", "description": "Optional CSS selector region"},
+					"max_chars":      map[string]any{"type": "integer", "description": "Max Markdown characters, capped at 30000", "default": 30000},
+					"mode":           map[string]any{"type": "string", "description": "Read mode: main_content or full", "default": "main_content"},
+					"include_links":  map[string]any{"type": "boolean", "description": "Include visible link metadata", "default": true},
+					"include_images": map[string]any{"type": "boolean", "description": "Include Markdown image tags", "default": false},
+					"focusa_scope":   map[string]any{"type": "object", "description": "Optional Focusa scope echoed into read metadata"},
+				},
+				"required": []string{"url"},
+			},
+		},
+		{
 			"name":        "browser_open",
 			"description": "Open a persistent browser session on a URL. Retries transient page startup/navigation flakiness. Returns session_id and initial screenshot. For browser errors, console logs, JS exceptions, failed requests/failed_request, API failures, CORS, or network debugging, call browser_diagnostics next.",
 			"parameters": map[string]any{
@@ -719,14 +736,17 @@ func openAITools() []map[string]any {
 
 		{
 			"name":        "browser_read",
-			"description": "Read compact page text for web surfing without a screenshot. Extracts main/article/body text, headings, optional links, and supports selector or @ref plus max_chars. Prefer this after browser_open/navigate when the agent needs page content, not pixels.",
+			"description": "Read compact page text or Markdown for web surfing without a screenshot. Extracts main/article/body content, headings, optional links, and supports selector or @ref plus max_chars. Prefer this after browser_open/navigate when the agent needs page content, not pixels.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"session_id":    map[string]string{"type": "string", "description": "Session ID"},
-					"selector":      map[string]string{"type": "string", "description": "Optional CSS selector or @ref region to read"},
-					"max_chars":     map[string]any{"type": "integer", "description": "Max text characters, capped at 30000", "default": 8000},
-					"include_links": map[string]any{"type": "boolean", "description": "Include up to 40 visible links", "default": false},
+					"session_id":     map[string]string{"type": "string", "description": "Session ID"},
+					"selector":       map[string]string{"type": "string", "description": "Optional CSS selector or @ref region to read"},
+					"max_chars":      map[string]any{"type": "integer", "description": "Max text characters, capped at 30000", "default": 8000},
+					"include_links":  map[string]any{"type": "boolean", "description": "Include up to 40 visible links", "default": false},
+					"format":         map[string]any{"type": "string", "description": "Output format: text or markdown", "default": "text"},
+					"mode":           map[string]any{"type": "string", "description": "Read mode: main_content or full", "default": "main_content"},
+					"include_images": map[string]any{"type": "boolean", "description": "Include Markdown image tags when format=markdown", "default": false},
 				},
 				"required": []string{"session_id"},
 			},

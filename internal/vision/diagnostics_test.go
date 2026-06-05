@@ -114,7 +114,7 @@ func TestClearDiagnosticsResetsRecorder(t *testing.T) {
 }
 
 func TestBuildReadFocusaMetadata(t *testing.T) {
-	meta := buildReadFocusaMetadata("sess1", 2, "https://example.com/page?token=secret&ok=1#frag", "Example", "main", 1234, true, &FocusaScope{ProjectRoot: "/repo", ContinuityID: "cont"})
+	meta := buildReadFocusaMetadata("sess1", 2, "https://example.com/page?token=secret&ok=1#frag", "Example", "main", 1234, true, "text", &FocusaScope{ProjectRoot: "/repo", ContinuityID: "cont"})
 	if meta == nil {
 		t.Fatal("expected metadata")
 	}
@@ -132,6 +132,11 @@ func TestBuildReadFocusaMetadata(t *testing.T) {
 	}
 	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") {
 		t.Fatalf("secret leaked: %+v", meta)
+	}
+
+	md := buildReadFocusaMetadata("sess1", 3, "https://example.com/doc", "Doc", "", 4321, false, "markdown", nil)
+	if md == nil || !strings.Contains(md.Summary, "Read Markdown") || md.FocusaScopeStatus != "missing" {
+		t.Fatalf("markdown metadata mismatch: %+v", md)
 	}
 }
 

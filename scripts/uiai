@@ -30,10 +30,12 @@ Commands:
   tools search <query>           Search tool discovery
   tools mcp|openai|graph|agent-card|docs
   packet compose <json-file|->    Compose Focusa research diagnostics packet
+  markdown <url> [--selector S] [--max-chars N] [--mode main_content|full] [--include-images]
+                                  One-shot public URL to uiai.source_markdown.v1
   research packet [--query Q|--url URL] [--goal G] [--out PATH]
                                   One-command search/open/read/diagnose/packet/cleanup proof
   session open <url> [--width N] [--height N]
-  session read <sid> [--selector S] [--max-chars N]
+  session read <sid> [--selector S] [--max-chars N] [--format text|markdown] [--mode main_content|full]
   session snapshot <sid>
   session diagnostics <sid> [--limit N] [--failed-only]
   session close <sid>
@@ -297,6 +299,22 @@ PY
   esac
 }
 
+cmd_markdown() {
+  [[ $# -ge 1 ]] || { err "usage: uiai markdown <url> [--selector S] [--max-chars N] [--mode main_content|full] [--include-images]"; exit 2; }
+  local url="$1" selector="" max_chars=30000 mode="main_content" include_images=false include_links=true; shift
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --selector) selector="${2:-}"; shift 2 ;;
+      --max-chars) max_chars="${2:-}"; shift 2 ;;
+      --mode) mode="${2:-}"; shift 2 ;;
+      --include-images) include_images=true; shift ;;
+      --no-links) include_links=false; shift ;;
+      *) err "unknown markdown option: $1"; exit 2 ;;
+    esac
+  done
+  jq -cn --arg url "$url" --arg selector "$selector" --argjson max_chars "$max_chars" --arg mode "$mode" --argjson include_images "$include_images" --argjson include_links "$include_links" '{url:$url,max_chars:$max_chars,mode:$mode,include_images:$include_images,include_links:$include_links} + (if $selector == "" then {} else {selector:$selector} end)' | { read -r body; api POST "/api/markdown" "$body"; } | emit
+}
+
 cmd_session() {
   local sub="${1:-}"; shift || true
   case "$sub" in
@@ -313,16 +331,19 @@ cmd_session() {
       jq -cn --arg url "$url" --argjson width "$width" --argjson height "$height" '{url:$url,width:$width,height:$height}' | { read -r body; api POST "/api/session" "$body"; } | emit
       ;;
     read)
-      [[ $# -ge 1 ]] || { err "usage: uiai session read <sid> [--selector S] [--max-chars N]"; exit 2; }
-      local sid="$1" selector="" max_chars=8000; shift
+      [[ $# -ge 1 ]] || { err "usage: uiai session read <sid> [--selector S] [--max-chars N] [--format text|markdown] [--mode main_content|full]"; exit 2; }
+      local sid="$1" selector="" max_chars=8000 format="text" mode="main_content" include_images=false; shift
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --selector) selector="${2:-}"; shift 2 ;;
           --max-chars) max_chars="${2:-}"; shift 2 ;;
+          --format) format="${2:-}"; shift 2 ;;
+          --mode) mode="${2:-}"; shift 2 ;;
+          --include-images) include_images=true; shift ;;
           *) err "unknown session read option: $1"; exit 2 ;;
         esac
       done
-      jq -cn --arg selector "$selector" --argjson max_chars "$max_chars" '{max_chars:$max_chars,include_links:true} + (if $selector == "" then {} else {selector:$selector} end)' | { read -r body; api POST "/api/session/$sid/read" "$body"; } | emit
+      jq -cn --arg selector "$selector" --argjson max_chars "$max_chars" --arg format "$format" --arg mode "$mode" --argjson include_images "$include_images" '{max_chars:$max_chars,include_links:true,format:$format,mode:$mode,include_images:$include_images} + (if $selector == "" then {} else {selector:$selector} end)' | { read -r body; api POST "/api/session/$sid/read" "$body"; } | emit
       ;;
     snapshot) [[ $# -ge 1 ]] || { err "usage: uiai session snapshot <sid>"; exit 2; }; api POST "/api/session/$1/snapshot" '{}' | emit ;;
     diagnostics)
@@ -351,6 +372,7 @@ case "$cmd" in
   errors) cmd_errors "$@" ;;
   tools) cmd_tools "$@" ;;
   packet) cmd_packet "$@" ;;
+  markdown) cmd_markdown "$@" ;;
   research) cmd_research "$@" ;;
   session) cmd_session "$@" ;;
   smoke)

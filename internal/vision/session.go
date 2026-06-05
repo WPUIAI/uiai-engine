@@ -882,22 +882,29 @@ func (s *Session) DOMInfo() (map[string]any, error) {
 
 // ReadOptions controls bounded page text extraction for agent web surfing.
 type ReadOptions struct {
-	Selector     string `json:"selector,omitempty"`
-	MaxChars     int    `json:"max_chars,omitempty"`
-	IncludeLinks bool   `json:"include_links,omitempty"`
+	Selector      string `json:"selector,omitempty"`
+	MaxChars      int    `json:"max_chars,omitempty"`
+	IncludeLinks  bool   `json:"include_links,omitempty"`
+	Format        string `json:"format,omitempty"`
+	Mode          string `json:"mode,omitempty"`
+	IncludeImages bool   `json:"include_images,omitempty"`
 }
 
 // PageReadResult is a compact, screenshot-free page reading payload.
 type PageReadResult struct {
+	Schema      string              `json:"schema,omitempty"`
 	URL         string              `json:"url"`
 	Title       string              `json:"title"`
 	Description string              `json:"description,omitempty"`
 	Selector    string              `json:"selector,omitempty"`
+	Format      string              `json:"format,omitempty"`
+	Mode        string              `json:"mode,omitempty"`
 	Text        string              `json:"text"`
 	Chars       int                 `json:"chars"`
 	Truncated   bool                `json:"truncated"`
 	Headings    []map[string]any    `json:"headings,omitempty"`
 	Links       []map[string]any    `json:"links,omitempty"`
+	Metadata    map[string]any      `json:"metadata,omitempty"`
 	Focusa      *ReadFocusaMetadata `json:"focusa,omitempty"`
 }
 
@@ -924,25 +931,72 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 	if opts.MaxChars > 30000 {
 		opts.MaxChars = 30000
 	}
+	format := strings.ToLower(strings.TrimSpace(opts.Format))
+	if format == "" {
+		format = "text"
+	}
+	if format != "text" && format != "markdown" {
+		return nil, fmt.Errorf("unsupported_read_format: %s", opts.Format)
+	}
+	mode := strings.ToLower(strings.TrimSpace(opts.Mode))
+	if mode == "" {
+		mode = "main_content"
+	}
 
 	selectorJSON, _ := json.Marshal(opts.Selector)
+	formatJSON, _ := json.Marshal(format)
+	modeJSON, _ := json.Marshal(mode)
+	includeImagesJSON, _ := json.Marshal(opts.IncludeImages)
 	js := fmt.Sprintf(`() => {
 		const selector = %s;
-		const root = selector ? document.querySelector(selector) : (document.querySelector('main, article, [role="main"]') || document.body || document.documentElement);
+		const format = %s;
+		const mode = %s;
+		const includeImages = %s;
+		const root = selector ? document.querySelector(selector) : (mode === 'full' ? (document.body || document.documentElement) : (document.querySelector('main, article, [role="main"]') || document.body || document.documentElement));
 		if (!root) return JSON.stringify({ error: 'selector_not_found', selector });
 		const hidden = (el) => {
 			const style = window.getComputedStyle(el);
 			return style.display === 'none' || style.visibility === 'hidden' || el.getAttribute('aria-hidden') === 'true';
 		};
+		const clean = (s) => (s || '').replace(/[ \t\n]+/g, ' ').trim();
+		const tick = String.fromCharCode(96);
+		const esc = (s) => clean(s).replace(/\\/g, '\\\\').replace(new RegExp('([*_\\x60~\\[\\]#])', 'g'), '\\$1');
 		const clone = root.cloneNode(true);
-		clone.querySelectorAll('script,style,noscript,svg,canvas,iframe,template,nav,footer,header').forEach(e => e.remove());
+		clone.querySelectorAll('script,style,noscript,svg,canvas,iframe,template').forEach(e => e.remove());
+		if (mode !== 'full') clone.querySelectorAll('nav,footer,header,aside').forEach(e => e.remove());
 		clone.querySelectorAll('[hidden],[aria-hidden="true"]').forEach(e => e.remove());
-		const text = (clone.innerText || clone.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+		const mdNode = (node, depth = 0) => {
+			if (!node) return '';
+			if (node.nodeType === Node.TEXT_NODE) return esc(node.textContent);
+			if (node.nodeType !== Node.ELEMENT_NODE || hidden(node)) return '';
+			const tag = node.tagName.toLowerCase();
+			const kids = () => Array.from(node.childNodes).map(n => mdNode(n, depth)).join('').replace(/[ \t]+\n/g, '\n').trim();
+			if (/^h[1-6]$/.test(tag)) return '\n\n' + '#'.repeat(Number(tag[1])) + ' ' + esc(node.innerText || node.textContent) + '\n\n';
+			if (tag === 'p') return '\n\n' + kids() + '\n\n';
+			if (tag === 'br') return '\n';
+			if (tag === 'strong' || tag === 'b') return '**' + kids() + '**';
+			if (tag === 'em' || tag === 'i') return '*' + kids() + '*';
+			if (tag === 'code') return tick + clean(node.textContent).replaceAll(tick, '\\' + tick) + tick;
+			if (tag === 'pre') return '\n\n' + tick + tick + tick + '\n' + (node.textContent || '').trim() + '\n' + tick + tick + tick + '\n\n';
+			if (tag === 'blockquote') return '\n\n' + (node.innerText || '').split('\n').map(l => '> ' + esc(l)).join('\n') + '\n\n';
+			if (tag === 'a') { const label = kids() || esc(node.href); return node.href ? '[' + label + '](' + node.href + ')' : label; }
+			if (tag === 'img') { if (!includeImages) return ''; const alt = esc(node.getAttribute('alt') || 'image'); const src = node.currentSrc || node.src || ''; return src ? '![' + alt + '](' + src + ')' : alt; }
+			if (tag === 'li') return '\n' + '  '.repeat(depth) + '- ' + Array.from(node.childNodes).map(n => mdNode(n, depth + 1)).join('').trim();
+			if (tag === 'ul' || tag === 'ol') return '\n' + Array.from(node.children).map(n => mdNode(n, depth)).join('') + '\n';
+			if (tag === 'tr') return Array.from(node.children).map(c => clean(c.innerText || c.textContent)).join(' | ') + '\n';
+			if (tag === 'table') return '\n\n' + Array.from(node.querySelectorAll('tr')).map(r => mdNode(r, depth)).join('').trim() + '\n\n';
+			return Array.from(node.childNodes).map(n => mdNode(n, depth)).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+		};
+		const plainText = (clone.innerText || clone.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+		const markdown = mdNode(clone).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+		const text = format === 'markdown' ? markdown : plainText;
 		const headings = Array.from(root.querySelectorAll('h1,h2,h3')).filter(e => !hidden(e)).slice(0, 20).map(e => ({ level: e.tagName.toLowerCase(), text: (e.innerText || e.textContent || '').trim().substring(0, 160) })).filter(h => h.text);
 		const links = Array.from(root.querySelectorAll('a[href]')).filter(e => !hidden(e)).slice(0, 40).map(e => ({ text: (e.innerText || e.textContent || '').trim().substring(0, 120), href: e.href })).filter(l => l.href);
 		const description = document.querySelector('meta[name="description"], meta[property="og:description"]')?.content || '';
-		return JSON.stringify({ url: location.href, title: document.title, description, selector, text, headings, links });
-	}`, string(selectorJSON))
+		const canonical = document.querySelector('link[rel="canonical"]')?.href || location.href;
+		const siteName = document.querySelector('meta[property="og:site_name"]')?.content || location.hostname;
+		return JSON.stringify({ url: location.href, canonical_url: canonical, site_name: siteName, title: document.title, description, selector, format, mode, text, headings, links });
+	}`, string(selectorJSON), string(formatJSON), string(modeJSON), string(includeImagesJSON))
 
 	result, err := s.page.Timeout(5 * time.Second).Eval(js)
 	if err != nil {
@@ -950,14 +1004,18 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 	}
 
 	var raw struct {
-		Error       string           `json:"error"`
-		URL         string           `json:"url"`
-		Title       string           `json:"title"`
-		Description string           `json:"description"`
-		Selector    string           `json:"selector"`
-		Text        string           `json:"text"`
-		Headings    []map[string]any `json:"headings"`
-		Links       []map[string]any `json:"links"`
+		Error        string           `json:"error"`
+		URL          string           `json:"url"`
+		Title        string           `json:"title"`
+		Description  string           `json:"description"`
+		Selector     string           `json:"selector"`
+		Format       string           `json:"format"`
+		Mode         string           `json:"mode"`
+		CanonicalURL string           `json:"canonical_url"`
+		SiteName     string           `json:"site_name"`
+		Text         string           `json:"text"`
+		Headings     []map[string]any `json:"headings"`
+		Links        []map[string]any `json:"links"`
 	}
 	if err := json.Unmarshal([]byte(result.Value.Str()), &raw); err != nil {
 		return nil, err
@@ -976,15 +1034,24 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 	s.ReadCount++
 	readSeq := s.ReadCount
 	out := &PageReadResult{
+		Schema:      "uiai.browser_read.v2",
 		URL:         raw.URL,
 		Title:       raw.Title,
 		Description: raw.Description,
 		Selector:    raw.Selector,
+		Format:      format,
+		Mode:        mode,
 		Text:        text,
 		Chars:       len(text),
 		Truncated:   truncated,
 		Headings:    raw.Headings,
-		Focusa:      buildReadFocusaMetadata(s.ID, readSeq, raw.URL, raw.Title, raw.Selector, len(text), truncated, s.FocusaScope),
+		Metadata: map[string]any{
+			"source_type":   "webpage",
+			"canonical_url": raw.CanonicalURL,
+			"site_name":     raw.SiteName,
+			"captured_at":   time.Now().UTC().Format(time.RFC3339),
+		},
+		Focusa: buildReadFocusaMetadata(s.ID, readSeq, raw.URL, raw.Title, raw.Selector, len(text), truncated, format, s.FocusaScope),
 	}
 	if opts.IncludeLinks {
 		out.Links = raw.Links
@@ -994,7 +1061,7 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 	return out, nil
 }
 
-func buildReadFocusaMetadata(sessionID string, readSeq int, pageURL, title, selector string, chars int, truncated bool, scope *FocusaScope) *ReadFocusaMetadata {
+func buildReadFocusaMetadata(sessionID string, readSeq int, pageURL, title, selector string, chars int, truncated bool, format string, scope *FocusaScope) *ReadFocusaMetadata {
 	if readSeq <= 0 {
 		readSeq = 1
 	}
@@ -1002,7 +1069,12 @@ func buildReadFocusaMetadata(sessionID string, readSeq int, pageURL, title, sele
 	if pageURL == "" {
 		targetRef = "browser:session=" + focusapacket.Truncate(sessionID, 80)
 	}
-	summary := fmt.Sprintf("Read %d chars from %s", chars, focusapacket.Truncate(firstNonEmpty(title, pageURL, sessionID), 160))
+	format = strings.ToLower(strings.TrimSpace(format))
+	label := "Read"
+	if format == "markdown" {
+		label = "Read Markdown"
+	}
+	summary := fmt.Sprintf("%s %d chars from %s", label, chars, focusapacket.Truncate(firstNonEmpty(title, pageURL, sessionID), 160))
 	if selector != "" {
 		summary += " selector=" + focusapacket.Truncate(selector, 80)
 	}

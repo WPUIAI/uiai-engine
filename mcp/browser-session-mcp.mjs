@@ -200,8 +200,25 @@ const BRIDGE_CORE_TOOLS = [
     },
   },
   {
+    name: "source_to_markdown",
+    description: "One-shot Source-to-Markdown conversion for public URLs. Returns uiai.source_markdown.v1 with Markdown, metadata, diagnostics, Focusa-ready evidence, and auto-closes the temporary session.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Public URL to convert" },
+        selector: { type: "string", description: "Optional CSS selector region" },
+        max_chars: { type: "integer", default: 30000, description: "Max Markdown characters" },
+        mode: { type: "string", default: "main_content", description: "Read mode: main_content or full" },
+        include_links: { type: "boolean", default: true, description: "Include visible link metadata" },
+        include_images: { type: "boolean", default: false, description: "Include Markdown image tags" },
+        focusa_scope: { type: "object", description: "Optional Focusa scope" },
+      },
+      required: ["url"],
+    },
+  },
+  {
     name: "browser_read",
-    description: "Extract compact readable page/region text without taking a screenshot. Use for agent web surfing after open/navigate.",
+    description: "Extract compact readable page/region text or Markdown without taking a screenshot. Use for agent web surfing after open/navigate.",
     inputSchema: {
       type: "object",
       properties: {
@@ -209,6 +226,9 @@ const BRIDGE_CORE_TOOLS = [
         selector: { type: "string", description: "Optional CSS selector or @ref region" },
         max_chars: { type: "integer", default: 8000, description: "Max text characters" },
         include_links: { type: "boolean", default: true, description: "Include visible links" },
+        format: { type: "string", default: "text", description: "Output format: text or markdown" },
+        mode: { type: "string", default: "main_content", description: "Read mode: main_content or full" },
+        include_images: { type: "boolean", default: false, description: "Include Markdown image tags when format=markdown" },
       },
       required: ["session_id"],
     },
@@ -416,10 +436,16 @@ async function toolsCall(name, args) {
       break;
 
 
+    case "source_to_markdown":
+      url = `${ENGINE}/api/markdown`;
+      method = "POST";
+      body = { url: args.url, selector: args.selector, max_chars: args.max_chars, mode: args.mode, include_links: args.include_links, include_images: args.include_images, focusa_scope: args.focusa_scope };
+      break;
+
     case "browser_read":
       url = `${ENGINE}/api/session/${args.session_id}/read`;
       method = "POST";
-      body = { selector: args.selector, max_chars: args.max_chars, include_links: args.include_links };
+      body = { selector: args.selector, max_chars: args.max_chars, include_links: args.include_links, format: args.format, mode: args.mode, include_images: args.include_images };
       break;
 
     case "browser_cookies":
