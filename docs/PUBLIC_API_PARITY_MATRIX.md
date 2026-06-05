@@ -8,6 +8,7 @@ Purpose: map public/operator/agent-facing UIAI HTTP route families to Pi, MCP, C
 - Auth modes: `internal/auth/auth.go` and [Endpoint Auth Matrix](ENDPOINT_AUTH_MATRIX.md).
 - Pi tools: `.pi/extensions/uiai-engine.ts` plus `scripts/smoke-pi-extension-registration.sh`.
 - MCP tools/routes: `mcp/browser-session-mcp.mjs` plus `scripts/smoke-mcp-tool-routes.sh`.
+- Cross-surface checker: `scripts/check-tool-parity.sh` verifies MCP advertised tools, Pi mirrors, MCP routes, CLI commands, docs mentions, and executable `/uiai` packet shortcuts.
 - CLI wrapper: `scripts/uiai`.
 - Public API details: [Session API](SESSION_API.md), [UIAI for Agents Quickstart](UIAI_FOR_AGENTS_QUICKSTART.md), [Agent UX Cookbook](AGENT_UX_COOKBOOK.md).
 
@@ -78,6 +79,7 @@ Purpose: map public/operator/agent-facing UIAI HTTP route families to Pi, MCP, C
 ## Verification commands
 
 ```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && node --check mcp/browser-session-mcp.mjs'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-registration.sh'

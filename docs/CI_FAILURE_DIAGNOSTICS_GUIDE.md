@@ -81,7 +81,8 @@ Workflow file:
 Main steps:
 
 1. `go test ./...`
-2. `scripts/check-focusa-packet-drift.sh`
+2. `scripts/check-tool-parity.sh`
+3. `scripts/check-focusa-packet-drift.sh`
 3. `SESSIONS=4 ROUNDS=10 scripts/stress-browser-diagnostics.sh`
 4. `scripts/soak-browser-flakiness.sh`
 5. artifact upload
@@ -90,6 +91,7 @@ Local reproduction:
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && go test ./...'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && SESSIONS=4 ROUNDS=10 OUT=/tmp/uiai-local-diagnostics-4x10.json scripts/stress-browser-diagnostics.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && DURATION_SECONDS=30 CONCURRENCY=2 OUT=/tmp/uiai-local-soak.json scripts/soak-browser-flakiness.sh'

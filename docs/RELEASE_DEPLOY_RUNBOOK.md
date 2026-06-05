@@ -31,6 +31,7 @@ Run these after docs, tool schemas, skills, or packet fields change:
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && PATTERN="does \\*\\*not\\*\\* yet expo""se|intentionally defer""red|Later, UIAI HT""TP|Defer .*research-pack""et" && rg -n "$PATTERN" README.md docs .pi mcp scripts || true'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-registration.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && node --check mcp/browser-session-mcp.mjs'
 ```

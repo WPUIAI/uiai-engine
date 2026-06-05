@@ -105,6 +105,7 @@ UIAI packets are proposals/evidence bundles. Focusa remains the durable Workpoin
 Run relevant gates after changing tool schemas, docs, route exposure, packet fields, browser behavior, or MCP/Pi code:
 
 ```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && node --check mcp/browser-session-mcp.mjs'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-registration.sh'
