@@ -121,7 +121,7 @@ uiai_browser_diagnostics session_id="<sid>" limit=50
 
 ### MCP equivalent
 
-Use the same MCP sequence with `browser_search`, `browser_open`, `browser_read`, `browser_snapshot`, and `browser_diagnostics`.
+Use the same MCP sequence with `browser_search`, `browser_open`, `browser_read`, `browser_snapshot`, and `browser_diagnostics`. CLI shortcut: `scripts/uiai-open-result.sh --query "UIAI Engine browser agents" --index 1 --out /tmp/uiai-open-result.json`.
 
 ## 3. Compose a Focusa research diagnostics packet
 

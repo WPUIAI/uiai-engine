@@ -6,6 +6,15 @@ This cookbook gives agents and operators repeatable UIAI workflows with clear in
 
 Use when an agent needs web content and should avoid raw SERP blobs.
 
+CLI helper for a selected search result:
+
+```bash
+scripts/uiai-open-result.sh --query "UIAI Engine browser agents" --index 1 --out /tmp/uiai-open-result.json
+jq '{ok,selected_url,session_id,evidence_refs,cleanup}' /tmp/uiai-open-result.json
+```
+
+The helper also accepts `--search-json <file>` when a prior search response already exists, validates invalid indices, returns Focusa-ready metadata, and recommends `close_when_done`.
+
 ### Pi
 
 ```text

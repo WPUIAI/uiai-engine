@@ -48,7 +48,7 @@ Main entry points:
 - Default config: [`config.yaml`](config.yaml)
 - MCP bridge: [`mcp/browser-session-mcp.mjs`](mcp/browser-session-mcp.mjs)
 - Pi extension: [`.pi/extensions/uiai-engine.ts`](.pi/extensions/uiai-engine.ts)
-- Search flow: call `uiai_search`/`browser_search`, open a selected result with `browser_open`, then use `browser_read` and diagnostics as needed.
+- Search flow: call `uiai_search`/`browser_search`, open a selected result with `browser_open` or `scripts/uiai-open-result.sh`, then use `browser_read` and diagnostics as needed.
 
 ## Documentation map
 
@@ -405,6 +405,7 @@ scripts/install-pi-skills.sh --apply
 
 # Smoke-check skills/discovery/graph/MCP bridge
 scripts/smoke-pi-skills.sh
+scripts/smoke-open-result.sh
 scripts/smoke-agent-integrations.sh
 scripts/uiai-mcp-reconnect-help.sh --check
 scripts/smoke-mcp-tool-routes.sh
@@ -441,6 +442,7 @@ scripts/uiai health
 scripts/uiai errors --limit 10 --source browser_session
 scripts/uiai tools search diagnostics
 scripts/uiai tools docs
+scripts/uiai-open-result.sh --query "UIAI Engine browser agents" --index 1 --out /tmp/uiai-open-result.json
 SID=$(scripts/uiai --json session open https://example.com | jq -r '.session.id')
 scripts/uiai session read "$SID" --max-chars 1000
 scripts/uiai session diagnostics "$SID"

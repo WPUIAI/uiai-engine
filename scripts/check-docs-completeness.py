@@ -5,11 +5,12 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 checks={
  'search': {
-   'README.md':['/api/search','uiai_search','browser_search'],
+   'README.md':['/api/search','uiai_search','browser_search','scripts/uiai-open-result.sh'],
    'docs/SESSION_API.md':['/api/search','uiai-search:<provider>:<query-hash>:<rank>'],
-   'docs/PUBLIC_API_PARITY_MATRIX.md':['/api/search','uiai_search','browser_search','uiai-search:<provider>:<query-hash>:<rank>'],
+   'docs/PUBLIC_API_PARITY_MATRIX.md':['/api/search','uiai_search','browser_search','uiai-search:<provider>:<query-hash>:<rank>','scripts/uiai-open-result.sh'],
    'docs/ENDPOINT_AUTH_MATRIX.md':['/api/search','loopback-public remote-auth'],
    'scripts/smoke-agent-integrations.sh':['/api/search','browser_search'],
+   'scripts/smoke-open-result.sh':['uiai-open-result.sh','open result smoke ok'],
  },
  'browser_session': {
    'README.md':['browser sessions/actions/diagnostics'],

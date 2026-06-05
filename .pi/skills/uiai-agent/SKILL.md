@@ -53,6 +53,7 @@ Use this sequence for research or page inspection:
 ```text
 uiai_search query="<query>" limit=3
 uiai_browser_open url="<selected url>" focusa_scope={project_root,continuity_id,evidence_ref}
+# CLI helper: scripts/uiai-open-result.sh --query "<query>" --index 1 --out /tmp/uiai-open-result.json
 uiai_browser_read session_id="<sid>" max_chars=2000 include_links=true
 uiai_browser_snapshot session_id="<sid>" interactive=true
 uiai_browser_diagnostics session_id="<sid>" limit=100   # if blank/broken/flaky/failed action
