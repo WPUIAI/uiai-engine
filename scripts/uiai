@@ -36,6 +36,7 @@ Commands:
   session close <sid>
   smoke agent                    Run scripts/smoke-agent-integrations.sh
   smoke browser                  Run scripts/stress-browser-diagnostics.sh
+  smoke packet                   Run scripts/smoke-focusa-packet.sh
   install-agent-integrations     Run scripts/install-agent-integrations.sh
 
 Output:
@@ -236,7 +237,8 @@ case "$cmd" in
     case "$sub" in
       agent) exec "$ROOT_DIR/scripts/smoke-agent-integrations.sh" ;;
       browser) exec "$ROOT_DIR/scripts/stress-browser-diagnostics.sh" ;;
-      *) err "usage: uiai smoke agent|browser"; exit 2 ;;
+      packet) exec "$ROOT_DIR/scripts/smoke-focusa-packet.sh" ;;
+      *) err "usage: uiai smoke agent|browser|packet"; exit 2 ;;
     esac
     ;;
   install-agent-integrations) exec "$ROOT_DIR/scripts/install-agent-integrations.sh" ;;
