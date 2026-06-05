@@ -49,6 +49,32 @@ Cleanup:
 
 - Always close the browser session when the page is no longer needed.
 
+
+## Planned Recipe: Source → Markdown / JSONL
+
+Use when an agent needs a public webpage, social thread, GitHub issue/PR, Reddit thread, YouTube transcript, or similar source converted into clean, cited, agent-ready Markdown or JSONL.
+
+This workflow is specified but not yet implemented. See [`SOURCE_TO_MARKDOWN_AGENT_SPEC.md`](SOURCE_TO_MARKDOWN_AGENT_SPEC.md).
+
+Planned surfaces:
+
+```text
+uiai_to_markdown url="<public-url>" format="markdown|jsonl" source="auto"
+source_to_markdown url="<public-url>" format="markdown|jsonl" source="auto"
+scripts/uiai md <public-url> --format markdown
+```
+
+Planned evidence handles:
+
+- `uiai-md:sha256:<prefix>`
+- source-specific record refs for JSONL chunks
+
+Rules:
+
+- Public-only by default.
+- Return structured `source_blocked` / `auth_required` failures instead of inventing content.
+- Preserve Focusa-ready `target_ref`, `evidence_ref`, `summary`, and next tools.
+
 ## Recipe 2: Persistent browser loop with @refs
 
 Use when the agent must interact with a web UI repeatedly.

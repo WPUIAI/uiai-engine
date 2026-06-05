@@ -59,6 +59,7 @@ Start here by task:
 | HLT ledger and current trajectory | [`docs/HLT_LEDGER.md`](docs/HLT_LEDGER.md) |
 | Agent quickstart: Pi, MCP, CLI, HTTP, browser workflow, Focusa packet handoff | [`docs/UIAI_FOR_AGENTS_QUICKSTART.md`](docs/UIAI_FOR_AGENTS_QUICKSTART.md) |
 | Agent UX cookbook: search/read, @refs, diagnostics, packets, visual QA, release proof | [`docs/AGENT_UX_COOKBOOK.md`](docs/AGENT_UX_COOKBOOK.md) |
+| Draft Source-to-Markdown spec: webpage/social/docs/issues/videos → Markdown/JSONL with agent discovery and Focusa evidence | [`docs/SOURCE_TO_MARKDOWN_AGENT_SPEC.md`](docs/SOURCE_TO_MARKDOWN_AGENT_SPEC.md) |
 | Completed agent-experience roadmap implementation summary | [`docs/AGENT_EXPERIENCE_ROADMAP_IMPLEMENTATION_SUMMARY.md`](docs/AGENT_EXPERIENCE_ROADMAP_IMPLEMENTATION_SUMMARY.md) |
 | Repo-local Pi skill source-of-truth policy | [`docs/SKILL_SOURCE_OF_TRUTH_POLICY.md`](docs/SKILL_SOURCE_OF_TRUTH_POLICY.md) |
 | Focusa packet examples gallery | [`docs/FOCUSA_PACKET_EXAMPLES_GALLERY.md`](docs/FOCUSA_PACKET_EXAMPLES_GALLERY.md) |
