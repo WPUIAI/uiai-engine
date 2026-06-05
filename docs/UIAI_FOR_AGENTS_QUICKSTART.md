@@ -1,6 +1,6 @@
 # UIAI for Agents Quickstart
 
-This is the shortest end-to-end path for using UIAI Engine as an agent browser, research, diagnostics, and Focusa evidence backend.
+This is the shortest end-to-end path for using UIAI Engine as an agent browser, research, diagnostics, and Focusa evidence backend. For repeatable operator/agent recipes, see [Agent UX Cookbook](AGENT_UX_COOKBOOK.md).
 
 ## 1. Start with health and discovery
 
