@@ -36,9 +36,10 @@ pi_uiai_tool_graph
 uiai_health
 ```
 
-Useful project skill:
+Useful project skills:
 
 ```text
+/skill:uiai-agent
 /skill:vision
 ```
 
