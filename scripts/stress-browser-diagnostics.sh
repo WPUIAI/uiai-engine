@@ -36,19 +36,23 @@ cleanup() {
 trap cleanup EXIT
 
 cp config.yaml "$TMPDIR/config.yaml"
-python3 - "$TMPDIR/config.yaml" "$ENGINE_PORT" <<'PY'
+python3 - "$TMPDIR/config.yaml" "$ENGINE_PORT" "$SESSIONS" <<'PY'
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 port = sys.argv[2]
+sessions = max(1, int(sys.argv[3]))
 s = p.read_text()
 s = s.replace('port: 7456', f'port: {port}', 1)
 s = s.replace('data_dir: "/home/wpuiai/uiai-engine/data"', f'data_dir: "{p.parent / "data"}"', 1)
 s = s.replace('share_dir: "/home/wpuiai/ai-api/shares"', f'share_dir: "{p.parent / "shares"}"', 1)
 s = s.replace('script_dir: "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"', f'script_dir: "{p.parent / "device-templates"}"', 1)
-s = s.replace('vision_pool_size: 2', 'vision_pool_size: 2', 1)
-s = s.replace('pool_size: 2', 'pool_size: 2', 1)
-s = s.replace('max_pool: 2', 'max_pool: 2', 1)
+s = s.replace('health_file: "/var/log/uiai/ip-pool-health.json"', f'health_file: "{p.parent / "ip-pool-health.json"}"', 1)
+s = s.replace('log_file: "/var/log/uiai/captcha-stats.jsonl"', f'log_file: "{p.parent / "captcha-stats.jsonl"}"', 1)
+s = s.replace('file: "/var/log/uiai/engine.log"', f'file: "{p.parent / "engine.log"}"', 1)
+s = s.replace('vision_pool_size: 2', f'vision_pool_size: {sessions}', 1)
+s = s.replace('pool_size: 2', f'pool_size: {sessions}', 1)
+s = s.replace('max_pool: 2', f'max_pool: {sessions}', 1)
 p.write_text(s)
 PY
 
@@ -115,7 +119,10 @@ def run_one(round_idx, idx):
     open_body = {'url': target, 'width': width, 'height': height}
     if focusa_scope:
         open_body['focusa_scope'] = focusa_scope
-    opened = http_json('POST', f"{engine}/api/session", open_body)
+    try:
+        opened = http_json('POST', f"{engine}/api/session", open_body)
+    except Exception as exc:
+        raise RuntimeError(f"open_session failed label={label} target={target} error={type(exc).__name__}: {exc}") from exc
     sid = opened['session']['id']
     time.sleep(0.35)
     diag = http_json('GET', f"{engine}/api/session/{sid}/diagnostics?limit=50")
@@ -145,7 +152,10 @@ for r in range(rounds):
     with concurrent.futures.ThreadPoolExecutor(max_workers=sessions) as ex:
         futs = [ex.submit(run_one, r, i) for i in range(sessions)]
         for fut in concurrent.futures.as_completed(futs):
-            results.append(fut.result())
+            try:
+                results.append(fut.result())
+            except Exception as exc:
+                results.append({'ok': False, 'label': 'exception', 'elapsed_ms': 0, 'summary': {}, 'error': f'{type(exc).__name__}: {exc}'})
 
 total_ms = round((time.time() - started) * 1000)
 passed = sum(1 for r in results if r['ok'])
@@ -174,6 +184,7 @@ with open(out_path, 'w') as f:
     json.dump(report, f, indent=2)
 print(json.dumps({k: report[k] for k in ['ok','sessions','rounds','total_runs','passed','failed','total_ms','avg_elapsed_ms','max_elapsed_ms']}, indent=2))
 if not report['ok']:
+    print(json.dumps({'failed_results': [r for r in results if not r.get('ok')][:10]}, indent=2), file=sys.stderr)
     raise SystemExit(1)
 PY
 
