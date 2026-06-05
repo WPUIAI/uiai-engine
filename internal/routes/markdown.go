@@ -121,8 +121,17 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 	}
 
 	capturedAt := time.Now().UTC().Format(time.RFC3339)
+	metadata := markdownMetadata(read, body, capturedAt)
+	var records []map[string]any
+	if gh, ok := matchGitHubPublicSource(firstMarkdownNonEmpty(read.URL, body.URL)); ok {
+		metadata = applyGitHubPublicMetadata(metadata, gh)
+		read.Text = renderGitHubPublicMarkdown(read.Text, read, gh)
+		read.Chars = len(read.Text)
+		records = githubPublicRecords(read, gh)
+		metadata["record_count"] = len(records)
+	}
 	markdown := read.Text
-	writeJSON(w, http.StatusOK, map[string]any{
+	response := map[string]any{
 		"schema":       "uiai.source_markdown.v1",
 		"url":          read.URL,
 		"title":        read.Title,
@@ -133,18 +142,23 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 		"truncated":    read.Truncated,
 		"headings":     read.Headings,
 		"links":        read.Links,
-		"metadata":     markdownMetadata(read, body, capturedAt),
+		"metadata":     metadata,
 		"diagnostics":  diagnostics,
 		"focusa":       oneShotMarkdownFocusa(read, body.URL),
 		"cleanup":      cleanup,
 		"duration_ms":  time.Since(started).Milliseconds(),
-		"source_stats": map[string]any{"format": "markdown", "mode": read.Mode, "max_chars": body.MaxChars},
-	})
+		"source_stats": map[string]any{"format": "markdown", "mode": read.Mode, "max_chars": body.MaxChars, "adapter": metadata["adapter"]},
+	}
+	if len(records) > 0 {
+		response["records"] = records
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func markdownMetadata(read *vision.PageReadResult, body markdownRequest, capturedAt string) map[string]any {
 	out := map[string]any{
 		"source_type":    "webpage",
+		"adapter":        "webpage_browser",
 		"schema":         "uiai.source_markdown.v1",
 		"captured_at":    capturedAt,
 		"selector":       read.Selector,
@@ -158,16 +172,119 @@ func markdownMetadata(read *vision.PageReadResult, body markdownRequest, capture
 }
 
 func oneShotMarkdownFocusa(read *vision.PageReadResult, requestedURL string) map[string]any {
-	h := sha256.Sum256([]byte(read.URL + "\n" + read.Text))
-	prefix := hex.EncodeToString(h[:])[:16]
+	evidenceRef := markdownEvidenceRef(read.URL, read.Text)
 	title := focusapacket.Truncate(firstMarkdownNonEmpty(read.Title, read.URL, requestedURL), 160)
 	return map[string]any{
 		"target_ref":     "source-markdown:" + sanitizeMarkdownURLForFocusa(firstMarkdownNonEmpty(read.URL, requestedURL)),
-		"evidence_ref":   "uiai-source-markdown:sha256:" + prefix,
+		"evidence_ref":   evidenceRef,
 		"preferred_tool": "focusa_evidence_capture",
 		"summary":        fmt.Sprintf("Converted %s to %d chars of Markdown", title, read.Chars),
 		"next_tools":     []string{"focusa_evidence_capture"},
 	}
+}
+
+func markdownEvidenceRef(pageURL, markdown string) string {
+	h := sha256.Sum256([]byte(pageURL + "\n" + markdown))
+	return "uiai-source-markdown:sha256:" + hex.EncodeToString(h[:])[:16]
+}
+
+type githubPublicSource struct {
+	Owner      string
+	Repo       string
+	Kind       string
+	Number     string
+	SourceType string
+	FieldName  string
+	URL        string
+}
+
+func matchGitHubPublicSource(raw string) (githubPublicSource, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return githubPublicSource{}, false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host != "github.com" && host != "www.github.com" {
+		return githubPublicSource{}, false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 4 || parts[0] == "" || parts[1] == "" || parts[3] == "" {
+		return githubPublicSource{}, false
+	}
+	gh := githubPublicSource{Owner: parts[0], Repo: parts[1], Kind: parts[2], Number: parts[3], URL: sanitizeMarkdownURLForFocusa(raw)}
+	switch parts[2] {
+	case "issues":
+		gh.SourceType = "github_issue"
+		gh.FieldName = "issue"
+	case "pull":
+		gh.SourceType = "github_pull_request"
+		gh.FieldName = "pull_request"
+	case "discussions":
+		gh.SourceType = "github_discussion"
+		gh.FieldName = "discussion"
+	default:
+		return githubPublicSource{}, false
+	}
+	return gh, true
+}
+
+func applyGitHubPublicMetadata(metadata map[string]any, gh githubPublicSource) map[string]any {
+	out := make(map[string]any, len(metadata)+8)
+	for k, v := range metadata {
+		out[k] = v
+	}
+	out["adapter"] = "github_public"
+	out["source_type"] = gh.SourceType
+	out["repo"] = gh.Owner + "/" + gh.Repo
+	out["owner"] = gh.Owner
+	out["repository"] = gh.Repo
+	out[gh.FieldName] = gh.Number
+	out["canonical_url"] = gh.URL
+	return out
+}
+
+func renderGitHubPublicMarkdown(markdown string, read *vision.PageReadResult, gh githubPublicSource) string {
+	title := githubPublicTitle(read, gh)
+	frontmatter := []string{
+		"---",
+		"source: " + gh.SourceType,
+		"adapter: github_public",
+		"repo: " + gh.Owner + "/" + gh.Repo,
+		gh.FieldName + ": " + gh.Number,
+		"url: " + gh.URL,
+		"evidence_ref: " + markdownEvidenceRef(read.URL, markdown),
+		"---",
+		"",
+		"# " + title,
+		"",
+	}
+	trimmed := strings.TrimSpace(markdown)
+	if trimmed == "" {
+		trimmed = "No readable GitHub content extracted. Inspect diagnostics or retry with a narrower selector."
+	}
+	return strings.Join(frontmatter, "\n") + trimmed
+}
+
+func githubPublicTitle(read *vision.PageReadResult, gh githubPublicSource) string {
+	title := strings.TrimSpace(read.Title)
+	if title == "" {
+		return gh.Owner + "/" + gh.Repo + " " + gh.Kind + " " + gh.Number
+	}
+	return title
+}
+
+func githubPublicRecords(read *vision.PageReadResult, gh githubPublicSource) []map[string]any {
+	return []map[string]any{{
+		"schema":       "uiai.source_markdown_record.v1",
+		"source_type":  gh.SourceType,
+		"record_type":  gh.Kind,
+		"index":        1,
+		"repo":         gh.Owner + "/" + gh.Repo,
+		gh.FieldName:   gh.Number,
+		"title":        githubPublicTitle(read, gh),
+		"url":          gh.URL,
+		"evidence_ref": markdownEvidenceRef(read.URL, read.Text) + "#record=1",
+	}}
 }
 
 func markdownFailure(class string, err error, url string, started time.Time) map[string]any {
