@@ -160,6 +160,7 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-regist
 - `/skill:vision` — detailed browser/screenshot/session API patterns.
 - `/skill:uiai-focusa-packet` — packet-specific proof/handoff playbook.
 - `/skill:uiai-release` — release/deploy/push/CI workflow.
+- `/skill:uiai-mcp` — MCP bridge setup, reconnect, route parity, and tool routing workflow.
 - `/skill:uiai-ci-debug` — GitHub Actions failure diagnostics.
 - `/skill:uiai-browser-debug` — browser failure triage.
 
