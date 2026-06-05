@@ -1,6 +1,6 @@
 # Agent Non-Browser API Exposure Inventory
 
-Purpose: document deeper non-browser API families that are intentionally exposed or omitted from Pi/MCP/CLI agent surfaces. This prevents accidental drift between HTTP route presence and agent-facing tool availability.
+Purpose: document deeper non-browser API families that are intentionally exposed or omitted from Pi/MCP/CLI agent surfaces. This prevents accidental drift between HTTP route presence and agent-facing tool availability. For the broader HTTP/Pi/MCP/CLI/auth/smoke map, see [Public API Parity Matrix](PUBLIC_API_PARITY_MATRIX.md).
 
 ## Exposure principles
 

@@ -65,6 +65,7 @@ Start here by task:
 | Agent-surface release proof checklist | [`docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md`](docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md) |
 | Release/deploy/push/watch-CI runbook | [`docs/RELEASE_DEPLOY_RUNBOOK.md`](docs/RELEASE_DEPLOY_RUNBOOK.md) |
 | GitHub Actions / Browser Reliability failure diagnostics | [`docs/CI_FAILURE_DIAGNOSTICS_GUIDE.md`](docs/CI_FAILURE_DIAGNOSTICS_GUIDE.md) |
+| Public API parity matrix across HTTP, Pi, MCP, CLI, auth, and smokes | [`docs/PUBLIC_API_PARITY_MATRIX.md`](docs/PUBLIC_API_PARITY_MATRIX.md) |
 | Non-browser agent API exposure inventory | [`docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md`](docs/AGENT_NON_BROWSER_API_EXPOSURE_INVENTORY.md) |
 | Endpoint auth mode matrix and route update rules | [`docs/ENDPOINT_AUTH_MATRIX.md`](docs/ENDPOINT_AUTH_MATRIX.md) |
 | Existing WordPress plugin ↔ Go engine route parity matrix | [`docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md) |
