@@ -60,6 +60,7 @@ Start here by task:
 | Agent quickstart: Pi, MCP, CLI, HTTP, browser workflow, Focusa packet handoff | [`docs/UIAI_FOR_AGENTS_QUICKSTART.md`](docs/UIAI_FOR_AGENTS_QUICKSTART.md) |
 | Agent UX cookbook: search/read, @refs, diagnostics, packets, visual QA, release proof | [`docs/AGENT_UX_COOKBOOK.md`](docs/AGENT_UX_COOKBOOK.md) |
 | Completed agent-experience roadmap implementation summary | [`docs/AGENT_EXPERIENCE_ROADMAP_IMPLEMENTATION_SUMMARY.md`](docs/AGENT_EXPERIENCE_ROADMAP_IMPLEMENTATION_SUMMARY.md) |
+| Repo-local Pi skill source-of-truth policy | [`docs/SKILL_SOURCE_OF_TRUTH_POLICY.md`](docs/SKILL_SOURCE_OF_TRUTH_POLICY.md) |
 | Browser/session API, agent tools, MCP formats, security boundaries, portability helpers | [`docs/SESSION_API.md`](docs/SESSION_API.md) |
 | UIAI × Focusa × Pi hand-in-glove research/diagnostics/evidence packet spec | [`docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md) |
 | Cross-surface interoperability contracts, acceptance matrix, and proof gates | [`docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md`](docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md) |
