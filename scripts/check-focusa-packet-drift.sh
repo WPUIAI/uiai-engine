@@ -22,6 +22,11 @@ checks={
  'README.md':['uiai_focusa_packet_build',schema],
  'scripts/smoke-focusa-packet.sh':[schema,'packet_bytes','focusa_browser_diagnostics_intake'],
  'scripts/smoke-focusa-packet-ci.sh':[schema,'packet endpoint ci smoke ok','uiai-packet-smoke-engine.log'],
+ 'scripts/check-focusa-packet-examples.py':[schema,'required_surfaces','focusa_browser_diagnostics_intake'],
+ 'docs/FOCUSA_PACKET_EXAMPLES_GALLERY.md':[schema,'research','diagnose','proof','recommended_focusa.args_preview'],
+ 'docs/examples/focusa-packets/research-packet.example.json':[schema,'"mode": "research"','focusa_evidence_capture'],
+ 'docs/examples/focusa-packets/diagnose-packet.example.json':[schema,'"mode": "diagnose"','focusa_browser_diagnostics_intake'],
+ 'docs/examples/focusa-packets/proof-packet.example.json':[schema,'"mode": "proof"','focusa_evidence_capture'],
 }
 missing=[]
 for rel, needles in checks.items():

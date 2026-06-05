@@ -1,0 +1,81 @@
+{
+  "schema": "uiai.focusa_research_diagnostics_packet.v1",
+  "mode": "diagnose",
+  "goal": "Diagnose a failed browser action without raw logs.",
+  "scope_status": "present",
+  "focusa_scope": {
+    "project_root": "/home/wpuiai/uiai-engine",
+    "continuity_id": "focusa-cont-uiai-engine-example",
+    "evidence_ref": "uiai-example-diagnose"
+  },
+  "target_refs": [
+    "browser:https://example.com/form"
+  ],
+  "evidence_refs": [
+    "uiai-diagnostics:session=example:seq=3",
+    "uiai-error:err-example-selector"
+  ],
+  "captures": [
+    {
+      "type": "diagnostics",
+      "evidence_ref": "uiai-diagnostics:session=example:seq=3",
+      "target_ref": "browser:https://example.com/form",
+      "summary": "Diagnostics show one selector failure, one console warning, and one failed request to /api/example."
+    },
+    {
+      "type": "error",
+      "evidence_ref": "uiai-error:err-example-selector",
+      "target_ref": "browser:https://example.com/form",
+      "summary": "Structured browser action error class selector_not_found with next action to refresh snapshot and retry @ref."
+    }
+  ],
+  "diagnostics_summary": {
+    "console_errors": 1,
+    "failed_requests": 1,
+    "top_findings": [
+      "selector_not_found for #submit-old",
+      "HTTP 404 for /api/example",
+      "console warning: form not hydrated"
+    ]
+  },
+  "active_object_hints": [
+    {
+      "kind": "selector",
+      "hint": "#submit-old"
+    },
+    {
+      "kind": "url",
+      "hint": "https://example.com/form"
+    }
+  ],
+  "recommended_focusa": {
+    "preferred_tool": "focusa_browser_diagnostics_intake",
+    "fallback_tool": "focusa_evidence_capture",
+    "args_preview": {
+      "target_ref": "browser:https://example.com/form",
+      "result": "Diagnostics packet captured selector_not_found plus failed request evidence; refresh snapshot and retry with @ref.",
+      "evidence_ref": "uiai-diagnostics:session=example:seq=3",
+      "diagnostics": {
+        "summary": {
+          "console_errors": 1,
+          "failed_requests": 1,
+          "exceptions": 0
+        }
+      }
+    },
+    "next_tools": [
+      "focusa_browser_diagnostics_intake",
+      "focusa_predict_record"
+    ]
+  },
+  "recommended_next_action": "Intake diagnostics, then retry from a fresh snapshot using @ref selectors.",
+  "render": {
+    "summary_line": "diagnose packet failed_requests=1 error=selector_not_found"
+  },
+  "headless_next_action": "Call focusa_browser_diagnostics_intake with recommended_focusa.args_preview.",
+  "cleanup": {
+    "session_id": "example",
+    "recommended_action": "keep_for_followup",
+    "tool": "uiai_browser_close"
+  }
+}

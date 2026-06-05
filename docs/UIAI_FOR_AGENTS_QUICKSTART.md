@@ -209,7 +209,7 @@ Pass the same `goal`, `mode`, `responses`, `focusa_scope`, and optional `cleanup
 
 ## 4. Capture or intake the packet in Focusa
 
-Use the packet's `recommended_focusa` block.
+Use the packet's `recommended_focusa` block. For redacted research/diagnose/proof fixtures, see [Focusa Packet Examples Gallery](FOCUSA_PACKET_EXAMPLES_GALLERY.md).
 
 Typical evidence capture:
 

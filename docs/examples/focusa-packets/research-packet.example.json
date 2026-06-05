@@ -1,0 +1,69 @@
+{
+  "schema": "uiai.focusa_research_diagnostics_packet.v1",
+  "mode": "research",
+  "goal": "Research UIAI Engine browser agents from a selected result.",
+  "scope_status": "present",
+  "focusa_scope": {
+    "project_root": "/home/wpuiai/uiai-engine",
+    "continuity_id": "focusa-cont-uiai-engine-example",
+    "evidence_ref": "uiai-example-research"
+  },
+  "target_refs": [
+    "https://example.com/uiai-agents"
+  ],
+  "evidence_refs": [
+    "uiai-search:brave:abc123:1",
+    "uiai-browser:session=example:read:1",
+    "uiai-browser:session=example:snapshot:1"
+  ],
+  "captures": [
+    {
+      "type": "search",
+      "evidence_ref": "uiai-search:brave:abc123:1",
+      "target_ref": "https://example.com/uiai-agents",
+      "title": "UIAI agents",
+      "summary": "Search result summary with URL fragments and sensitive query values removed."
+    },
+    {
+      "type": "read",
+      "evidence_ref": "uiai-browser:session=example:read:1",
+      "target_ref": "https://example.com/uiai-agents",
+      "summary": "Bounded page text says agents should use read, snapshot, diagnostics, and packet handoff."
+    },
+    {
+      "type": "snapshot",
+      "evidence_ref": "uiai-browser:session=example:snapshot:1",
+      "target_ref": "https://example.com/uiai-agents",
+      "summary": "Interactive snapshot exposed navigation and article links through @ref selectors."
+    }
+  ],
+  "active_object_hints": [
+    {
+      "kind": "url",
+      "hint": "https://example.com/uiai-agents"
+    }
+  ],
+  "recommended_focusa": {
+    "preferred_tool": "focusa_evidence_capture",
+    "fallback_tool": "focusa_active_object_resolve",
+    "args_preview": {
+      "target_ref": "https://example.com/uiai-agents",
+      "result": "Research packet captured selected search result, bounded read text, and snapshot refs for UIAI agent workflow.",
+      "evidence_ref": "uiai-search:brave:abc123:1"
+    },
+    "next_tools": [
+      "focusa_evidence_capture",
+      "focusa_active_object_resolve"
+    ]
+  },
+  "recommended_next_action": "Capture research evidence, then resolve active object if the target page matters for follow-up work.",
+  "render": {
+    "summary_line": "research packet evidence=3 target=https://example.com/uiai-agents"
+  },
+  "headless_next_action": "Call focusa_evidence_capture with recommended_focusa.args_preview.",
+  "cleanup": {
+    "session_id": "example",
+    "recommended_action": "close_when_done",
+    "tool": "uiai_browser_close"
+  }
+}

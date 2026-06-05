@@ -153,6 +153,7 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && go test ./internal/focusapacket .
 - `docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`
 - `docs/SESSION_API.md`
 - `docs/UIAI_FOR_AGENTS_QUICKSTART.md`
+- `docs/FOCUSA_PACKET_EXAMPLES_GALLERY.md`
 - `docs/AGENT_UX_COOKBOOK.md`
 - `docs/PUBLIC_API_PARITY_MATRIX.md`
 - `README.md`

@@ -1,0 +1,69 @@
+{
+  "schema": "uiai.focusa_research_diagnostics_packet.v1",
+  "mode": "proof",
+  "goal": "Prove visual QA artifact capture without storing raw image data.",
+  "scope_status": "present",
+  "focusa_scope": {
+    "project_root": "/home/wpuiai/uiai-engine",
+    "continuity_id": "focusa-cont-uiai-engine-example",
+    "evidence_ref": "uiai-example-proof"
+  },
+  "target_refs": [
+    "https://example.com/landing",
+    "uiai-share:share-example"
+  ],
+  "evidence_refs": [
+    "uiai-screenshot:sha256:abc123",
+    "uiai-share:share-example",
+    "uiai-browser:session=example:read:2"
+  ],
+  "captures": [
+    {
+      "type": "screenshot",
+      "evidence_ref": "uiai-screenshot:sha256:abc123",
+      "target_ref": "https://example.com/landing",
+      "summary": "Screenshot artifact captured 1280x800 JPEG; raw image payload omitted."
+    },
+    {
+      "type": "share",
+      "evidence_ref": "uiai-share:share-example",
+      "target_ref": "uiai-share:share-example",
+      "summary": "Share artifact stores the visual proof; cite share id instead of transcript blob."
+    },
+    {
+      "type": "read",
+      "evidence_ref": "uiai-browser:session=example:read:2",
+      "target_ref": "https://example.com/landing",
+      "summary": "Bounded read confirmed the landing page hero, CTA, and footer text rendered."
+    }
+  ],
+  "active_object_hints": [
+    {
+      "kind": "source",
+      "hint": "screenshot/share artifact"
+    }
+  ],
+  "recommended_focusa": {
+    "preferred_tool": "focusa_evidence_capture",
+    "fallback_tool": "focusa_active_object_resolve",
+    "args_preview": {
+      "target_ref": "https://example.com/landing",
+      "result": "Proof packet captured screenshot/share artifact refs and bounded page read; raw image data omitted.",
+      "evidence_ref": "uiai-share:share-example"
+    },
+    "next_tools": [
+      "focusa_evidence_capture",
+      "focusa_predict_record"
+    ]
+  },
+  "recommended_next_action": "Capture visual proof evidence and cite artifact refs in the release report.",
+  "render": {
+    "summary_line": "proof packet artifacts=2 target=https://example.com/landing"
+  },
+  "headless_next_action": "Call focusa_evidence_capture with recommended_focusa.args_preview.",
+  "cleanup": {
+    "session_id": "example",
+    "recommended_action": "close_when_done",
+    "tool": "uiai_browser_close"
+  }
+}
