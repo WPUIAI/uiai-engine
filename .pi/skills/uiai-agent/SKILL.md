@@ -138,7 +138,7 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-regist
 ## When to use sibling skills
 
 - `/skill:vision` — detailed browser/screenshot/session API patterns.
-- `/skill:uiai-focusa-packet` — packet-specific proof/handoff playbook, when present.
+- `/skill:uiai-focusa-packet` — packet-specific proof/handoff playbook.
 - `/skill:uiai-release` — release/deploy/push/CI workflow, when present.
 - `/skill:uiai-ci-debug` — GitHub Actions failure diagnostics, when present.
 - `/skill:uiai-browser-debug` — browser failure triage, when present.
