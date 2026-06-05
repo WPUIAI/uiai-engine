@@ -310,7 +310,8 @@ Current route contract inventory: [`WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`](WO
    - `uiai errors [--limit N] [--source S] [--class C] [--json]`
    - `uiai tools [search <q>|mcp|openai|graph|agent-card]`
    - `uiai session open/read/snapshot/diagnostics/close`
-   - `uiai smoke agent|browser`
+   - `uiai smoke agent|browser|packet`
+   - `uiai packet compose <json-file|->`
    - `uiai install-agent-integrations`
 3. Output modes:
    - compact default

@@ -426,6 +426,7 @@ scripts/uiai session read "$SID" --max-chars 1000
 scripts/uiai session diagnostics "$SID"
 scripts/uiai session close "$SID"
 scripts/uiai smoke agent
+scripts/uiai smoke packet
 ```
 
 Output modes: `--compact` (default), `--json`, `--pretty`.

@@ -29,6 +29,7 @@ Commands:
   tools                          List tool names/descriptions
   tools search <query>           Search tool discovery
   tools mcp|openai|graph|agent-card
+  packet compose <json-file|->    Compose Focusa research diagnostics packet
   session open <url> [--width N] [--height N]
   session read <sid> [--selector S] [--max-chars N]
   session snapshot <sid>
@@ -178,6 +179,24 @@ cmd_tools() {
   esac
 }
 
+cmd_packet() {
+  local sub="${1:-}"; shift || true
+  case "$sub" in
+    compose)
+      [[ $# -ge 1 ]] || { err "usage: uiai packet compose <json-file|->"; exit 2; }
+      local body
+      if [[ "$1" == "-" ]]; then
+        body="$(cat)"
+      else
+        [[ -f "$1" ]] || { err "packet request file not found: $1"; exit 2; }
+        body="$(cat "$1")"
+      fi
+      api POST "/api/agent/research-packet" "$body" | emit
+      ;;
+    *) err "usage: uiai packet compose <json-file|->"; exit 2 ;;
+  esac
+}
+
 cmd_session() {
   local sub="${1:-}"; shift || true
   case "$sub" in
@@ -231,6 +250,7 @@ case "$cmd" in
   health) api GET "/api/health/browser" | emit ;;
   errors) cmd_errors "$@" ;;
   tools) cmd_tools "$@" ;;
+  packet) cmd_packet "$@" ;;
   session) cmd_session "$@" ;;
   smoke)
     sub="${1:-agent}"

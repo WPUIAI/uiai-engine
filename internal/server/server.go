@@ -272,6 +272,11 @@ func (e *Engine) mountRoutes() {
 		routes.MountSearchRoutes(r, e.cfg)
 	})
 
+	// Agent packet composer — bounded Focusa-compatible packet from existing UIAI responses
+	r.Route("/api/agent", func(r chi.Router) {
+		routes.MountAgentPacketRoutes(r)
+	})
+
 	// Engine/browser error history — bounded and redacted for agent/operator troubleshooting
 	r.Route("/api/errors", func(r chi.Router) {
 		routes.MountErrorsRoutes(r)
@@ -341,6 +346,7 @@ func (e *Engine) handleRoot(w http.ResponseWriter, r *http.Request) {
 			"media":         "/api/media",
 			"share":         "/api/share",
 			"search":        "/api/search",
+			"agentPacket":   "/api/agent/research-packet",
 		},
 	})
 }

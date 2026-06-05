@@ -94,7 +94,7 @@ Recommended first surfaces, in order:
 | Option | Pros | Cons | Decision |
 |---|---|---|---|
 | Pi-composed from existing tools | no new endpoint; proves workflow fast | harder to share with MCP/CLI; Pi can grow workflow logic | Best first proof. |
-| UIAI HTTP endpoint `/api/agent/research-packet` | reusable by Pi/MCP/CLI; canonical packet shape | bigger build; endpoint might over-automate | Defer until Pi-composed packet proves shape. |
+| UIAI HTTP endpoint `/api/agent/research-packet` | reusable by Pi/MCP/CLI; canonical packet shape | endpoint can over-automate if it gathers data itself | Implemented as a composer only: callers pass existing UIAI responses; endpoint normalizes/redacts/bounds the packet. |
 | Focusa intake composes packet | closest to Workpoint/evidence | violates UIAI execution ownership; can blur authority | No for execution; Focusa only ingests/captures. |
 
 ## 7. Focusa intake decision

@@ -104,7 +104,7 @@ Add a guided Pi command or tool family, not necessarily a huge new engine primit
 /uiai proof <url-or-session>
 ```
 
-Minimum viable implementation can be a Pi extension workflow menu that chains existing tools and emits a packet. Later, UIAI HTTP can add a first-class `/api/agent/research-packet` endpoint if repeated use proves the packet shape.
+Minimum viable implementation includes both a Pi extension workflow menu that chains existing tools and a first-class HTTP composer at `/api/agent/research-packet` for Pi/MCP/CLI parity. The HTTP endpoint composes only from caller-supplied UIAI responses; it does not open paid or mutating browser actions itself.
 
 ## 4. Hand-in-glove contracts
 
@@ -482,7 +482,7 @@ This section captures the audit-only pass performed after the initial spec. It i
 This section resolves the previous no-build questions. Iteration 1 may start when these choices are accepted by the implementation owner.
 
 1. **First response surfaces:** start with `search`, browser `read`, browser `snapshot`, browser `diagnostics`, structured `errors`, `screenshot`, and `share` to Iteration 1.5/2 unless they are already returned by the chosen proof path.
-2. **Packet composition location:** compose in the Pi extension first, using existing UIAI calls and `/api/tools/graph` workflow metadata. Defer `POST /api/agent/research-packet` until the Pi-composed packet proves the schema and UX.
+2. **Packet composition location:** compose in the Pi extension for local Pi workflows and expose `POST /api/agent/research-packet` for HTTP/MCP/CLI parity. The endpoint accepts existing UIAI responses and returns the same bounded packet schema.
 3. **Focusa intake path:** do not add a new Focusa packet intake tool for Iteration 1. Route research/read/search summaries through `focusa_evidence_capture`; route diagnostics/failure envelopes through `focusa_browser_diagnostics_intake`; use `focusa_active_object_resolve` and `focusa_predict_record` as explicit follow-up tools.
 4. **Packet size budget:** packet JSON should stay under 8 KB by default. Individual capture summaries max 500 chars; `goal` and `recommended_next_action` max 240 chars; `diagnostics_summary` max 2 KB; `args_preview` max 2 KB; max 8 captures, 16 target refs, 32 evidence refs, and 16 active-object hints.
 5. **Stable schema:** use `uiai.focusa_research_diagnostics_packet.v1` with required fields `schema`, `mode`, `goal`, `scope_status`, `target_refs`, `evidence_refs`, `captures`, `recommended_focusa`, `recommended_next_action`, and `cleanup` when a browser session exists.

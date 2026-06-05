@@ -15,9 +15,10 @@ checks={
  'internal/vision/snapshot.go':['SnapshotFocusaMetadata','uiai-browser:session=','snapshot:','focusa_evidence_capture'],
  'internal/vision/diagnostics.go':['DiagnosticsFocusaMetadata','uiai-diagnostics:session=','focusa_browser_diagnostics_intake'],
  'internal/observability/errors.go':['ErrorFocusaMetadata','uiai-error:','focusa_browser_diagnostics_intake'],
- 'internal/routes/tools.go':['focusa_research_packet','browser_snapshot','screenshot','share','packet_metadata_surfaces','packet_args_preview'],
+ 'internal/routes/tools.go':['focusa_research_packet','browser_snapshot','screenshot','share','packet_metadata_surfaces','packet_args_preview','uiai_focusa_packet_compose'],
+ 'internal/routes/agent_packet.go':[schema,'MountAgentPacketRoutes','/research-packet','focusa_browser_diagnostics_intake'],
  'docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md':[schema,'Implementation bead decomposition','Focusa packet intake friction gate'],
- 'docs/SESSION_API.md':['Packet parity status','agent_pressure',schema],
+ 'docs/SESSION_API.md':['Packet parity status','agent_pressure','/api/agent/research-packet',schema],
  'README.md':['uiai_focusa_packet_build',schema],
  'scripts/smoke-focusa-packet.sh':[schema,'packet_bytes','focusa_browser_diagnostics_intake'],
 }
