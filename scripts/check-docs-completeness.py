@@ -53,7 +53,7 @@ checks={
    'docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md':['scripts/check-tool-parity.sh','scripts/release-service-smoke.sh --check-only','scripts/ci-log-summary.py'],
    'docs/CI_FAILURE_DIAGNOSTICS_GUIDE.md':['scripts/ci-log-summary.py','scripts/release-service-smoke.sh --check-only'],
    'docs/RELEASE_DEPLOY_RUNBOOK.md':['scripts/ci-log-summary.py','scripts/release-service-smoke.sh --check-only'],
-   '.pi/skills/uiai-release/SKILL.md':['scripts/release-service-smoke.sh --check-only'],
+   '.pi/skills/uiai-release/SKILL.md':['scripts/release-service-smoke.sh --check-only','scripts/smoke-open-result.sh','scripts/smoke-render-diagnostics-artifact.sh','scripts/smoke-pi-skills.sh'],
    '.pi/skills/uiai-ci-debug/SKILL.md':['scripts/ci-log-summary.py'],
  },
 }

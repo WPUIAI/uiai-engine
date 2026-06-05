@@ -43,10 +43,15 @@ Run the relevant set before release claims:
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-docs-completeness.py'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-examples.py'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-skills.sh'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-open-result.sh'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-render-diagnostics-artifact.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && go test ./...'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && bun test ./.pi/extensions/uiai-engine.packet-builder.test.ts'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && node --check mcp/browser-session-mcp.mjs'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-registration.sh'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai-mcp-reconnect-help.sh --check'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-mcp-tool-routes.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-agent-integrations.sh'
 ```
@@ -134,6 +139,9 @@ Expected:
 - `focusa packet smoke ok`.
 - `agent integration smoke ok`.
 - `mcp tool route parity ok`.
+- `pi skill smoke ok`.
+- `open result smoke ok`.
+- `diagnostics artifact render smoke ok`.
 - `pi extension registration ok`.
 
 ## 7. Push and watch GitHub Actions
