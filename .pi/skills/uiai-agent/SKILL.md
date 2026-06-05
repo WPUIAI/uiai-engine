@@ -72,7 +72,13 @@ Rules:
 Use when the outcome needs durable proof or handoff context.
 
 1. Collect bounded UIAI responses: search/read/snapshot/diagnostics/errors/screenshot/share.
-2. Compose packet:
+2. Compose packet, either with executable `/uiai` shortcuts or tool calls:
+
+```text
+/uiai research <query>
+/uiai proof <url>
+/uiai diagnose <session_id>
+```
 
 ```text
 uiai_focusa_packet_build goal="<goal>" mode="proof" responses=[...] focusa_scope={project_root,continuity_id,evidence_ref} cleanup_session_id="<sid>"

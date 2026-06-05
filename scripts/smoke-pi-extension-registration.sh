@@ -60,7 +60,7 @@ if missing_required:
 
 if "uiai" not in registered_commands:
     raise SystemExit("Pi extension missing /uiai command registration")
-for phrase in ["Run research packet", "Run diagnostics packet", "Run proof packet", "guidedPrompts"]:
+for phrase in ["Run research packet", "Run diagnostics packet", "Run proof packet", "guidedPrompts", "runGuidedPacketWorkflow", "/uiai research <query>", "/uiai proof <url>", "/uiai diagnose <session_id>"]:
     if phrase not in src:
         raise SystemExit(f"Pi extension missing guided workflow phrase: {phrase}")
 

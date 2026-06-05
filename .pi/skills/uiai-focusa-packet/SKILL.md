@@ -12,6 +12,7 @@ UIAI packet output is a bounded proposal/evidence bundle. It does not write dura
 
 ## Canonical surfaces
 
+- Executable Pi shortcuts: `/uiai research <query>`, `/uiai proof <url>`, `/uiai diagnose <session_id>`.
 - Pi local builder: `uiai_focusa_packet_build`.
 - Pi/HTTP composer: `uiai_focusa_packet_compose` → `POST /api/agent/research-packet`.
 - MCP composer: `uiai_focusa_packet_compose`.

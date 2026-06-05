@@ -146,6 +146,67 @@ function post(path: string, body: Record<string, any>) {
 	return callEngine(path, { method: "POST", body: JSON.stringify(cleanBody(body)) });
 }
 
+async function runGuidedPacketWorkflow(mode: PacketMode, input: string, ctx: any) {
+	const focusa_scope = {
+		project_root: "/home/wpuiai/uiai-engine",
+		continuity_id: "focusa-cont-uiai-engine-82afe24f-90ce-4d6e-b5f2-1b431b7773fc",
+		evidence_ref: `pi-uiai-${mode}-packet`,
+	};
+	const responses: any[] = [];
+	let selectedUrl = input.trim();
+	let sessionId = "";
+	let sessionClosed = false;
+	if (mode === "research") {
+		const search = await post("/api/search", { query: input, limit: 1 });
+		responses.push(search);
+		selectedUrl = search?.results?.[0]?.url || "";
+		if (!selectedUrl) throw new Error("UIAI research search returned no selectable URL");
+	}
+	if (mode === "diagnose") {
+		const diagnostics = await callEngine(`/api/session/${encodeURIComponent(input.trim())}/diagnostics?limit=100`);
+		const packet = await post("/api/agent/research-packet", {
+			mode,
+			goal: `Diagnose UIAI browser session ${input.trim()}`,
+			responses: [diagnostics],
+			focusa_scope,
+			recommended_next_action: "Pass recommended_focusa.args_preview to focusa_browser_diagnostics_intake if scope is canonical.",
+		});
+		ctx.ui.setEditorText(`UIAI diagnose packet ready. Preferred Focusa tool: ${packet?.recommended_focusa?.preferred_tool || "unknown"}\n\n${JSON.stringify(packet?.recommended_focusa?.args_preview || packet, null, 2)}`);
+		ctx.ui.notify("UIAI diagnose packet composed", "info");
+		return;
+	}
+	try {
+		const opened = await post("/api/session", { url: selectedUrl, width: 1280, height: 800, focusa_scope });
+		sessionId = opened?.session?.id || opened?.id || "";
+		if (!sessionId) throw new Error("UIAI browser session id missing");
+		responses.push(
+			await post(`/api/session/${sessionId}/read`, { max_chars: 2000, include_links: true }),
+			await post(`/api/session/${sessionId}/snapshot`, { interactive: true, compact: true }),
+			await callEngine(`/api/session/${sessionId}/diagnostics?limit=100`),
+		);
+		const packet = await post("/api/agent/research-packet", {
+			mode,
+			goal: mode === "research" ? `Research packet for ${input}` : `Proof packet for ${selectedUrl}`,
+			responses,
+			focusa_scope,
+			recommended_next_action: "Capture packet evidence with Focusa, then continue from the Workpoint.",
+			cleanup_session_id: sessionId,
+		});
+		try {
+			await callEngine(`/api/session/${sessionId}`, { method: "DELETE" });
+			sessionClosed = true;
+		} catch {
+			sessionClosed = false;
+		}
+		ctx.ui.setEditorText(`UIAI ${mode} packet ready for ${selectedUrl}\nSession closed: ${sessionClosed}\nPreferred Focusa tool: ${packet?.recommended_focusa?.preferred_tool || "unknown"}\n\n${JSON.stringify(packet?.recommended_focusa?.args_preview || packet, null, 2)}`);
+		ctx.ui.notify(`UIAI ${mode} packet composed`, "info");
+	} finally {
+		if (sessionId && !sessionClosed) {
+			try { await callEngine(`/api/session/${sessionId}`, { method: "DELETE" }); } catch { /* best-effort cleanup */ }
+		}
+	}
+}
+
 function truncateText(value: any, maxChars: number): string {
 	const text = String(value ?? "").trim();
 	if (maxChars <= 0) return "";
@@ -872,7 +933,15 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerCommand("uiai", {
 		description: "Show UIAI Engine agent menu and bootstrap widget; use /uiai off to hide the widget",
 		handler: async (args, ctx) => {
-			const action = String(args || "").trim().toLowerCase();
+			const rawAction = String(args || "").trim();
+			const executable = rawAction.match(/^(research|proof|diagnose)\s+(.+)$/i);
+			if (executable) {
+				renderUiaiWidget(ctx);
+				pi.appendEntry(UIAI_WIDGET_STATE_ENTRY, { visible: true });
+				await runGuidedPacketWorkflow(executable[1].toLowerCase() as PacketMode, executable[2], ctx);
+				return;
+			}
+			const action = rawAction.toLowerCase();
 			if (["off", "hide", "clear", "disable"].includes(action)) {
 				ctx.ui.setWidget("uiai-engine", undefined);
 				pi.appendEntry(UIAI_WIDGET_STATE_ENTRY, { visible: false });
@@ -886,9 +955,9 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 				return;
 			}
 			const guidedPrompts: Record<string, string> = {
-				research: "Run UIAI research: call uiai_search with a query, open one selected result with uiai_browser_open, read it with uiai_browser_read max_chars<=2000, run uiai_browser_diagnostics, then call uiai_focusa_packet_compose (or local uiai_focusa_packet_build) with the search/read/diagnostics responses and cleanup_session_id.",
-				diagnose: "Run UIAI diagnose: call uiai_browser_diagnostics for a session_id, then call uiai_focusa_packet_compose mode=diagnose with the diagnostics response and copy recommended_focusa.args_preview to focusa_browser_diagnostics_intake if scope is canonical.",
-				proof: "Run UIAI proof: open or reuse a URL/session, verify with uiai_browser_read max_chars<=2000 and uiai_browser_diagnostics, call uiai_focusa_packet_compose mode=proof with cleanup_session_id, then capture Focusa evidence using args_preview.",
+				research: "Run /uiai research <query> to search, open the top result, read/snapshot/diagnose, compose a packet, close the session, and insert Focusa args_preview; or manually call uiai_search → open → read → diagnostics → uiai_focusa_packet_compose.",
+				diagnose: "Run /uiai diagnose <session_id> to read browser diagnostics, compose mode=diagnose, and insert Focusa args_preview; or manually call uiai_browser_diagnostics then uiai_focusa_packet_compose.",
+				proof: "Run /uiai proof <url> to open/read/snapshot/diagnose, compose mode=proof, close the session, and insert Focusa args_preview; or manually call uiai_focusa_packet_compose with cleanup_session_id.",
 			};
 			if (guidedPrompts[action]) {
 				renderUiaiWidget(ctx);

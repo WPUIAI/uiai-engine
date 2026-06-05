@@ -189,6 +189,16 @@ uiai_focusa_packet_compose goal="Quickstart proof packet" mode="proof" responses
 
 Use `uiai_focusa_packet_build` only when you need local Pi composition without the HTTP composer.
 
+Executable Pi command shortcuts:
+
+```text
+/uiai research <query>
+/uiai proof <url>
+/uiai diagnose <session_id>
+```
+
+These commands compose the packet and insert the recommended Focusa args preview into the editor; `research` and `proof` also close the browser session after packet composition.
+
 ### MCP composer
 
 ```text
