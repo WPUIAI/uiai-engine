@@ -77,3 +77,17 @@ test("buildResearchDiagnosticsPacket recognizes snapshot packet capture", async 
 	expect(packet.captures[0].type).toBe("snapshot");
 	expect(packet.recommended_focusa.preferred_tool).toBe("focusa_evidence_capture");
 });
+
+
+test("buildResearchDiagnosticsPacket recognizes screenshot and share captures", async () => {
+	const { buildResearchDiagnosticsPacket } = await import("./uiai-engine");
+	const packet = buildResearchDiagnosticsPacket({
+		goal: "artifact proof",
+		responses: [
+			{ focusa: { target_ref: "browser:https://example.com", evidence_ref: "uiai-screenshot:sha256:abc", summary: "Screenshot captured" } },
+			{ focusa: { target_ref: "browser:https://example.com", evidence_ref: "uiai-share:def", summary: "Share created" } },
+		],
+	});
+	expect(packet.captures.map((capture: any) => capture.type)).toEqual(["screenshot", "share"]);
+	expect(packet.recommended_focusa.preferred_tool).toBe("focusa_evidence_capture");
+});

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
@@ -68,10 +69,14 @@ func shareEvidence(id, targetURL, title string, scope *vision.FocusaScope) map[s
 		result += ": " + title
 	}
 	evidence := map[string]any{
-		"target_ref":   targetURL,
-		"result":       result,
-		"evidence_ref": "uiai-share:" + id,
-		"artifact_ref": "/api/share/" + id,
+		"target_ref":          "browser:" + focusapacket.SanitizeURL(targetURL),
+		"result":              result,
+		"summary":             result,
+		"evidence_ref":        "uiai-share:" + id,
+		"artifact_ref":        "/api/share/" + id,
+		"preferred_tool":      "focusa_evidence_capture",
+		"next_tools":          []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
+		"focusa_scope_status": routeFocusaScopeStatus(scope),
 	}
 	if scope != nil {
 		evidence["focusa_scope"] = scope

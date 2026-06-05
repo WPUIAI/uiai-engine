@@ -195,7 +195,7 @@ func toolGraph() map[string]any {
 			"scope_input":              "browser_open accepts focusa_scope or flat workpoint_id/continuity_id/project_root/evidence_ref fields",
 			"scope_echo":               "session info, diagnostics, read results, search results, and failure envelopes expose Focusa-ready metadata when present",
 			"packet_schema":            "uiai.focusa_research_diagnostics_packet.v1",
-			"packet_metadata_surfaces": []string{"search", "browser_read", "browser_snapshot", "browser_diagnostics", "structured_errors"},
+			"packet_metadata_surfaces": []string{"search", "browser_read", "browser_snapshot", "browser_diagnostics", "structured_errors", "screenshot", "share"},
 			"evidence_refs":            []string{"uiai-diagnostics:session=<id>:seq=<seq>", "uiai-search:<provider>:<query-hash>:<rank>", "uiai-browser:session=<id>:read:<seq>", "uiai-error:<error_id>", "uiai-screenshot:sha256:<prefix>", "uiai-share:<share_id>"},
 			"preferred_focusa_tools":   []string{"focusa_browser_diagnostics_intake", "focusa_evidence_capture", "focusa_workpoint_link_evidence", "focusa_predict_record"},
 			"packet_args_preview": map[string]any{

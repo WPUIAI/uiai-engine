@@ -209,6 +209,8 @@ function captureFromResponse(response: any): PacketCapture | undefined {
 	else if (String(focusa.evidence_ref || "").includes("error")) type = "error";
 	else if (String(focusa.evidence_ref || "").includes(":read:")) type = "read";
 	else if (String(focusa.evidence_ref || "").includes(":snapshot:")) type = "snapshot";
+	else if (String(focusa.evidence_ref || "").includes("uiai-screenshot:")) type = "screenshot";
+	else if (String(focusa.evidence_ref || "").includes("uiai-share:")) type = "share";
 	return {
 		type,
 		evidence_ref: truncateText(focusa.evidence_ref || "", 240),

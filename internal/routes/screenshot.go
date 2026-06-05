@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/storage"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
@@ -18,6 +20,39 @@ import (
 func screenshotEvidenceRef(data []byte) string {
 	sum := sha256.Sum256(data)
 	return "uiai-screenshot:sha256:" + hex.EncodeToString(sum[:])[:16]
+}
+
+func routeFocusaScopeStatus(scope *vision.FocusaScope) string {
+	if scope == nil {
+		return string(focusapacket.ScopeMissing)
+	}
+	if scope.ProjectRoot != "" && scope.ContinuityID != "" {
+		return string(focusapacket.ScopePresent)
+	}
+	return string(focusapacket.ScopePartial)
+}
+
+func screenshotFocusaMetadata(targetURL, artifactRef, format string, bytes int, scope *vision.FocusaScope) map[string]any {
+	summary := "UIAI screenshot captured"
+	if bytes > 0 {
+		summary += " bytes=" + strconv.Itoa(bytes)
+	}
+	evidence := map[string]any{
+		"target_ref":          "browser:" + focusapacket.SanitizeURL(targetURL),
+		"result":              summary,
+		"summary":             summary,
+		"evidence_ref":        artifactRef,
+		"artifact_ref":        artifactRef,
+		"preferred_tool":      "focusa_evidence_capture",
+		"next_tools":          []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
+		"focusa_scope_status": routeFocusaScopeStatus(scope),
+		"mime_type":           "image/" + format,
+		"bytes":               bytes,
+	}
+	if scope != nil {
+		evidence["focusa_scope"] = scope
+	}
+	return evidence
 }
 
 func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usage *storage.UsageStore) {
@@ -88,14 +123,7 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usag
 		}
 
 		artifactRef := screenshotEvidenceRef(result.Data)
-		focusaEvidence := map[string]any{
-			"target_ref":   body.URL,
-			"result":       "UIAI screenshot captured",
-			"evidence_ref": artifactRef,
-			"artifact_ref": artifactRef,
-			"mime_type":    "image/" + result.Format,
-			"bytes":        len(result.Data),
-		}
+		focusaEvidence := screenshotFocusaMetadata(body.URL, artifactRef, result.Format, len(result.Data), body.FocusaScope)
 		if body.FocusaScope != nil {
 			focusaEvidence["focusa_scope"] = body.FocusaScope
 		}
@@ -107,6 +135,7 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usag
 			"size":            len(result.Data),
 			"duration":        result.Duration.Milliseconds(),
 			"focusa_evidence": focusaEvidence,
+			"focusa":          focusaEvidence,
 		}
 		if result.DOMReport != "" {
 			resp["dom_report"] = result.DOMReport
