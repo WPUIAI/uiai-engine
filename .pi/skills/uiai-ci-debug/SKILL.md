@@ -106,6 +106,7 @@ Common Browser Reliability artifacts:
 Core gates:
 
 ```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-docs-completeness.py'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && go test ./...'

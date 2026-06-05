@@ -34,6 +34,8 @@ jobs:
         run: go test ./...
       - name: Focusa packet drift check
         run: scripts/check-focusa-packet-drift.sh
+      - name: Docs completeness check
+        run: scripts/check-docs-completeness.py
       - name: Focusa packet endpoint smoke
         run: |
           mkdir -p "$OUT_DIR"

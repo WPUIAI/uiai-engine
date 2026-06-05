@@ -12,6 +12,7 @@ node --check mcp/browser-session-mcp.mjs
 scripts/smoke-agent-integrations.sh
 scripts/release-service-smoke.sh --check-only
 scripts/smoke-focusa-packet-ci.sh
+scripts/check-docs-completeness.py
 scripts/check-tool-parity.sh
 scripts/smoke-mcp-tool-routes.sh
 scripts/smoke-mcp-structured-failure.sh
@@ -44,7 +45,7 @@ make release-browser-reliability
 | Auth/security | loopback/remote negative and remote positive tests pass; redaction tests pass | `go test ./internal/auth ./internal/observability ./internal/vision` |
 | Focusa evidence | diagnostics/error evidence handles and packet endpoint smoke pass | `/tmp/uiai-error-focusa-evidence.json`, `/tmp/uiai-browser-reliability/focusa-packet-smoke.json`, docs handle refs |
 | WordPress plugin parity | Existing plugin route/auth/error docs updated; plugin changes committed separately if needed | `docs/WORDPRESS_PLUGIN_ROUTE_PARITY_MATRIX.md`; WPUIAI commit hash if plugin changed |
-| Public docs | README, Session API, gap inventory, and matrices updated when surface behavior changes | doc commit hash |
+| Public docs | README, Session API, gap inventory, skills, parity/auth matrices, and smokes updated when surface behavior changes | `scripts/check-docs-completeness.py`; doc commit hash |
 
 ## Release notes template
 

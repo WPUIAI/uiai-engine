@@ -39,6 +39,7 @@ cmds=(
   "scripts/smoke-agent-integrations.sh"
   "scripts/smoke-mcp-tool-routes.sh"
   "scripts/smoke-pi-extension-registration.sh"
+  "scripts/check-docs-completeness.py"
   "scripts/check-tool-parity.sh"
 )
 if [[ "$MODE" == "dry-run" ]]; then
@@ -80,6 +81,7 @@ run scripts/smoke-focusa-packet.sh; proof+=("smoke:focusa-packet:ok:/tmp/uiai-fo
 run scripts/smoke-agent-integrations.sh; proof+=("smoke:agent-integrations:ok")
 run scripts/smoke-mcp-tool-routes.sh; proof+=("smoke:mcp-tool-routes:ok")
 run scripts/smoke-pi-extension-registration.sh; proof+=("smoke:pi-extension-registration:ok")
+run scripts/check-docs-completeness.py >/tmp/uiai-docs-completeness-release-smoke.json; proof+=("smoke:docs-completeness:ok:/tmp/uiai-docs-completeness-release-smoke.json")
 run scripts/check-tool-parity.sh >/tmp/uiai-tool-parity-release-smoke.json; proof+=("smoke:tool-parity:ok:/tmp/uiai-tool-parity-release-smoke.json")
 sha="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 echo "release smoke ok: mode=$MODE service=$SERVICE git=$sha health=$HEALTH_URL"

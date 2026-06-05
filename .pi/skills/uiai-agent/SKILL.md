@@ -105,6 +105,7 @@ UIAI packets are proposals/evidence bundles. Focusa remains the durable Workpoin
 Run relevant gates after changing tool schemas, docs, route exposure, packet fields, browser behavior, or MCP/Pi code:
 
 ```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-docs-completeness.py'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && node --check mcp/browser-session-mcp.mjs'
@@ -120,6 +121,16 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-browser-error-regre
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-failed-network-diagnostics.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && make browser-reliability'
 ```
+
+## Docs completeness gate
+
+When adding or changing an agent-facing route/tool/skill/smoke, run:
+
+```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-docs-completeness.py'
+```
+
+The gate checks known agent surfaces for README, Session API, quickstart/cookbook, parity matrix, auth matrix, release checklist, skills, smokes, and CI workflow coverage. Fix failures by updating the named file/needle instead of weakening the gate unless the canonical surface truly changed.
 
 ## Release-safe proof loop
 
