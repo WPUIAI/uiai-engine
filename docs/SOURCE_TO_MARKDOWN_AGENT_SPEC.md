@@ -511,7 +511,7 @@ Tool names:
 | Surface | Tool |
 |---|---|
 | HTTP | `/api/markdown`, `/api/session/{id}/read format=markdown` |
-| Pi | `uiai_to_markdown`, `uiai_browser_read format=markdown` |
+| Pi | `uiai_source_to_markdown`, `uiai_browser_read format=markdown` |
 | MCP | `source_to_markdown`, `browser_read format=markdown` |
 | CLI | `scripts/uiai md <url>`, `scripts/uiai session read <sid> --format markdown` |
 | WPUIAI | Research card/report action later |
@@ -557,7 +557,7 @@ source_to_markdown -> focusa_predict_record
 Add Pi tool:
 
 ```ts
-uiai_to_markdown({
+uiai_source_to_markdown({
   url: string,
   source?: "auto" | "webpage" | "x" | "reddit" | "github" | "youtube" | "hackernews" | "facebook_public" | "linkedin_public",
   format?: "markdown" | "json" | "jsonl",
@@ -755,7 +755,7 @@ Structured failures:
 
 - `/api/session/{id}/read` accepts `format=markdown` and returns Markdown in `text` plus `format=markdown`.
 - `/api/markdown` converts a normal webpage into Markdown using one-shot browser open/read/close.
-- Pi tool `uiai_to_markdown` exists.
+- Pi tool `uiai_source_to_markdown` exists.
 - MCP tool `source_to_markdown` exists.
 - CLI `scripts/uiai md <url>` exists.
 - `/api/tools/search?q=markdown` returns Source-to-Markdown tools.

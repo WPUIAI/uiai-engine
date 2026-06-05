@@ -50,9 +50,9 @@ def pi_candidates(name):
     return out
 missing_pi=sorted(name for name in mcp_names if not (pi_candidates(name) & pi_tools))
 missing_mcp_routes=sorted(name for name in mcp_names if name not in route_cases)
-required_cli=['status','health','errors','tools','packet compose','research packet','session open','session read','session diagnostics','session close','smoke agent','smoke browser','smoke packet']
+required_cli=['status','health','errors','tools','packet compose','markdown <url>','research packet','session open','session read','session diagnostics','session close','smoke agent','smoke browser','smoke packet']
 missing_cli=[cmd for cmd in required_cli if cmd not in cli_src]
-required_docs=['PUBLIC_API_PARITY_MATRIX.md','scripts/uiai research packet','uiai_focusa_packet_compose','uiai_browser_diagnostics','smoke-mcp-tool-routes.sh','smoke-pi-extension-registration.sh']
+required_docs=['PUBLIC_API_PARITY_MATRIX.md','scripts/uiai research packet','scripts/uiai markdown','uiai_source_to_markdown','source_to_markdown','uiai_focusa_packet_compose','uiai_browser_diagnostics','smoke-mcp-tool-routes.sh','smoke-pi-extension-registration.sh']
 doc_blob='\n'.join([readme,parity,quickstart])
 missing_docs=[needle for needle in required_docs if needle not in doc_blob]
 required_pi_phrases=['/uiai research <query>','/uiai proof <url>','/uiai diagnose <session_id>','runGuidedPacketWorkflow']

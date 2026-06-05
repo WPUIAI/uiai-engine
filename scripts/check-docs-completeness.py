@@ -19,6 +19,14 @@ checks={
    'docs/PUBLIC_API_PARITY_MATRIX.md':['/api/session','Full agent parity for core browser workflows'],
    'docs/ENDPOINT_AUTH_MATRIX.md':['/api/session','loopback-public remote-auth'],
  },
+ 'source_markdown': {
+   'README.md':['/api/markdown','uiai.source_markdown.v1','source_to_markdown'],
+   'docs/UIAI_FOR_AGENTS_QUICKSTART.md':['uiai_source_to_markdown','source_to_markdown','scripts/uiai markdown'],
+   'docs/AGENT_UX_COOKBOOK.md':['uiai_source_to_markdown','source_to_markdown','uiai-source-markdown:sha256:<prefix>'],
+   'docs/SOURCE_TO_MARKDOWN_AGENT_SPEC.md':['/api/markdown','uiai_source_to_markdown','source_to_markdown','focusa_evidence_capture'],
+   'scripts/smoke-agent-integrations.sh':['source_to_markdown','uiai-source-markdown:sha256:<prefix>'],
+   'scripts/check-tool-parity.sh':['markdown <url>','uiai_source_to_markdown','source_to_markdown'],
+ },
  'diagnostics_errors': {
    'README.md':['/api/errors','uiai_errors','browser_diagnostics'],
    'docs/SESSION_API.md':['/api/errors','uiai-diagnostics:','uiai-error:'],

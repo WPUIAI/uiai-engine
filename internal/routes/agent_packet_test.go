@@ -44,6 +44,30 @@ func TestBuildResearchPacketFromResponses(t *testing.T) {
 	}
 }
 
+func TestBuildResearchPacketFromSourceMarkdownResponse(t *testing.T) {
+	packet := buildResearchPacketFromResponses(researchPacketRequest{
+		Goal: "source markdown packet",
+		Responses: []map[string]any{{
+			"title": "Example Source",
+			"focusa": map[string]any{
+				"target_ref":   "source-markdown:https://example.test/path?token=secret#frag",
+				"evidence_ref": "uiai-source-markdown:sha256:abcdef1234567890",
+				"summary":      "Converted Example Source to Markdown",
+			},
+		}},
+	})
+	if len(packet.Captures) != 1 || packet.Captures[0].Type != "source_markdown" {
+		t.Fatalf("unexpected captures: %+v", packet.Captures)
+	}
+	if packet.RecommendedFocusa.PreferredTool != "focusa_evidence_capture" {
+		t.Fatalf("unexpected preferred tool: %+v", packet.RecommendedFocusa)
+	}
+	data, _ := json.Marshal(packet)
+	if strings.Contains(string(data), "secret") || strings.Contains(string(data), "#frag") {
+		t.Fatalf("packet leaked secret/fragment: %s", string(data))
+	}
+}
+
 func TestAgentResearchPacketEndpoint(t *testing.T) {
 	r := chi.NewRouter()
 	MountAgentPacketRoutes(r)

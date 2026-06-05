@@ -26,9 +26,13 @@ fetch "$ENGINE_URL/api/tools/agent-card" | jq -e '.service == "uiai-engine"' >/d
 fetch "$ENGINE_URL/api/tools/docs" | jq -e '.schema == "uiai.agent_docs.v1" and (.doc_links[] | select(.path == "docs/REMOTE_AUTH_EXAMPLES.md")) and (.quick_examples[] | select(.name == "focusa_packet"))' >/dev/null
 fetch "$ENGINE_URL/api/tools/graph" | jq -e '.focusa_integration.preferred_focusa_tools | index("focusa_browser_diagnostics_intake")' >/dev/null
 fetch "$ENGINE_URL/api/tools/graph" | jq -e '.focusa_integration.evidence_refs[] | select(. == "uiai-search:<provider>:<query-hash>:<rank>")' >/dev/null
+fetch "$ENGINE_URL/api/tools/graph" | jq -e '.focusa_integration.evidence_refs[] | select(. == "uiai-source-markdown:sha256:<prefix>")' >/dev/null
+fetch "$ENGINE_URL/api/tools/graph" | jq -e '.workflows[] | select(.name == "source_to_markdown" and .schema == "uiai.source_markdown.v1")' >/dev/null
+fetch "$ENGINE_URL/api/tools/search?q=markdown" | jq -e '.tools[] | select(.name == "source_to_markdown")' >/dev/null
 fetch "$ENGINE_URL/api/tools/search?q=read" | jq -e '.tools[] | select(.name == "browser_read")' >/dev/null
 fetch "$ENGINE_URL/api/tools/search?q=search" | jq -e '.tools[] | select(.name == "browser_search")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "browser_open") | .related_tools | index("focusa_browser_diagnostics_intake")' >/dev/null
+fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "source_to_markdown")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "browser_search")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_health")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_status")' >/dev/null
@@ -49,6 +53,7 @@ bash -n "$CLI"
 "$CLI" --json status | jq -e '.type == "status"' >/dev/null
 "$CLI" --json errors --limit 1 | jq -e 'has("events")' >/dev/null
 "$CLI" --json tools mcp | jq -e '.tools[] | select(.name == "uiai_errors")' >/dev/null
+"$CLI" --json tools search markdown | jq -e '.tools[] | select(.name == "source_to_markdown")' >/dev/null
 
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-extension-registration.sh" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-rendering.sh" >/dev/null

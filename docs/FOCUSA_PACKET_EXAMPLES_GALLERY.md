@@ -6,7 +6,7 @@ These examples show redacted `uiai.focusa_research_diagnostics_packet.v1` packet
 
 | Mode | Fixture | Surfaces covered | Expected Focusa tool |
 |---|---|---|---|
-| research | [`examples/focusa-packets/research-packet.example.json`](examples/focusa-packets/research-packet.example.json) | search, read, snapshot | `focusa_evidence_capture` |
+| research | [`examples/focusa-packets/research-packet.example.json`](examples/focusa-packets/research-packet.example.json) | search, source_markdown, read, snapshot | `focusa_evidence_capture` |
 | diagnose | [`examples/focusa-packets/diagnose-packet.example.json`](examples/focusa-packets/diagnose-packet.example.json) | diagnostics, error | `focusa_browser_diagnostics_intake` |
 | proof | [`examples/focusa-packets/proof-packet.example.json`](examples/focusa-packets/proof-packet.example.json) | screenshot, share, read | `focusa_evidence_capture` |
 
@@ -33,7 +33,7 @@ scripts/smoke-focusa-packet-ci.sh
 
 ## Focusa handoff examples
 
-Research/proof packets usually route to `focusa_evidence_capture` using `recommended_focusa.args_preview`.
+Research/proof packets usually route to `focusa_evidence_capture` using `recommended_focusa.args_preview`; Source-to-Markdown captures use `uiai-source-markdown:sha256:<prefix>` evidence refs.
 
 Diagnostics packets usually route to `focusa_browser_diagnostics_intake` using `recommended_focusa.args_preview.diagnostics`.
 

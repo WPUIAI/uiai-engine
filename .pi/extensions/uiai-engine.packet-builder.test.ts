@@ -68,6 +68,20 @@ describe("buildResearchDiagnosticsPacket", () => {
 });
 
 
+test("buildResearchDiagnosticsPacket recognizes source markdown captures", async () => {
+	const { buildResearchDiagnosticsPacket } = await import("./uiai-engine");
+	const packet = buildResearchDiagnosticsPacket({
+		goal: "source markdown proof",
+		responses: [{ focusa: { target_ref: "source-markdown:https://example.com/page?token=secret#frag", evidence_ref: "uiai-source-markdown:sha256:abc", summary: "Converted source to Markdown" } }],
+	});
+	expect(packet.captures[0].type).toBe("source_markdown");
+	expect(packet.recommended_focusa.preferred_tool).toBe("focusa_evidence_capture");
+	const encoded = JSON.stringify(packet);
+	expect(encoded).not.toContain("secret");
+	expect(encoded).not.toContain("#frag");
+});
+
+
 test("buildResearchDiagnosticsPacket recognizes snapshot packet capture", async () => {
 	const { buildResearchDiagnosticsPacket } = await import("./uiai-engine");
 	const packet = buildResearchDiagnosticsPacket({

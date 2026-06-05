@@ -98,7 +98,7 @@ func captureFromFocusaResponse(response map[string]any) (focusapacket.Capture, b
 		return focusapacket.Capture{}, false
 	}
 	evidenceRef := stringValue(focusa["evidence_ref"])
-	targetRef := stringValue(focusa["target_ref"])
+	targetRef := sanitizePacketTargetRef(stringValue(focusa["target_ref"]))
 	typ := packetCaptureType(evidenceRef)
 	title := stringValue(response["title"])
 	if title == "" {
@@ -111,12 +111,21 @@ func captureFromFocusaResponse(response map[string]any) (focusapacket.Capture, b
 	return focusapacket.Capture{Type: typ, EvidenceRef: evidenceRef, TargetRef: targetRef, Title: title, Summary: firstString([]string{stringValue(focusa["summary"]), stringValue(focusa["result"]), stringValue(response["message"])}, "UIAI evidence capture")}, true
 }
 
+func sanitizePacketTargetRef(target string) string {
+	if strings.HasPrefix(target, "source-markdown:") {
+		return "source-markdown:" + sanitizeMarkdownURLForFocusa(strings.TrimPrefix(target, "source-markdown:"))
+	}
+	return target
+}
+
 func packetCaptureType(evidenceRef string) string {
 	switch {
 	case strings.Contains(evidenceRef, "diagnostics"):
 		return "diagnostics"
 	case strings.Contains(evidenceRef, "uiai-error"):
 		return "error"
+	case strings.Contains(evidenceRef, "uiai-source-markdown"):
+		return "source_markdown"
 	case strings.Contains(evidenceRef, ":read:"):
 		return "read"
 	case strings.Contains(evidenceRef, ":snapshot:"):

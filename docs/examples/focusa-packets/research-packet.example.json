@@ -13,6 +13,7 @@
   ],
   "evidence_refs": [
     "uiai-search:brave:abc123:1",
+    "uiai-source-markdown:sha256:abcdef1234567890",
     "uiai-browser:session=example:read:1",
     "uiai-browser:session=example:snapshot:1"
   ],
@@ -23,6 +24,12 @@
       "target_ref": "https://example.com/uiai-agents",
       "title": "UIAI agents",
       "summary": "Search result summary with URL fragments and sensitive query values removed."
+    },
+    {
+      "type": "source_markdown",
+      "evidence_ref": "uiai-source-markdown:sha256:abcdef1234567890",
+      "target_ref": "source-markdown:https://example.com/uiai-agents",
+      "summary": "Source-to-Markdown converted the selected result into bounded Markdown with metadata and diagnostics."
     },
     {
       "type": "read",
@@ -58,7 +65,7 @@
   },
   "recommended_next_action": "Capture research evidence, then resolve active object if the target page matters for follow-up work.",
   "render": {
-    "summary_line": "research packet evidence=3 target=https://example.com/uiai-agents"
+    "summary_line": "research packet evidence=4 target=https://example.com/uiai-agents"
   },
   "headless_next_action": "Call focusa_evidence_capture with recommended_focusa.args_preview.",
   "cleanup": {

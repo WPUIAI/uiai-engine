@@ -29,7 +29,7 @@ type FocusaScope = {
 };
 
 type PacketCapture = {
-	type: "search" | "read" | "diagnostics" | "error" | string;
+	type: "search" | "source_markdown" | "read" | "diagnostics" | "error" | string;
 	evidence_ref: string;
 	target_ref: string;
 	title?: string;
@@ -243,6 +243,7 @@ function sanitizeTargetRef(ref: any): string {
 	const value = String(ref || "").trim();
 	if (!value) return "";
 	if (value.startsWith("browser:http://") || value.startsWith("browser:https://")) return `browser:${sanitizeUrl(value.slice("browser:".length))}`;
+	if (value.startsWith("source-markdown:http://") || value.startsWith("source-markdown:https://")) return `source-markdown:${sanitizeUrl(value.slice("source-markdown:".length))}`;
 	if (value.startsWith("http://") || value.startsWith("https://")) return sanitizeUrl(value);
 	return truncateText(value, 500);
 }
@@ -268,6 +269,7 @@ function captureFromResponse(response: any): PacketCapture | undefined {
 	let type = "search";
 	if (String(focusa.evidence_ref || "").includes("diagnostics")) type = "diagnostics";
 	else if (String(focusa.evidence_ref || "").includes("error")) type = "error";
+	else if (String(focusa.evidence_ref || "").includes("uiai-source-markdown")) type = "source_markdown";
 	else if (String(focusa.evidence_ref || "").includes(":read:")) type = "read";
 	else if (String(focusa.evidence_ref || "").includes(":snapshot:")) type = "snapshot";
 	else if (String(focusa.evidence_ref || "").includes("uiai-screenshot:")) type = "screenshot";
@@ -482,7 +484,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_focusa_packet_build",
 		label: "UIAI Focusa Packet Build",
-		description: "Compose a bounded uiai.focusa_research_diagnostics_packet.v1 locally from existing UIAI search/read/diagnostics/error responses. Does not call Focusa or create durable memory.",
+		description: "Compose a bounded uiai.focusa_research_diagnostics_packet.v1 locally from existing UIAI search/source_markdown/read/diagnostics/error responses. Does not call Focusa or create durable memory.",
 		parameters: Type.Object({
 			goal: Type.String({ description: "Bounded user-visible goal for the packet" }),
 			mode: Type.Optional(Type.String({ description: "research, diagnose, or proof", default: "research" })),
@@ -531,7 +533,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_source_to_markdown",
 		label: "UIAI Source to Markdown",
-		description: "One-shot Source-to-Markdown conversion for public URLs. Returns uiai.source_markdown.v1 with Markdown, metadata, diagnostics, Focusa-ready evidence, and auto-closes the temporary session.",
+		description: "One-shot Source-to-Markdown conversion for public URLs. Returns uiai.source_markdown.v1 with Markdown, source metadata/adapters, diagnostics, Focusa-ready evidence, and auto-closes the temporary session.",
 		parameters: Type.Object({
 			url: Type.String({ description: "Public URL to convert" }),
 			selector: Type.Optional(Type.String({ description: "Optional CSS selector region" })),
