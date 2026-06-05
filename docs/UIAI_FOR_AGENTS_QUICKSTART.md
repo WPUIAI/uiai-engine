@@ -43,6 +43,7 @@ Useful project skills:
 /skill:uiai-focusa-packet
 /skill:uiai-release
 /skill:uiai-ci-debug
+/skill:uiai-browser-debug
 /skill:vision
 ```
 
