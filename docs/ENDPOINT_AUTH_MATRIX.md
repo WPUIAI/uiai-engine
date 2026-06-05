@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-04
 
-This matrix is the security contract for Go engine route families. Source of truth for enforcement is `internal/auth/auth.go`; route mounts are in `internal/server/server.go`.
+This matrix is the security contract for Go engine route families. Source of truth for enforcement is `internal/auth/auth.go`; route mounts are in `internal/server/server.go`. Safe copy/paste examples for curl, CLI, Pi, and MCP live in [Remote Auth Examples](REMOTE_AUTH_EXAMPLES.md).
 
 ## Auth modes
 

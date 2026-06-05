@@ -272,6 +272,7 @@ Remote examples use environment variables, never literal secrets:
 export UIAI_ENGINE_URL="https://your-authenticated-tunnel.example"
 export UIAI_API_KEY="..."          # sent as X-API-Key by Pi/CLI helpers
 export UIAI_BEARER_TOKEN="..."     # alternative Authorization: Bearer token
+# See docs/REMOTE_AUTH_EXAMPLES.md for curl, scripts/uiai, Pi, and MCP examples.
 scripts/uiai health
 ```
 

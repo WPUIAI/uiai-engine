@@ -63,6 +63,7 @@ Start here by task:
 | Repo-local Pi skill source-of-truth policy | [`docs/SKILL_SOURCE_OF_TRUTH_POLICY.md`](docs/SKILL_SOURCE_OF_TRUTH_POLICY.md) |
 | Focusa packet examples gallery | [`docs/FOCUSA_PACKET_EXAMPLES_GALLERY.md`](docs/FOCUSA_PACKET_EXAMPLES_GALLERY.md) |
 | MCP cache and reconnect troubleshooting | [`docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md`](docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md) |
+| Remote auth examples for curl, CLI, Pi, and MCP | [`docs/REMOTE_AUTH_EXAMPLES.md`](docs/REMOTE_AUTH_EXAMPLES.md) |
 | Browser/session API, agent tools, MCP formats, security boundaries, portability helpers | [`docs/SESSION_API.md`](docs/SESSION_API.md) |
 | UIAI × Focusa × Pi hand-in-glove research/diagnostics/evidence packet spec | [`docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md) |
 | Cross-surface interoperability contracts, acceptance matrix, and proof gates | [`docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md`](docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md) |

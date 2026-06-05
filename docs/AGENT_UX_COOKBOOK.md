@@ -231,6 +231,7 @@ Use when the agent is outside loopback.
 ```bash
 export UIAI_ENGINE_URL="https://<authenticated-tunnel>"
 export UIAI_API_KEY="..."       # or UIAI_BEARER_TOKEN
+# See REMOTE_AUTH_EXAMPLES.md for copy/paste-safe curl, CLI, Pi, and MCP examples.
 scripts/uiai health
 scripts/uiai tools graph
 ```
