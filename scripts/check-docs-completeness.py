@@ -25,6 +25,8 @@ checks={
    'docs/AGENT_UX_COOKBOOK.md':['Diagnostics-first debugging','uiai_errors'],
    'docs/PUBLIC_API_PARITY_MATRIX.md':['/api/errors','uiai_errors'],
    'docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md':['Failed network diagnostics','Focusa evidence'],
+   'scripts/smoke-render-diagnostics-artifact.sh':['diagnostics artifact render smoke ok'],
+   '.pi/skills/uiai-browser-debug/SKILL.md':['scripts/render-diagnostics-artifact.py'],
  },
  'focusa_packet': {
    'README.md':['uiai.focusa_research_diagnostics_packet.v1','uiai_focusa_packet_build','/api/agent/research-packet'],

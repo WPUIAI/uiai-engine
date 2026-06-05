@@ -142,6 +142,18 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && make browser-reliability'
 - Store bounded summaries, not raw logs.
 - Close sessions after proof or cleanup recommendation.
 
+## Artifact rendering
+
+Before copying diagnostics or packet JSON into a report, render a bounded summary:
+
+```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/render-diagnostics-artifact.py /tmp/uiai-browser-diagnostics-4x10.json'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/render-diagnostics-artifact.py /tmp/uiai-focusa-packet-smoke.json'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-render-diagnostics-artifact.sh'
+```
+
+The renderer shows summary counts, top console errors/exceptions/failed requests, evidence refs, Focusa args preview, cleanup, and recommended next action without raw blobs/secrets.
+
 ## Final browser-debug report
 
 Include:

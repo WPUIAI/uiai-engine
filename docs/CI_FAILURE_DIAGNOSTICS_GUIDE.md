@@ -88,7 +88,19 @@ uiai-soak-site.log
 browser-flakiness-soak.json
 ```
 
-## 5. Browser Reliability workflow anatomy
+## 5. Diagnostics artifact rendering
+
+Use the bounded renderer before pasting JSON into reports:
+
+```bash
+scripts/render-diagnostics-artifact.py /tmp/uiai-browser-diagnostics-4x10.json
+scripts/render-diagnostics-artifact.py /tmp/uiai-focusa-packet-smoke.json
+scripts/smoke-render-diagnostics-artifact.sh
+```
+
+It summarizes counts, top console/errors/failed requests, evidence refs, Focusa `args_preview`, cleanup, and next action while redacting secret-like strings.
+
+## 6. Browser Reliability workflow anatomy
 
 Workflow file:
 

@@ -406,6 +406,7 @@ scripts/install-pi-skills.sh --apply
 # Smoke-check skills/discovery/graph/MCP bridge
 scripts/smoke-pi-skills.sh
 scripts/smoke-open-result.sh
+scripts/smoke-render-diagnostics-artifact.sh
 scripts/smoke-agent-integrations.sh
 scripts/uiai-mcp-reconnect-help.sh --check
 scripts/smoke-mcp-tool-routes.sh
@@ -446,6 +447,7 @@ scripts/uiai-open-result.sh --query "UIAI Engine browser agents" --index 1 --out
 SID=$(scripts/uiai --json session open https://example.com | jq -r '.session.id')
 scripts/uiai session read "$SID" --max-chars 1000
 scripts/uiai session diagnostics "$SID"
+scripts/render-diagnostics-artifact.py /tmp/uiai-focusa-packet-smoke.json
 scripts/uiai session close "$SID"
 scripts/uiai smoke agent
 scripts/uiai smoke packet

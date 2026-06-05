@@ -104,6 +104,13 @@ Rules:
 
 ## Recipe 4: Proof packet capture
 
+Render packet/diagnostics artifacts for human reports:
+
+```bash
+scripts/render-diagnostics-artifact.py /tmp/uiai-research-packet.json
+```
+
+
 Use when an agent needs a bounded, redacted proof bundle for Focusa or a release report.
 
 Steps:
