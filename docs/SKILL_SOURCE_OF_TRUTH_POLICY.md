@@ -57,19 +57,23 @@ scripts/smoke-pi-extension-registration.sh
 
 ## Optional sync commands
 
-From the UIAI repo root:
+From the UIAI repo root, dry-run first:
 
 ```bash
-mkdir -p ~/.pi/skills
-cp -a .pi/skills/uiai-agent ~/.pi/skills/
-cp -a .pi/skills/uiai-focusa-packet ~/.pi/skills/
-cp -a .pi/skills/uiai-release ~/.pi/skills/
-cp -a .pi/skills/uiai-mcp ~/.pi/skills/
-cp -a .pi/skills/uiai-remote-auth ~/.pi/skills/
-cp -a .pi/skills/uiai-docs-maintenance ~/.pi/skills/
-cp -a .pi/skills/uiai-ci-debug ~/.pi/skills/
-cp -a .pi/skills/uiai-browser-debug ~/.pi/skills/
-cp -a .pi/skills/vision ~/.pi/skills/
+scripts/install-pi-skills.sh --dry-run
+```
+
+Apply copies with automatic backups for changed destination skills:
+
+```bash
+scripts/install-pi-skills.sh --apply
+```
+
+Use a custom destination when testing without touching a real Pi global directory:
+
+```bash
+scripts/install-pi-skills.sh --dry-run --dest /tmp/uiai-pi-skills
+scripts/install-pi-skills.sh --apply --dest /tmp/uiai-pi-skills
 ```
 
 Before overwriting global copies, inspect local operator customizations if any:
@@ -78,7 +82,7 @@ Before overwriting global copies, inspect local operator customizations if any:
 diff -ru ~/.pi/skills/uiai-agent .pi/skills/uiai-agent || true
 ```
 
-If the global copy has useful local additions, port those additions into the repo-local skill deliberately, then sync outward.
+If the global copy has useful local additions, port those additions into the repo-local skill deliberately, then sync outward. `scripts/install-pi-skills.sh --apply` backs up changed destination copies under `.uiai-backups/` unless `--force-no-backup` is explicitly provided.
 
 ## Release proof expectation
 

@@ -42,8 +42,9 @@ checks={
    'scripts/check-tool-parity.sh':['research packet','/uiai research <query>'],
  },
  'repo_skills': {
-   'README.md':['.pi/skills/uiai-agent/SKILL.md','.pi/skills/uiai-focusa-packet/SKILL.md','.pi/skills/uiai-release/SKILL.md','.pi/skills/uiai-ci-debug/SKILL.md','.pi/skills/uiai-browser-debug/SKILL.md'],
-   'docs/UIAI_FOR_AGENTS_QUICKSTART.md':['/skill:uiai-agent','/skill:uiai-focusa-packet','/skill:uiai-release','/skill:uiai-ci-debug','/skill:uiai-browser-debug'],
+   'README.md':['.pi/skills/uiai-agent/SKILL.md','.pi/skills/uiai-focusa-packet/SKILL.md','.pi/skills/uiai-release/SKILL.md','.pi/skills/uiai-mcp/SKILL.md','.pi/skills/uiai-remote-auth/SKILL.md','.pi/skills/uiai-docs-maintenance/SKILL.md','.pi/skills/uiai-ci-debug/SKILL.md','.pi/skills/uiai-browser-debug/SKILL.md'],
+   'docs/UIAI_FOR_AGENTS_QUICKSTART.md':['/skill:uiai-agent','/skill:uiai-focusa-packet','/skill:uiai-release','/skill:uiai-mcp','/skill:uiai-remote-auth','/skill:uiai-docs-maintenance','/skill:uiai-ci-debug','/skill:uiai-browser-debug','scripts/install-pi-skills.sh --apply'],
+   'scripts/smoke-pi-skills.sh':['uiai-docs-maintenance','uiai-remote-auth','pi skill smoke ok'],
  },
  'release_ci': {
    'docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md':['scripts/check-tool-parity.sh','scripts/release-service-smoke.sh --check-only','scripts/ci-log-summary.py'],

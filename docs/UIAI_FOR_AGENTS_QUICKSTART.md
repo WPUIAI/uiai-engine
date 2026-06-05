@@ -43,6 +43,9 @@ Useful project skills:
 /skill:uiai-agent
 /skill:uiai-focusa-packet
 /skill:uiai-release
+/skill:uiai-mcp
+/skill:uiai-remote-auth
+/skill:uiai-docs-maintenance
 /skill:uiai-ci-debug
 /skill:uiai-browser-debug
 /skill:vision
@@ -55,6 +58,8 @@ Install/merge the bridge config, then reconnect the MCP client after tool change
 ```bash
 DRY_RUN=1 scripts/install-agent-integrations.sh
 scripts/install-agent-integrations.sh
+scripts/install-pi-skills.sh --dry-run
+scripts/install-pi-skills.sh --apply
 scripts/smoke-agent-integrations.sh
 scripts/smoke-mcp-tool-routes.sh
 ```

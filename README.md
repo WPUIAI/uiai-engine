@@ -397,11 +397,14 @@ Start with the full agent path in [`docs/UIAI_FOR_AGENTS_QUICKSTART.md`](docs/UI
 ```bash
 # Optional preview
 DRY_RUN=1 scripts/install-agent-integrations.sh
+scripts/install-pi-skills.sh --dry-run
 
-# Install Pi extension + MCP config
+# Install Pi extension + MCP config + convenience global skill copies
 scripts/install-agent-integrations.sh
+scripts/install-pi-skills.sh --apply
 
-# Smoke-check discovery/graph/MCP bridge
+# Smoke-check skills/discovery/graph/MCP bridge
+scripts/smoke-pi-skills.sh
 scripts/smoke-agent-integrations.sh
 scripts/smoke-mcp-tool-routes.sh
 scripts/smoke-mcp-structured-failure.sh
@@ -420,6 +423,7 @@ export UIAI_BEARER_TOKEN="..."         # optional alternative to UIAI_API_KEY fo
 export UIAI_PI_TIMEOUT_MS=30000
 export UIAI_MCP_TIMEOUT_MS=60000
 scripts/install-agent-integrations.sh
+scripts/install-pi-skills.sh --apply
 scripts/smoke-agent-integrations.sh
 ```
 

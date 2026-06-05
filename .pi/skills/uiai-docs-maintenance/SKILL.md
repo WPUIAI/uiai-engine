@@ -11,6 +11,7 @@ Use this skill when a UIAI Engine change affects public docs, README links, Pi/M
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && git status --short --branch && bd ready | sed -n "1,120p"'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-docs-completeness.py'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-skills.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 ```
 
