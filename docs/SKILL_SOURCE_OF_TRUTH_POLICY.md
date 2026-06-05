@@ -11,6 +11,7 @@ UIAI Engine project-specific Pi skills are versioned project artifacts. Their ca
 | `uiai-release` | `.pi/skills/uiai-release/SKILL.md` | Release/deploy/push/CI proof workflow and service smoke bundle. |
 | `uiai-mcp` | `.pi/skills/uiai-mcp/SKILL.md` | MCP bridge setup, discovery, cache/reconnect, route parity, and tool routing workflow. |
 | `uiai-remote-auth` | `.pi/skills/uiai-remote-auth/SKILL.md` | Authenticated remote/tunnel setup, safe env vars, and loopback-public boundary workflow. |
+| `uiai-docs-maintenance` | `.pi/skills/uiai-docs-maintenance/SKILL.md` | Docs source-of-truth, parity, drift, release proof, and beads-to-docs workflow. |
 | `uiai-ci-debug` | `.pi/skills/uiai-ci-debug/SKILL.md` | GitHub Actions log/artifact failure diagnostics and local reproduction. |
 | `uiai-browser-debug` | `.pi/skills/uiai-browser-debug/SKILL.md` | Diagnostics-first browser/session debugging and Focusa intake. |
 | `vision` | `.pi/skills/vision/SKILL.md` | Browser/vision/session API reference workflow for screenshots, @refs, diagnostics, and packets. |
@@ -65,6 +66,7 @@ cp -a .pi/skills/uiai-focusa-packet ~/.pi/skills/
 cp -a .pi/skills/uiai-release ~/.pi/skills/
 cp -a .pi/skills/uiai-mcp ~/.pi/skills/
 cp -a .pi/skills/uiai-remote-auth ~/.pi/skills/
+cp -a .pi/skills/uiai-docs-maintenance ~/.pi/skills/
 cp -a .pi/skills/uiai-ci-debug ~/.pi/skills/
 cp -a .pi/skills/uiai-browser-debug ~/.pi/skills/
 cp -a .pi/skills/vision ~/.pi/skills/

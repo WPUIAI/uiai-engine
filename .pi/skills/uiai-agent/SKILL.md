@@ -162,6 +162,7 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-regist
 - `/skill:uiai-release` — release/deploy/push/CI workflow.
 - `/skill:uiai-mcp` — MCP bridge setup, reconnect, route parity, and tool routing workflow.
 - `/skill:uiai-remote-auth` — remote/tunnel auth boundaries, env vars, and credential-safe examples.
+- `/skill:uiai-docs-maintenance` — docs source-of-truth, parity, drift, release proof, and bead closure workflow.
 - `/skill:uiai-ci-debug` — GitHub Actions failure diagnostics.
 - `/skill:uiai-browser-debug` — browser failure triage.
 
