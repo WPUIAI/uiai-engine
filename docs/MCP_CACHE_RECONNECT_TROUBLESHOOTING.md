@@ -26,6 +26,7 @@ This means adding/removing/renaming tools, changing schemas, or fixing `tools/ca
 Run from the repo root:
 
 ```bash
+scripts/uiai-mcp-reconnect-help.sh --check
 node --check mcp/browser-session-mcp.mjs
 scripts/smoke-mcp-tool-routes.sh
 scripts/smoke-mcp-structured-failure.sh

@@ -10,6 +10,7 @@ Use this skill when setting up, validating, debugging, or changing UIAI Engine M
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && git status --short --branch && bd ready | sed -n "1,120p"'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai-mcp-reconnect-help.sh --check'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && node --check mcp/browser-session-mcp.mjs'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-mcp-tool-routes.sh'

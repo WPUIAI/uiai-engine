@@ -406,6 +406,7 @@ scripts/install-pi-skills.sh --apply
 # Smoke-check skills/discovery/graph/MCP bridge
 scripts/smoke-pi-skills.sh
 scripts/smoke-agent-integrations.sh
+scripts/uiai-mcp-reconnect-help.sh --check
 scripts/smoke-mcp-tool-routes.sh
 scripts/smoke-mcp-structured-failure.sh
 scripts/smoke-pi-extension-registration.sh
