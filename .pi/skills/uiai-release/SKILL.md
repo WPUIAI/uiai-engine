@@ -107,6 +107,20 @@ Fix source/config/unit issue, rebuild, restart, and repeat health.
 
 ## 6. Live localhost proof
 
+Bundled proof against the current running service:
+
+```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/release-service-smoke.sh --check-only'
+```
+
+Live restart/bundle mode requires root/systemctl boundary:
+
+```bash
+cd /home/wpuiai/uiai-engine && scripts/release-service-smoke.sh --skip-build
+```
+
+Manual proof:
+
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-focusa-packet.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-agent-integrations.sh'

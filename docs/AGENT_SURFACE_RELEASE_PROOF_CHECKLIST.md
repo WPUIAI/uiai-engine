@@ -10,6 +10,7 @@ Run from `/home/wpuiai/uiai-engine` unless noted. For live release claims, build
 go test ./...
 node --check mcp/browser-session-mcp.mjs
 scripts/smoke-agent-integrations.sh
+scripts/release-service-smoke.sh --check-only
 scripts/check-tool-parity.sh
 scripts/smoke-mcp-tool-routes.sh
 scripts/smoke-mcp-structured-failure.sh
@@ -37,6 +38,7 @@ make release-browser-reliability
 | MCP bridge | `node --check`, route parity smoke, structured failure smoke pass | `scripts/smoke-mcp-tool-routes.sh`, `scripts/smoke-mcp-structured-failure.sh` |
 | Pi extension | registration, rendering, and `/uiai off` smokes pass | `scripts/smoke-pi-extension-registration.sh`, `scripts/smoke-pi-rendering.sh`, `scripts/smoke-pi-uiai-off.sh` |
 | CLI | `scripts/uiai` smoke paths in `scripts/smoke-agent-integrations.sh` pass and `scripts/check-tool-parity.sh` sees required commands | CLI JSON/status/errors/tools/research packet proof |
+| Service/live proof | Current service answers `/health` and bundled live smokes pass | `scripts/release-service-smoke.sh --check-only`; systemd status for real restarts |
 | Search/providers | provider metadata and search smoke pass; missing-key degraded-mode test passes; search results include `uiai-search:<provider>:<query-hash>:<rank>` refs | `go test ./internal/routes`, `scripts/smoke-agent-integrations.sh` |
 | Auth/security | loopback/remote negative and remote positive tests pass; redaction tests pass | `go test ./internal/auth ./internal/observability ./internal/vision` |
 | Focusa evidence | diagnostics/error evidence handles and smoke pass | `/tmp/uiai-error-focusa-evidence.json` plus docs handle refs |

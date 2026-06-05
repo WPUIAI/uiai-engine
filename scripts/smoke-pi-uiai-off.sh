@@ -15,7 +15,8 @@ if not handler:
     raise SystemExit('missing /uiai command handler')
 body = handler.group(1)
 required = [
-    'const action = String(args || "").trim().toLowerCase();',
+    'const rawAction = String(args || "").trim();',
+    'const action = rawAction.toLowerCase();',
     '["off", "hide", "clear", "disable"].includes(action)',
     'ctx.ui.setWidget("uiai-engine", undefined);',
     'pi.appendEntry(UIAI_WIDGET_STATE_ENTRY, { visible: false });',

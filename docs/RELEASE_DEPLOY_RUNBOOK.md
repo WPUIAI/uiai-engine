@@ -120,7 +120,15 @@ Fix the source/config/unit issue, rebuild, restart, and repeat health verificati
 
 ## 7. Live localhost proof
 
-Run live smokes against the restarted service:
+Use the bundled smoke after rebuild/restart, or `--check-only` to prove the currently running service without restarting:
+
+```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/release-service-smoke.sh --check-only'
+# live mode requires root/systemctl boundary:
+# cd /home/wpuiai/uiai-engine && scripts/release-service-smoke.sh --skip-build
+```
+
+Manual live smokes:
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-focusa-packet.sh'
