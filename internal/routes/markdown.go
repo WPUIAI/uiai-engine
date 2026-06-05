@@ -129,6 +129,12 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 		read.Chars = len(read.Text)
 		records = githubPublicRecords(read, gh)
 		metadata["record_count"] = len(records)
+	} else if rd, ok := matchRedditPublicSource(firstMarkdownNonEmpty(read.URL, body.URL)); ok {
+		metadata = applyRedditPublicMetadata(metadata, rd)
+		read.Text = renderRedditPublicMarkdown(read.Text, read, rd)
+		read.Chars = len(read.Text)
+		records = redditPublicRecords(read, rd)
+		metadata["record_count"] = len(records)
 	}
 	markdown := read.Text
 	response := map[string]any{
@@ -285,6 +291,108 @@ func githubPublicRecords(read *vision.PageReadResult, gh githubPublicSource) []m
 		"url":          gh.URL,
 		"evidence_ref": markdownEvidenceRef(read.URL, read.Text) + "#record=1",
 	}}
+}
+
+type redditPublicSource struct {
+	Subreddit string
+	PostID    string
+	Slug      string
+	CommentID string
+	URL       string
+}
+
+func matchRedditPublicSource(raw string) (redditPublicSource, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return redditPublicSource{}, false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host != "reddit.com" && host != "www.reddit.com" && host != "old.reddit.com" && host != "new.reddit.com" {
+		return redditPublicSource{}, false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 4 || strings.ToLower(parts[0]) != "r" || parts[1] == "" || strings.ToLower(parts[2]) != "comments" || parts[3] == "" {
+		return redditPublicSource{}, false
+	}
+	rd := redditPublicSource{Subreddit: parts[1], PostID: parts[3], URL: sanitizeMarkdownURLForFocusa(raw)}
+	if len(parts) >= 5 {
+		rd.Slug = parts[4]
+	}
+	if len(parts) >= 6 {
+		rd.CommentID = parts[5]
+	}
+	return rd, true
+}
+
+func applyRedditPublicMetadata(metadata map[string]any, rd redditPublicSource) map[string]any {
+	out := make(map[string]any, len(metadata)+8)
+	for k, v := range metadata {
+		out[k] = v
+	}
+	out["adapter"] = "reddit_public"
+	out["source_type"] = "reddit_thread"
+	out["subreddit"] = "r/" + rd.Subreddit
+	out["post_id"] = rd.PostID
+	out["canonical_url"] = rd.URL
+	if rd.CommentID != "" {
+		out["comment_id"] = rd.CommentID
+	}
+	return out
+}
+
+func renderRedditPublicMarkdown(markdown string, read *vision.PageReadResult, rd redditPublicSource) string {
+	title := redditPublicTitle(read, rd)
+	frontmatter := []string{
+		"---",
+		"source: reddit_thread",
+		"adapter: reddit_public",
+		"subreddit: r/" + rd.Subreddit,
+		"post_id: " + rd.PostID,
+		"url: " + rd.URL,
+		"evidence_ref: " + markdownEvidenceRef(read.URL, markdown),
+		"---",
+		"",
+		"# " + title,
+		"",
+	}
+	trimmed := strings.TrimSpace(markdown)
+	if trimmed == "" {
+		trimmed = "No readable Reddit content extracted. Inspect diagnostics or retry with old.reddit.com."
+	}
+	if !strings.Contains(strings.ToLower(trimmed), "comment") {
+		trimmed += "\n\n## Top comments\n\nComment extraction is browser-rendered and bounded; inspect records/diagnostics for capture details."
+	}
+	return strings.Join(frontmatter, "\n") + trimmed
+}
+
+func redditPublicTitle(read *vision.PageReadResult, rd redditPublicSource) string {
+	title := strings.TrimSpace(read.Title)
+	if title != "" {
+		return title
+	}
+	if rd.Slug != "" {
+		return strings.ReplaceAll(rd.Slug, "_", " ")
+	}
+	return "Reddit thread r/" + rd.Subreddit + " " + rd.PostID
+}
+
+func redditPublicRecords(read *vision.PageReadResult, rd redditPublicSource) []map[string]any {
+	record := map[string]any{
+		"schema":       "uiai.source_markdown_record.v1",
+		"source_type":  "reddit_thread",
+		"record_type":  "post",
+		"index":        1,
+		"subreddit":    "r/" + rd.Subreddit,
+		"post_id":      rd.PostID,
+		"title":        redditPublicTitle(read, rd),
+		"url":          rd.URL,
+		"evidence_ref": markdownEvidenceRef(read.URL, read.Text) + "#record=1",
+	}
+	if rd.CommentID != "" {
+		record["comment_id"] = rd.CommentID
+		record["record_type"] = "comment_thread"
+	}
+	return []map[string]any{record}
 }
 
 func markdownFailure(class string, err error, url string, started time.Time) map[string]any {
