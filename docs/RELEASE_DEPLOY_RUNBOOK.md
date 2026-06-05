@@ -158,7 +158,7 @@ gh run list --branch main --limit 10 --json databaseId,headSha,status,conclusion
 gh run watch <run-id> --exit-status
 ```
 
-If the run fails, inspect logs and artifacts before guessing:
+If the run fails, inspect logs and artifacts before guessing. Use [CI Failure Diagnostics Guide](CI_FAILURE_DIAGNOSTICS_GUIDE.md) for the focused failure-class playbook:
 
 ```bash
 gh run view <run-id> --log-failed | sed -n '1,320p'
@@ -205,6 +205,7 @@ focusa_evidence_capture(
 
 - [UIAI for Agents Quickstart](UIAI_FOR_AGENTS_QUICKSTART.md)
 - [Agent Surface Release Proof Checklist](AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md)
+- [CI Failure Diagnostics Guide](CI_FAILURE_DIAGNOSTICS_GUIDE.md)
 - [Browser Reliability Runbook](BROWSER_RELIABILITY_RUNBOOK.md)
 - [Endpoint Auth Matrix](ENDPOINT_AUTH_MATRIX.md)
 - [Session API](SESSION_API.md)
