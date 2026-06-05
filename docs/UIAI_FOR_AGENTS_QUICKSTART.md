@@ -298,7 +298,7 @@ make browser-reliability
 ## 8. Troubleshooting
 
 - If an action fails or a page is blank/broken, call diagnostics before patching.
-- If MCP tools look stale, reconnect/restart the MCP client/bridge and reload Pi sessions using the MCP adapter.
+- If MCP tools look stale, reconnect/restart the MCP client/bridge and reload Pi sessions using the MCP adapter; see [MCP Cache and Reconnect Troubleshooting](MCP_CACHE_RECONNECT_TROUBLESHOOTING.md).
 - If CI fails, inspect both failed step logs and uploaded artifacts with `gh run view --log-failed` and `gh run download`.
 - If a remote call returns `401`, confirm the route auth mode in `docs/ENDPOINT_AUTH_MATRIX.md` and set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`.
 

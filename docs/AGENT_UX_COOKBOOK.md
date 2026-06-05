@@ -249,7 +249,7 @@ Use after adding/removing/renaming tools or changing MCP call routes.
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && node --check mcp/browser-session-mcp.mjs && scripts/smoke-mcp-tool-routes.sh'
 ```
 
-Then restart/reconnect MCP clients and reload Pi sessions that use the MCP adapter.
+Then restart/reconnect MCP clients and reload Pi sessions that use the MCP adapter. For cache-layer symptoms and exact reconnect steps, see [MCP Cache and Reconnect Troubleshooting](MCP_CACHE_RECONNECT_TROUBLESHOOTING.md).
 
 Symptoms of stale MCP metadata:
 
