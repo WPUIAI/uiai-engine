@@ -181,3 +181,88 @@ func TestApplyRedditPublicMetadataAndRecords(t *testing.T) {
 		t.Fatalf("bad reddit record: %+v", rec)
 	}
 }
+
+func TestMatchXPublicSource(t *testing.T) {
+	tests := []struct {
+		url       string
+		author    string
+		kind      string
+		statusID  string
+		articleID string
+		source    string
+	}{
+		{"https://x.com/example/status/12345?token=secret#frag", "example", "status", "12345", "", "x_thread"},
+		{"https://twitter.com/example/statuses/67890", "example", "status", "67890", "", "x_thread"},
+		{"https://x.com/example/articles/999", "example", "article", "", "999", "x_article"},
+	}
+	for _, tc := range tests {
+		xp, ok := matchXPublicSource(tc.url)
+		if !ok {
+			t.Fatalf("expected x match for %s", tc.url)
+		}
+		if xp.Author != tc.author || xp.Kind != tc.kind || xp.StatusID != tc.statusID || xp.ArticleID != tc.articleID || xp.SourceType != tc.source {
+			t.Fatalf("bad x source: %+v", xp)
+		}
+		if strings.Contains(xp.URL, "secret") || strings.Contains(xp.URL, "#frag") {
+			t.Fatalf("url not sanitized: %s", xp.URL)
+		}
+	}
+}
+
+func TestMatchXPublicSourceRejectsNonTargets(t *testing.T) {
+	for _, raw := range []string{
+		"https://example.com/user/status/123",
+		"https://x.com/user",
+		"https://x.com/user/likes",
+	} {
+		if xp, ok := matchXPublicSource(raw); ok {
+			t.Fatalf("unexpected x match for %s: %+v", raw, xp)
+		}
+	}
+}
+
+func TestRenderXPublicMarkdownBlocked(t *testing.T) {
+	xp, ok := matchXPublicSource("https://x.com/example/status/12345?token=secret#frag")
+	if !ok {
+		t.Fatal("expected x match")
+	}
+	read := &vision.PageReadResult{URL: "https://x.com/example/status/12345", Title: "Example on X"}
+	out := renderXPublicMarkdown("Log in to view this post", read, xp)
+	for _, want := range []string{
+		"source: x_thread",
+		"adapter: x_public",
+		"author: @example",
+		"status_id: 12345",
+		"best_effort: true",
+		"blocked: true",
+		"failure_class: auth_required",
+		"Source blocked or authentication required",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in markdown:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "secret") || strings.Contains(out, "#frag") {
+		t.Fatalf("secret leaked in markdown:\n%s", out)
+	}
+}
+
+func TestApplyXPublicMetadataAndRecords(t *testing.T) {
+	xp, ok := matchXPublicSource("https://x.com/example/articles/999")
+	if !ok {
+		t.Fatal("expected x match")
+	}
+	meta := applyXPublicMetadata(map[string]any{"schema": "uiai.source_markdown.v1"}, xp, "Something went wrong")
+	if meta["adapter"] != "x_public" || meta["source_type"] != "x_article" || meta["author"] != "@example" || meta["article_id"] != "999" || meta["blocked"] != true || meta["failure_class"] != "auth_required" {
+		t.Fatalf("bad metadata: %+v", meta)
+	}
+	read := &vision.PageReadResult{URL: "https://x.com/example/articles/999", Title: "X Article", Text: "Something went wrong"}
+	records := xPublicRecords(read, xp)
+	if len(records) != 1 {
+		t.Fatalf("record count = %d", len(records))
+	}
+	rec := records[0]
+	if rec["schema"] != "uiai.source_markdown_record.v1" || rec["source_type"] != "x_article" || rec["record_type"] != "article" || rec["article_id"] != "999" || rec["blocked"] != true {
+		t.Fatalf("bad x record: %+v", rec)
+	}
+}

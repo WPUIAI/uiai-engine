@@ -135,6 +135,12 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 		read.Chars = len(read.Text)
 		records = redditPublicRecords(read, rd)
 		metadata["record_count"] = len(records)
+	} else if xp, ok := matchXPublicSource(firstMarkdownNonEmpty(read.URL, body.URL)); ok {
+		metadata = applyXPublicMetadata(metadata, xp, read.Text)
+		read.Text = renderXPublicMarkdown(read.Text, read, xp)
+		read.Chars = len(read.Text)
+		records = xPublicRecords(read, xp)
+		metadata["record_count"] = len(records)
 	}
 	markdown := read.Text
 	response := map[string]any{
@@ -393,6 +399,142 @@ func redditPublicRecords(read *vision.PageReadResult, rd redditPublicSource) []m
 		record["record_type"] = "comment_thread"
 	}
 	return []map[string]any{record}
+}
+
+type xPublicSource struct {
+	Author     string
+	Kind       string
+	StatusID   string
+	ArticleID  string
+	URL        string
+	SourceType string
+}
+
+func matchXPublicSource(raw string) (xPublicSource, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return xPublicSource{}, false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host != "x.com" && host != "www.x.com" && host != "twitter.com" && host != "www.twitter.com" {
+		return xPublicSource{}, false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 1 || parts[0] == "" {
+		return xPublicSource{}, false
+	}
+	xp := xPublicSource{Author: parts[0], URL: sanitizeMarkdownURLForFocusa(raw), SourceType: "x_thread"}
+	if len(parts) >= 3 && (parts[1] == "status" || parts[1] == "statuses") && parts[2] != "" {
+		xp.Kind = "status"
+		xp.StatusID = parts[2]
+		return xp, true
+	}
+	if len(parts) >= 3 && parts[1] == "articles" && parts[2] != "" {
+		xp.Kind = "article"
+		xp.ArticleID = parts[2]
+		xp.SourceType = "x_article"
+		return xp, true
+	}
+	return xPublicSource{}, false
+}
+
+func applyXPublicMetadata(metadata map[string]any, xp xPublicSource, markdown string) map[string]any {
+	out := make(map[string]any, len(metadata)+10)
+	for k, v := range metadata {
+		out[k] = v
+	}
+	out["adapter"] = "x_public"
+	out["source_type"] = xp.SourceType
+	out["author"] = "@" + xp.Author
+	out["canonical_url"] = xp.URL
+	out["best_effort"] = true
+	if xp.StatusID != "" {
+		out["status_id"] = xp.StatusID
+	}
+	if xp.ArticleID != "" {
+		out["article_id"] = xp.ArticleID
+	}
+	if xPublicLooksBlocked(markdown) {
+		out["blocked"] = true
+		out["failure_class"] = "auth_required"
+		out["recommended_next_action"] = "Retry with a browser session carrying valid auth, try a public mirror, or capture the source as blocked evidence."
+	}
+	return out
+}
+
+func renderXPublicMarkdown(markdown string, read *vision.PageReadResult, xp xPublicSource) string {
+	title := xPublicTitle(read, xp)
+	blocked := xPublicLooksBlocked(markdown)
+	frontmatter := []string{
+		"---",
+		"source: " + xp.SourceType,
+		"adapter: x_public",
+		"author: @" + xp.Author,
+		"url: " + xp.URL,
+		"best_effort: true",
+		"evidence_ref: " + markdownEvidenceRef(read.URL, markdown),
+	}
+	if xp.StatusID != "" {
+		frontmatter = append(frontmatter, "status_id: "+xp.StatusID)
+	}
+	if xp.ArticleID != "" {
+		frontmatter = append(frontmatter, "article_id: "+xp.ArticleID)
+	}
+	if blocked {
+		frontmatter = append(frontmatter, "blocked: true", "failure_class: auth_required")
+	}
+	frontmatter = append(frontmatter, "---", "", "# "+title, "")
+	trimmed := strings.TrimSpace(markdown)
+	if trimmed == "" || blocked {
+		trimmed = "Source blocked or authentication required. X/Twitter often limits anonymous browser access.\n\n## Next options\n\n- Retry with an authenticated browser session when policy allows.\n- Use a public mirror/archive if available.\n- Capture this result as blocked source evidence with diagnostics."
+	}
+	return strings.Join(frontmatter, "\n") + trimmed
+}
+
+func xPublicTitle(read *vision.PageReadResult, xp xPublicSource) string {
+	title := strings.TrimSpace(read.Title)
+	if title != "" {
+		return title
+	}
+	if xp.Kind == "article" {
+		return "X Article by @" + xp.Author
+	}
+	return "X Thread by @" + xp.Author
+}
+
+func xPublicRecords(read *vision.PageReadResult, xp xPublicSource) []map[string]any {
+	record := map[string]any{
+		"schema":       "uiai.source_markdown_record.v1",
+		"source_type":  xp.SourceType,
+		"record_type":  xp.Kind,
+		"index":        1,
+		"author":       "@" + xp.Author,
+		"title":        xPublicTitle(read, xp),
+		"url":          xp.URL,
+		"evidence_ref": markdownEvidenceRef(read.URL, read.Text) + "#record=1",
+	}
+	if xp.StatusID != "" {
+		record["status_id"] = xp.StatusID
+	}
+	if xp.ArticleID != "" {
+		record["article_id"] = xp.ArticleID
+	}
+	if xPublicLooksBlocked(read.Text) {
+		record["blocked"] = true
+		record["failure_class"] = "auth_required"
+	}
+	return []map[string]any{record}
+}
+
+func xPublicLooksBlocked(markdown string) bool {
+	lower := strings.ToLower(markdown)
+	blockedNeedles := []string{"log in", "sign in", "create account", "something went wrong", "rate limit", "account suspended", "this post is unavailable", "javascript is not available"}
+	for _, needle := range blockedNeedles {
+		if strings.Contains(lower, needle) {
+			return true
+		}
+	}
+	return strings.TrimSpace(markdown) == ""
 }
 
 func markdownFailure(class string, err error, url string, started time.Time) map[string]any {
