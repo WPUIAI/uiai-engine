@@ -127,6 +127,27 @@ Schema:
 uiai.focusa_research_diagnostics_packet.v1
 ```
 
+### One-command CLI workflow
+
+```bash
+scripts/uiai research packet --url https://example.com \
+  --goal "Quickstart proof packet" \
+  --out /tmp/uiai-research-packet.json
+
+jq '{ok,selected_url,session_closed,packet:{schema:.packet.schema,mode:.packet.mode,evidence_refs:(.packet.evidence_refs|length),preferred_tool:.packet.recommended_focusa.preferred_tool}}' \
+  /tmp/uiai-research-packet.json
+```
+
+With provider search first:
+
+```bash
+scripts/uiai research packet --query "UIAI Engine browser agents" \
+  --goal "Quickstart research packet" \
+  --out /tmp/uiai-research-packet.json
+```
+
+The command searches when `--query` is supplied, opens the selected URL, reads bounded text, captures a snapshot and diagnostics, composes a packet, closes the session, and writes the report artifact.
+
 ### HTTP composer
 
 ```bash

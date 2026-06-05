@@ -30,6 +30,8 @@ Commands:
   tools search <query>           Search tool discovery
   tools mcp|openai|graph|agent-card
   packet compose <json-file|->    Compose Focusa research diagnostics packet
+  research packet [--query Q|--url URL] [--goal G] [--out PATH]
+                                  One-command search/open/read/diagnose/packet/cleanup proof
   session open <url> [--width N] [--height N]
   session read <sid> [--selector S] [--max-chars N]
   session snapshot <sid>
@@ -197,6 +199,103 @@ cmd_packet() {
   esac
 }
 
+cmd_research() {
+  local sub="${1:-}"; shift || true
+  case "$sub" in
+    packet)
+      local query="" url="" goal="UIAI research packet" out="/tmp/uiai-research-packet.json" width=1280 height=800 max_chars=2000
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --query) query="${2:-}"; shift 2 ;;
+          --url) url="${2:-}"; shift 2 ;;
+          --goal) goal="${2:-}"; shift 2 ;;
+          --out) out="${2:-}"; shift 2 ;;
+          --width) width="${2:-}"; shift 2 ;;
+          --height) height="${2:-}"; shift 2 ;;
+          --max-chars) max_chars="${2:-}"; shift 2 ;;
+          *) err "unknown research packet option: $1"; exit 2 ;;
+        esac
+      done
+      [[ -n "$query" || -n "$url" ]] || { err "usage: uiai research packet [--query Q|--url URL] [--goal G] [--out PATH]"; exit 2; }
+      FORMAT="$FORMAT" ENGINE_URL="$ENGINE_URL" TIMEOUT_SECONDS="$TIMEOUT_SECONDS" UIAI_API_KEY="${UIAI_API_KEY:-}" UIAI_BEARER_TOKEN="${UIAI_BEARER_TOKEN:-}" \
+      python3 - "$query" "$url" "$goal" "$out" "$width" "$height" "$max_chars" <<'PY'
+import json, os, sys, urllib.request, urllib.error
+query, url, goal, out, width, height, max_chars = sys.argv[1:8]
+engine=os.environ.get('ENGINE_URL','http://localhost:7456').rstrip('/')
+timeout=int(os.environ.get('TIMEOUT_SECONDS','20'))
+fmt=os.environ.get('FORMAT','compact')
+headers={'Content-Type':'application/json'}
+if os.environ.get('UIAI_API_KEY'):
+    headers['X-API-Key']=os.environ['UIAI_API_KEY']
+elif os.environ.get('UIAI_BEARER_TOKEN'):
+    headers['Authorization']='Bearer '+os.environ['UIAI_BEARER_TOKEN']
+
+def req(method,path,body=None):
+    data=json.dumps(body).encode() if body is not None else None
+    r=urllib.request.Request(engine+path, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(r, timeout=timeout) as resp:
+            raw=resp.read().decode() or '{}'
+            return json.loads(raw)
+    except urllib.error.HTTPError as e:
+        raw=e.read().decode(errors='replace')
+        try: data=json.loads(raw)
+        except Exception: data={'error':raw or str(e)}
+        raise SystemExit(json.dumps({'ok':False,'status':e.code,'error':data}, indent=2))
+
+responses=[]
+search=None
+selected_url=url
+if query:
+    search=req('POST','/api/search',{'query':query,'limit':1})
+    responses.append(search)
+    results=search.get('results') or []
+    if not selected_url and results:
+        selected_url=results[0].get('url') or ''
+if not selected_url:
+    raise SystemExit('uiai research packet: no URL supplied and search returned no selectable result')
+
+sid=None
+session_closed=False
+try:
+    opened=req('POST','/api/session',{'url':selected_url,'width':int(width),'height':int(height),'focusa_scope':{'project_root':'/home/wpuiai/uiai-engine','continuity_id':'focusa-cont-uiai-engine-82afe24f-90ce-4d6e-b5f2-1b431b7773fc','evidence_ref':'uiai-research-packet-cli'}})
+    sid=(opened.get('session') or {}).get('id') or opened.get('id')
+    if not sid: raise SystemExit(json.dumps({'ok':False,'error':'session id missing','opened':opened}, indent=2))
+    read=req('POST',f'/api/session/{sid}/read',{'max_chars':int(max_chars),'include_links':True})
+    snapshot=req('POST',f'/api/session/{sid}/snapshot',{'interactive':True,'compact':True})
+    diagnostics=req('GET',f'/api/session/{sid}/diagnostics?limit=100')
+    responses.extend([read,snapshot,diagnostics])
+    packet=req('POST','/api/agent/research-packet',{
+        'mode':'research' if query else 'proof',
+        'goal':goal,
+        'responses':responses,
+        'focusa_scope':{'project_root':'/home/wpuiai/uiai-engine','continuity_id':'focusa-cont-uiai-engine-82afe24f-90ce-4d6e-b5f2-1b431b7773fc','evidence_ref':'uiai-research-packet-cli'},
+        'recommended_next_action':'Capture packet evidence with Focusa, then close any remaining browser session.',
+        'cleanup_session_id':sid,
+    })
+finally:
+    if sid:
+        try:
+            req('DELETE',f'/api/session/{sid}')
+            session_closed=True
+        except Exception:
+            session_closed=False
+
+report={'ok':True,'query':query or None,'selected_url':selected_url,'session_id':sid,'session_closed':session_closed,'out':out,'packet':packet}
+with open(out,'w') as f: json.dump(report,f,indent=2)
+if fmt == 'json':
+    print(json.dumps(report,separators=(',',':')))
+elif fmt == 'pretty':
+    print(json.dumps(report,indent=2))
+else:
+    rf=packet.get('recommended_focusa',{}) if isinstance(packet,dict) else {}
+    print(f"research packet ok: out={out} url={selected_url} session_closed={session_closed} schema={packet.get('schema')} evidence_refs={len(packet.get('evidence_refs',[]))} preferred_tool={rf.get('preferred_tool')}")
+PY
+      ;;
+    *) err "usage: uiai research packet [--query Q|--url URL] [--goal G] [--out PATH]"; exit 2 ;;
+  esac
+}
+
 cmd_session() {
   local sub="${1:-}"; shift || true
   case "$sub" in
@@ -251,6 +350,7 @@ case "$cmd" in
   errors) cmd_errors "$@" ;;
   tools) cmd_tools "$@" ;;
   packet) cmd_packet "$@" ;;
+  research) cmd_research "$@" ;;
   session) cmd_session "$@" ;;
   smoke)
     sub="${1:-agent}"

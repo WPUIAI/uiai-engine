@@ -31,7 +31,7 @@ Purpose: map public/operator/agent-facing UIAI HTTP route families to Pi, MCP, C
 | `/api/screenshot`, `/api/screenshot/*` | loopback-public remote-auth | `uiai_screenshot` | `screenshot`/browser screenshot helpers | HTTP examples/smokes | `uiai-screenshot:sha256:<prefix>` | browser reliability scripts, agent integrations | HTTP + Pi/MCP | CLI one-shot can stay HTTP example until demand. |
 | `/api/share/*`, `/v/{token}` | public share view; create/update auth per route | packet builder recognizes share artifacts | MCP graph/docs reference share evidence | HTTP examples | `uiai-share:<share_id>` | packet tests recognize share captures | HTTP/docs only | Keep transcript raw blobs out; expose share write tools only with workflow proof. |
 | `/api/errors` | loopback-public remote-auth | `uiai_errors` | `uiai_errors` | HTTP examples; `scripts/uiai errors` if available | `uiai-error:<error_id>` | `scripts/smoke-agent-integrations.sh`, `scripts/smoke-mcp-structured-failure.sh` | Full agent parity | Redaction and bounded event shape required. |
-| `/api/agent/research-packet` | loopback-public remote-auth | `uiai_focusa_packet_build` | `uiai_focusa_packet_compose` | `scripts/uiai packet compose`, `scripts/uiai smoke packet` | packet `evidence_refs[]`, Focusa args preview | `scripts/smoke-focusa-packet.sh`, packet builder tests, drift check | Full agent parity | Packet is a proposal/evidence bundle; Focusa decides durable writes. |
+| `/api/agent/research-packet` | loopback-public remote-auth | `uiai_focusa_packet_build` | `uiai_focusa_packet_compose` | `scripts/uiai research packet`, `scripts/uiai packet compose`, `scripts/uiai smoke packet` | packet `evidence_refs[]`, Focusa args preview | `scripts/smoke-focusa-packet.sh`, packet builder tests, drift check, CLI one-command smoke | Full agent parity | Packet is a proposal/evidence bundle; Focusa decides durable writes. |
 | `/api/media/frame/catalog`, `/api/media/frame/render` | loopback-public remote-auth | `uiai_frame_catalog`, `uiai_frame_render` | `frame_catalog`, `frame_render` | HTTP examples | rendered frame artifact refs | `scripts/smoke-agent-integrations.sh`, MCP route smoke | HTTP + Pi/MCP | Used for visual QA; keep base64 out of transcript. |
 | `/api/critique/models`, `/api/critique/dimensions` | public metadata | `uiai_critique_models`, `uiai_critique_dimensions` | `critique_models`, `critique_dimensions` | HTTP examples | read-only model/dimension metadata | `scripts/smoke-agent-integrations.sh` | HTTP + Pi/MCP | Metadata only; paid critique execution remains omitted from generic agent tools. |
 
@@ -70,7 +70,7 @@ Purpose: map public/operator/agent-facing UIAI HTTP route families to Pi, MCP, C
 
 ## Current known gaps
 
-- CLI is intentionally lighter than Pi/MCP for browser actions; it covers discovery, core session/read/diagnostics/close, packet compose/smoke, installs, and release smokes.
+- CLI is intentionally lighter than Pi/MCP for browser actions; it covers discovery, core session/read/diagnostics/close, one-command research packets, packet compose/smoke, installs, and release smokes.
 - Share write/update workflows are documented as artifact refs but not generic Pi/MCP write tools.
 - Paid AI execution routes are intentionally not generic Pi/MCP tools; metadata helper exposure is the current least-risk slice.
 - Admin, memory, intelligence, training, captcha, migration, and media production route families remain HTTP/plugin/service surfaces pending explicit operator workflows.

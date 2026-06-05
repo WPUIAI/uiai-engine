@@ -103,6 +103,7 @@ SID=$(scripts/uiai --json session open https://example.com | jq -r '.session.id'
 scripts/uiai session read "$SID" --max-chars 1000
 scripts/uiai session diagnostics "$SID"
 scripts/uiai session close "$SID"
+scripts/uiai research packet --url https://example.com --goal "CLI proof packet" --out /tmp/uiai-research-packet.json
 scripts/uiai smoke agent
 ```
 

@@ -81,6 +81,8 @@ uiai_focusa_packet_build goal="<goal>" mode="proof" responses=[...] focusa_scope
 HTTP/CLI alternatives:
 
 ```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai research packet --url https://example.com --goal "Proof packet" --out /tmp/uiai-research-packet.json'
+# Or manual compose from a prepared request:
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai packet compose /tmp/uiai-packet-request.json | tee /tmp/uiai-packet.json'
 ```
 

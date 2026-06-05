@@ -83,6 +83,13 @@ focusa_browser_diagnostics_intake(
 
 ## CLI/HTTP examples
 
+One-command workflow:
+
+```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai research packet --url https://example.com --goal "Proof packet" --out /tmp/uiai-research-packet.json'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai research packet --query "UIAI Engine browser agents" --goal "Research packet" --out /tmp/uiai-research-packet.json'
+```
+
 Compose from a JSON request:
 
 ```bash

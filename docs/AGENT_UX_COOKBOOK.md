@@ -110,7 +110,13 @@ Pi:
 uiai_focusa_packet_compose goal="<proof goal>" mode="proof" responses=[search,read,snapshot,diagnostics] focusa_scope={...} cleanup_session_id="<sid>"
 ```
 
-CLI:
+One-command CLI:
+
+```bash
+scripts/uiai research packet --url https://example.com --goal "Proof packet" --out /tmp/uiai-research-packet.json
+```
+
+Manual CLI composer:
 
 ```bash
 scripts/uiai --json packet compose /tmp/uiai-packet-request.json | tee /tmp/uiai-packet.json
