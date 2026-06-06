@@ -672,7 +672,32 @@ WPUIAI should not expose raw internals. It can package Source-to-Markdown as pro
 
 ### Research card
 
-A WordPress admin action:
+Implemented engine response contract:
+
+```json
+{
+  "wpuiai": {
+    "research_card": {
+      "schema": "wpui.source_markdown_research_card.v1",
+      "source_url": "https://example.com/source",
+      "source_type": "webpage|github_issue|reddit_thread|x_thread|...",
+      "title": "Source title",
+      "markdown_excerpt": "bounded excerpt",
+      "evidence_ref": "uiai-source-markdown:sha256:<prefix>",
+      "captured_at": "2026-06-05T00:00:00Z",
+      "suggested_uses": ["content source", "competitor proof", "reference", "FAQ seed", "SEO seed"],
+      "metadata": {}
+    },
+    "report": {
+      "schema": "wpui.source_markdown_report.v1",
+      "summary": "Captured source as Markdown for WPUIAI research/card workflows.",
+      "evidence_ref": "uiai-source-markdown:sha256:<prefix>"
+    }
+  }
+}
+```
+
+WordPress admin workflow:
 
 ```text
 Paste URL -> Capture Markdown -> Save Research Card
@@ -683,7 +708,7 @@ Card fields:
 - Source URL.
 - Source type.
 - Markdown excerpt.
-- JSONL artifact link.
+- JSONL/record artifact refs.
 - Evidence ref.
 - Captured at.
 - Suggested WPUIAI use: content source, competitor proof, reference, FAQ seed, SEO seed.
@@ -819,7 +844,8 @@ Recommended order:
 
 ### Phase 5 — WPUIAI productization
 
-- Research cards.
+- Implemented engine-side `wpuiai.research_card` and `wpuiai.report` response objects for `/api/markdown`.
+- WordPress plugin UI/save integration remains a plugin-side follow-up.
 - Blueprint content-source import.
 - Client proof report integration.
 

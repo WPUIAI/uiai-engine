@@ -182,6 +182,28 @@ func TestApplyRedditPublicMetadataAndRecords(t *testing.T) {
 	}
 }
 
+func TestWPUIAISourceMarkdownProductization(t *testing.T) {
+	read := &vision.PageReadResult{URL: "https://example.com/source", Title: "Example Source", Text: strings.Repeat("research ", 300)}
+	metadata := map[string]any{"source_type": "reddit_thread", "captured_at": "2026-06-05T00:00:00Z"}
+	records := []map[string]any{{"evidence_ref": "uiai-source-markdown:sha256:abc#record=1"}}
+	out := wpuiAISourceMarkdownProductization(read, metadata, records, "uiai-source-markdown:sha256:abc")
+	card := out["research_card"].(map[string]any)
+	if card["schema"] != "wpui.source_markdown_research_card.v1" || card["source_type"] != "reddit_thread" || card["evidence_ref"] != "uiai-source-markdown:sha256:abc" || card["record_count"] != 1 {
+		t.Fatalf("bad research card: %+v", card)
+	}
+	if len(card["markdown_excerpt"].(string)) > 1205 {
+		t.Fatalf("excerpt not bounded: %d", len(card["markdown_excerpt"].(string)))
+	}
+	uses := card["suggested_uses"].([]string)
+	if len(uses) == 0 || uses[0] != "market research" {
+		t.Fatalf("bad uses: %+v", uses)
+	}
+	report := out["report"].(map[string]any)
+	if report["schema"] != "wpui.source_markdown_report.v1" || report["record_count"] != 1 {
+		t.Fatalf("bad report: %+v", report)
+	}
+}
+
 func TestMatchXPublicSource(t *testing.T) {
 	tests := []struct {
 		url       string

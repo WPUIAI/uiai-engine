@@ -20,10 +20,10 @@ checks={
    'docs/ENDPOINT_AUTH_MATRIX.md':['/api/session','loopback-public remote-auth'],
  },
  'source_markdown': {
-   'README.md':['/api/markdown','uiai.source_markdown.v1','source_to_markdown'],
+   'README.md':['/api/markdown','uiai.source_markdown.v1','source_to_markdown','wpuiai.research_card'],
    'docs/UIAI_FOR_AGENTS_QUICKSTART.md':['uiai_source_to_markdown','source_to_markdown','scripts/uiai markdown'],
    'docs/AGENT_UX_COOKBOOK.md':['uiai_source_to_markdown','source_to_markdown','uiai-source-markdown:sha256:<prefix>'],
-   'docs/SOURCE_TO_MARKDOWN_AGENT_SPEC.md':['/api/markdown','uiai_source_to_markdown','source_to_markdown','focusa_evidence_capture'],
+   'docs/SOURCE_TO_MARKDOWN_AGENT_SPEC.md':['/api/markdown','uiai_source_to_markdown','source_to_markdown','focusa_evidence_capture','wpui.source_markdown_research_card.v1'],
    'scripts/smoke-agent-integrations.sh':['source_to_markdown','uiai-source-markdown:sha256:<prefix>'],
    'scripts/check-tool-parity.sh':['markdown <url>','uiai_source_to_markdown','source_to_markdown'],
  },

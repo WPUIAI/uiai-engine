@@ -143,6 +143,8 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 		metadata["record_count"] = len(records)
 	}
 	markdown := read.Text
+	evidenceRef := markdownEvidenceRef(read.URL, markdown)
+	wpuiAI := wpuiAISourceMarkdownProductization(read, metadata, records, evidenceRef)
 	response := map[string]any{
 		"schema":       "uiai.source_markdown.v1",
 		"url":          read.URL,
@@ -157,6 +159,7 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 		"metadata":     metadata,
 		"diagnostics":  diagnostics,
 		"focusa":       oneShotMarkdownFocusa(read, body.URL),
+		"wpuiai":       wpuiAI,
 		"cleanup":      cleanup,
 		"duration_ms":  time.Since(started).Milliseconds(),
 		"source_stats": map[string]any{"format": "markdown", "mode": read.Mode, "max_chars": body.MaxChars, "adapter": metadata["adapter"]},
@@ -198,6 +201,66 @@ func oneShotMarkdownFocusa(read *vision.PageReadResult, requestedURL string) map
 func markdownEvidenceRef(pageURL, markdown string) string {
 	h := sha256.Sum256([]byte(pageURL + "\n" + markdown))
 	return "uiai-source-markdown:sha256:" + hex.EncodeToString(h[:])[:16]
+}
+
+func wpuiAISourceMarkdownProductization(read *vision.PageReadResult, metadata map[string]any, records []map[string]any, evidenceRef string) map[string]any {
+	sourceType := stringFromMap(metadata, "source_type", "webpage")
+	capturedAt := stringFromMap(metadata, "captured_at", time.Now().UTC().Format(time.RFC3339))
+	excerpt := focusapacket.Truncate(strings.TrimSpace(read.Text), 1200)
+	card := map[string]any{
+		"schema":           "wpui.source_markdown_research_card.v1",
+		"source_url":       read.URL,
+		"source_type":      sourceType,
+		"title":            firstMarkdownNonEmpty(read.Title, read.URL),
+		"markdown_excerpt": excerpt,
+		"evidence_ref":     evidenceRef,
+		"captured_at":      capturedAt,
+		"suggested_uses":   suggestedWPUIAIUses(sourceType),
+		"metadata":         metadata,
+	}
+	if len(records) > 0 {
+		card["record_count"] = len(records)
+		card["record_refs"] = sourceMarkdownRecordRefs(records)
+	}
+	return map[string]any{
+		"research_card": card,
+		"report": map[string]any{
+			"schema":       "wpui.source_markdown_report.v1",
+			"summary":      fmt.Sprintf("Captured %s as Markdown for WPUIAI research/card workflows.", firstMarkdownNonEmpty(read.Title, sourceType)),
+			"evidence_ref": evidenceRef,
+			"source_url":   read.URL,
+			"source_type":  sourceType,
+			"record_count": len(records),
+		},
+	}
+}
+
+func suggestedWPUIAIUses(sourceType string) []string {
+	switch sourceType {
+	case "github_issue", "github_pull_request", "github_discussion":
+		return []string{"developer proof", "feature requirement", "release note source", "support reference"}
+	case "reddit_thread", "x_thread", "x_article":
+		return []string{"market research", "voice-of-customer", "FAQ seed", "competitor proof"}
+	default:
+		return []string{"content source", "competitor proof", "reference", "FAQ seed", "SEO seed"}
+	}
+}
+
+func sourceMarkdownRecordRefs(records []map[string]any) []string {
+	refs := make([]string, 0, len(records))
+	for _, record := range records {
+		if ref := stringFromMap(record, "evidence_ref", ""); ref != "" {
+			refs = append(refs, ref)
+		}
+	}
+	return refs
+}
+
+func stringFromMap(values map[string]any, key, fallback string) string {
+	if value, ok := values[key].(string); ok && strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	return fallback
 }
 
 type githubPublicSource struct {
