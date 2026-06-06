@@ -2,6 +2,19 @@
 
 This is the shortest end-to-end path for using UIAI Engine as an agent browser, research, diagnostics, and Focusa evidence backend. For repeatable operator/agent recipes, see [Agent UX Cookbook](AGENT_UX_COOKBOOK.md).
 
+## Highest-value agent benefits
+
+Use UIAI Engine first for these public, agent-visible benefits:
+
+1. **Discover tools fast:** agent cards, tool search, tool graph, docs metadata, OpenAI schemas, MCP schemas, Pi wrappers, and CLI discovery.
+2. **Turn sources into proof:** Source-to-Markdown converts public URLs into Markdown, metadata, diagnostics, records, Focusa refs, and WPUIAI research cards/reports.
+3. **Browse like an agent, not a screenshot bot:** persistent sessions support read, snapshot, @ref actions, forms, navigation, cookies, auth state, and diagnostics.
+4. **Debug from evidence:** console, exceptions, failed requests, structured errors, and `uiai_errors` produce bounded redacted proof.
+5. **Hand off to Focusa/Pi cleanly:** scoped browser calls and research packets produce `focusa_evidence_capture` / diagnostics-intake args previews.
+6. **Ship with proof:** repeatable smokes cover discovery, MCP/Pi parity, Source-to-Markdown E2E, packet examples, and live service health.
+
+Legacy parity, old API retirement, and plugin-only internals are maintenance references; they are not the primary public story.
+
 ## 1. Start with health and discovery
 
 Use discovery before loading full schemas.

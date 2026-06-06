@@ -4,6 +4,13 @@ import json
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 checks={
+ 'agent_discovery_index': {
+   'README.md':['Clearest benefits','docs/AGENT_DISCOVERY_INDEX.md','/api/tools/agent-card','pi_uiai_agent_card','Public sources become usable proof'],
+   'docs/AGENT_DISCOVERY_INDEX.md':['Highest-value public benefits','/api/tools/agent-card','/api/tools/search?q=<keyword>','/api/tools/graph','/api/tools/docs','pi_uiai_agent_card','uiai_agent_card','scripts/uiai tools agent-card','source_to_markdown','uiai-source-markdown:sha256:<prefix>','scripts/smoke-source-markdown-e2e.sh'],
+   'docs/UIAI_FOR_AGENTS_QUICKSTART.md':['Highest-value agent benefits','Turn sources into proof','Hand off to Focusa/Pi cleanly'],
+   'docs/PUBLIC_API_PARITY_MATRIX.md':['Public benefit priority','Source-to-Markdown','Maintenance-only compatibility'],
+   'internal/routes/tools.go':['top_benefits','docs/AGENT_DISCOVERY_INDEX.md','Agent discovery index'],
+ },
  'search': {
    'README.md':['/api/search','uiai_search','browser_search','scripts/uiai-open-result.sh'],
    'docs/SESSION_API.md':['/api/search','uiai-search:<provider>:<query-hash>:<rank>'],

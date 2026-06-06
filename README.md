@@ -1,32 +1,36 @@
 # UIAI Engine
 
-UIAI Engine is the Go backend for WPUIAI cloud features, visual/browser automation, persistent agent browsing, AI-powered design analysis, workflow orchestration, usage/credit accounting, and agent tool discovery. It is the successor/rewrite path for the older `WPUIAI/ai-api` Bun/PHP/vision-daemon stack, with expanded Go-native browser sessions, MCP/Pi integrations, [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff, captcha support, media jobs, training/data APIs, and operational tooling.
+UIAI Engine is the agent-compatible browser and intelligence backend for WPUIAI. It turns web pages, browser sessions, diagnostics, and visual checks into clean, discoverable, evidence-backed outputs for Pi, MCP clients, Focusa, WPUIAI, and remote agents.
+
+## Clearest benefits
+
+Start here. These are the main reasons to use UIAI Engine:
+
+| Benefit | What you get |
+|---|---|
+| **Agents discover features fast** | Agent cards, tool search, tool graph, docs metadata, OpenAI/MCP schemas, Pi cards, MCP cards, and CLI discovery. |
+| **Public sources become usable proof** | Source-to-Markdown converts URLs into clean Markdown, records, metadata, diagnostics, Focusa evidence refs, and WPUIAI research cards/reports. |
+| **Agents can browse real sites reliably** | Persistent browser sessions keep state across reads, snapshots, @ref actions, forms, navigation, cookies, auth state, and diagnostics. |
+| **Debugging starts from evidence** | Console errors, exceptions, failed requests, structured error envelopes, and `uiai_errors` reduce screenshot-only guessing. |
+| **Research flows hand off cleanly** | Search → browse → read/snapshot → diagnostics → redacted Focusa/Pi packet → evidence capture. |
+| **Visual QA has artifacts** | Screenshots, device frames, shares, browser reliability checks, and release proof scripts produce reviewable output. |
+| **WPUIAI gets product-ready outputs** | Research cards, proof reports, critique/design/reference support, workflow support, and usage/accounting surfaces. |
+
+Primary entry points: `/api/tools/agent-card`, `/api/tools/search`, `/api/tools/graph`, `/api/tools/docs`, `/api/markdown`, `/api/session/*`, `/api/agent/research-packet`, Pi `pi_uiai_agent_card`, Pi `uiai_source_to_markdown`, MCP `source_to_markdown`, and `scripts/uiai`.
+
+Legacy parity, old route retirement, and compatibility inventories are maintenance references below the primary product/agent benefits.
 
 ## What this engine does
 
 UIAI Engine serves as a single local or remote API surface for:
 
-- **WPUIAI plugin cloud calls:** critique, UI reverse/reference analysis, section detection, layout comparison, style enhancement, copilot chat, intake, workflow orchestration, and usage reporting.
-- **Visual automation:** one-shot screenshots, persistent browser sessions, DOM snapshots, page text extraction, click/type/fill/select/press actions, CSS injection, viewport changes, cookies/auth save-load, diagnostics, and shareable artifacts.
 - **Agent integrations:** Pi extension tools, MCP browser-session bridge, OpenAI/MCP tool schemas, compact agent cards, provider-neutral web search, tool search, tool graph metadata, and [Focusa](https://github.com/Startempire-Wire/focusa)-aware evidence routes.
+- **Visual automation:** one-shot screenshots, persistent browser sessions, DOM snapshots, page text extraction, click/type/fill/select/press actions, CSS injection, viewport changes, cookies/auth save-load, diagnostics, and shareable artifacts.
+- **WPUIAI plugin cloud calls:** critique, UI reverse/reference analysis, section detection, layout comparison, style enhancement, copilot chat, intake, workflow orchestration, and usage reporting.
 - **Design/build pipelines:** design-system extraction, content mapping, block recipes, five-way comparison, migration helpers, and SSE events.
 - **Media and device output:** device-frame catalog/rendering, media job production, screenshot compare, share viewers, and artifact handles.
 - **Reliability and safety:** browser pool metrics, diagnostics without screenshots, URL allow/deny rules, loopback-public browser APIs, authenticated remote exposure, rate limits, credit deduction, and secret-safe deployment conventions.
 - **Training/intelligence surfaces:** indexing, search/embed helpers, dataset/job/eval/model-registry endpoints, and code artifact upload/download routes.
-
-## Relationship to `WPUIAI/ai-api`
-
-`uiai-engine` is not a direct in-place continuation of the older `ai-api` codebase. It is a Go rewrite/successor that preserves many product routes while adding larger browser/session and agent-integration capabilities.
-
-Shared/successor route families include `/api/critique`, `/api/ui-reverse`, `/api/section-detect`, `/api/layout-compare`, `/api/style-enhance`, `/api/copilot`, `/api/intake`, `/api/workflow`, `/api/usage`, `/api/extension`, `/api/memory`, `/api/admin`, `/api/intelligence`, `/api/training`, `/api/screenshot`, and `/api/share`.
-
-Parity is intentionally documented instead of assumed:
-
-- Full retirement/readiness inventory: [`docs/FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md`](docs/FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md)
-- UI Reverse parity gaps: [`docs/UI_REVERSE_GO_PARITY_GAP_INVENTORY_2026-03-07.md`](docs/UI_REVERSE_GO_PARITY_GAP_INVENTORY_2026-03-07.md)
-- Workflow/cloud orchestration map: [`docs/WORKFLOW_API_ORCHESTRATION.md`](docs/WORKFLOW_API_ORCHESTRATION.md)
-
-Do not remove old API dependency paths solely because a Go route exists. The parity inventory requires caller compatibility, behavior parity, auth parity, response-shape parity, fallback/repair parity, and proof before retirement.
 
 ## Runtime architecture
 
@@ -57,6 +61,7 @@ Start here by task:
 | Need | Read |
 |---|---|
 | HLT ledger and current trajectory | [`docs/HLT_LEDGER.md`](docs/HLT_LEDGER.md) |
+| Agent discovery index: `/api/tools/agent-card`, `pi_uiai_agent_card`, cards, search, graph, docs endpoint, Pi/MCP/CLI discovery, gaps | [`docs/AGENT_DISCOVERY_INDEX.md`](docs/AGENT_DISCOVERY_INDEX.md) |
 | Agent quickstart: Pi, MCP, CLI, HTTP, browser workflow, Focusa packet handoff | [`docs/UIAI_FOR_AGENTS_QUICKSTART.md`](docs/UIAI_FOR_AGENTS_QUICKSTART.md) |
 | Agent UX cookbook: search/read, @refs, diagnostics, packets, visual QA, release proof | [`docs/AGENT_UX_COOKBOOK.md`](docs/AGENT_UX_COOKBOOK.md) |
 | Draft Source-to-Markdown spec: webpage/social/docs/issues/videos → Markdown/JSONL with agent discovery and Focusa evidence | [`docs/SOURCE_TO_MARKDOWN_AGENT_SPEC.md`](docs/SOURCE_TO_MARKDOWN_AGENT_SPEC.md) |
@@ -543,19 +548,15 @@ Cross-link: [`docs/SESSION_API.md#security--remote-exposure-boundaries`](docs/SE
 | [`scripts/stress-browser-diagnostics.sh`](scripts/stress-browser-diagnostics.sh) | diagnostics stress run. |
 | [`scripts/soak-browser-flakiness.sh`](scripts/soak-browser-flakiness.sh) | browser flake soak. |
 
-## Current parity/readiness warnings
+## Maintenance reference: legacy/parity notes
 
-The Go engine is more developed than the old AI API in many areas, but parity remains intentionally tracked:
-
-- Screenshot/share/viewer: partial; not universally safe to retire old paths without proof.
-- UI Reverse/reference analysis: implemented but not fully parity-certified.
-- Section detect/layout compare/style enhance/copilot/intake/workflow/intelligence/training: route presence does not equal full caller/contract parity.
-
-Before deleting or disabling old API dependency code, read:
+These docs are intentionally lower-priority for new readers. They exist for maintainers deciding whether old dependency paths can be retired or whether plugin callers need compatibility proof:
 
 1. [`docs/FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md`](docs/FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md)
 2. [`docs/UI_REVERSE_GO_PARITY_GAP_INVENTORY_2026-03-07.md`](docs/UI_REVERSE_GO_PARITY_GAP_INVENTORY_2026-03-07.md)
 3. [`docs/WORKFLOW_API_ORCHESTRATION.md`](docs/WORKFLOW_API_ORCHESTRATION.md)
+
+For public/product positioning, lead with agent discovery, Source-to-Markdown, persistent browser workflows, diagnostics, Focusa/Pi/MCP handoff, and WPUIAI research-card/report outputs.
 
 ## Recommended contribution workflow
 

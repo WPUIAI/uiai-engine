@@ -2,6 +2,18 @@
 
 Purpose: map public/operator/agent-facing UIAI HTTP route families to Pi, MCP, CLI, auth, evidence, and smoke coverage so routes do not silently drift across surfaces.
 
+## Public benefit priority
+
+Prioritize these agent-visible benefits in public docs, cards, and examples:
+
+1. **Discovery first:** `/api/tools/agent-card`, `/api/tools/search`, `/api/tools/graph`, `/api/tools/docs`, Pi cards, MCP cards, and CLI discovery.
+2. **Source-to-Markdown:** public URL → Markdown, metadata, diagnostics, records, Focusa evidence refs, `wpuiai.research_card`, and `wpuiai.report`.
+3. **Persistent browser workflows:** session read/snapshot/@ref actions/diagnostics/cookies/auth state for agent web work.
+4. **Focusa/Pi/MCP handoff:** packet composition, evidence handles, diagnostics intake, and redacted args previews.
+5. **Diagnostics and visual proof:** errors, failed network, screenshots, frames, shares, and browser reliability proof.
+
+Maintenance-only compatibility, old route retirement, and paid/mutating plugin/admin internals remain lower-priority reference sections.
+
 ## Source of truth
 
 - HTTP route mounts: `internal/server/server.go`.

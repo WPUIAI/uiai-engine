@@ -56,9 +56,10 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-mcp-tool-routes.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-mcp-structured-failure.sh'
 ```
 
-For browser reliability and error evidence changes:
+For browser reliability, Source-to-Markdown, and error evidence changes:
 
 ```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-source-markdown-e2e.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-browser-error-regressions.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-failed-network-diagnostics.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && make browser-reliability'
