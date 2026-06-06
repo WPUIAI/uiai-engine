@@ -309,3 +309,26 @@ Remaining non-vulnerability notes:
 
 - Full default `gosec` still reports low-severity informational items, mostly ignored write/cleanup errors and log-injection taint warnings. These are not counted as open vulnerabilities under the final closure gate; medium-or-higher security findings are closed.
 - Production/release builds should explicitly use Go `1.25.11+` until the OS package repo catches up.
+
+## Deploy Proof — 2026-06-06
+
+Deployment actions:
+
+- Built live binary with Go `1.25.11`:
+  - `export PATH=/opt/go1.25.11/bin:$PATH`
+  - `go build -o ./uiai-engine ./cmd/uiai-engine`
+- Restarted `uiai-engine.service` after clearing an orphan non-systemd listener from an earlier test run.
+- Verified systemd owns the live listener on `127.0.0.1:7456`.
+
+Live proof:
+
+- `GET /health`: healthy.
+- `GET /api/tools/mcp`: tool manifest reachable and includes browser tools.
+- `POST /api/session` with `http://127.0.0.1:9/`: blocked as private/internal URL.
+- `POST /api/markdown` with public `https://example.com/?token=SECRET123#frag`: redacted secret query/fragment.
+- `scripts/smoke-mcp-tool-routes.sh`: `mcp tool route parity ok: advertised=39 routed=39 extra_routes=0`.
+- `scripts/smoke-pi-extension-registration.sh`: `pi extension registration ok: tools=40 commands=1 mcp_mirrors=39`.
+
+Note:
+
+- `scripts/release-service-smoke.sh --check-only` currently assumes localhost/private browser targets; this is incompatible with hardened `allow_private_urls: false` and should be updated to use a public test URL or an explicit dev profile.
