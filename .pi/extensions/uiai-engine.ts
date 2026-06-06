@@ -610,7 +610,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_browser_open",
 		label: "UIAI Browser Open",
-		description: "Open a persistent UIAI browser session. Prefer read/snapshot @refs and diagnostics-first debugging for reliable web surfing.",
+		description: "Open a persistent UIAI browser session for public http/https targets. Private/internal targets require explicit local/dev allow_private_urls; prefer read/snapshot @refs and diagnostics-first debugging.",
 		parameters: Type.Object({
 			url: Type.String({ description: "URL to open" }),
 			width: Type.Optional(Type.Number({ description: "Viewport width", default: 1280 })),
@@ -912,7 +912,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_screenshot",
 		label: "UIAI Screenshot",
-		description: "One-shot screenshot: navigate, capture, forget. Use sessions for multi-step browsing.",
+		description: "One-shot screenshot for public http/https targets: navigate, capture, forget. Private/internal targets require explicit local/dev allow_private_urls; use sessions for multi-step browsing.",
 		parameters: Type.Object({
 			url: Type.String({ description: "URL to screenshot" }),
 			width: Type.Optional(Type.Number({ description: "Viewport width", default: 1280 })),
@@ -981,7 +981,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 			const guidedPrompts: Record<string, string> = {
 				research: "Run /uiai research <query> to search, open the top result, read/snapshot/diagnose, compose a packet, close the session, and insert Focusa args_preview; or manually call uiai_search → open → read → diagnostics → uiai_focusa_packet_compose.",
 				diagnose: "Run /uiai diagnose <session_id> to read browser diagnostics, compose mode=diagnose, and insert Focusa args_preview; or manually call uiai_browser_diagnostics then uiai_focusa_packet_compose.",
-				proof: "Run /uiai proof <url> to open/read/snapshot/diagnose, compose mode=proof, close the session, and insert Focusa args_preview; or manually call uiai_focusa_packet_compose with cleanup_session_id.",
+				proof: "Run /uiai proof <url> with a public http/https URL to open/read/snapshot/diagnose, compose mode=proof, close the session, and insert Focusa args_preview; private/internal targets need explicit local/dev allow_private_urls. Or manually call uiai_focusa_packet_compose with cleanup_session_id.",
 			};
 			if (guidedPrompts[action]) {
 				renderUiaiWidget(ctx);
@@ -1016,12 +1016,12 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 				const prompts: Record<string, string> = {
 					"Show agent card": "Use pi_uiai_agent_card to show the UIAI Engine bootstrap card.",
 					"Search tools": "Use pi_uiai_tool_search with q=diagnostics, read, click, screenshot, or frame.",
-					"Open browser session": "Use uiai_browser_open with a URL, then uiai_browser_read, uiai_browser_snapshot, and action tools.",
+					"Open browser session": "Use uiai_browser_open with a public http/https URL, then uiai_browser_read, uiai_browser_snapshot, and action tools. Private/internal targets need an explicit local/dev allow_private_urls profile.",
 					"Run research packet": guidedPrompts.research,
 					"Run diagnostics packet": guidedPrompts.diagnose,
 					"Run proof packet": guidedPrompts.proof,
 					"Run diagnostics": "Use uiai_browser_diagnostics with a session_id after any failed or surprising browser action.",
-					"One-shot screenshot": "Use uiai_screenshot with a URL for a one-off capture.",
+					"One-shot screenshot": "Use uiai_screenshot with a public http/https URL for a one-off capture; private/internal targets need explicit local/dev allow_private_urls.",
 					"Show tool graph": "Use pi_uiai_tool_graph to inspect UIAI workflows and Focusa handoff routes.",
 				};
 				if (choice && prompts[choice]) ctx.ui.setEditorText(prompts[choice]);
