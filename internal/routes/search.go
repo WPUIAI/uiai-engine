@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -379,7 +380,7 @@ func searchWikipedia(query string, limit int) ([]searchResult, error) {
 	if base == "" {
 		base = "https://en.wikipedia.org/w/api.php"
 	}
-	u, err := url.Parse(base)
+	u, err := searchAPIURL(base, "https://en.wikipedia.org/w/api.php", []string{"en.wikipedia.org", "wikipedia.org"})
 	if err != nil {
 		return nil, fmt.Errorf("invalid Wikipedia API URL: %w", err)
 	}
@@ -391,7 +392,7 @@ func searchWikipedia(query string, limit int) ([]searchResult, error) {
 	q.Set("search", query)
 	u.RawQuery = q.Encode()
 
-	httpReq, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	httpReq, err := http.NewRequest(http.MethodGet, u.String(), nil) // #nosec G704 -- URL validated by searchAPIURL host allowlist/loopback gate.
 	if err != nil {
 		return nil, err
 	}
@@ -399,13 +400,13 @@ func searchWikipedia(query string, limit int) ([]searchResult, error) {
 	httpReq.Header.Set("User-Agent", "uiai-engine/agent-search (+https://github.com/WPUIAI/uiai-engine)")
 
 	client := &http.Client{Timeout: 12 * time.Second}
-	resp, err := client.Do(httpReq)
+	resp, err := client.Do(httpReq) // #nosec G704 -- API URL is restricted by searchAPIURL allowlist/loopback test gate.
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("Wikipedia API returned HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("wikipedia API returned HTTP %d", resp.StatusCode)
 	}
 
 	var decoded []any
@@ -413,7 +414,7 @@ func searchWikipedia(query string, limit int) ([]searchResult, error) {
 		return nil, err
 	}
 	if len(decoded) < 4 {
-		return nil, fmt.Errorf("Wikipedia API returned unexpected OpenSearch payload")
+		return nil, fmt.Errorf("wikipedia API returned unexpected OpenSearch payload")
 	}
 	titles := stringsFromJSONArray(decoded[1])
 	descriptions := stringsFromJSONArray(decoded[2])
@@ -440,6 +441,39 @@ func searchWikipedia(query string, limit int) ([]searchResult, error) {
 	return results, nil
 }
 
+func searchAPIURL(raw, fallback string, allowedHosts []string) (*url.URL, error) {
+	if strings.TrimSpace(raw) == "" {
+		raw = fallback
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme != "https" && !isLoopbackHost(u.Hostname()) {
+		return nil, fmt.Errorf("search API URL must use https unless loopback")
+	}
+	host := strings.ToLower(u.Hostname())
+	if isLoopbackHost(host) {
+		return u, nil
+	}
+	for _, allowed := range allowedHosts {
+		allowed = strings.ToLower(strings.TrimSpace(allowed))
+		if host == allowed || strings.HasSuffix(host, "."+allowed) {
+			return u, nil
+		}
+	}
+	return nil, fmt.Errorf("search API host %q is not allowed", host)
+}
+
+func isLoopbackHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 func stringsFromJSONArray(value any) []string {
 	items, ok := value.([]any)
 	if !ok {
@@ -463,7 +497,7 @@ func searchBrave(query string, limit int) ([]searchResult, error) {
 	if base == "" {
 		base = "https://api.search.brave.com/res/v1/web/search"
 	}
-	u, err := url.Parse(base)
+	u, err := searchAPIURL(base, "https://api.search.brave.com/res/v1/web/search", []string{"api.search.brave.com"})
 	if err != nil {
 		return nil, fmt.Errorf("invalid Brave API URL: %w", err)
 	}
@@ -472,7 +506,7 @@ func searchBrave(query string, limit int) ([]searchResult, error) {
 	q.Set("count", strconv.Itoa(limit))
 	u.RawQuery = q.Encode()
 
-	httpReq, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	httpReq, err := http.NewRequest(http.MethodGet, u.String(), nil) // #nosec G704 -- URL validated by searchAPIURL host allowlist/loopback gate.
 	if err != nil {
 		return nil, err
 	}
@@ -480,13 +514,13 @@ func searchBrave(query string, limit int) ([]searchResult, error) {
 	httpReq.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 12 * time.Second}
-	resp, err := client.Do(httpReq)
+	resp, err := client.Do(httpReq) // #nosec G704 -- API URL is restricted by searchAPIURL allowlist/loopback test gate.
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("Brave API returned HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("brave API returned HTTP %d", resp.StatusCode)
 	}
 
 	var decoded braveWebResponse

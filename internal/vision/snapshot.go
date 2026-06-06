@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 )
@@ -68,7 +67,6 @@ type SnapshotStats struct {
 
 // refStore tracks refs per snapshot call.
 type refStore struct {
-	mu      sync.Mutex
 	counter int
 	refs    map[string]SnapshotRef
 }
@@ -425,7 +423,7 @@ func buildSnapshotFocusaMetadata(sessionID string, snapshotSeq int, pageURL, tit
 	if pageURL == "" {
 		targetRef = "browser:session=" + focusapacket.Truncate(sessionID, 80)
 	}
-	summary := fmt.Sprintf("Snapshot %d refs (%d interactive, %d lines) from %s", stats.RefCount, stats.Interactive, stats.Lines, focusapacket.Truncate(firstNonEmpty(title, pageURL, sessionID), 160))
+	summary := fmt.Sprintf("Snapshot %d refs (%d interactive, %d lines) from %s", stats.RefCount, stats.Interactive, stats.Lines, focusapacket.Truncate(safePageLabel(title, pageURL, sessionID), 160))
 	if selector != "" {
 		summary += " selector=" + focusapacket.Truncate(selector, 80)
 	}

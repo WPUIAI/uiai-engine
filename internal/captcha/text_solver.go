@@ -250,7 +250,7 @@ func solveWithTesseract(ctx context.Context, imgBase64, imgType string, ppCfg *P
 	var bestText string
 	var bestScore int
 	for _, psm := range []string{"7", "8", "13"} {
-		cmd := exec.CommandContext(ctx, "tesseract", tmpFile, "stdout",
+		cmd := exec.CommandContext(ctx, "tesseract", tmpFile, "stdout", // #nosec G204 -- tesseract args are fixed options and generated temp-file paths.
 			"--psm", psm, "-l", "eng",
 			"-c", "tessedit_char_whitelist=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 		out, err := cmd.Output()

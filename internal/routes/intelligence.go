@@ -19,9 +19,6 @@ import (
 
 var docStore sync.Map // runId → []document
 
-// embeddingCache stores computed embeddings per document.
-var embeddingCache sync.Map // runId:docIdx → []float64
-
 func MountIntelligenceReal(r chi.Router, cfg *config.Config, aiProv *ai.Provider) {
 	r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "healthy", "module": "intelligence"})
@@ -178,7 +175,7 @@ func MountIntelligenceReal(r chi.Router, cfg *config.Config, aiProv *ai.Provider
 	r.Post("/wasm/{runId}", func(w http.ResponseWriter, req *http.Request) {
 		runId := chi.URLParam(req, "runId")
 		wasmDir := filepath.Join(cfg.Storage.DataDir, "wasm")
-		os.MkdirAll(wasmDir, 0755)
+		os.MkdirAll(wasmDir, 0750)
 		wasmPath := filepath.Join(wasmDir, runId+".wasm")
 
 		data, err := io.ReadAll(io.LimitReader(req.Body, 50*1024*1024)) // 50MB limit
@@ -186,7 +183,7 @@ func MountIntelligenceReal(r chi.Router, cfg *config.Config, aiProv *ai.Provider
 			writeJSON(w, 400, map[string]string{"error": "read body failed"})
 			return
 		}
-		if err := os.WriteFile(wasmPath, data, 0644); err != nil {
+		if err := os.WriteFile(wasmPath, data, 0600); err != nil {
 			writeJSON(w, 500, map[string]string{"error": "write failed"})
 			return
 		}
@@ -209,7 +206,7 @@ func MountIntelligenceReal(r chi.Router, cfg *config.Config, aiProv *ai.Provider
 	r.Post("/js/{runId}", func(w http.ResponseWriter, req *http.Request) {
 		runId := chi.URLParam(req, "runId")
 		jsDir := filepath.Join(cfg.Storage.DataDir, "js")
-		os.MkdirAll(jsDir, 0755)
+		os.MkdirAll(jsDir, 0750)
 		jsPath := filepath.Join(jsDir, runId+".js")
 
 		data, err := io.ReadAll(io.LimitReader(req.Body, 20*1024*1024)) // 20MB limit
@@ -217,7 +214,7 @@ func MountIntelligenceReal(r chi.Router, cfg *config.Config, aiProv *ai.Provider
 			writeJSON(w, 400, map[string]string{"error": "read body failed"})
 			return
 		}
-		if err := os.WriteFile(jsPath, data, 0644); err != nil {
+		if err := os.WriteFile(jsPath, data, 0600); err != nil {
 			writeJSON(w, 500, map[string]string{"error": "write failed"})
 			return
 		}

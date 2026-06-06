@@ -34,7 +34,7 @@ func initMemStore(dataDir string) {
 	memBackend = &persistentMemStore{
 		dataDir: filepath.Join(dataDir, "memory"),
 	}
-	os.MkdirAll(memBackend.dataDir, 0755)
+	os.MkdirAll(memBackend.dataDir, 0750)
 }
 
 func (s *persistentMemStore) get(userId string) *userMemory {
@@ -45,7 +45,7 @@ func (s *persistentMemStore) get(userId string) *userMemory {
 
 	// Try loading from disk
 	path := filepath.Join(s.dataDir, userId+".json")
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path is scoped to memory dataDir with userId JSON suffix.
 	if err == nil {
 		m := &userMemory{Preferences: map[string]any{}, Context: map[string]any{}}
 		if json.Unmarshal(data, m) == nil {
@@ -70,7 +70,7 @@ func (s *persistentMemStore) save(userId string) {
 	}
 	m := v.(*userMemory)
 	data, _ := json.MarshalIndent(m, "", "  ")
-	os.WriteFile(filepath.Join(s.dataDir, userId+".json"), data, 0644)
+	os.WriteFile(filepath.Join(s.dataDir, userId+".json"), data, 0600)
 }
 
 func (s *persistentMemStore) delete(userId string) {

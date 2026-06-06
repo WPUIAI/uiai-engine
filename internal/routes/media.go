@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/auth"
@@ -328,7 +329,7 @@ func (d *mediaDeps) produceMockup(job *media.Job) (string, error) {
 	}
 
 	nodePath := findNode()
-	cmd := exec.Command(nodePath, args...)
+	cmd := exec.Command(nodePath, args...) // #nosec G204 -- nodePath is from fixed allowlist and args are constructed flags.
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("mockup script failed: %v\nOutput: %s", err, truncate(string(out), 500))
@@ -377,7 +378,7 @@ func (d *mediaDeps) produceGIF(job *media.Job) (string, error) {
 	}
 
 	nodePath := findNode()
-	cmd := exec.Command(nodePath, args...)
+	cmd := exec.Command(nodePath, args...) // #nosec G204 -- nodePath is from fixed allowlist and args are constructed flags.
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("GIF script failed: %v\nOutput: %s", err, truncate(string(out), 500))
@@ -424,7 +425,7 @@ func validateMediaURL(rawURL string) error {
 		}
 	}
 	// Resolve and check for private IPs
-	ips, err := net.LookupHost(host)
+	ips, err := net.LookupHost(host) // #nosec G704 -- DNS lookup is used only to reject private/internal addresses before outbound media access.
 	if err == nil {
 		for _, ipStr := range ips {
 			ip := net.ParseIP(ipStr)
@@ -446,10 +447,25 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
+func safeR2UploadURL(endpoint, bucket, key string) (string, error) {
+	u, err := url.Parse(strings.TrimRight(endpoint, "/"))
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme != "https" {
+		return "", fmt.Errorf("R2_ENDPOINT must use https")
+	}
+	if err := validateMediaURL(u.String()); err != nil {
+		return "", err
+	}
+	u.Path = strings.TrimRight(u.Path, "/") + "/" + strings.Trim(bucket, "/") + "/" + strings.TrimLeft(key, "/")
+	return u.String(), nil
+}
+
 // uploadToR2 uploads a file to Cloudflare R2 using the S3-compatible API.
 // Returns the public URL on success.
 func uploadToR2(cfg *config.Config, localPath, r2Key string) (string, error) {
-	data, err := os.ReadFile(localPath)
+	data, err := os.ReadFile(localPath) // #nosec G304 -- localPath is an internal generated media artifact path.
 	if err != nil {
 		return "", fmt.Errorf("read file: %w", err)
 	}
@@ -463,8 +479,11 @@ func uploadToR2(cfg *config.Config, localPath, r2Key string) (string, error) {
 		return "", fmt.Errorf("R2_ENDPOINT not configured")
 	}
 
-	uploadURL := fmt.Sprintf("%s/%s/%s", r2Endpoint, cfg.Media.R2Bucket, r2Key)
-	req, err := http.NewRequest("PUT", uploadURL, bytes.NewReader(data))
+	uploadURL, err := safeR2UploadURL(r2Endpoint, cfg.Media.R2Bucket, r2Key)
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequest("PUT", uploadURL, bytes.NewReader(data)) // #nosec G704 -- R2 endpoint is validated by safeR2UploadURL.
 	if err != nil {
 		return "", err
 	}
@@ -484,7 +503,7 @@ func uploadToR2(cfg *config.Config, localPath, r2Key string) (string, error) {
 	}
 
 	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // #nosec G704 -- R2 endpoint is validated by safeR2UploadURL.
 	if err != nil {
 		return "", err
 	}

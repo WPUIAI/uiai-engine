@@ -403,14 +403,14 @@ func extractTextWithLocalTesseract(ctx context.Context, imageBase64, imageType s
 	candidate := ""
 	warnings := []string{}
 	for _, variant := range variants {
-		cmd := exec.CommandContext(ctx, "convert", variant.args...)
+		cmd := exec.CommandContext(ctx, "convert", variant.args...) // #nosec G204 -- convert args are generated temp-file paths and fixed image options.
 		if out, err := cmd.CombinedOutput(); err != nil {
 			warnings = append(warnings, fmt.Sprintf("convert %s failed: %s", variant.name, strings.TrimSpace(string(out))))
 			continue
 		}
 		outPath := variant.args[len(variant.args)-1]
 		for _, psm := range []string{"8", "7", "6"} {
-			cmd = exec.CommandContext(ctx, "tesseract", outPath, "stdout", "--psm", psm, "-l", "eng", "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+			cmd = exec.CommandContext(ctx, "tesseract", outPath, "stdout", "--psm", psm, "-l", "eng", "-c", "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") // #nosec G204 -- tesseract args are fixed options and generated temp-file paths.
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf("tesseract %s/psm%s failed: %s", variant.name, psm, strings.TrimSpace(string(out))))

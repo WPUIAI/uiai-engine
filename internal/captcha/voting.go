@@ -5,7 +5,6 @@ import (
 	"log"
 	"strings"
 	"sync"
-	"unicode"
 
 	"github.com/WPUIAI/uiai-engine/internal/ai"
 )
@@ -172,9 +171,10 @@ func charLevelVote(answers []string) string {
 func normalizeChars(s string) string {
 	s = strings.ToLower(s)
 	var out []byte
-	for _, c := range s {
-		if unicode.IsLetter(c) || unicode.IsDigit(c) {
-			out = append(out, byte(c))
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') {
+			out = append(out, ch)
 		}
 	}
 	return string(out)

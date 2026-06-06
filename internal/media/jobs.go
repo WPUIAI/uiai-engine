@@ -167,9 +167,9 @@ func (s *JobStore) saveLocked() {
 	}
 
 	dir := filepath.Dir(s.filePath)
-	os.MkdirAll(dir, 0755)
+	os.MkdirAll(dir, 0750)
 
-	if err := os.WriteFile(s.filePath, data, 0644); err != nil {
+	if err := os.WriteFile(s.filePath, data, 0600); err != nil {
 		log.Printf("[media] Failed to save jobs: %v", err)
 	}
 }

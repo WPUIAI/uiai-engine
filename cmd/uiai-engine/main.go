@@ -58,7 +58,7 @@ func main() {
 	log.Printf("uiai-engine %s starting (config: %s)", version, cfgPath)
 
 	// Ensure data directory exists
-	if err := os.MkdirAll(cfg.Storage.DataDir, 0755); err != nil {
+	if err := os.MkdirAll(cfg.Storage.DataDir, 0750); err != nil {
 		log.Fatalf("Failed to create data dir %s: %v", cfg.Storage.DataDir, err)
 	}
 

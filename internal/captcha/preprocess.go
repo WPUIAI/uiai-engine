@@ -43,7 +43,11 @@ func Preprocess(imgBase64, imgType string, cfg *PreprocessConfig) (string, error
 
 	// 3. Threshold → binary
 	if cfg.Threshold > 0 {
-		gray = threshold(gray, uint8(cfg.Threshold))
+		thresholdValue := cfg.Threshold
+		if thresholdValue > 255 {
+			thresholdValue = 255
+		}
+		gray = threshold(gray, uint8(thresholdValue))
 	}
 
 	// 4. Morphological open (remove thin lines)

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net"
 	"net/url"
 	"os"
@@ -181,7 +180,7 @@ func (p *IPPool) PickExcluding(exclude map[string]bool) (string, func(), error) 
 	var node *IPNode
 	switch p.config.Strategy {
 	case "random":
-		node = available[rand.Intn(len(available))]
+		node = available[secureIntn(len(available))]
 	case "round_robin":
 		node = available[p.index%len(available)]
 		p.index++
@@ -432,7 +431,7 @@ func (p *IPPool) pickWeighted(nodes []*IPNode) *IPNode {
 	for _, c := range candidates {
 		totalScore += c.score
 	}
-	r := rand.Float64() * totalScore
+	r := secureFloat64(totalScore)
 	cumulative := 0.0
 	for _, c := range candidates {
 		cumulative += c.score
@@ -496,7 +495,7 @@ func (p *IPPool) saveHealth() {
 	if err != nil {
 		return
 	}
-	os.WriteFile(p.config.HealthFile, data, 0644)
+	os.WriteFile(p.config.HealthFile, data, 0600)
 }
 
 // ─── Browser launch ────────────────────────────────────────────────────────
@@ -606,7 +605,7 @@ func (pb *ProxiedBrowser) OpenPage(targetURL string, width, height int, stealth 
 	if stealth.PatchWebdriver {
 		ua := ""
 		if stealth.RandomUserAgent && len(stealth.UserAgents) > 0 {
-			ua = stealth.UserAgents[rand.Intn(len(stealth.UserAgents))]
+			ua = stealth.UserAgents[secureIntn(len(stealth.UserAgents))]
 		}
 		stealthJS := `
 			Object.defineProperty(navigator, 'webdriver', {get: () => undefined});

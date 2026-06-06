@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -661,6 +660,6 @@ func randomDelay(minMs, maxMs int) {
 	if maxMs <= minMs {
 		maxMs = minMs + 100
 	}
-	d := time.Duration(minMs+rand.Intn(maxMs-minMs)) * time.Millisecond
+	d := time.Duration(minMs+secureIntn(maxMs-minMs)) * time.Millisecond
 	time.Sleep(d)
 }

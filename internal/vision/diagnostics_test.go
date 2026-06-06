@@ -75,6 +75,27 @@ func TestDiagnosticsRedactsURLQueryAndFragment(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsSnapshotRedactsSessionURL(t *testing.T) {
+	s := &Session{ID: "sid", URL: "https://example.test/app?token=secret&ok=1#frag", diagnostics: newDiagnosticsRecorder()}
+	snap := s.Diagnostics(10, "all", false)
+	if strings.Contains(snap.URL, "secret") || strings.Contains(snap.URL, "#frag") || strings.Contains(snap.URL, "token=") {
+		t.Fatalf("diagnostics URL leaked secret: %q", snap.URL)
+	}
+}
+
+func TestSanitizeDiagnosticTextRedactsSecrets(t *testing.T) {
+	raw := "Authorization Bearer SECRET123 url=https://example.test/a?token=abc&ok=1#frag api_key=BAD cookie=sessionid"
+	got := sanitizeDiagnosticText(raw)
+	for _, leaked := range []string{"SECRET123", "token=abc", "#frag", "api_key=BAD", "sessionid"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("diagnostic text leaked %q in %q", leaked, got)
+		}
+	}
+	if !strings.Contains(got, "Bearer REDACTED") || !strings.Contains(got, "token=REDACTED") {
+		t.Fatalf("diagnostic text not redacted as expected: %q", got)
+	}
+}
+
 func TestDiagnosticsFailedOnly(t *testing.T) {
 	s := &Session{ID: "sid"}
 	s.diagnostics = newDiagnosticsRecorder()
@@ -130,7 +151,7 @@ func TestBuildReadFocusaMetadata(t *testing.T) {
 	if len(meta.NextTools) == 0 || meta.Summary == "" || !strings.Contains(meta.Summary, "truncated") {
 		t.Fatalf("incomplete summary/next tools: %+v", meta)
 	}
-	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") {
+	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") || strings.Contains(meta.Summary, "secret") || strings.Contains(meta.Summary, "#frag") {
 		t.Fatalf("secret leaked: %+v", meta)
 	}
 
@@ -157,7 +178,7 @@ func TestBuildDiagnosticsFocusaMetadata(t *testing.T) {
 	if len(meta.NextTools) == 0 || !strings.Contains(meta.Summary, "failed_requests=3") {
 		t.Fatalf("incomplete metadata: %+v", meta)
 	}
-	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") {
+	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") || strings.Contains(meta.Summary, "secret") || strings.Contains(meta.Summary, "#frag") {
 		t.Fatalf("secret leaked: %+v", meta)
 	}
 }
@@ -179,7 +200,7 @@ func TestBuildSnapshotFocusaMetadata(t *testing.T) {
 	if len(meta.NextTools) == 0 || !strings.Contains(meta.Summary, "Snapshot 2 refs") {
 		t.Fatalf("incomplete metadata: %+v", meta)
 	}
-	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") {
+	if strings.Contains(meta.TargetRef, "secret") || strings.Contains(meta.TargetRef, "#frag") || strings.Contains(meta.Summary, "secret") || strings.Contains(meta.Summary, "#frag") {
 		t.Fatalf("secret leaked: %+v", meta)
 	}
 }

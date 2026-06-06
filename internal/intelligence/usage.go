@@ -66,7 +66,7 @@ func (t *UsageTracker) load() {
 
 func (t *UsageTracker) save() {
 	dir := filepath.Dir(t.path)
-	os.MkdirAll(dir, 0755)
+	os.MkdirAll(dir, 0750)
 	data, _ := json.MarshalIndent(t.data, "", "  ")
-	os.WriteFile(t.path, data, 0644)
+	os.WriteFile(t.path, data, 0600)
 }

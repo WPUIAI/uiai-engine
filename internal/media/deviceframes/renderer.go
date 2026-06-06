@@ -114,7 +114,7 @@ func discoverManifestPath() string {
 }
 
 func loadManifest(path string) (*Manifest, string, error) {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) // #nosec G304 -- manifest path is resolved from bundled device-frame assets.
 	if err != nil {
 		return nil, "", fmt.Errorf("read manifest: %w", err)
 	}
@@ -251,7 +251,7 @@ func (r *Renderer) loadFrameImage(fc *FrameConfig) (image.Image, error) {
 	if _, err := os.Stat(svgPath); err != nil {
 		return nil, fmt.Errorf("svg not found: %s", svgPath)
 	}
-	cmd := exec.Command("convert", svgPath, "png:-")
+	cmd := exec.Command("convert", svgPath, "png:-") // #nosec G204 -- svgPath is from bundled device-frame assets and output is stdout.
 	pngBytes, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("rasterize svg: %w", err)

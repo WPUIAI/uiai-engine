@@ -288,7 +288,7 @@ func (p *Pool) restartBrowser() error {
 
 	// Kill any orphan chrome processes from this launcher
 	if p.browserPID > 0 {
-		exec.Command("kill", "-9", fmt.Sprintf("%d", p.browserPID)).Run()
+		exec.Command("kill", "-9", fmt.Sprintf("%d", p.browserPID)).Run() // #nosec G204 -- browserPID is captured from managed browser process.
 		time.Sleep(500 * time.Millisecond)
 	}
 
@@ -638,14 +638,6 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 }
 
 // containsAny checks if s contains any of the substrings.
-func containsAny(s string, subs ...string) bool {
-	for _, sub := range subs {
-		if strings.Contains(s, sub) {
-			return true
-		}
-	}
-	return false
-}
 
 // isDangerousScheme blocks non-HTTP schemes unconditionally (file://, ftp://, data://, etc).
 func isDangerousScheme(rawURL string) bool {

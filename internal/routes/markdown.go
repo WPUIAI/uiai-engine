@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +18,8 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
+
+var markdownURLRe = regexp.MustCompile(`https?://[^\s)\]"'<>]+`)
 
 // MountMarkdownRoutes registers the one-shot Source-to-Markdown API.
 func MountMarkdownRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManager) {
@@ -123,7 +126,7 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 	}
 
 	capturedAt := time.Now().UTC().Format(time.RFC3339)
-	metadata := markdownMetadata(read, body, capturedAt)
+	metadata := sanitizeMarkdownPayload(markdownMetadata(read, body, capturedAt)).(map[string]any)
 	sourceMatchURL := firstMarkdownNonEmpty(body.URL, read.URL)
 	var records []map[string]any
 	if gh, ok := matchGitHubPublicSource(sourceMatchURL); ok {
@@ -157,8 +160,10 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 		records = xPublicRecords(read, xp)
 		metadata["record_count"] = len(records)
 	}
-	markdown := redactMarkdownSecretFragments(read.Text)
+	markdown := sanitizeMarkdownText(read.Text)
 	read.Text = markdown
+	read.Links = sanitizeMarkdownLinks(read.Links)
+	read.Metadata = sanitizeMarkdownPayload(read.Metadata).(map[string]any)
 	evidenceRef := markdownEvidenceRef(read.URL, markdown)
 	safeURL := sanitizeMarkdownURLForFocusa(firstMarkdownNonEmpty(read.URL, body.URL))
 	format := normalizeSourceMarkdownFormat(body.Format)
@@ -182,7 +187,7 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 		"chars":        read.Chars,
 		"truncated":    read.Truncated,
 		"headings":     read.Headings,
-		"links":        read.Links,
+		"links":        sanitizeMarkdownLinks(read.Links),
 		"metadata":     metadata,
 		"diagnostics":  diagnostics,
 		"focusa":       oneShotMarkdownFocusa(read, body.URL),
@@ -268,7 +273,7 @@ func markdownMetadata(read *vision.PageReadResult, body markdownRequest, capture
 
 func oneShotMarkdownFocusa(read *vision.PageReadResult, requestedURL string) map[string]any {
 	evidenceRef := markdownEvidenceRef(read.URL, read.Text)
-	title := focusapacket.Truncate(firstMarkdownNonEmpty(read.Title, read.URL, requestedURL), 160)
+	title := focusapacket.Truncate(firstMarkdownNonEmpty(sanitizeMarkdownText(read.Title), sanitizeMarkdownURLForFocusa(read.URL), sanitizeMarkdownURLForFocusa(requestedURL)), 160)
 	return map[string]any{
 		"target_ref":     "source-markdown:" + sanitizeMarkdownURLForFocusa(firstMarkdownNonEmpty(read.URL, requestedURL)),
 		"evidence_ref":   evidenceRef,
@@ -291,7 +296,7 @@ func wpuiAISourceMarkdownProductization(read *vision.PageReadResult, metadata ma
 		"schema":           "wpui.source_markdown_research_card.v1",
 		"source_url":       safeSourceURL,
 		"source_type":      sourceType,
-		"title":            firstMarkdownNonEmpty(read.Title, read.URL),
+		"title":            firstMarkdownNonEmpty(sanitizeMarkdownText(read.Title), safeSourceURL),
 		"markdown_excerpt": excerpt,
 		"evidence_ref":     evidenceRef,
 		"captured_at":      capturedAt,
@@ -940,12 +945,54 @@ func sanitizeMarkdownDiagnostics(value any) any {
 }
 
 func redactMarkdownSecretFragments(value string) string {
-	out := value
-	secretNeedles := []string{"token=secret", "secret=secret", "api_key=secret", "key=secret", "password=secret", "#frag"}
-	for _, needle := range secretNeedles {
-		out = strings.ReplaceAll(out, needle, strings.ReplaceAll(needle, "secret", "REDACTED"))
+	return sanitizeMarkdownText(value)
+}
+
+func sanitizeMarkdownText(value string) string {
+	if value == "" {
+		return value
+	}
+	out := markdownURLRe.ReplaceAllStringFunc(value, sanitizeMarkdownURLForFocusa)
+	out = regexp.MustCompile(`(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|cookie|set-cookie)\s*[:=]\s*)[^\s,;&)\]]+`).ReplaceAllString(out, `${1}REDACTED`)
+	return out
+}
+
+func sanitizeMarkdownLinks(links []map[string]any) []map[string]any {
+	if len(links) == 0 {
+		return links
+	}
+	out := make([]map[string]any, 0, len(links))
+	for _, link := range links {
+		copyLink := make(map[string]any, len(link))
+		for key, value := range link {
+			copyLink[key] = sanitizeMarkdownPayload(value)
+		}
+		out = append(out, copyLink)
 	}
 	return out
+}
+
+func sanitizeMarkdownPayload(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, item := range v {
+			out[key] = sanitizeMarkdownPayload(item)
+		}
+		return out
+	case []map[string]any:
+		return sanitizeMarkdownLinks(v)
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = sanitizeMarkdownPayload(item)
+		}
+		return out
+	case string:
+		return sanitizeMarkdownText(v)
+	default:
+		return value
+	}
 }
 
 func markdownFailure(class string, err error, url string, started time.Time) map[string]any {

@@ -249,7 +249,7 @@ func GenerateBlueprint(plan Plan) string {
 	if len(plan.SocialLinks) > 0 {
 		fmt.Fprintf(&b, "## Social Links\n")
 		for platform, url := range plan.SocialLinks {
-			fmt.Fprintf(&b, "- **%s:** %s\n", strings.Title(platform), url)
+			fmt.Fprintf(&b, "- **%s:** %s\n", titleASCII(platform), url)
 		}
 		b.WriteString("\n")
 	}
@@ -338,6 +338,14 @@ Return valid JSON:
     }
   }
 }`, pageType, businessType, strings.Join(patterns, ", "))
+}
+
+func titleASCII(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return value
+	}
+	return strings.ToUpper(value[:1]) + value[1:]
 }
 
 // BuildInferencePrompt creates the AI prompt for intake data inference.

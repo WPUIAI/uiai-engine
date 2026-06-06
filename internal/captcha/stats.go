@@ -28,7 +28,7 @@ func NewStatsTracker(cfg StatsConfig) *StatsTracker {
 	}
 	if st.logFile != "" {
 		dir := filepath.Dir(st.logFile)
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			log.Printf("[captcha-stats] cannot create log dir %s: %v", dir, err)
 		}
 	}
@@ -70,7 +70,7 @@ func (st *StatsTracker) Record(entry StatsEntry) {
 		entry.Timestamp = time.Now()
 		line, err := json.Marshal(entry)
 		if err == nil {
-			f, err := os.OpenFile(st.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err := os.OpenFile(st.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 			if err == nil {
 				f.Write(line)
 				f.Write([]byte("\n"))

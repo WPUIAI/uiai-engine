@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"runtime"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -413,12 +412,4 @@ fetch('/api/admin/dashboard').then(r=>r.json()).then(d=>{
 </script>
 </body></html>`))
 	}
-}
-
-// providerKeyMask returns first 4 + last 4 chars of a key for safe display.
-func providerKeyMask(key string) string {
-	if len(key) < 12 {
-		return strings.Repeat("*", len(key))
-	}
-	return key[:4] + "..." + key[len(key)-4:]
 }

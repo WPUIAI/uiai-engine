@@ -67,6 +67,6 @@ func (s *UsageStore) load() {
 
 func (s *UsageStore) save() {
 	data, _ := json.MarshalIndent(s.records, "", "  ")
-	os.MkdirAll(filepath.Dir(s.path), 0755)
-	os.WriteFile(s.path, data, 0644)
+	os.MkdirAll(filepath.Dir(s.path), 0750)
+	os.WriteFile(s.path, data, 0600)
 }

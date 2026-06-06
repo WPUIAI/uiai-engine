@@ -1,6 +1,7 @@
 package vision
 
 import (
+	cryptorand "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -103,8 +104,8 @@ func WrapPage(page *rod.Page, url string, width, height int) *Session {
 // generateID creates a short unique session ID.
 func generateID() string {
 	b := make([]byte, 6)
-	for i := range b {
-		b[i] = byte(time.Now().UnixNano()>>(i*8)) ^ byte(i*37+13)
+	if _, err := cryptorand.Read(b); err != nil {
+		return base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf("%06x", time.Now().UnixNano()))[:6])
 	}
 	s := base64.RawURLEncoding.EncodeToString(b)
 	if len(s) > 8 {
@@ -1074,7 +1075,7 @@ func buildReadFocusaMetadata(sessionID string, readSeq int, pageURL, title, sele
 	if format == "markdown" {
 		label = "Read Markdown"
 	}
-	summary := fmt.Sprintf("%s %d chars from %s", label, chars, focusapacket.Truncate(firstNonEmpty(title, pageURL, sessionID), 160))
+	summary := fmt.Sprintf("%s %d chars from %s", label, chars, focusapacket.Truncate(safePageLabel(title, pageURL, sessionID), 160))
 	if selector != "" {
 		summary += " selector=" + focusapacket.Truncate(selector, 80)
 	}
@@ -1099,15 +1100,6 @@ func readFocusaScopeStatus(scope *FocusaScope) string {
 		return string(focusapacket.ScopePresent)
 	}
 	return string(focusapacket.ScopePartial)
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }
 
 // WaitFor waits for a CSS selector to appear, then screenshots.

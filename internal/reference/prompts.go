@@ -47,6 +47,7 @@ Be thorough - identify ALL visible sections. Most marketing pages have 6-12 sect
 IMPORTANT: Count every distinct visual region. Include header, footer, and transitional sections. If you see fewer than 5 sections, look more carefully.`
 
 // tokenExtractionPrompt is Pass 3 — matches PHP build_token_extraction_prompt() exactly.
+// #nosec G101 -- design tokens are UI values, not credentials.
 const tokenExtractionPrompt = `You are a professional UI/UX analyst. Analyze this website screenshot and extract design system tokens.
 
 ## COLOR TOKENS

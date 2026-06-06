@@ -33,14 +33,14 @@ var shareDataDir string
 // loadShareStore reads persisted shares from disk on startup.
 func loadShareStore(dataDir string) {
 	shareDataDir = filepath.Join(dataDir, "shares")
-	os.MkdirAll(shareDataDir, 0755)
+	os.MkdirAll(shareDataDir, 0750)
 
 	entries, _ := os.ReadDir(shareDataDir)
 	for _, e := range entries {
 		if filepath.Ext(e.Name()) != ".json" {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(shareDataDir, e.Name()))
+		data, err := os.ReadFile(filepath.Join(shareDataDir, e.Name())) // #nosec G304 -- e.Name comes from os.ReadDir of shareDataDir.
 		if err != nil {
 			continue
 		}
@@ -60,7 +60,7 @@ func persistShare(entry *shareEntry) {
 		return
 	}
 	data, _ := json.MarshalIndent(entry, "", "  ")
-	os.WriteFile(filepath.Join(shareDataDir, entry.ID+".json"), data, 0644)
+	os.WriteFile(filepath.Join(shareDataDir, entry.ID+".json"), data, 0600)
 }
 
 func shareEvidence(id, targetURL, title string, scope *vision.FocusaScope) map[string]any {

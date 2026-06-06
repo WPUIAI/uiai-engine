@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"os/exec"
 	"strings"
@@ -295,7 +294,7 @@ func (s *Solver) solveTextInSession(ctx context.Context, sess *vision.Session, c
 		if err != nil || result == nil || result.Text == "" {
 			log.Printf("[captcha] attempt %d: no answer from solver", attempt)
 			if attempt < maxAttempts {
-				jitter := time.Duration(rand.Intn(1000)) * time.Millisecond
+				jitter := time.Duration(secureIntn(1000)) * time.Millisecond
 				time.Sleep(retryDelay + jitter)
 			}
 			continue
@@ -329,7 +328,7 @@ func (s *Solver) solveTextInSession(ctx context.Context, sess *vision.Session, c
 			if strings.Contains(checkResult, "FAIL") {
 				log.Printf("[captcha] attempt %d: rejected by site", attempt)
 				if attempt < maxAttempts {
-					jitter := time.Duration(rand.Intn(1000)) * time.Millisecond
+					jitter := time.Duration(secureIntn(1000)) * time.Millisecond
 					time.Sleep(retryDelay + jitter)
 				}
 				continue

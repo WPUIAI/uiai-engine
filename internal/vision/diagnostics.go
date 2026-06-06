@@ -2,6 +2,7 @@ package vision
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,13 @@ const (
 	maxConsoleEvents   = 200
 	maxExceptionEvents = 100
 	maxNetworkEvents   = 300
+)
+
+var (
+	diagnosticURLRe            = regexp.MustCompile(`https?://[^\s"'<>]+`)
+	diagnosticAuthBearerRe     = regexp.MustCompile(`(?i)(authorization\s*[:=]?\s*bearer\s+)[A-Za-z0-9._~+/=-]+`)
+	diagnosticBearerRe         = regexp.MustCompile(`(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+`)
+	diagnosticSecretKeyValueRe = regexp.MustCompile(`(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|cookie|set-cookie)\s*[:=]\s*)[^\s,;&]+`)
 )
 
 type ConsoleEvent struct {
@@ -161,7 +169,7 @@ func (s *Session) Diagnostics(limit int, level string, failedOnly bool) Diagnost
 	seq := s.diagnostics.seq
 	return DiagnosticsSnapshot{
 		SessionID:      s.ID,
-		URL:            s.URL,
+		URL:            redactURL(s.URL),
 		Title:          s.Title,
 		Seq:            seq,
 		GeneratedAt:    time.Now().UTC().Format(time.RFC3339),
@@ -180,7 +188,7 @@ func buildDiagnosticsFocusaMetadata(sessionID string, seq uint64, pageURL, title
 	if pageURL == "" {
 		targetRef = "browser:session=" + focusapacket.Truncate(sessionID, 80)
 	}
-	result := fmt.Sprintf("Diagnostics for %s: console_errors=%d exceptions=%d failed_requests=%d http_4xx=%d http_5xx=%d", focusapacket.Truncate(firstNonEmpty(title, pageURL, sessionID), 160), summary.ConsoleErrors, summary.Exceptions, summary.FailedRequests, summary.HTTP4xx, summary.HTTP5xx)
+	result := fmt.Sprintf("Diagnostics for %s: console_errors=%d exceptions=%d failed_requests=%d http_4xx=%d http_5xx=%d", focusapacket.Truncate(safePageLabel(title, pageURL, sessionID), 160), summary.ConsoleErrors, summary.Exceptions, summary.FailedRequests, summary.HTTP4xx, summary.HTTP5xx)
 	return &DiagnosticsFocusaMetadata{
 		TargetRef:         targetRef,
 		EvidenceRef:       fmt.Sprintf("uiai-diagnostics:session=%s:seq=%d", focusapacket.Truncate(sessionID, 80), seq),
@@ -197,7 +205,7 @@ func (s *Session) recordConsole(e *proto.RuntimeConsoleAPICalled) {
 	}
 	args := make([]string, 0, len(e.Args))
 	for _, arg := range e.Args {
-		args = append(args, remoteObjectPreview(arg))
+		args = append(args, sanitizeDiagnosticText(remoteObjectPreview(arg)))
 	}
 	url, line, col := stackTop(e.StackTrace)
 	s.diagnostics.mu.Lock()
@@ -207,9 +215,9 @@ func (s *Session) recordConsole(e *proto.RuntimeConsoleAPICalled) {
 		Seq:         s.diagnostics.seq,
 		TS:          time.Now().UTC().Format(time.RFC3339),
 		Level:       string(e.Type),
-		Text:        strings.Join(args, " "),
+		Text:        sanitizeDiagnosticText(strings.Join(args, " ")),
 		ArgsPreview: args,
-		URL:         url,
+		URL:         redactURL(url),
 		Line:        line,
 		Column:      col,
 	}, maxConsoleEvents)
@@ -232,11 +240,11 @@ func (s *Session) recordException(e *proto.RuntimeExceptionThrown) {
 	s.diagnostics.exceptions = appendBounded(s.diagnostics.exceptions, ExceptionEvent{
 		Seq:          s.diagnostics.seq,
 		TS:           time.Now().UTC().Format(time.RFC3339),
-		Text:         text,
-		URL:          d.URL,
+		Text:         sanitizeDiagnosticText(text),
+		URL:          redactURL(d.URL),
 		Line:         d.LineNumber,
 		Column:       d.ColumnNumber,
-		StackPreview: stackPreview(d.StackTrace),
+		StackPreview: sanitizeDiagnosticText(stackPreview(d.StackTrace)),
 	}, maxExceptionEvents)
 }
 
@@ -431,6 +439,27 @@ func redactURL(raw string) string {
 		}
 	}
 	return raw
+}
+
+func sanitizeDiagnosticText(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	clean := diagnosticURLRe.ReplaceAllStringFunc(raw, focusapacket.SanitizeURL)
+	clean = diagnosticAuthBearerRe.ReplaceAllString(clean, `${1}REDACTED`)
+	clean = diagnosticBearerRe.ReplaceAllString(clean, `${1}REDACTED`)
+	clean = diagnosticSecretKeyValueRe.ReplaceAllString(clean, `${1}REDACTED`)
+	return truncateDiag(clean, 1000)
+}
+
+func safePageLabel(title, pageURL, sessionID string) string {
+	if strings.TrimSpace(title) != "" {
+		return sanitizeDiagnosticText(title)
+	}
+	if strings.TrimSpace(pageURL) != "" {
+		return focusapacket.SanitizeURL(pageURL)
+	}
+	return sanitizeDiagnosticText(sessionID)
 }
 
 func truncateDiag(s string, max int) string {

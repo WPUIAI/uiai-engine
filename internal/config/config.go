@@ -129,7 +129,7 @@ type CORSConfig struct {
 
 // Load reads config from a YAML file and expands environment variables.
 func Load(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- config path is explicit operator/CLI input or fixed config candidate.
 	if err != nil {
 		return nil, fmt.Errorf("read config %s: %w", path, err)
 	}

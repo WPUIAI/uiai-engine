@@ -488,12 +488,12 @@ func (l *Layer) handleEmbed(w http.ResponseWriter, r *http.Request) {
 func (l *Layer) handleServeWASM(w http.ResponseWriter, r *http.Request) {
 	runID := chi.URLParam(r, "runId")
 	path := l.store.ArtifactPath(runID, "docfind_bg.wasm")
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Stat(path); err != nil { // #nosec G703 -- Store.ArtifactPath validates runID and uses a fixed artifact filename.
 		writeJSON(w, 404, map[string]string{"error": "WASM artifact not found"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/wasm")
-	http.ServeFile(w, r, path)
+	http.ServeFile(w, r, path) // #nosec G703 -- Store.ArtifactPath validates runID and uses a fixed artifact filename.
 }
 
 func (l *Layer) handleUploadWASM(w http.ResponseWriter, r *http.Request) {
@@ -520,12 +520,12 @@ func (l *Layer) handleUploadWASM(w http.ResponseWriter, r *http.Request) {
 func (l *Layer) handleServeJS(w http.ResponseWriter, r *http.Request) {
 	runID := chi.URLParam(r, "runId")
 	path := l.store.ArtifactPath(runID, "docfind.js")
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Stat(path); err != nil { // #nosec G703 -- Store.ArtifactPath validates runID and uses a fixed artifact filename.
 		writeJSON(w, 404, map[string]string{"error": "JS artifact not found"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/javascript")
-	http.ServeFile(w, r, path)
+	http.ServeFile(w, r, path) // #nosec G703 -- Store.ArtifactPath validates runID and uses a fixed artifact filename.
 }
 
 func (l *Layer) handleUploadJS(w http.ResponseWriter, r *http.Request) {

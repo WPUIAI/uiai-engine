@@ -53,7 +53,6 @@ func New(cfg *config.Config) *Engine {
 	r := chi.NewRouter()
 
 	// Global middleware
-	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
 	r.Use(errorRecovery)
 	r.Use(middleware.Compress(5))        // gzip compression — reduces transfer size for JSON + screenshot data

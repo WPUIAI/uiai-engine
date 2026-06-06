@@ -409,3 +409,26 @@ func TestApplyXPublicMetadataAndRecords(t *testing.T) {
 		t.Fatalf("bad x record: %+v", rec)
 	}
 }
+
+func TestSanitizeMarkdownPayloadRedactsLinksMetadataAndText(t *testing.T) {
+	payload := map[string]any{
+		"canonical_url": "https://example.test/page?token=SECRET123&ok=1#frag",
+		"links": []map[string]any{{
+			"href": "https://example.test/next?api_key=BAD&token=SECRET123#frag",
+			"text": "secret link",
+		}},
+		"markdown": "[secret link](https://example.test/next?api_key=BAD&token=SECRET123#frag) cookie=YUM",
+	}
+	got := sanitizeMarkdownPayload(payload).(map[string]any)
+	text := got["markdown"].(string)
+	links := got["links"].([]map[string]any)
+	combined := got["canonical_url"].(string) + "\n" + links[0]["href"].(string) + "\n" + text
+	for _, leaked := range []string{"SECRET123", "api_key=BAD", "#frag", "cookie=YUM"} {
+		if strings.Contains(combined, leaked) {
+			t.Fatalf("leaked %q in sanitized payload: %+v", leaked, got)
+		}
+	}
+	if !strings.Contains(combined, "token=REDACTED") || !strings.Contains(combined, "api_key=REDACTED") || !strings.Contains(combined, "cookie=REDACTED") {
+		t.Fatalf("missing redaction markers: %+v", got)
+	}
+}
