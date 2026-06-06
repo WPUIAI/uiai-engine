@@ -186,7 +186,7 @@ func TestWPUIAISourceMarkdownProductization(t *testing.T) {
 	read := &vision.PageReadResult{URL: "https://example.com/source", Title: "Example Source", Text: strings.Repeat("research ", 300)}
 	metadata := map[string]any{"source_type": "reddit_thread", "captured_at": "2026-06-05T00:00:00Z"}
 	records := []map[string]any{{"evidence_ref": "uiai-source-markdown:sha256:abc#record=1"}}
-	out := wpuiAISourceMarkdownProductization(read, metadata, records, "uiai-source-markdown:sha256:abc")
+	out := wpuiAISourceMarkdownProductization(read, metadata, records, "uiai-source-markdown:sha256:abc", "https://example.test/thread")
 	card := out["research_card"].(map[string]any)
 	if card["schema"] != "wpui.source_markdown_research_card.v1" || card["source_type"] != "reddit_thread" || card["evidence_ref"] != "uiai-source-markdown:sha256:abc" || card["record_count"] != 1 {
 		t.Fatalf("bad research card: %+v", card)

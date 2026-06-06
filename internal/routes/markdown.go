@@ -110,7 +110,7 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 		Mode:          body.Mode,
 		IncludeImages: body.IncludeImages,
 	})
-	diagnostics := sess.Diagnostics(25, "", false)
+	diagnostics := sanitizedMarkdownDiagnosticsSnapshot(sess.Diagnostics(25, "", false))
 	if err != nil {
 		_ = sm.Close(sess.ID)
 		writeJSON(w, http.StatusBadGateway, markdownFailure("source_read_failed", err, body.URL, started))
@@ -144,10 +144,11 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 	}
 	markdown := read.Text
 	evidenceRef := markdownEvidenceRef(read.URL, markdown)
-	wpuiAI := wpuiAISourceMarkdownProductization(read, metadata, records, evidenceRef)
+	safeURL := sanitizeMarkdownURLForFocusa(firstMarkdownNonEmpty(read.URL, body.URL))
+	wpuiAI := wpuiAISourceMarkdownProductization(read, metadata, records, evidenceRef, safeURL)
 	response := map[string]any{
 		"schema":       "uiai.source_markdown.v1",
-		"url":          read.URL,
+		"url":          safeURL,
 		"title":        read.Title,
 		"description":  read.Description,
 		"markdown":     markdown,
@@ -203,13 +204,13 @@ func markdownEvidenceRef(pageURL, markdown string) string {
 	return "uiai-source-markdown:sha256:" + hex.EncodeToString(h[:])[:16]
 }
 
-func wpuiAISourceMarkdownProductization(read *vision.PageReadResult, metadata map[string]any, records []map[string]any, evidenceRef string) map[string]any {
+func wpuiAISourceMarkdownProductization(read *vision.PageReadResult, metadata map[string]any, records []map[string]any, evidenceRef string, safeSourceURL string) map[string]any {
 	sourceType := stringFromMap(metadata, "source_type", "webpage")
 	capturedAt := stringFromMap(metadata, "captured_at", time.Now().UTC().Format(time.RFC3339))
 	excerpt := focusapacket.Truncate(strings.TrimSpace(read.Text), 1200)
 	card := map[string]any{
 		"schema":           "wpui.source_markdown_research_card.v1",
-		"source_url":       read.URL,
+		"source_url":       safeSourceURL,
 		"source_type":      sourceType,
 		"title":            firstMarkdownNonEmpty(read.Title, read.URL),
 		"markdown_excerpt": excerpt,
@@ -228,7 +229,7 @@ func wpuiAISourceMarkdownProductization(read *vision.PageReadResult, metadata ma
 			"schema":       "wpui.source_markdown_report.v1",
 			"summary":      fmt.Sprintf("Captured %s as Markdown for WPUIAI research/card workflows.", firstMarkdownNonEmpty(read.Title, sourceType)),
 			"evidence_ref": evidenceRef,
-			"source_url":   read.URL,
+			"source_url":   safeSourceURL,
 			"source_type":  sourceType,
 			"record_count": len(records),
 		},
@@ -598,6 +599,51 @@ func xPublicLooksBlocked(markdown string) bool {
 		}
 	}
 	return strings.TrimSpace(markdown) == ""
+}
+
+func sanitizedMarkdownDiagnosticsSnapshot(value any) any {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return sanitizeMarkdownDiagnostics(value)
+	}
+	var decoded any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return sanitizeMarkdownDiagnostics(value)
+	}
+	return sanitizeMarkdownDiagnostics(decoded)
+}
+
+func sanitizeMarkdownDiagnostics(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, item := range v {
+			out[key] = sanitizeMarkdownDiagnostics(item)
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = sanitizeMarkdownDiagnostics(item)
+		}
+		return out
+	case string:
+		if strings.Contains(v, "://") {
+			return sanitizeMarkdownURLForFocusa(v)
+		}
+		return redactMarkdownSecretFragments(v)
+	default:
+		return value
+	}
+}
+
+func redactMarkdownSecretFragments(value string) string {
+	out := value
+	secretNeedles := []string{"token=secret", "secret=secret", "api_key=secret", "key=secret", "password=secret", "#frag"}
+	for _, needle := range secretNeedles {
+		out = strings.ReplaceAll(out, needle, strings.ReplaceAll(needle, "secret", "REDACTED"))
+	}
+	return out
 }
 
 func markdownFailure(class string, err error, url string, started time.Time) map[string]any {

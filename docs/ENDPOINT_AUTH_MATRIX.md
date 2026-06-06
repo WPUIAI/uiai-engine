@@ -29,6 +29,7 @@ Local-token env support: `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_A
 | `/api/screenshot`, `/api/screenshot/*` | loopback-public remote-auth | `isLoopbackToolPath`; `internal/auth/auth_test.go` pattern | Local visual tool surface; remote callers authenticate. |
 | `/api/session`, `/api/session/*` | loopback-public remote-auth | `isLoopbackToolPath` | Persistent browser automation; remote callers authenticate. |
 | `/api/search`, `/api/search/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestSearchToolPathLoopbackPublicRemoteAuth` | Provider-neutral search; remote callers authenticate. |
+| `/api/markdown`, `/api/markdown/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestMarkdownToolPathLoopbackPublicRemoteAuth` | Source-to-Markdown browser capture; remote callers authenticate. |
 | `/api/agent/research-packet` | loopback-public remote-auth | `isLoopbackToolPath`; `TestAgentPacketToolPathLoopbackPublicRemoteAuth` | Agent packet composer; accepts existing UIAI responses and returns bounded redacted Focusa packet. |
 | `/api/media/frame`, `/api/media/frame/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestMediaFrameToolPathLoopbackPublicRemoteAuth` | Frame catalog/render agent helpers. |
 | `/api/errors`, `/api/errors/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestErrorsToolPathLoopbackPublicRemoteAuth` | Bounded redacted troubleshooting events. |
@@ -57,5 +58,5 @@ Local-token env support: `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_A
 
 ## Current verification
 
-- `go test ./internal/auth` covers loopback/remote boundaries for search, agent packet, errors, media frame, session, screenshot, loopback detection, local-token auth, and remote positive auth via `X-API-Key`/Bearer.
+- `go test ./internal/auth` covers loopback/remote boundaries for search, markdown, agent packet, errors, media frame, session, screenshot, loopback detection, local-token auth, and remote positive auth via `X-API-Key`/Bearer.
 - `scripts/smoke-agent-integrations.sh` exercises public discovery, loopback tool surfaces, MCP/Pi parity, and browser error smoke.

@@ -9,7 +9,7 @@ import (
 )
 
 func TestLoopbackToolPathClassification(t *testing.T) {
-	for _, path := range []string{"/api/session", "/api/session/abc/read", "/api/screenshot", "/api/screenshot/share", "/api/search", "/api/search/providers", "/api/agent/research-packet"} {
+	for _, path := range []string{"/api/session", "/api/session/abc/read", "/api/screenshot", "/api/screenshot/share", "/api/search", "/api/search/providers", "/api/markdown", "/api/markdown/", "/api/agent/research-packet"} {
 		if !isLoopbackToolPath(path) {
 			t.Fatalf("expected loopback tool path: %s", path)
 		}
@@ -68,6 +68,32 @@ func TestErrorsToolPathLoopbackPublicRemoteAuth(t *testing.T) {
 	handler.ServeHTTP(remoteRes, remoteReq)
 	if remoteRes.Code != http.StatusUnauthorized || hit {
 		t.Fatalf("expected remote errors request unauthorized, code=%d hit=%v", remoteRes.Code, hit)
+	}
+}
+
+func TestMarkdownToolPathLoopbackPublicRemoteAuth(t *testing.T) {
+	authenticator := New(&config.Config{})
+	hit := false
+	handler := authenticator.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	loopbackReq := httptest.NewRequest("POST", "http://example.test/api/markdown", nil)
+	loopbackReq.RemoteAddr = "127.0.0.1:12345"
+	loopbackRes := httptest.NewRecorder()
+	handler.ServeHTTP(loopbackRes, loopbackReq)
+	if loopbackRes.Code != http.StatusNoContent || !hit {
+		t.Fatalf("expected loopback markdown request through, code=%d hit=%v", loopbackRes.Code, hit)
+	}
+
+	hit = false
+	remoteReq := httptest.NewRequest("POST", "http://example.test/api/markdown", nil)
+	remoteReq.RemoteAddr = "203.0.113.10:12345"
+	remoteRes := httptest.NewRecorder()
+	handler.ServeHTTP(remoteRes, remoteReq)
+	if remoteRes.Code != http.StatusUnauthorized || hit {
+		t.Fatalf("expected remote markdown request unauthorized, code=%d hit=%v", remoteRes.Code, hit)
 	}
 }
 
@@ -131,6 +157,7 @@ func TestLoopbackToolPathsRemoteAuthPositive(t *testing.T) {
 		"/api/media/frame/catalog",
 		"/api/session",
 		"/api/screenshot",
+		"/api/markdown",
 		"/api/agent/research-packet",
 	} {
 		for _, tc := range []struct {
