@@ -15,8 +15,12 @@ need jq
 need python3
 TMP="$(mktemp)"
 ENGINE_PID=""
+ENGINE_CONFIG=""
 cleanup(){
   rm -f "$TMP"
+  if [[ -n "$ENGINE_CONFIG" ]]; then
+    rm -f "$ENGINE_CONFIG"
+  fi
   if [[ -n "$ENGINE_PID" ]]; then
     kill "$ENGINE_PID" >/dev/null 2>&1 || true
     wait "$ENGINE_PID" >/dev/null 2>&1 || true
@@ -26,7 +30,26 @@ trap cleanup EXIT
 if ! curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$ENGINE_URL/api/tools/mcp" > "$TMP"; then
   need go
   ENGINE_LOG="${UIAI_TOOL_PARITY_ENGINE_LOG:-/tmp/uiai-tool-parity-engine.log}"
-  (cd "$ROOT_DIR" && go run ./cmd/uiai-engine > "$ENGINE_LOG" 2>&1) &
+  ENGINE_CONFIG="$(mktemp)"
+  python3 - <<'PY' "$ROOT_DIR/config.yaml" "$ENGINE_CONFIG"
+from pathlib import Path
+import sys
+src = Path(sys.argv[1]).read_text()
+out = Path(sys.argv[2])
+base = Path('/tmp/uiai-tool-parity-runtime')
+replacements = {
+    '"/home/wpuiai/ai-api/shares"': '"/tmp/uiai-tool-parity-runtime/shares"',
+    '"/home/wpuiai/uiai-engine/data"': '"/tmp/uiai-tool-parity-runtime/data"',
+    '"/var/log/uiai/ip-pool-health.json"': '"/tmp/uiai-tool-parity-runtime/ip-pool-health.json"',
+    '"/var/log/uiai/captcha-stats.jsonl"': '"/tmp/uiai-tool-parity-runtime/captcha-stats.jsonl"',
+    '"/var/log/uiai/engine.log"': '"/tmp/uiai-tool-parity-runtime/engine.log"',
+}
+for old, new in replacements.items():
+    src = src.replace(old, new)
+base.mkdir(parents=True, exist_ok=True)
+out.write_text(src)
+PY
+  (cd "$ROOT_DIR" && go run ./cmd/uiai-engine -config "$ENGINE_CONFIG" > "$ENGINE_LOG" 2>&1) &
   ENGINE_PID=$!
   for _ in $(seq 1 60); do
     if curl -fsS --max-time 2 "$ENGINE_URL/health" >/dev/null 2>&1; then
