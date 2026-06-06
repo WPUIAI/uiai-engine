@@ -258,12 +258,12 @@ Requirements:
 
 ## 11. [Focusa](https://github.com/Startempire-Wire/focusa) integration contract
 
-UIAI diagnostics are evidence, not authority. [Focusa](https://github.com/Startempire-Wire/focusa) should ingest bounded diagnostic snapshots through its existing evidence/prediction/Workpoint flow:
+UIAI diagnostics are evidence, not authority. [Focusa](https://github.com/Startempire-Wire/focusa) should ingest bounded diagnostic snapshots through its existing evidence/prediction/Workpoint flow. Focusa tools do not bypass UIAI URL safety: `url_not_allowed` is expected policy evidence for private/internal targets unless an explicit local/dev UIAI profile enables private URLs.
 
 1. Agent opens or reuses a UIAI browser session, passing `focusa_scope` when `workpoint_id`, `continuity_id`, `project_root`, or `evidence_ref` are known.
 2. Agent reproduces the page issue.
 3. Agent reads `browser_diagnostics`; diagnostics echo `focusa_scope` when the session was scoped.
-4. Agent captures a stable evidence reference in [Focusa](https://github.com/Startempire-Wire/focusa), preferably through `focusa_browser_diagnostics_intake` so embedded scope is reused.
+4. Agent captures a stable evidence reference in [Focusa](https://github.com/Startempire-Wire/focusa), preferably through `focusa_browser_diagnostics_intake` so embedded scope is reused. That Focusa tool consumes the UIAI diagnostics/error envelope; it does not call UIAI or open target URLs.
 5. [Focusa](https://github.com/Startempire-Wire/focusa) active object resolution maps URL/stack/API routes to likely project files.
 6. [Focusa](https://github.com/Startempire-Wire/focusa) prediction records the likely cause/fix path.
 7. Fix verification captures a second diagnostics snapshot proving console/network clean or improved.

@@ -309,6 +309,7 @@ Symptoms of stale MCP metadata:
 - Prefer stable evidence handles over raw blobs.
 - Close sessions when done.
 - Use Focusa tools for durable evidence, Workpoint, prediction, and metacog writes; UIAI packets are proposals, not Focusa memory.
+- Focusa intake records UIAI diagnostics/errors but cannot bypass UIAI URL safety; treat `url_not_allowed` as hardened private-target policy evidence.
 
 ## Related docs
 

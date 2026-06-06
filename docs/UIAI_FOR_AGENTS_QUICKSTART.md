@@ -140,7 +140,7 @@ Use the same MCP sequence with `browser_search`, `browser_open`, `browser_read`,
 
 ## 3. Compose a Focusa research diagnostics packet
 
-UIAI packets are bounded, redacted evidence proposals. They do **not** write Focusa memory by themselves. Focusa remains the cognitive authority.
+UIAI packets are bounded, redacted evidence proposals. They do **not** write Focusa memory by themselves. Focusa remains the cognitive authority. Focusa intake tools consume UIAI evidence/diagnostics; they do not bypass UIAI auth, redaction, or private-target URL safety.
 
 Schema:
 
@@ -248,6 +248,7 @@ When the packet is diagnostics/error-heavy, prefer:
 
 ```text
 focusa_browser_diagnostics_intake(diagnostics=<diagnostics-json>, target_ref=<target>, project_root=<root>, continuity_id=<continuity>)
+# If diagnostics/error_class is url_not_allowed, record it as UIAI hardened URL-policy evidence or use an explicit local/dev UIAI profile.
 ```
 
 ## 5. Cleanup

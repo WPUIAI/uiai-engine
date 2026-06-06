@@ -49,7 +49,7 @@ This STG deliberately avoids a big-bang autonomous endpoint build. The implement
 - Focusa Pi integration spec defines **Focusa as single cognitive authority** and Pi extension as thin UX glue.
 - Focusa Pi contract allows Pi to emit typed proposals, action intents, evidence observations, failures, blockers, scratch records, and decision candidates; Pi must not become parallel memory.
 - Focusa tools expose ProjectIdentity, Workpoint checkpoint/resume/evidence, Trajectory, active object resolution, diagnostics intake, prediction, metacog, traversal, and tool doctor flows.
-- `focusa_browser_diagnostics_intake` is the preferred UIAI diagnostics wrapper: it captures bounded evidence, infers scope, emits active-object hints, records prediction candidates, and optionally captures metacog lessons.
+- `focusa_browser_diagnostics_intake` is the preferred UIAI diagnostics wrapper: it consumes existing UIAI diagnostics/error envelopes, captures bounded evidence, infers scope, emits active-object hints, records prediction candidates, and optionally captures metacog lessons; it does not call UIAI or open browser targets.
 
 ## 3. Product target
 
@@ -214,7 +214,7 @@ This pass tightens the original STG from “add a packet/workflow” to “make 
 4. **Render compact, expand on demand:** Pi TUI should show `goal`, `target_ref`, `evidence_ref_count`, `diagnostics_status`, `preferred_focusa_tool`, and `next`; expanded JSON remains available.
 5. **Headless parity from day one:** UIAI packet schema must be usable from Pi TUI, Pi RPC/JSON, MCP, and CLI with the same bounded handles.
 6. **Focusa tool graph as route policy:** use `focusa_project_identity -> trajectory_view -> workpoint_resume/checkpoint -> evidence/intake -> active_object -> prediction/metacog` as default choreography; operator steering still wins.
-7. **Resource safety:** avoid full lineage/ontology/diagnostics payloads in packet workflows; use Focusa `traverse`/`tool_doctor`/`resource_mode` and UIAI health/metrics when pressure rises.
+7. **Resource safety:** avoid full lineage/ontology/diagnostics payloads in packet workflows; Focusa `tool_doctor` reads only UIAI browser health/metrics (`/api/health/browser`, `/api/metrics/browser`) for pressure, while `traverse`/`resource_mode` manage Focusa-side load.
 
 #### Required plugin/core upgrades discovered by the pass
 
@@ -231,6 +231,7 @@ This pass tightens the original STG from “add a packet/workflow” to “make 
 #### Non-negotiable constraints from this pass
 
 - Focusa remains the single cognitive authority; Pi and UIAI emit typed, bounded proposals and evidence handles.
+- Focusa does not bypass UIAI auth, redaction, or URL safety; UIAI `url_not_allowed` is captured as policy evidence, not treated as a Focusa failure.
 - UIAI packet workflows must never inline raw screenshots, raw HAR, auth headers, cookies, or large page bodies.
 - The Pi extension must not create long-lived local packet memory beyond Pi session/Workpoint handles and explicit Focusa state.
 - Guided workflows must degrade cleanly in Pi RPC/JSON/SDK contexts where TUI dialogs/custom components are no-ops or protocol-mediated.
