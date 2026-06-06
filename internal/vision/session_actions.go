@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
 )
@@ -66,6 +65,9 @@ func (s *Session) Select(selector string, values []string) (*SnapResult, error) 
 	if s.page == nil {
 		return nil, fmt.Errorf("session closed")
 	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("option value/text required")
+	}
 
 	start := time.Now()
 
@@ -74,14 +76,45 @@ func (s *Session) Select(selector string, values []string) (*SnapResult, error) 
 		return nil, fmt.Errorf("element not found: %s", selector)
 	}
 
-	// Try selecting by value first via Rod's Select method
-	err = el.Timeout(3*time.Second).Select(values, true, rod.SelectorTypeText)
-	if err != nil {
-		// Fallback: try by value attribute
-		err = el.Timeout(3*time.Second).Select(values, true, rod.SelectorTypeCSSSector)
-		if err != nil {
-			return nil, fmt.Errorf("option not found: %v", values)
+	if err := el.ScrollIntoView(); err != nil {
+		return nil, fmt.Errorf("select scroll failed: %w", err)
+	}
+
+	payload, _ := json.Marshal(values)
+	res, err := el.Eval(fmt.Sprintf(`() => {
+		const el = this;
+		const requested = new Set(%s.map(String));
+		if (!el || el.tagName !== 'SELECT') return {ok:false, error:'element is not a select'};
+		let matched = 0;
+		for (const option of Array.from(el.options || [])) {
+			const isMatch = requested.has(String(option.value)) || requested.has(String(option.textContent || '').trim()) || requested.has(String(option.label || '').trim());
+			if (isMatch) {
+				option.selected = true;
+				matched++;
+			} else if (!el.multiple) {
+				option.selected = false;
+			}
 		}
+		if (matched === 0) return {ok:false, error:'option not found'};
+		el.dispatchEvent(new Event('input', { bubbles: true }));
+		el.dispatchEvent(new Event('change', { bubbles: true }));
+		return {ok:true, value: el.value, selected: Array.from(el.selectedOptions || []).map((o) => o.value)};
+	}`, string(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("select failed: %w", err)
+	}
+	var status struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	if err := res.Value.Unmarshal(&status); err != nil {
+		return nil, fmt.Errorf("select result parse failed: %w", err)
+	}
+	if !status.OK {
+		if status.Error == "" {
+			status.Error = "option not found"
+		}
+		return nil, fmt.Errorf("%s: %v", status.Error, values)
 	}
 
 	time.Sleep(100 * time.Millisecond)

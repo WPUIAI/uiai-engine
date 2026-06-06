@@ -332,8 +332,8 @@ Cross-link: [`docs/DEVICE_FRAME_INTEGRATION.md`](docs/DEVICE_FRAME_INTEGRATION.m
 |---|---|---|
 | `POST` | `/api/captcha/solve-image` | Stateless image/text captcha solve. |
 | `POST` | `/api/captcha/solve-proxied` | Proxy/browser-assisted captcha solve. |
-| `GET` | `/api/captcha/status` | Solver status/capabilities. |
-| `GET` | `/api/captcha/pool` | Proxy/IP pool status. |
+| `GET` | `/api/captcha/status` | Authenticated solver status/capabilities. |
+| `GET` | `/api/captcha/pool` | Authenticated proxy/IP pool status. |
 | `POST` | `/api/captcha/pool/add` | Add IP/proxy to pool. |
 | `POST` | `/api/captcha/pool/remove` | Remove IP/proxy from pool. |
 | `POST` | `/api/session/{id}/captcha/solve` | Solve captcha in an existing browser session. |

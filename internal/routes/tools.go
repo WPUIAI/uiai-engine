@@ -609,7 +609,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_snapshot",
-			"description": "Get accessibility tree with @ref selectors. PREFERRED over browser_dom. Returns a text tree like: '- link \"Sign In\" [ref=e3]'. Use refs in click/type/hover: {\"selector\": \"@e3\"}. Options: interactive (only buttons/links/inputs), compact (remove empty nodes), max_depth.",
+			"description": "Get accessibility tree with @ref selectors. PREFERRED over browser_dom. Returns a text tree like: '- link \"Sign In\" [ref=@e3]'. Use refs in click/type/hover: {\"selector\": \"@e3\"}. Options: interactive (only buttons/links/inputs), compact (remove empty nodes), max_depth.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -813,7 +813,7 @@ func openAITools() []map[string]any {
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"frameId":     map[string]string{"type": "string", "description": "Frame ID from frame_catalog"},
+					"frameId":     map[string]string{"type": "string", "description": "Frame ID from frame_catalog (`frameId`; `frame_id` alias also accepted by HTTP)"},
 					"imageBase64": map[string]string{"type": "string", "description": "Source screenshot base64"},
 					"fit":         map[string]any{"type": "string", "description": "cover or contain", "default": "cover"},
 					"format":      map[string]any{"type": "string", "description": "png or jpeg", "default": "png"},

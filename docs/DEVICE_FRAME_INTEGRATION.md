@@ -7,7 +7,7 @@ Yes — we can integrate GitHub device-frame sources into UIAI API cleanly.
 
 Best long-term path:
 1. Vendor approved frame packs into repo-managed asset store.
-2. Normalize to a single internal manifest format (`frame_id`, viewport safe area, output sizes).
+2. Normalize to a single internal manifest format (`frame_id`; catalog also emits camelCase `frameId` for tool/API clients), viewport safe area, and output sizes.
 3. Expose stable API endpoint for rendering screenshots into those frames.
 4. Add update/sync job with license checks + visual regression snapshots.
 

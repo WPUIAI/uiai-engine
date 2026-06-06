@@ -88,13 +88,13 @@ config.yaml               # captcha section with full proxy/pool config
 | `POST` | `/api/captcha/solve-image` | Stateless text captcha solve from base64 image |
 | `POST` | `/api/session/{id}/captcha/solve` | Session-scoped solve (text + reCAPTCHA v2) |
 | `POST` | `/api/captcha/solve-proxied` | One-shot proxied browser: navigate + fill + solve |
-| `GET`  | `/api/captcha/status` | Backend availability, solve stats, pool info |
+| `GET`  | `/api/captcha/status` | Authenticated backend availability, solve stats, pool info |
 
 ### IP Pool Management
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `GET`  | `/api/captcha/pool` | Full pool status with per-IP health |
+| `GET`  | `/api/captcha/pool` | Authenticated full pool status with per-IP health |
 | `POST` | `/api/captcha/pool/add` | Add IP at runtime (no restart) |
 | `POST` | `/api/captcha/pool/remove` | Remove IP at runtime |
 
@@ -144,6 +144,8 @@ config.yaml               # captcha section with full proxy/pool config
 ```
 
 #### `GET /api/captcha/pool`
+
+Requires authentication; unauthenticated calls return 401 by design because proxy/IP-pool state is operationally sensitive.
 ```json
 {
   "total_ips": 3,

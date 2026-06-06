@@ -379,7 +379,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 				Name:     el.Name,
 				Tag:      el.Tag,
 			}
-			line += fmt.Sprintf(" [ref=%s]", ref)
+			line += fmt.Sprintf(" [ref=@%s]", ref)
 
 			if isInteractive {
 				interactiveCount++

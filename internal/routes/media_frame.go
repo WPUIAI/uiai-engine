@@ -37,9 +37,29 @@ func handleFrameCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{
-		"frames": renderer.Catalog(),
+		"frames": frameCatalogResponse(renderer.Catalog()),
 		"count":  len(renderer.Catalog()),
 	})
+}
+
+func frameCatalogResponse(frames []deviceframes.FrameConfig) []map[string]any {
+	out := make([]map[string]any, 0, len(frames))
+	for _, frame := range frames {
+		out = append(out, map[string]any{
+			"frame_id":      frame.FrameID,
+			"frameId":       frame.FrameID,
+			"title":         frame.Title,
+			"source":        frame.Source,
+			"source_ref":    frame.SourceRef,
+			"license":       frame.License,
+			"svg":           frame.SVG,
+			"safe_area":     frame.SafeArea,
+			"output":        frame.Output,
+			"corner_radius": frame.CornerRadius,
+			"active":        frame.Active,
+		})
+	}
+	return out
 }
 
 func handleFrameRender(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +71,7 @@ func handleFrameRender(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		FrameID     string `json:"frameId"`
+		FrameIDAlt  string `json:"frame_id"`
 		ImageBase64 string `json:"imageBase64"`
 		Fit         string `json:"fit"`
 		Format      string `json:"format"`
@@ -60,6 +81,9 @@ func handleFrameRender(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
 		return
+	}
+	if body.FrameID == "" {
+		body.FrameID = body.FrameIDAlt
 	}
 	if body.FrameID == "" {
 		writeJSON(w, 400, map[string]string{"error": "frameId required"})
