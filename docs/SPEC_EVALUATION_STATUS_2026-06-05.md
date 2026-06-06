@@ -44,7 +44,7 @@ Purpose: current implementation-grounded register for remaining UIAI spec work a
 | `uiai-engine-44k.4` | WPUIAI plugin UI/save contract for research cards | Implemented as engine-side integration contract; plugin repo implementation remains separate follow-up. |
 | `uiai-engine-44k.5` | Observability pressure summary deepening | Implemented in this slice; pending tests/smoke before closing. |
 | `uiai-engine-44k.6` | Second search provider | Implemented in this slice with keyless Wikipedia provider; pending tests/smoke before closing. |
-| `uiai-engine-44k.7` | Docs/public-benefit drift automation | Expand CI checks across README, Session API, discovery, parity matrix, Pi/MCP/CLI surfaces. |
+| `uiai-engine-44k.7` | Docs/public-benefit drift automation | Implemented in this slice: CI now runs tool parity; docs completeness guards adapters, providers, agent_pressure, WPUIAI contract, and packet reconciliation. |
 | `uiai-engine-44k.8` | Stale ResearchDiagnosticsPacket matrix reconciliation | Implemented in this slice; pending docs checks before closing. |
 
 ## Focusa specs 98/99 grounding checklist for any Focusa-facing UIAI change

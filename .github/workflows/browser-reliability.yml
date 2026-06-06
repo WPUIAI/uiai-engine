@@ -36,6 +36,8 @@ jobs:
         run: scripts/check-focusa-packet-drift.sh
       - name: Docs completeness check
         run: scripts/check-docs-completeness.py
+      - name: Tool parity check
+        run: scripts/check-tool-parity.sh
       - name: Focusa packet endpoint smoke
         run: |
           mkdir -p "$OUT_DIR"
