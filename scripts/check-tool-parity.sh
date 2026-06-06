@@ -14,8 +14,33 @@ need curl
 need jq
 need python3
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
-curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$ENGINE_URL/api/tools/mcp" > "$TMP"
+ENGINE_PID=""
+cleanup(){
+  rm -f "$TMP"
+  if [[ -n "$ENGINE_PID" ]]; then
+    kill "$ENGINE_PID" >/dev/null 2>&1 || true
+    wait "$ENGINE_PID" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+if ! curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$ENGINE_URL/api/tools/mcp" > "$TMP"; then
+  need go
+  ENGINE_LOG="${UIAI_TOOL_PARITY_ENGINE_LOG:-/tmp/uiai-tool-parity-engine.log}"
+  (cd "$ROOT_DIR" && go run ./cmd/uiai-engine > "$ENGINE_LOG" 2>&1) &
+  ENGINE_PID=$!
+  for _ in $(seq 1 60); do
+    if curl -fsS --max-time 2 "$ENGINE_URL/health" >/dev/null 2>&1; then
+      break
+    fi
+    if ! kill -0 "$ENGINE_PID" >/dev/null 2>&1; then
+      echo "tool parity engine exited early; log: $ENGINE_LOG" >&2
+      sed -n '1,120p' "$ENGINE_LOG" >&2 || true
+      exit 1
+    fi
+    sleep 0.5
+  done
+  curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$ENGINE_URL/api/tools/mcp" > "$TMP"
+fi
 python3 - <<'PY' "$ROOT_DIR" "$TMP"
 import json, re, sys
 from pathlib import Path
