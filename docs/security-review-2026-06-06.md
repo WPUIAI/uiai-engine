@@ -86,19 +86,16 @@ Verification after fix:
 
 ### High — private URL access disabled SSRF protection in current config
 
-**Status:** Not changed; operational boundary finding.
+**Status:** Closed.
 
 Evidence:
-- `config.yaml` has `vision.allow_private_urls: true`.
-- Server binds `127.0.0.1`, which reduces exposure.
+- `config.yaml` now has `vision.allow_private_urls: false`.
+- Live proof blocks `POST /api/session` with `http://127.0.0.1:9/` as `url_not_allowed`.
+- Release smokes now use public browser targets by default; private localhost browser smokes require explicit local/dev opt-in with `UIAI_ALLOW_PRIVATE_SMOKES=1`.
 
 Risk:
-- Safe for local agent/dev use only.
-- Dangerous if service becomes externally reachable or reverse-proxied without strict auth because browser/markdown endpoints can reach private/internal network URLs.
-
-Recommended fix:
-- Keep `allow_private_urls: false` for any internet-facing or multi-tenant deployment.
-- Require explicit documented local-only profile for `true`.
+- Private/internal browser navigation remains appropriate only for explicit local/dev profiles.
+- Remote or reverse-proxied deployments should keep `allow_private_urls: false` and require normal UIAI auth headers.
 
 ### Medium — tracked and ignored binary artifacts in repo root
 
@@ -331,4 +328,4 @@ Live proof:
 
 Note:
 
-- `scripts/release-service-smoke.sh --check-only` currently assumes localhost/private browser targets; this is incompatible with hardened `allow_private_urls: false` and should be updated to use a public test URL or an explicit dev profile.
+- `scripts/release-service-smoke.sh --check-only` now uses hardened public-target smokes by default; private localhost browser smokes are opt-in via `UIAI_ALLOW_PRIVATE_SMOKES=1` for local/dev profiles.

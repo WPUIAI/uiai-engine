@@ -4,7 +4,7 @@ Use this checklist before claiming a UIAI Engine release that changes HTTP, Pi, 
 
 ## Required proof commands
 
-Run from `/home/wpuiai/uiai-engine` unless noted. For live release claims, build/deploy the current commit to `uiai-engine.service` first, wait for `/health`, then run localhost proof against the live service. Use [Release Deploy Runbook](RELEASE_DEPLOY_RUNBOOK.md) for the full rebuild, restart, push, CI-watch, failure-triage, and proof loop.
+Run from `/home/wpuiai/uiai-engine` unless noted. For live release claims, build/deploy the current commit to `uiai-engine.service` first, wait for `/health`, then run hardened live proof against the service. Private localhost browser smokes require explicit local/dev opt-in with `UIAI_ALLOW_PRIVATE_SMOKES=1`. Use [Release Deploy Runbook](RELEASE_DEPLOY_RUNBOOK.md) for the full rebuild, restart, push, CI-watch, failure-triage, and proof loop.
 
 ```bash
 go test ./...
@@ -19,6 +19,8 @@ scripts/smoke-mcp-structured-failure.sh
 scripts/smoke-pi-extension-registration.sh
 scripts/smoke-pi-rendering.sh
 scripts/smoke-pi-uiai-off.sh
+# local/dev-only when private URLs are enabled:
+UIAI_ALLOW_PRIVATE_SMOKES=1 scripts/smoke-agent-integrations.sh
 scripts/smoke-browser-error-regressions.sh
 scripts/smoke-failed-network-diagnostics.sh
 scripts/smoke-focusa-error-evidence.sh
@@ -35,8 +37,8 @@ make release-browser-reliability
 | Surface | Required proof | Evidence to cite |
 |---|---|---|
 | HTTP discovery/tools | `/api/tools/agent-card`, `/api/tools/search`, `/api/tools/graph`, `/api/tools/mcp` pass through `scripts/smoke-agent-integrations.sh` | smoke output + commit hash |
-| Browser/session | open/read/diagnostics/close and browser error regression smokes pass | `/tmp/uiai-browser-error-regressions.json` when generated |
-| Failed network diagnostics | `scripts/smoke-failed-network-diagnostics.sh` passes | `/tmp/uiai-failed-network-diagnostics.json` |
+| Browser/session | public-target open/read/diagnostics/close pass in `scripts/smoke-agent-integrations.sh`; private localhost browser error regressions pass only in explicit local/dev profile | `/tmp/uiai-browser-error-regressions.json` when generated |
+| Failed network diagnostics | `scripts/smoke-failed-network-diagnostics.sh` passes in explicit local/dev profile | `/tmp/uiai-failed-network-diagnostics.json` |
 | MCP bridge | `node --check`, route parity smoke, structured failure smoke pass | `scripts/smoke-mcp-tool-routes.sh`, `scripts/smoke-mcp-structured-failure.sh` |
 | Pi extension | registration, rendering, and `/uiai off` smokes pass | `scripts/smoke-pi-extension-registration.sh`, `scripts/smoke-pi-rendering.sh`, `scripts/smoke-pi-uiai-off.sh` |
 | CLI | `scripts/uiai` smoke paths in `scripts/smoke-agent-integrations.sh` pass and `scripts/check-tool-parity.sh` sees required commands | CLI JSON/status/errors/tools/research packet proof |

@@ -3,26 +3,31 @@ set -euo pipefail
 ENGINE_URL="${ENGINE_URL:-http://127.0.0.1:7456}"
 OUT="${OUT:-/tmp/uiai-focusa-packet-smoke.json}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-15}"
-SITE_DIR="$(mktemp -d)"
+SITE_DIR=""
 SITE_PORT="${SITE_PORT:-8765}"
 SERVER_PID=""
+TARGET_URL="${SMOKE_TARGET_URL:-https://example.com/?ok=1&token=redacted-candidate#frag}"
 cleanup(){
   if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" >/dev/null 2>&1 || true; fi
-  rm -rf "$SITE_DIR"
+  if [[ -n "$SITE_DIR" ]]; then rm -rf "$SITE_DIR"; fi
 }
 trap cleanup EXIT
-cat > "$SITE_DIR/index.html" <<'HTML'
+if [[ "${UIAI_ALLOW_PRIVATE_SMOKES:-0}" == "1" ]]; then
+  SITE_DIR="$(mktemp -d)"
+  cat > "$SITE_DIR/index.html" <<'HTML'
 <!doctype html><html><head><meta charset="utf-8"><title>UIAI Focusa packet smoke</title><meta name="description" content="Harmless local UIAI Focusa packet smoke page"></head><body><main><h1>UIAI Focusa packet smoke</h1><p>Bounded read and diagnostics proof page.</p><a href="/next?token=redacted-candidate#frag">redaction candidate</a><script>console.warn("packet smoke warning");</script></main></body></html>
 HTML
-python3 -m http.server "$SITE_PORT" --directory "$SITE_DIR" >/tmp/uiai-focusa-packet-site.log 2>&1 &
-SERVER_PID=$!
-export ENGINE_URL OUT TIMEOUT_SECONDS SITE_PORT
+  python3 -m http.server "$SITE_PORT" --directory "$SITE_DIR" >/tmp/uiai-focusa-packet-site.log 2>&1 &
+  SERVER_PID=$!
+  TARGET_URL="http://127.0.0.1:${SITE_PORT}/index.html?ok=1&token=redacted-candidate#frag"
+fi
+export ENGINE_URL OUT TIMEOUT_SECONDS TARGET_URL
 python3 - <<'PY'
 import json, os, time, urllib.request
 engine=os.environ['ENGINE_URL'].rstrip('/')
 out=os.environ['OUT']
 timeout=int(os.environ.get('TIMEOUT_SECONDS','15'))
-site=f"http://127.0.0.1:{os.environ['SITE_PORT']}/index.html?ok=1&token=redacted-candidate#frag"
+site=os.environ['TARGET_URL']
 
 def req(method,path,body=None):
     data=None

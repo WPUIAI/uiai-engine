@@ -60,7 +60,11 @@ bash -n "$CLI"
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-extension-registration.sh" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-rendering.sh" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-pi-uiai-off.sh" >/dev/null
-"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-failed-network-diagnostics.sh" >/dev/null
-"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-browser-error-regressions.sh" >/dev/null
+if [[ "${UIAI_ALLOW_PRIVATE_SMOKES:-0}" == "1" ]]; then
+  "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-failed-network-diagnostics.sh" >/dev/null
+  "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-browser-error-regressions.sh" >/dev/null
+else
+  say "skipping private localhost browser smokes (set UIAI_ALLOW_PRIVATE_SMOKES=1 for dev profile)"
+fi
 
 say "agent integration smoke ok"

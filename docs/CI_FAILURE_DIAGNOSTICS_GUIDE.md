@@ -124,6 +124,8 @@ Local reproduction:
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && go test ./...'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/release-service-smoke.sh --check-only'
+# Optional local/dev-only private localhost browser regressions when config allows private URLs:
+# as-user wpuiai 'cd /home/wpuiai/uiai-engine && UIAI_ALLOW_PRIVATE_SMOKES=1 scripts/release-service-smoke.sh --check-only'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-docs-completeness.py'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-tool-parity.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh'

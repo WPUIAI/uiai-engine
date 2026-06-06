@@ -19,6 +19,8 @@ Modes:
   --skip-build   In live mode, restart and smoke without rebuilding binary.
 
 Live mode requires root for systemctl restart. Repo commands run as current user; invoke as wpuiai for build/smokes or use release runbook boundaries.
+
+Default smokes are compatible with vision.allow_private_urls=false. Set UIAI_ALLOW_PRIVATE_SMOKES=1 only for local/dev configs that explicitly allow private URLs.
 EOF
 }
 while [[ $# -gt 0 ]]; do

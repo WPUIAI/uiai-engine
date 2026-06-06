@@ -520,7 +520,7 @@ Default config lives in [`config.yaml`](config.yaml). Important sections:
 Security notes:
 
 - Secrets should be referenced through environment variables or an external systemd environment file such as `/etc/wpuiai/ai-api.env`, not committed literal values.
-- `vision.allow_private_urls: true` is appropriate for local/dev; remote deployment should review URL safety rules in [`docs/SESSION_API.md`](docs/SESSION_API.md).
+- `vision.allow_private_urls: false` is the hardened default and blocks private/internal navigation. Set it to `true` only in explicit local/dev profiles, then run private localhost smokes with `UIAI_ALLOW_PRIVATE_SMOKES=1`.
 - Browser/session, screenshot, provider search, and `/api/agent/research-packet` APIs are loopback-public only; remote callers must authenticate. The Pi extension can send `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` for authenticated remote/media helpers. Local VPS deployments may configure an eternal env-backed `UIAI_LOCAL_API_TOKEN` accepted as `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`.
 
 ## Security and exposure model
@@ -566,6 +566,8 @@ go test ./...
 node --check mcp/browser-session-mcp.mjs
 go build ./cmd/uiai-engine
 scripts/smoke-agent-integrations.sh
+# Optional local/dev-only private localhost browser regressions:
+# UIAI_ALLOW_PRIVATE_SMOKES=1 scripts/smoke-agent-integrations.sh
 ```
 
 For browser-affecting changes, also run or consult:

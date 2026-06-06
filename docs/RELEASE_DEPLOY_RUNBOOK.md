@@ -121,12 +121,14 @@ journalctl -u uiai-engine.service -n 120 --no-pager
 
 Fix the source/config/unit issue, rebuild, restart, and repeat health verification.
 
-## 7. Live localhost proof
+## 7. Live service proof
 
-Use the bundled smoke after rebuild/restart, or `--check-only` to prove the currently running service without restarting:
+Use the bundled smoke after rebuild/restart, or `--check-only` to prove the currently running service without restarting. The default profile is compatible with hardened `vision.allow_private_urls: false`: public browser targets are used, and private localhost browser regression smokes are skipped unless explicitly enabled.
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/release-service-smoke.sh --check-only'
+# Optional local/dev-only private localhost browser regressions:
+# as-user wpuiai 'cd /home/wpuiai/uiai-engine && UIAI_ALLOW_PRIVATE_SMOKES=1 scripts/release-service-smoke.sh --check-only'
 # live mode requires root/systemctl boundary:
 # cd /home/wpuiai/uiai-engine && scripts/release-service-smoke.sh --skip-build
 ```
@@ -143,7 +145,7 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-regist
 Expected outputs:
 
 - Packet smoke prints `focusa packet smoke ok` and writes `/tmp/uiai-focusa-packet-smoke.json`.
-- Agent integration smoke prints `agent integration smoke ok`.
+- Agent integration smoke prints `agent integration smoke ok`; hardened default also prints that private localhost browser smokes were skipped unless `UIAI_ALLOW_PRIVATE_SMOKES=1` is set.
 - MCP route smoke prints advertised/routed parity.
 - Pi extension smoke prints tool/command/mirror counts.
 
