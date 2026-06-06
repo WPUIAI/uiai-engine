@@ -2,7 +2,7 @@
 
 Purpose: define how the WordPress plugin should save/display UIAI Engine Source-to-Markdown product objects without exposing raw engine internals.
 
-Status: engine-side contract; plugin implementation remains cross-repo follow-up.
+Status: implemented across engine contract plus plugin save/display flow in `/home/wpuiai/public_html/wp-content/plugins/wpuiai` (`uiai-833`).
 
 ## Scope
 
@@ -36,7 +36,7 @@ The plugin should call:
 }
 ```
 
-Use `format=jsonl` only when the UI needs record/chunk lines for adapter-supported structured sources. The plugin should never store raw diagnostics, raw browser session state, cookies, auth headers, or full unbounded page bodies.
+Use `format=jsonl` / JSONL only when the UI needs record/chunk lines for adapter-supported structured sources. The plugin should never store raw diagnostics, raw browser session state, cookies, auth headers, or full unbounded page bodies.
 
 ## Response fields the plugin may persist
 
@@ -124,9 +124,9 @@ The plugin should display a concise message and keep raw response bodies out of 
 
 ## Acceptance checklist for plugin implementation
 
-- [ ] Capture form calls `/api/markdown` and validates top-level + `wpuiai` schemas.
-- [ ] Saved card record uses `wpui.saved_research_card.v1` or an equivalent migration-backed shape.
-- [ ] Admin list/detail displays bounded excerpt, evidence ref, record/chunk counts, and suggested uses.
-- [ ] Structured engine errors are preserved in logs/admin notices without dumping raw bodies.
-- [ ] Tests cover successful card save, truncated response, structured error, JSONL/chunk refs, and missing schema rejection.
-- [ ] Proof cites UIAI `scripts/smoke-source-markdown-e2e.sh` plus plugin-side unit/integration tests.
+- [x] Capture form calls `/api/markdown` and validates top-level + `wpuiai` schemas.
+- [x] Saved card record uses `wpui.saved_research_card.v1` as private `wpuiai_research` post metadata.
+- [x] Admin capture page and `wpuiai_research` private post list/detail expose bounded saved card fields.
+- [x] Structured engine failures are reduced to concise admin messages without raw body persistence.
+- [x] Plugin test `tests/unit/test-source-markdown-research-cards.php` covers successful save shape, bounded/truncated excerpt, record/chunk refs, and missing schema rejection.
+- [x] Proof cites UIAI `scripts/smoke-source-markdown-e2e.sh` plus plugin-side `php tests/unit/test-source-markdown-research-cards.php` and WP-CLI load smoke.

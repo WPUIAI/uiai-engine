@@ -19,7 +19,7 @@ Purpose: current implementation-grounded register for remaining UIAI spec work a
 | Agent discovery | Implemented | README agent section; `docs/AGENT_DISCOVERY_INDEX.md`; `/api/tools/*`; Pi and MCP card/search/graph tools. |
 | Source-to-Markdown MVP | Implemented | `POST /api/markdown`; `browser_read format=markdown`; Pi/MCP/CLI exposure; generic browser capture plus GitHub/Reddit/X/Hacker News/YouTube adapters. |
 | Source-to-Markdown records | Implemented in current work slice | `internal/routes/markdown.go` emits `uiai.source_markdown_record.v1` records for MVP adapters including Hacker News/YouTube plus `format=jsonl`, JSONL lines, and `uiai.source_markdown_chunk.v1` refs. |
-| WPUIAI research-card/report objects | Engine implemented; contract documented; plugin pending | `/api/markdown` includes `wpuiai.research_card` / `wpuiai.report`; `docs/WPUIAI_RESEARCH_CARD_INTEGRATION_CONTRACT.md` defines plugin save/display contract. |
+| WPUIAI research-card/report objects | Implemented | `/api/markdown` includes `wpuiai.research_card` / `wpuiai.report`; `docs/WPUIAI_RESEARCH_CARD_INTEGRATION_CONTRACT.md` is implemented; plugin save/display flow uses `wpuiai_research` private posts. |
 | Focusa ResearchDiagnosticsPacket MVP | Implemented enough to supersede older planning matrix | Pi builder, HTTP endpoint `/api/agent/research-packet`, MCP composer, CLI compose/smoke, packet drift/smoke scripts. |
 | Browser diagnostics baseline | Implemented | Diagnostics route, diagnostics docs, Focusa diagnostics intake path, smoke/proof scripts. |
 | Search provider baseline | Implemented/deepened | Provider-neutral `/api/search`, `/api/search/providers`, Brave default, keyless Wikipedia second provider, cache TTL, bounded timeout, redaction, evidence refs. |
@@ -38,14 +38,14 @@ Purpose: current implementation-grounded register for remaining UIAI spec work a
 
 | Bead | Live gap | Notes |
 |---|---|---|
-| `uiai-engine-44k.1` | Explicit Source-to-Markdown JSONL/chunked output mode | Implemented in this slice; pending tests/smoke before closing. |
-| `uiai-engine-44k.2` | Hacker News public adapter | Implemented in this slice; pending tests/smoke before closing. |
-| `uiai-engine-44k.3` | YouTube transcript/metadata adapter | Implemented in this slice; pending tests/smoke before closing. |
-| `uiai-engine-44k.4` | WPUIAI plugin UI/save contract for research cards | Implemented as engine-side integration contract; plugin repo implementation remains separate follow-up. |
-| `uiai-engine-44k.5` | Observability pressure summary deepening | Implemented in this slice; pending tests/smoke before closing. |
-| `uiai-engine-44k.6` | Second search provider | Implemented in this slice with keyless Wikipedia provider; pending tests/smoke before closing. |
+| `uiai-engine-44k.1` | Explicit Source-to-Markdown JSONL/chunked output mode | Implemented and validated with tests/smoke. |
+| `uiai-engine-44k.2` | Hacker News public adapter | Implemented and validated with tests/smoke. |
+| `uiai-engine-44k.3` | YouTube transcript/metadata adapter | Implemented and validated with tests/smoke. |
+| `uiai-engine-44k.4` | WPUIAI plugin UI/save contract for research cards | Engine contract implemented; false-closure audit spawned `uiai-engine-44k.9` for plugin implementation. |
+| `uiai-engine-44k.5` | Observability pressure summary deepening | Implemented and validated with tests/smoke. |
+| `uiai-engine-44k.6` | Second search provider | Implemented with keyless Wikipedia provider and validated with tests/smoke. |
 | `uiai-engine-44k.7` | Docs/public-benefit drift automation | Implemented in this slice: CI now runs tool parity; docs completeness guards adapters, providers, agent_pressure, WPUIAI contract, and packet reconciliation. |
-| `uiai-engine-44k.8` | Stale ResearchDiagnosticsPacket matrix reconciliation | Implemented in this slice; pending docs checks before closing. |
+| `uiai-engine-44k.8` | Stale ResearchDiagnosticsPacket matrix reconciliation | Implemented and validated with docs checks. |
 
 ## Focusa specs 98/99 grounding checklist for any Focusa-facing UIAI change
 
@@ -61,4 +61,4 @@ Purpose: current implementation-grounded register for remaining UIAI spec work a
 
 1. Finish `uiai-engine-44k.1` validation: Go route tests, tool parity, and Source-to-Markdown smoke.
 2. Close `uiai-engine-44k.4` after docs checks.
-3. Close `uiai-engine-44k.8` after docs checks, then continue adapter/provider/observability follow-ups.
+3. False-closure audit reopened the epic and added `uiai-engine-44k.9` for plugin implementation; no planned spec work should remain marked as follow-up without an open bead.

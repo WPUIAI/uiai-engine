@@ -851,7 +851,7 @@ Recommended order:
 ### Phase 5 — WPUIAI productization
 
 - Implemented engine-side `wpuiai.research_card` and `wpuiai.report` response objects for `/api/markdown`.
-- WordPress plugin UI/save integration remains a plugin-side follow-up.
+- WordPress plugin UI/save integration is implemented in the WPUIAI plugin as the `wpuiai_research` private-post save/display flow.
 - Blueprint content-source import.
 - Client proof report integration.
 
