@@ -44,6 +44,7 @@ port = sys.argv[2]
 sessions = max(1, int(sys.argv[3]))
 s = p.read_text()
 s = s.replace('port: 7456', f'port: {port}', 1)
+s = s.replace('allow_private_urls: false', 'allow_private_urls: true', 1)
 s = s.replace('data_dir: "/home/wpuiai/uiai-engine/data"', f'data_dir: "{p.parent / "data"}"', 1)
 s = s.replace('share_dir: "/home/wpuiai/ai-api/shares"', f'share_dir: "{p.parent / "shares"}"', 1)
 s = s.replace('script_dir: "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"', f'script_dir: "{p.parent / "device-templates"}"', 1)

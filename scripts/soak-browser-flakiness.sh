@@ -30,6 +30,7 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 s = p.read_text().replace('port: 7456', f'port: {sys.argv[2]}', 1)
+s = s.replace('allow_private_urls: false', 'allow_private_urls: true', 1)
 s = s.replace('data_dir: "/home/wpuiai/uiai-engine/data"', 'data_dir: "/tmp/uiai-soak-data"', 1)
 p.write_text(s)
 PY
