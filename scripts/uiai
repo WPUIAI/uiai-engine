@@ -30,7 +30,7 @@ Commands:
   tools search <query>           Search tool discovery
   tools mcp|openai|graph|agent-card|docs
   packet compose <json-file|->    Compose Focusa research diagnostics packet
-  markdown <url> [--selector S] [--max-chars N] [--mode main_content|full] [--include-images]
+  markdown <url> [--selector S] [--max-chars N] [--mode main_content|full] [--format json|markdown|jsonl] [--include-images]
                                   One-shot public URL to uiai.source_markdown.v1
   research packet [--query Q|--url URL] [--goal G] [--out PATH]
                                   One-command search/open/read/diagnose/packet/cleanup proof
@@ -300,19 +300,21 @@ PY
 }
 
 cmd_markdown() {
-  [[ $# -ge 1 ]] || { err "usage: uiai markdown <url> [--selector S] [--max-chars N] [--mode main_content|full] [--include-images]"; exit 2; }
-  local url="$1" selector="" max_chars=30000 mode="main_content" include_images=false include_links=true; shift
+  [[ $# -ge 1 ]] || { err "usage: uiai markdown <url> [--selector S] [--max-chars N] [--mode main_content|full] [--format json|markdown|jsonl] [--include-images]"; exit 2; }
+  local url="$1" selector="" max_chars=30000 mode="main_content" response_format="json" include_images=false include_links=true; shift
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --selector) selector="${2:-}"; shift 2 ;;
       --max-chars) max_chars="${2:-}"; shift 2 ;;
       --mode) mode="${2:-}"; shift 2 ;;
+      --format) response_format="${2:-}"; shift 2 ;;
+      --jsonl) response_format="jsonl"; shift ;;
       --include-images) include_images=true; shift ;;
       --no-links) include_links=false; shift ;;
       *) err "unknown markdown option: $1"; exit 2 ;;
     esac
   done
-  jq -cn --arg url "$url" --arg selector "$selector" --argjson max_chars "$max_chars" --arg mode "$mode" --argjson include_images "$include_images" --argjson include_links "$include_links" '{url:$url,max_chars:$max_chars,mode:$mode,include_images:$include_images,include_links:$include_links} + (if $selector == "" then {} else {selector:$selector} end)' | { read -r body; api POST "/api/markdown" "$body"; } | emit
+  jq -cn --arg url "$url" --arg selector "$selector" --argjson max_chars "$max_chars" --arg mode "$mode" --arg format "$response_format" --argjson include_images "$include_images" --argjson include_links "$include_links" '{url:$url,max_chars:$max_chars,mode:$mode,format:$format,include_images:$include_images,include_links:$include_links} + (if $selector == "" then {} else {selector:$selector} end)' | { read -r body; api POST "/api/markdown" "$body"; } | emit
 }
 
 cmd_session() {

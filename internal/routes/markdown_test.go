@@ -99,6 +99,26 @@ func TestGitHubPublicRecords(t *testing.T) {
 	}
 }
 
+func TestSourceMarkdownJSONLAndChunks(t *testing.T) {
+	records := []map[string]any{
+		{"schema": "uiai.source_markdown_record.v1", "source_type": "github_issue", "record_type": "issue", "evidence_ref": "uiai-source-markdown:sha256:abc#record=1"},
+		{"schema": "uiai.source_markdown_record.v1", "source_type": "github_issue", "record_type": "comment", "evidence_ref": "uiai-source-markdown:sha256:abc#record=2"},
+	}
+	jsonl, chunks := sourceMarkdownJSONL(records, "uiai-source-markdown:sha256:abc")
+	if strings.Count(jsonl, "\n") != 1 || !strings.Contains(jsonl, "\"chunk_index\":1") || !strings.Contains(jsonl, "\"parent_evidence_ref\":\"uiai-source-markdown:sha256:abc\"") {
+		t.Fatalf("bad jsonl: %s", jsonl)
+	}
+	if len(chunks) != 2 || chunks[0]["schema"] != "uiai.source_markdown_chunk.v1" || chunks[1]["index"] != 2 {
+		t.Fatalf("bad chunks: %+v", chunks)
+	}
+}
+
+func TestNormalizeSourceMarkdownFormat(t *testing.T) {
+	if normalizeSourceMarkdownFormat("jsonl") != "jsonl" || normalizeSourceMarkdownFormat("md") != "markdown" || normalizeSourceMarkdownFormat("bogus") != "json" {
+		t.Fatalf("unexpected format normalization")
+	}
+}
+
 func TestMatchRedditPublicSource(t *testing.T) {
 	tests := []struct {
 		url       string
@@ -179,6 +199,107 @@ func TestApplyRedditPublicMetadataAndRecords(t *testing.T) {
 	rec := records[0]
 	if rec["schema"] != "uiai.source_markdown_record.v1" || rec["source_type"] != "reddit_thread" || rec["record_type"] != "comment_thread" || rec["comment_id"] != "def456" {
 		t.Fatalf("bad reddit record: %+v", rec)
+	}
+}
+
+func TestMatchHackerNewsPublicSource(t *testing.T) {
+	hn, ok := matchHackerNewsPublicSource("https://news.ycombinator.com/item?id=12345&token=secret#frag")
+	if !ok {
+		t.Fatal("expected HN match")
+	}
+	if hn.ItemID != "12345" || strings.Contains(hn.URL, "secret") || strings.Contains(hn.URL, "#frag") {
+		t.Fatalf("bad HN source: %+v", hn)
+	}
+	for _, raw := range []string{"https://news.ycombinator.com/news", "https://example.com/item?id=123"} {
+		if got, ok := matchHackerNewsPublicSource(raw); ok {
+			t.Fatalf("unexpected HN match for %s: %+v", raw, got)
+		}
+	}
+}
+
+func TestRenderHackerNewsPublicMarkdownAndRecords(t *testing.T) {
+	hn, ok := matchHackerNewsPublicSource("https://news.ycombinator.com/item?id=12345")
+	if !ok {
+		t.Fatal("expected HN match")
+	}
+	read := &vision.PageReadResult{URL: "https://news.ycombinator.com/item?id=12345", Title: "Example story | Hacker News", Text: "Story body"}
+	meta := applyHackerNewsPublicMetadata(map[string]any{"schema": "uiai.source_markdown.v1"}, hn)
+	if meta["adapter"] != "hackernews_public" || meta["source_type"] != "hackernews_thread" || meta["item_id"] != "12345" {
+		t.Fatalf("bad HN metadata: %+v", meta)
+	}
+	out := renderHackerNewsPublicMarkdown("Story body", read, hn)
+	for _, want := range []string{"source: hackernews_thread", "adapter: hackernews_public", "item_id: 12345", "## Comments"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in markdown:\n%s", want, out)
+		}
+	}
+	records := hackerNewsPublicRecords(read, hn)
+	if len(records) != 1 || records[0]["source_type"] != "hackernews_thread" || records[0]["record_type"] != "thread" || records[0]["item_id"] != "12345" {
+		t.Fatalf("bad HN records: %+v", records)
+	}
+}
+
+func TestMatchYouTubePublicSource(t *testing.T) {
+	tests := []struct {
+		url string
+		id  string
+	}{
+		{"https://www.youtube.com/watch?v=abc_123-XYZ&token=secret#frag", "abc_123-XYZ"},
+		{"https://youtu.be/abc123", "abc123"},
+		{"https://m.youtube.com/shorts/short_123", "short_123"},
+		{"https://www.youtube.com/embed/embed-123", "embed-123"},
+	}
+	for _, tc := range tests {
+		yt, ok := matchYouTubePublicSource(tc.url)
+		if !ok || yt.VideoID != tc.id {
+			t.Fatalf("bad YouTube match for %s: %+v ok=%v", tc.url, yt, ok)
+		}
+		if strings.Contains(yt.URL, "secret") || strings.Contains(yt.URL, "#frag") {
+			t.Fatalf("url not sanitized: %s", yt.URL)
+		}
+	}
+	for _, raw := range []string{"https://youtube.com/feed/subscriptions", "https://example.com/watch?v=abc"} {
+		if got, ok := matchYouTubePublicSource(raw); ok {
+			t.Fatalf("unexpected YouTube match for %s: %+v", raw, got)
+		}
+	}
+}
+
+func TestRenderYouTubePublicMarkdownAndRecords(t *testing.T) {
+	yt, ok := matchYouTubePublicSource("https://www.youtube.com/watch?v=abc123")
+	if !ok {
+		t.Fatal("expected YouTube match")
+	}
+	read := &vision.PageReadResult{URL: "https://www.youtube.com/watch?v=abc123", Title: "Example video - YouTube", Text: "Description\nShow transcript\nhello world"}
+	meta := applyYouTubePublicMetadata(map[string]any{"schema": "uiai.source_markdown.v1"}, yt, read.Text)
+	if meta["adapter"] != "youtube_public" || meta["source_type"] != "youtube_video" || meta["video_id"] != "abc123" || meta["transcript_available"] != true {
+		t.Fatalf("bad YouTube metadata: %+v", meta)
+	}
+	out := renderYouTubePublicMarkdown(read.Text, read, yt)
+	for _, want := range []string{"source: youtube_video", "adapter: youtube_public", "video_id: abc123", "transcript_available: true", "## Transcript"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in markdown:\n%s", want, out)
+		}
+	}
+	records := youtubePublicRecords(read, yt)
+	if len(records) != 1 || records[0]["source_type"] != "youtube_video" || records[0]["record_type"] != "video_metadata" || records[0]["video_id"] != "abc123" || records[0]["transcript_available"] != true {
+		t.Fatalf("bad YouTube records: %+v", records)
+	}
+}
+
+func TestYouTubePublicBlockedMetadata(t *testing.T) {
+	yt, ok := matchYouTubePublicSource("https://youtu.be/abc123")
+	if !ok {
+		t.Fatal("expected YouTube match")
+	}
+	read := &vision.PageReadResult{URL: "https://youtu.be/abc123", Title: "Blocked", Text: "This video is unavailable"}
+	meta := applyYouTubePublicMetadata(map[string]any{"schema": "uiai.source_markdown.v1"}, yt, read.Text)
+	if meta["blocked"] != true || meta["failure_class"] != "auth_or_transcript_unavailable" {
+		t.Fatalf("blocked metadata missing: %+v", meta)
+	}
+	out := renderYouTubePublicMarkdown(read.Text, read, yt)
+	if !strings.Contains(out, "Do not scrape credentials") || !strings.Contains(out, "blocked: true") {
+		t.Fatalf("blocked guidance missing:\n%s", out)
 	}
 }
 

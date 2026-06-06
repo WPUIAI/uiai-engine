@@ -44,6 +44,7 @@ type markdownRequest struct {
 	Selector      string              `json:"selector,omitempty"`
 	MaxChars      int                 `json:"max_chars,omitempty"`
 	Mode          string              `json:"mode,omitempty"`
+	Format        string              `json:"format,omitempty"`
 	IncludeLinks  *bool               `json:"include_links,omitempty"`
 	IncludeImages bool                `json:"include_images,omitempty"`
 	Width         int                 `json:"width,omitempty"`
@@ -70,6 +71,7 @@ func markdownRequestFromQuery(req *http.Request) markdownRequest {
 		Selector:      q.Get("selector"),
 		MaxChars:      maxChars,
 		Mode:          q.Get("mode"),
+		Format:        q.Get("format"),
 		IncludeLinks:  includeLinks,
 		IncludeImages: truthy(q.Get("include_images")),
 		Width:         width,
@@ -122,37 +124,61 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 
 	capturedAt := time.Now().UTC().Format(time.RFC3339)
 	metadata := markdownMetadata(read, body, capturedAt)
+	sourceMatchURL := firstMarkdownNonEmpty(body.URL, read.URL)
 	var records []map[string]any
-	if gh, ok := matchGitHubPublicSource(firstMarkdownNonEmpty(read.URL, body.URL)); ok {
+	if gh, ok := matchGitHubPublicSource(sourceMatchURL); ok {
 		metadata = applyGitHubPublicMetadata(metadata, gh)
 		read.Text = renderGitHubPublicMarkdown(read.Text, read, gh)
 		read.Chars = len(read.Text)
 		records = githubPublicRecords(read, gh)
 		metadata["record_count"] = len(records)
-	} else if rd, ok := matchRedditPublicSource(firstMarkdownNonEmpty(read.URL, body.URL)); ok {
+	} else if rd, ok := matchRedditPublicSource(sourceMatchURL); ok {
 		metadata = applyRedditPublicMetadata(metadata, rd)
 		read.Text = renderRedditPublicMarkdown(read.Text, read, rd)
 		read.Chars = len(read.Text)
 		records = redditPublicRecords(read, rd)
 		metadata["record_count"] = len(records)
-	} else if xp, ok := matchXPublicSource(firstMarkdownNonEmpty(read.URL, body.URL)); ok {
+	} else if hn, ok := matchHackerNewsPublicSource(sourceMatchURL); ok {
+		metadata = applyHackerNewsPublicMetadata(metadata, hn)
+		read.Text = renderHackerNewsPublicMarkdown(read.Text, read, hn)
+		read.Chars = len(read.Text)
+		records = hackerNewsPublicRecords(read, hn)
+		metadata["record_count"] = len(records)
+	} else if yt, ok := matchYouTubePublicSource(sourceMatchURL); ok {
+		metadata = applyYouTubePublicMetadata(metadata, yt, read.Text)
+		read.Text = renderYouTubePublicMarkdown(read.Text, read, yt)
+		read.Chars = len(read.Text)
+		records = youtubePublicRecords(read, yt)
+		metadata["record_count"] = len(records)
+	} else if xp, ok := matchXPublicSource(sourceMatchURL); ok {
 		metadata = applyXPublicMetadata(metadata, xp, read.Text)
 		read.Text = renderXPublicMarkdown(read.Text, read, xp)
 		read.Chars = len(read.Text)
 		records = xPublicRecords(read, xp)
 		metadata["record_count"] = len(records)
 	}
-	markdown := read.Text
+	markdown := redactMarkdownSecretFragments(read.Text)
+	read.Text = markdown
 	evidenceRef := markdownEvidenceRef(read.URL, markdown)
 	safeURL := sanitizeMarkdownURLForFocusa(firstMarkdownNonEmpty(read.URL, body.URL))
+	format := normalizeSourceMarkdownFormat(body.Format)
+	jsonl, chunks := sourceMarkdownJSONL(records, evidenceRef)
+	if format == "jsonl" {
+		metadata["output_format"] = "jsonl"
+	}
+	if len(chunks) > 0 {
+		metadata["chunk_count"] = len(chunks)
+	}
 	wpuiAI := wpuiAISourceMarkdownProductization(read, metadata, records, evidenceRef, safeURL)
 	response := map[string]any{
 		"schema":       "uiai.source_markdown.v1",
 		"url":          safeURL,
 		"title":        read.Title,
 		"description":  read.Description,
+		"format":       format,
 		"markdown":     markdown,
 		"text":         markdown,
+		"jsonl":        jsonl,
 		"chars":        read.Chars,
 		"truncated":    read.Truncated,
 		"headings":     read.Headings,
@@ -163,12 +189,65 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 		"wpuiai":       wpuiAI,
 		"cleanup":      cleanup,
 		"duration_ms":  time.Since(started).Milliseconds(),
-		"source_stats": map[string]any{"format": "markdown", "mode": read.Mode, "max_chars": body.MaxChars, "adapter": metadata["adapter"]},
+		"source_stats": map[string]any{"format": format, "mode": read.Mode, "max_chars": body.MaxChars, "adapter": metadata["adapter"], "record_count": len(records), "chunk_count": len(chunks)},
 	}
 	if len(records) > 0 {
 		response["records"] = records
 	}
+	if len(chunks) > 0 {
+		response["chunks"] = chunks
+	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+func normalizeSourceMarkdownFormat(format string) string {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "jsonl":
+		return "jsonl"
+	case "json", "":
+		return "json"
+	case "markdown", "md":
+		return "markdown"
+	default:
+		return "json"
+	}
+}
+
+func sourceMarkdownJSONL(records []map[string]any, evidenceRef string) (string, []map[string]any) {
+	if len(records) == 0 {
+		return "", nil
+	}
+	lines := make([]string, 0, len(records))
+	chunks := make([]map[string]any, 0, len(records))
+	for i, record := range records {
+		copyRecord := make(map[string]any, len(record)+4)
+		for k, v := range record {
+			copyRecord[k] = v
+		}
+		copyRecord["chunk_index"] = i + 1
+		copyRecord["chunk_count"] = len(records)
+		copyRecord["parent_evidence_ref"] = evidenceRef
+		if _, ok := copyRecord["schema"]; !ok {
+			copyRecord["schema"] = "uiai.source_markdown_record.v1"
+		}
+		if _, ok := copyRecord["evidence_ref"]; !ok {
+			copyRecord["evidence_ref"] = fmt.Sprintf("%s#record=%d", evidenceRef, i+1)
+		}
+		encoded, err := json.Marshal(copyRecord)
+		if err != nil {
+			continue
+		}
+		lines = append(lines, string(encoded))
+		chunks = append(chunks, map[string]any{
+			"schema":       "uiai.source_markdown_chunk.v1",
+			"index":        i + 1,
+			"count":        len(records),
+			"evidence_ref": copyRecord["evidence_ref"],
+			"record_type":  copyRecord["record_type"],
+			"source_type":  copyRecord["source_type"],
+		})
+	}
+	return strings.Join(lines, "\n"), chunks
 }
 
 func markdownMetadata(read *vision.PageReadResult, body markdownRequest, capturedAt string) map[string]any {
@@ -461,6 +540,229 @@ func redditPublicRecords(read *vision.PageReadResult, rd redditPublicSource) []m
 	if rd.CommentID != "" {
 		record["comment_id"] = rd.CommentID
 		record["record_type"] = "comment_thread"
+	}
+	return []map[string]any{record}
+}
+
+type hackerNewsPublicSource struct {
+	ItemID string
+	URL    string
+}
+
+func matchHackerNewsPublicSource(raw string) (hackerNewsPublicSource, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return hackerNewsPublicSource{}, false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host != "news.ycombinator.com" && host != "www.news.ycombinator.com" {
+		return hackerNewsPublicSource{}, false
+	}
+	if strings.Trim(u.Path, "/") != "item" {
+		return hackerNewsPublicSource{}, false
+	}
+	itemID := strings.TrimSpace(u.Query().Get("id"))
+	if itemID == "" {
+		return hackerNewsPublicSource{}, false
+	}
+	return hackerNewsPublicSource{ItemID: itemID, URL: sanitizeMarkdownURLForFocusa(raw)}, true
+}
+
+func applyHackerNewsPublicMetadata(metadata map[string]any, hn hackerNewsPublicSource) map[string]any {
+	out := make(map[string]any, len(metadata)+6)
+	for k, v := range metadata {
+		out[k] = v
+	}
+	out["adapter"] = "hackernews_public"
+	out["source_type"] = "hackernews_thread"
+	out["item_id"] = hn.ItemID
+	out["canonical_url"] = hn.URL
+	out["best_effort"] = true
+	return out
+}
+
+func renderHackerNewsPublicMarkdown(markdown string, read *vision.PageReadResult, hn hackerNewsPublicSource) string {
+	title := hackerNewsPublicTitle(read, hn)
+	frontmatter := []string{
+		"---",
+		"source: hackernews_thread",
+		"adapter: hackernews_public",
+		"item_id: " + hn.ItemID,
+		"url: " + hn.URL,
+		"best_effort: true",
+		"evidence_ref: " + markdownEvidenceRef(read.URL, markdown),
+		"---",
+		"",
+		"# " + title,
+		"",
+	}
+	trimmed := strings.TrimSpace(markdown)
+	if trimmed == "" {
+		trimmed = "No readable Hacker News content extracted. Inspect diagnostics or retry with a browser session."
+	}
+	if !strings.Contains(strings.ToLower(trimmed), "comment") {
+		trimmed += "\n\n## Comments\n\nComment extraction is browser-rendered and bounded; inspect records/diagnostics for capture details."
+	}
+	return strings.Join(frontmatter, "\n") + trimmed
+}
+
+func hackerNewsPublicTitle(read *vision.PageReadResult, hn hackerNewsPublicSource) string {
+	title := strings.TrimSpace(read.Title)
+	if title != "" {
+		return title
+	}
+	return "Hacker News item " + hn.ItemID
+}
+
+func hackerNewsPublicRecords(read *vision.PageReadResult, hn hackerNewsPublicSource) []map[string]any {
+	return []map[string]any{{
+		"schema":       "uiai.source_markdown_record.v1",
+		"source_type":  "hackernews_thread",
+		"record_type":  "thread",
+		"index":        1,
+		"item_id":      hn.ItemID,
+		"title":        hackerNewsPublicTitle(read, hn),
+		"url":          hn.URL,
+		"evidence_ref": markdownEvidenceRef(read.URL, read.Text) + "#record=1",
+	}}
+}
+
+type youtubePublicSource struct {
+	VideoID string
+	URL     string
+}
+
+func matchYouTubePublicSource(raw string) (youtubePublicSource, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return youtubePublicSource{}, false
+	}
+	host := strings.ToLower(u.Hostname())
+	var videoID string
+	if host == "youtu.be" || host == "www.youtu.be" {
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(parts) >= 1 {
+			videoID = parts[0]
+		}
+	} else if host == "youtube.com" || host == "www.youtube.com" || host == "m.youtube.com" {
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if strings.Trim(u.Path, "/") == "watch" {
+			videoID = u.Query().Get("v")
+		} else if len(parts) >= 2 && (parts[0] == "shorts" || parts[0] == "embed" || parts[0] == "live") {
+			videoID = parts[1]
+		}
+	}
+	videoID = sanitizeYouTubeVideoID(videoID)
+	if videoID == "" {
+		return youtubePublicSource{}, false
+	}
+	return youtubePublicSource{VideoID: videoID, URL: sanitizeMarkdownURLForFocusa(raw)}, true
+}
+
+func sanitizeYouTubeVideoID(videoID string) string {
+	videoID = strings.TrimSpace(videoID)
+	if videoID == "" {
+		return ""
+	}
+	var out strings.Builder
+	for _, r := range videoID {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			out.WriteRune(r)
+		}
+	}
+	return out.String()
+}
+
+func applyYouTubePublicMetadata(metadata map[string]any, yt youtubePublicSource, markdown string) map[string]any {
+	out := make(map[string]any, len(metadata)+10)
+	for k, v := range metadata {
+		out[k] = v
+	}
+	out["adapter"] = "youtube_public"
+	out["source_type"] = "youtube_video"
+	out["video_id"] = yt.VideoID
+	out["canonical_url"] = yt.URL
+	out["best_effort"] = true
+	out["transcript_available"] = youtubePublicTranscriptAvailable(markdown)
+	if youtubePublicLooksBlocked(markdown) {
+		out["blocked"] = true
+		out["failure_class"] = "auth_or_transcript_unavailable"
+		out["recommended_next_action"] = "Capture available metadata as evidence, or retry only with a public transcript/authorized browser session when policy allows."
+	}
+	return out
+}
+
+func renderYouTubePublicMarkdown(markdown string, read *vision.PageReadResult, yt youtubePublicSource) string {
+	title := youtubePublicTitle(read, yt)
+	transcriptAvailable := youtubePublicTranscriptAvailable(markdown)
+	blocked := youtubePublicLooksBlocked(markdown)
+	frontmatter := []string{
+		"---",
+		"source: youtube_video",
+		"adapter: youtube_public",
+		"video_id: " + yt.VideoID,
+		"url: " + yt.URL,
+		"best_effort: true",
+		"transcript_available: " + strconv.FormatBool(transcriptAvailable),
+		"evidence_ref: " + markdownEvidenceRef(read.URL, markdown),
+	}
+	if blocked {
+		frontmatter = append(frontmatter, "blocked: true", "failure_class: auth_or_transcript_unavailable")
+	}
+	frontmatter = append(frontmatter, "---", "", "# "+title, "")
+	trimmed := strings.TrimSpace(markdown)
+	if trimmed == "" || blocked {
+		trimmed = "Public YouTube transcript or metadata was unavailable from the browser-rendered page.\n\n## Next options\n\n- Capture this metadata-only result as blocked evidence.\n- Retry only when a public transcript is visible or an authorized browser session is already available.\n- Do not scrape credentials or bypass access controls."
+	} else if transcriptAvailable && !strings.Contains(strings.ToLower(trimmed), "## transcript") {
+		trimmed += "\n\n## Transcript\n\nTranscript-like text was detected in the rendered page. Extraction is best-effort and bounded; verify against the public page before treating it as complete."
+	} else if !transcriptAvailable {
+		trimmed += "\n\n## Transcript\n\nNo public transcript text was detected in the bounded browser read."
+	}
+	return strings.Join(frontmatter, "\n") + trimmed
+}
+
+func youtubePublicTitle(read *vision.PageReadResult, yt youtubePublicSource) string {
+	title := strings.TrimSpace(read.Title)
+	if title != "" {
+		return title
+	}
+	return "YouTube video " + yt.VideoID
+}
+
+func youtubePublicTranscriptAvailable(markdown string) bool {
+	lower := strings.ToLower(markdown)
+	if strings.Contains(lower, "no public transcript") || strings.Contains(lower, "no transcript") || strings.Contains(lower, "transcript unavailable") {
+		return false
+	}
+	return strings.Contains(lower, "transcript") || strings.Contains(lower, "show transcript")
+}
+
+func youtubePublicLooksBlocked(markdown string) bool {
+	lower := strings.ToLower(markdown)
+	blockedMarkers := []string{"sign in to confirm", "this video is unavailable", "video unavailable", "private video", "members only", "age-restricted", "transcript unavailable", "no transcript"}
+	for _, marker := range blockedMarkers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func youtubePublicRecords(read *vision.PageReadResult, yt youtubePublicSource) []map[string]any {
+	record := map[string]any{
+		"schema":               "uiai.source_markdown_record.v1",
+		"source_type":          "youtube_video",
+		"record_type":          "video_metadata",
+		"index":                1,
+		"video_id":             yt.VideoID,
+		"title":                youtubePublicTitle(read, yt),
+		"url":                  yt.URL,
+		"transcript_available": youtubePublicTranscriptAvailable(read.Text),
+		"evidence_ref":         markdownEvidenceRef(read.URL, read.Text) + "#record=1",
+	}
+	if youtubePublicLooksBlocked(read.Text) {
+		record["blocked"] = true
+		record["failure_class"] = "auth_or_transcript_unavailable"
 	}
 	return []map[string]any{record}
 }

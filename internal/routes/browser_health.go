@@ -18,44 +18,161 @@ func MountBrowserHealth(r chi.Router, pool *vision.Pool) {
 }
 
 func agentPressureSummary(browserStats map[string]any) map[string]any {
-	activePages, _ := browserStats["active_pages"].(int)
-	availablePages, _ := browserStats["available_pages"].(int)
-	maxPages, _ := browserStats["max_pages"].(int)
-	failCount, _ := browserStats["fail_count"].(int64)
-	if failCount == 0 {
-		if v, ok := browserStats["fail_count"].(int); ok {
-			failCount = int64(v)
-		}
-	}
-	cacheSummary := map[string]any{"status": "unknown"}
+	activePages := intFromAny(browserStats["active_pages"])
+	availablePages := intFromAny(browserStats["available_pages"])
+	maxPages := intFromAny(browserStats["max_pages"])
+	failCount := int64FromAny(browserStats["fail_count"])
+	queue := mapFromAny(browserStats["queue"])
+	queueDepth := intFromAny(queue["depth"])
+	queueRejected := intFromAny(queue["rejected"])
+	queueP95WaitMs := intFromAny(queue["p95_wait_ms"])
+
+	cacheSummary := map[string]any{"status": "unknown", "pressure": "unknown"}
 	if cache, ok := browserStats["cache"].(map[string]any); ok {
 		cacheSummary = cache
 	}
-	browserPressure := "normal"
-	if maxPages > 0 && activePages >= maxPages {
-		browserPressure = "saturated"
-	} else if availablePages == 0 && activePages > 0 {
-		browserPressure = "constrained"
-	}
+	cachePressure := cachePressureLevel(cacheSummary)
+	cacheSummary["pressure"] = cachePressure
+
+	searchSummary := searchPressureSummary()
+	searchPressure := stringFromAny(searchSummary["pressure"], "unknown")
+	browserPressure := browserPressureLevel(activePages, availablePages, maxPages, failCount, queueDepth, queueRejected, queueP95WaitMs)
+	errorPressure := errorPressureLevel(observability.Count())
+	overallPressure := maxPressureLevel(browserPressure, searchPressure, cachePressure, errorPressure)
+	actions := pressureRecommendedActions(overallPressure, browserPressure, searchPressure, cachePressure, errorPressure)
+
 	return map[string]any{
+		"schema":              "uiai.agent_pressure.v1",
+		"telemetry_class":     "noncanonical_operational",
+		"authority":           "advisory_only",
+		"overall_pressure":    overallPressure,
+		"recommended_actions": actions,
 		"packet": map[string]any{
 			"schema":             "uiai.focusa_research_diagnostics_packet.v1",
-			"surfaces":           []string{"search", "browser_read", "browser_diagnostics", "structured_errors"},
+			"surfaces":           []string{"search", "source_markdown", "browser_read", "browser_snapshot", "browser_diagnostics", "structured_errors", "screenshot", "share"},
 			"max_packet_bytes":   8192,
-			"composition_status": "pi_extension_first",
+			"composition_status": "pi_http_mcp_cli_available",
+			"authority":          "proposal_only_until_focusa_capture",
 		},
-		"search": searchPressureSummary(),
+		"search": searchSummary,
 		"browser": map[string]any{
 			"pressure":        browserPressure,
 			"active_pages":    activePages,
 			"available_pages": availablePages,
 			"max_pages":       maxPages,
 			"fail_count":      failCount,
+			"queue_depth":     queueDepth,
+			"queue_rejected":  queueRejected,
+			"queue_p95_ms":    queueP95WaitMs,
 		},
-		"cache":              cacheSummary,
-		"errors":             map[string]any{"stored_count": observability.Count()},
-		"recommended_action": "Use uiai_focusa_packet_build with bounded response metadata; close browser sessions when cleanup recommends; narrow diagnostics if browser pressure is constrained.",
+		"cache":               cacheSummary,
+		"errors":              map[string]any{"pressure": errorPressure, "stored_count": observability.Count()},
+		"recommended_action":  actions[0],
+		"focusa_routing_hint": "Use as operational telemetry only; capture/link evidence through Focusa tools before treating results as durable cognition.",
 	}
+}
+
+func intFromAny(value any) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	default:
+		return 0
+	}
+}
+
+func int64FromAny(value any) int64 {
+	switch v := value.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	default:
+		return 0
+	}
+}
+
+func mapFromAny(value any) map[string]any {
+	if m, ok := value.(map[string]any); ok {
+		return m
+	}
+	return map[string]any{}
+}
+
+func stringFromAny(value any, fallback string) string {
+	if s, ok := value.(string); ok && s != "" {
+		return s
+	}
+	return fallback
+}
+
+func browserPressureLevel(activePages, availablePages, maxPages int, failCount int64, queueDepth, queueRejected, queueP95WaitMs int) string {
+	if maxPages > 0 && activePages >= maxPages || queueRejected > 0 || queueP95WaitMs >= 5000 {
+		return "saturated"
+	}
+	if (availablePages == 0 && activePages > 0) || queueDepth > 0 || failCount >= 3 {
+		return "constrained"
+	}
+	return "normal"
+}
+
+func cachePressureLevel(cache map[string]any) string {
+	if stringFromAny(cache["status"], "") == "disabled" {
+		return "disabled"
+	}
+	entries := intFromAny(cache["entries"])
+	maxEntries := intFromAny(cache["max_entries"])
+	if maxEntries > 0 && entries >= maxEntries {
+		return "saturated"
+	}
+	return "normal"
+}
+
+func errorPressureLevel(storedCount int) string {
+	if storedCount >= 100 {
+		return "saturated"
+	}
+	if storedCount >= 20 {
+		return "constrained"
+	}
+	return "normal"
+}
+
+func maxPressureLevel(levels ...string) string {
+	rank := map[string]int{"unknown": 0, "disabled": 0, "normal": 1, "degraded": 2, "constrained": 3, "saturated": 4}
+	best := "normal"
+	for _, level := range levels {
+		if rank[level] > rank[best] {
+			best = level
+		}
+	}
+	return best
+}
+
+func pressureRecommendedActions(overall, browser, search, cache, errors string) []string {
+	actions := []string{"Use bounded packet/source/read metadata and capture durable evidence through Focusa only after scope is verified."}
+	if browser == "saturated" || browser == "constrained" {
+		actions = append(actions, "Close unused browser sessions, reduce concurrent page work, and prefer browser_read/diagnostics over screenshots.")
+	}
+	if search == "degraded" || search == "constrained" || search == "saturated" {
+		actions = append(actions, "Check /api/search/providers and use cached/known URLs or Source-to-Markdown when live search is degraded.")
+	}
+	if cache == "saturated" {
+		actions = append(actions, "Reduce repeated screenshot/source captures or let cache entries expire before stress workflows.")
+	}
+	if errors == "constrained" || errors == "saturated" {
+		actions = append(actions, "Inspect /api/errors and browser diagnostics before retrying action loops.")
+	}
+	if overall == "normal" {
+		actions = append(actions, "Proceed with normal browser/search/source workflow and close sessions when cleanup recommends.")
+	}
+	return actions
 }
 
 func browserHealthStatus(pool *vision.Pool) int {

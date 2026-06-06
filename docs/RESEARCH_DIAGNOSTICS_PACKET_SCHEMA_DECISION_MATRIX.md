@@ -1,13 +1,28 @@
 # ResearchDiagnosticsPacket Schema Decision Matrix
 
-**Status:** planning-only decision artifact; no implementation authorized yet.  
-**Date:** 2026-06-04  
-**Parent spec:** [`UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md)  
+**Status:** historical decision artifact; implemented/superseded by current packet surfaces.
+**Date:** 2026-06-04
+**Reconciled:** 2026-06-05
+**Parent spec:** [`UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md)
+**Implementation refs:** `POST /api/agent/research-packet`, Pi `uiai_focusa_packet_build`, MCP `uiai_focusa_packet_compose`, CLI `scripts/uiai packet compose`, `scripts/uiai research packet`, `scripts/smoke-focusa-packet.sh`, `scripts/smoke-source-markdown-e2e.sh`.
+**Focusa foundation refs:** `/home/wirebot/focusa/docs/98-project-root-crdt-reconciliation-foundation-spec.md`, `/home/wirebot/focusa/docs/99-original-intent-vs-implementation-audit.md`.
 **HLT alignment:** make UIAI Engine the agent browser/research/diagnostics/proof engine for Pi, with Focusa as cognitive authority.
+
+## 0. Reconciliation summary
+
+This document originally gated packet implementation. That gate is now superseded: UIAI implements `uiai.focusa_research_diagnostics_packet.v1` as a bounded evidence proposal composer across Pi, HTTP, MCP, and CLI.
+
+Current authority rule, grounded in Focusa specs 98/99:
+
+- UIAI packets are **proposal-only evidence bundles**.
+- `focusa_scope` is metadata echoed by UIAI, not Focusa authority.
+- Durable Focusa state begins only after `focusa_evidence_capture`, `focusa_browser_diagnostics_intake`, or `focusa_workpoint_link_evidence` succeeds.
+- Packet renderers/docs must distinguish packet composed vs Focusa capture accepted.
+- Cross-surface semantics for `canonical`, `advisory`, `degraded`, `stale`, `scope_status`, `evidence_refs`, `preferred_focusa_tool`, `next_tools`, and `recovery_hint` must remain consistent across UIAI, Pi, MCP, CLI, and Focusa tools.
 
 ## 1. Decision goal
 
-Decide the smallest safe packet schema and first response surfaces before building UIAI, Pi, or Focusa changes.
+Historical goal: decide the smallest safe packet schema and first response surfaces before building UIAI, Pi, or Focusa changes.
 
 The packet must answer:
 
@@ -112,7 +127,7 @@ New Focusa tool only if repeated packets need one-call evidence + hints + predic
 
 ## 8. Proof path before implementation
 
-Use a harmless local/public page and no paid/mutating calls:
+Historical pre-build proof path used a harmless local/public page and no paid/mutating calls:
 
 ```text
 uiai_search query="UIAI Engine browser agents" limit=1
@@ -134,18 +149,19 @@ Acceptance:
 
 ## 9. Build/no-build decision checklist
 
-Build may start only when all are true:
+Resolved status:
 
-- [ ] Packet schema accepted.
-- [ ] First response surfaces accepted.
-- [ ] Max sizes accepted.
-- [ ] Redaction rules accepted.
-- [ ] Focusa intake path accepted.
-- [ ] Proof path accepted.
-- [ ] Project-card crosswire handling defined or excluded from MVP.
+- [x] Packet schema accepted: `uiai.focusa_research_diagnostics_packet.v1`.
+- [x] First response surfaces accepted: search, Source-to-Markdown, browser read/snapshot/diagnostics, structured errors, screenshot/share.
+- [x] Max sizes accepted: bounded packet captures, redacted summaries, no raw blobs.
+- [x] Redaction rules accepted: no provider keys, bearer tokens, cookies, auth headers, raw request bodies, screenshots/base64, HAR-like data, raw SERP blobs, or unbounded page text.
+- [x] Focusa intake path accepted for Iteration 1: evidence capture for research/read/search summaries; diagnostics intake for diagnostics/failure envelopes; active-object/prediction as explicit follow-ups.
+- [x] Proof path accepted and implemented through packet smoke and Source-to-Markdown E2E smoke.
+- [x] Project-card crosswire handling excluded from packet MVP; Focusa specs 98/99 now require ProjectIdentity/Workpoint authority validation for canonical capture.
 
-Until then: planning/spec only.
+## 10. Remaining follow-up decisions
 
-## 10. Recommended next planning question
-
-Should Iteration 1 add metadata to **all first surfaces** (`search`, `read`, `diagnostics`, `errors`) or start with only `search + read + diagnostics`?
+1. Whether repeated packet use justifies a dedicated Focusa daemon/API packet-intake composite beyond Pi-only `focusa_browser_diagnostics_intake`.
+2. Whether compact Pi packet renderers should add stronger `proposal_only` / `capture_pending` text for every packet mode.
+3. How Focusa specs 98/99 authority-plane repairs change UIAI packet `scope_status`, envelope fields, and cross-repo proof commands.
+4. Whether Source-to-Markdown adapter expansion (HN/YouTube) needs packet schema extensions or only more `captures` / `records` entries.

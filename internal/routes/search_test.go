@@ -100,6 +100,44 @@ func TestSearchEvidenceRefsAreStableAndRanked(t *testing.T) {
 	}
 }
 
+func TestSearchWikipediaMapsOpenSearchResults(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("action") != "opensearch" || r.URL.Query().Get("search") != "agent browser" || r.URL.Query().Get("limit") != "2" {
+			t.Fatalf("bad wikipedia query: %s", r.URL.RawQuery)
+		}
+		if !strings.Contains(r.Header.Get("User-Agent"), "uiai-engine") {
+			t.Fatalf("missing user-agent: %q", r.Header.Get("User-Agent"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`["agent browser",["Agent Browser","Browser agent"],["first desc","second desc"],["https://en.wikipedia.org/wiki/Agent?token=secret#frag","https://en.wikipedia.org/wiki/Browser_agent"]]`))
+	}))
+	defer server.Close()
+	t.Setenv("UIAI_WIKIPEDIA_SEARCH_API_URL", server.URL)
+
+	results, err := searchWikipedia("agent browser", 2)
+	if err != nil {
+		t.Fatalf("searchWikipedia error: %v", err)
+	}
+	if len(results) != 2 || results[0].Title != "Agent Browser" || results[0].Source != "Wikipedia" {
+		t.Fatalf("unexpected wikipedia results: %+v", results)
+	}
+	if strings.Contains(results[0].URL, "secret") || strings.Contains(results[0].URL, "#frag") || !strings.Contains(results[0].URL, "token=REDACTED") {
+		t.Fatalf("wikipedia result URL not redacted: %s", results[0].URL)
+	}
+}
+
+func TestSearchWikipediaRejectsBadPayload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"bad":true}`))
+	}))
+	defer server.Close()
+	t.Setenv("UIAI_WIKIPEDIA_SEARCH_API_URL", server.URL)
+	if _, err := searchWikipedia("agent browser", 2); err == nil {
+		t.Fatalf("expected bad payload error")
+	}
+}
+
 func TestSearchBraveMapsWebResults(t *testing.T) {
 	t.Setenv("BRAVE_SEARCH_API_KEY", "test-key")
 	var sawToken bool
@@ -160,7 +198,7 @@ func TestSearchProvidersReportsMissingKeyDegraded(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		t.Fatalf("decode providers: %v", err)
 	}
-	if len(body.Providers) != 1 || body.Providers[0].ID != "brave" {
+	if len(body.Providers) != 2 || body.Providers[0].ID != "brave" || body.Providers[1].ID != "wikipedia" {
 		t.Fatalf("unexpected providers: %+v", body.Providers)
 	}
 	brave := body.Providers[0]

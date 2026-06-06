@@ -118,6 +118,15 @@ func handleSearchProviders(w http.ResponseWriter, _ *http.Request) {
 				"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
 				"capabilities":      []string{"web_search", "source_urls", "snippets"},
 			},
+			{
+				"id":                "wikipedia",
+				"name":              "Wikipedia OpenSearch",
+				"configured":        true,
+				"status":            "ready",
+				"degraded_reason":   "",
+				"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
+				"capabilities":      []string{"encyclopedia_search", "source_urls", "snippets", "keyless_public"},
+			},
 		},
 	})
 }
@@ -166,8 +175,10 @@ func runSearch(w http.ResponseWriter, req searchRequest) {
 	switch provider {
 	case "brave":
 		results, err = searchBrave(query, limit)
+	case "wikipedia":
+		results, err = searchWikipedia(query, limit)
 	default:
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": []string{"brave"}})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": []string{"brave", "wikipedia"}})
 		return
 	}
 	if err != nil {
@@ -196,15 +207,21 @@ func searchPressureSummary() map[string]any {
 	entries := len(searchCache.entries)
 	searchCache.Unlock()
 	providersStatus := "degraded"
+	pressure := "degraded"
 	if strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")) != "" {
 		providersStatus = "ready"
+		pressure = "normal"
 	}
 	return map[string]any{
-		"provider":          "brave",
-		"provider_status":   providersStatus,
-		"cache_entries":     entries,
-		"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
-		"packet_surface":    "search",
+		"default_provider":    "brave",
+		"provider":            "brave",
+		"provider_status":     providersStatus,
+		"pressure":            pressure,
+		"available_providers": []string{"brave", "wikipedia"},
+		"ready_providers":     []string{"wikipedia"},
+		"cache_entries":       entries,
+		"cache_ttl_seconds":   int(searchCacheTTL() / time.Second),
+		"packet_surface":      "search",
 	}
 }
 
@@ -355,6 +372,86 @@ func annotateSearchEvidence(results []searchResult, provider, query string) {
 		results[i].Rank = rank
 		results[i].EvidenceRef = searchEvidenceRef(provider, query, rank)
 	}
+}
+
+func searchWikipedia(query string, limit int) ([]searchResult, error) {
+	base := strings.TrimSpace(os.Getenv("UIAI_WIKIPEDIA_SEARCH_API_URL"))
+	if base == "" {
+		base = "https://en.wikipedia.org/w/api.php"
+	}
+	u, err := url.Parse(base)
+	if err != nil {
+		return nil, fmt.Errorf("invalid Wikipedia API URL: %w", err)
+	}
+	q := u.Query()
+	q.Set("action", "opensearch")
+	q.Set("format", "json")
+	q.Set("namespace", "0")
+	q.Set("limit", strconv.Itoa(limit))
+	q.Set("search", query)
+	u.RawQuery = q.Encode()
+
+	httpReq, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("User-Agent", "uiai-engine/agent-search (+https://github.com/WPUIAI/uiai-engine)")
+
+	client := &http.Client{Timeout: 12 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("Wikipedia API returned HTTP %d", resp.StatusCode)
+	}
+
+	var decoded []any
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		return nil, err
+	}
+	if len(decoded) < 4 {
+		return nil, fmt.Errorf("Wikipedia API returned unexpected OpenSearch payload")
+	}
+	titles := stringsFromJSONArray(decoded[1])
+	descriptions := stringsFromJSONArray(decoded[2])
+	urls := stringsFromJSONArray(decoded[3])
+	results := make([]searchResult, 0, len(titles))
+	for i, title := range titles {
+		if i >= len(urls) || strings.TrimSpace(urls[i]) == "" {
+			continue
+		}
+		desc := ""
+		if i < len(descriptions) {
+			desc = descriptions[i]
+		}
+		results = append(results, sanitizeSearchResult(searchResult{
+			Title:       title,
+			URL:         urls[i],
+			Description: desc,
+			Source:      "Wikipedia",
+		}))
+		if len(results) >= limit {
+			break
+		}
+	}
+	return results, nil
+}
+
+func stringsFromJSONArray(value any) []string {
+	items, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func searchBrave(query string, limit int) ([]searchResult, error) {

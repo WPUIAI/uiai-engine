@@ -201,7 +201,7 @@ const BRIDGE_CORE_TOOLS = [
   },
   {
     name: "source_to_markdown",
-    description: "One-shot Source-to-Markdown conversion for public URLs. Returns uiai.source_markdown.v1 with Markdown, metadata, diagnostics, Focusa-ready evidence, and auto-closes the temporary session.",
+    description: "One-shot Source-to-Markdown conversion for public URLs. Returns uiai.source_markdown.v1 with Markdown, metadata, optional JSONL records/chunks, diagnostics, Focusa-ready evidence, and auto-closes the temporary session.",
     inputSchema: {
       type: "object",
       properties: {
@@ -209,6 +209,7 @@ const BRIDGE_CORE_TOOLS = [
         selector: { type: "string", description: "Optional CSS selector region" },
         max_chars: { type: "integer", default: 30000, description: "Max Markdown characters" },
         mode: { type: "string", default: "main_content", description: "Read mode: main_content or full" },
+        format: { type: "string", default: "json", enum: ["json", "markdown", "jsonl"], description: "Response format hint" },
         include_links: { type: "boolean", default: true, description: "Include visible link metadata" },
         include_images: { type: "boolean", default: false, description: "Include Markdown image tags" },
         focusa_scope: { type: "object", description: "Optional Focusa scope" },

@@ -83,7 +83,7 @@ Deemphasize legacy/backward-compatibility topics. Keep them as maintenance refer
 
 | Gap | Why it matters | Suggested next gate |
 |---|---|---|
-| WPUIAI plugin UI/save for `wpuiai.research_card` | Engine returns product cards, but plugin-side save/display is still follow-up | Add plugin route/UI parity task in the WPUIAI plugin repo or documented integration contract |
+| WPUIAI plugin UI/save for `wpuiai.research_card` | Engine returns product cards and engine-side save/display contract is documented; plugin-side implementation remains follow-up | See `docs/WPUIAI_RESEARCH_CARD_INTEGRATION_CONTRACT.md` and create plugin repo tasks before editing the live plugin |
 | Public website/docs deployment freshness is unknown | GitHub docs are updated, but live marketing/docs pages may lag | Verify any public docs site and link this index if one exists |
 | Paid/mutating AI/admin/intelligence routes are intentionally omitted from generic agents | Prevents surprise credit spend and unsafe mutations | Add read-only summaries first, then cost/auth/rollback proof before tools |
 | CLI remains lighter than Pi/MCP for full browser actions | CLI is adequate for core loops, but not every browser action | Add only operator-useful commands; avoid bloating CLI with every Pi/MCP action |

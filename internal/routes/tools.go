@@ -96,7 +96,7 @@ func agentBootstrapCard() map[string]any {
 		"base_url": "http://localhost:7456",
 		"top_benefits": []string{
 			"Discover UIAI features quickly through agent cards, tool search, graph routing, docs metadata, Pi cards, MCP cards, and CLI discovery.",
-			"Convert public sources into Markdown, metadata, diagnostics, records, Focusa evidence refs, and WPUIAI research cards/reports.",
+			"Convert public sources into Markdown, metadata, optional JSONL records/chunks, diagnostics, Focusa evidence refs, and WPUIAI research cards/reports.",
 			"Use persistent browser sessions for reads, snapshots, @ref actions, forms, navigation, cookies, auth state, and diagnostics.",
 			"Debug with bounded console/exception/network evidence instead of screenshot-only guessing.",
 			"Hand off redacted research/diagnostics/proof packets to Focusa and Pi workflows.",
@@ -262,7 +262,7 @@ func toolGraph() map[string]any {
 			},
 		},
 		"workflows": []map[string]any{
-			{"name": "source_to_markdown", "schema": "uiai.source_markdown.v1", "steps": []string{"source_to_markdown or POST /api/markdown", "receive Markdown plus diagnostics and focusa evidence", "focusa_evidence_capture when scoped", "browser_open/browser_read only for follow-up interactions"}, "preferred_focusa_tools": []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"}},
+			{"name": "source_to_markdown", "schema": "uiai.source_markdown.v1", "steps": []string{"source_to_markdown or POST /api/markdown", "receive Markdown plus optional JSONL records/chunks, diagnostics, and focusa evidence", "focusa_evidence_capture when scoped", "browser_open/browser_read only for follow-up interactions"}, "preferred_focusa_tools": []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"}},
 			{"name": "focusa_research_packet", "schema": "uiai.focusa_research_diagnostics_packet.v1", "steps": []string{"focusa_workpoint_resume or project identity when scoped", "browser_search/uiai_search", "browser_open selected result with focusa_scope", "browser_read max_chars<=2000", "browser_diagnostics", "uiai_focusa_packet_build", "focusa_evidence_capture or focusa_browser_diagnostics_intake", "browser_close when cleanup recommends"}, "preferred_focusa_tools": []string{"focusa_evidence_capture", "focusa_browser_diagnostics_intake"}},
 			{"name": "search_then_browse", "steps": []string{"browser_search", "browser_open selected result", "browser_read", "browser_snapshot", "browser_diagnostics", "browser_close"}},
 			{"name": "web_surfing", "steps": []string{"browser_open", "browser_read", "browser_snapshot", "browser_click/browser_fill/browser_press", "browser_diagnostics", "browser_close"}},
@@ -329,7 +329,7 @@ func workflowHints(name string) []string {
 		return []string{"Use after UIAI engine/browser failures", "Events are bounded and redacted", "Pair browser_session events with browser_diagnostics for page-level evidence"}
 	}
 	if name == "source_to_markdown" {
-		return []string{"Use for one-shot public URL to Markdown evidence", "Prefer browser_open/browser_read when follow-up interaction is needed", "Capture focusa.evidence_ref with Focusa when scoped"}
+		return []string{"Use for one-shot public URL to Markdown evidence", "Use format=jsonl when adapter records/chunks are needed", "Prefer browser_open/browser_read when follow-up interaction is needed", "Capture focusa.evidence_ref with Focusa when scoped"}
 	}
 	if name == "browser_search" {
 		return []string{"Use provider-neutral search for discovery", "Open a selected result with browser_open", "Use browser_read for page text", "Use browser_diagnostics on navigation failures"}
@@ -461,7 +461,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "source_to_markdown",
-			"description": "One-shot Source-to-Markdown conversion for public URLs. Opens a temporary browser session, reads main/full content as Markdown, returns uiai.source_markdown.v1 with metadata, diagnostics, Focusa-ready evidence fields, and closes the session.",
+			"description": "One-shot Source-to-Markdown conversion for public URLs. Opens a temporary browser session, reads main/full content as Markdown, returns uiai.source_markdown.v1 with metadata, optional JSONL records/chunks, diagnostics, Focusa-ready evidence fields, and closes the session.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -469,6 +469,7 @@ func openAITools() []map[string]any {
 					"selector":       map[string]string{"type": "string", "description": "Optional CSS selector region"},
 					"max_chars":      map[string]any{"type": "integer", "description": "Max Markdown characters, capped at 30000", "default": 30000},
 					"mode":           map[string]any{"type": "string", "description": "Read mode: main_content or full", "default": "main_content"},
+					"format":         map[string]any{"type": "string", "description": "Response format hint: json, markdown, or jsonl", "default": "json", "enum": []string{"json", "markdown", "jsonl"}},
 					"include_links":  map[string]any{"type": "boolean", "description": "Include visible link metadata", "default": true},
 					"include_images": map[string]any{"type": "boolean", "description": "Include Markdown image tags", "default": false},
 					"focusa_scope":   map[string]any{"type": "object", "description": "Optional Focusa scope echoed into read metadata"},

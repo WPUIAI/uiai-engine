@@ -102,7 +102,7 @@ try:
     caps=packet.get("captures",[])
     add("focusa_packet_from_source_markdown", packet.get("schema")=="uiai.focusa_research_diagnostics_packet.v1" and caps and caps[0].get("type")=="source_markdown" and packet.get("recommended_focusa",{}).get("preferred_tool")=="focusa_evidence_capture" and no_secret(packet), caps[0].get("evidence_ref") if caps else "no capture", {"capture_type":caps[0].get("type") if caps else None})
 except Exception as e: add("focusa_packet_from_source_markdown", False, repr(e))
-for name,url,adapter in [("github_adapter_live","https://github.com/WPUIAI/uiai-engine/issues/1?token=secret#frag","github_public"),("reddit_adapter_live","https://old.reddit.com/r/golang/comments/1/example_title/?token=secret#frag","reddit_public"),("x_adapter_live","https://x.com/example/status/12345?token=secret#frag","x_public")]:
+for name,url,adapter in [("github_adapter_live","https://github.com/WPUIAI/uiai-engine/issues/1?token=secret#frag","github_public"),("reddit_adapter_live","https://old.reddit.com/r/golang/comments/1/example_title/?token=secret#frag","reddit_public"),("hackernews_adapter_live","https://news.ycombinator.com/item?id=8863&token=secret#frag","hackernews_public"),("youtube_adapter_live","https://www.youtube.com/watch?v=dQw4w9WgXcQ&token=secret#frag","youtube_public"),("x_adapter_live","https://x.com/example/status/12345?token=secret#frag","x_public")]:
     last_error=""; last_data=None; passed=False; detail=""
     for _attempt in range(2):
         try:

@@ -392,9 +392,11 @@ Boundary: X blocking is common. If blocked, return `blocked=true`, failure class
 Targets:
 
 - Video metadata.
-- Transcript when publicly available.
+- Transcript when publicly available in browser-rendered public text.
 - Chapters.
 - Description links.
+
+Status: implemented as a best-effort public/browser-rendered adapter for `youtube.com/watch`, `youtu.be`, `/shorts/`, `/embed/`, and `/live/` URLs. It emits `youtube_video` metadata, transcript availability/blocked flags, one structured `video_metadata` record, and JSONL/chunk output when records exist. It does not scrape credentials, bypass access controls, or call private transcript APIs.
 
 Output:
 
@@ -419,7 +421,9 @@ transcript_available: true
 
 Targets:
 
-- Public HN item threads.
+- Public HN item threads at `news.ycombinator.com/item?id=<id>`.
+
+Status: implemented as a best-effort browser-rendered adapter with `hackernews_thread` metadata, a structured `uiai.source_markdown_record.v1` thread record, and JSONL/chunk output through `/api/markdown format=jsonl` when records exist.
 
 Why: easy, useful for agents, public HTML.
 
@@ -668,6 +672,8 @@ Failure result should recommend:
 
 ## 16. WPUIAI integration ideas
 
+Implementation contract: [`WPUIAI_RESEARCH_CARD_INTEGRATION_CONTRACT.md`](WPUIAI_RESEARCH_CARD_INTEGRATION_CONTRACT.md).
+
 WPUIAI should not expose raw internals. It can package Source-to-Markdown as product workflows:
 
 ### Research card
@@ -839,7 +845,7 @@ Recommended order:
 2. Reddit public post/thread.
 3. Hacker News item.
 4. X public thread/article best-effort.
-5. YouTube transcript/metadata.
+5. YouTube transcript/metadata. Implemented best-effort public metadata/transcript detection; richer transcript segmentation remains follow-up if public transcript text is reliably available.
 6. Facebook/LinkedIn public best-effort.
 
 ### Phase 5 — WPUIAI productization

@@ -533,12 +533,13 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_source_to_markdown",
 		label: "UIAI Source to Markdown",
-		description: "One-shot Source-to-Markdown conversion for public URLs. Returns uiai.source_markdown.v1 with Markdown, source metadata/adapters, diagnostics, Focusa-ready evidence, and auto-closes the temporary session.",
+		description: "One-shot Source-to-Markdown conversion for public URLs. Returns uiai.source_markdown.v1 with Markdown, source metadata/adapters, optional JSONL records/chunks, diagnostics, Focusa-ready evidence, and auto-closes the temporary session.",
 		parameters: Type.Object({
 			url: Type.String({ description: "Public URL to convert" }),
 			selector: Type.Optional(Type.String({ description: "Optional CSS selector region" })),
 			max_chars: Type.Optional(Type.Number({ description: "Max Markdown characters, capped by engine", default: 30000 })),
 			mode: Type.Optional(Type.String({ description: "Read mode: main_content or full", default: "main_content" })),
+			format: Type.Optional(Type.String({ description: "Response format hint: json, markdown, or jsonl", default: "json" })),
 			include_links: Type.Optional(Type.Boolean({ description: "Include visible link metadata", default: true })),
 			include_images: Type.Optional(Type.Boolean({ description: "Include Markdown image tags", default: false })),
 			focusa_scope: Type.Optional(Type.Any({ description: "Optional Focusa scope to echo into metadata" })),

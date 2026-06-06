@@ -22,6 +22,7 @@ say "UIAI agent integration smoke"
 say "engine_url=$ENGINE_URL"
 
 fetch "$ENGINE_URL/api/health" | jq -e '.status == "healthy" or .status == "ok"' >/dev/null
+fetch "$ENGINE_URL/api/metrics/browser" | jq -e '.agent_pressure.schema == "uiai.agent_pressure.v1" and .agent_pressure.telemetry_class == "noncanonical_operational" and .agent_pressure.packet.authority == "proposal_only_until_focusa_capture" and (.agent_pressure.recommended_actions | length) >= 1' >/dev/null
 fetch "$ENGINE_URL/api/tools/agent-card" | jq -e '.service == "uiai-engine"' >/dev/null
 fetch "$ENGINE_URL/api/tools/docs" | jq -e '.schema == "uiai.agent_docs.v1" and (.doc_links[] | select(.path == "docs/REMOTE_AUTH_EXAMPLES.md")) and (.quick_examples[] | select(.name == "focusa_packet"))' >/dev/null
 fetch "$ENGINE_URL/api/tools/graph" | jq -e '.focusa_integration.preferred_focusa_tools | index("focusa_browser_diagnostics_intake")' >/dev/null
@@ -42,8 +43,9 @@ fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "frame_cat
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_errors")' >/dev/null
 fetch "$ENGINE_URL/api/media/frame/catalog" | jq -e '.count > 0' >/dev/null
 fetch "$ENGINE_URL/api/errors?limit=1" | jq -e 'has("events") and has("redaction")' >/dev/null
-fetch_auth "$ENGINE_URL/api/search/providers" | jq -e '.providers[] | select(.id == "brave") | has("configured") and has("cache_ttl_seconds")' >/dev/null
+fetch_auth "$ENGINE_URL/api/search/providers" | jq -e '(.providers[] | select(.id == "brave") | has("configured") and has("cache_ttl_seconds")) and (.providers[] | select(.id == "wikipedia") | .configured == true and .status == "ready" and (.capabilities | index("keyless_public")))' >/dev/null
 fetch_auth -X POST "$ENGINE_URL/api/search" -H "Content-Type: application/json" -d '{"query":"UIAI Engine browser agents","limit":1}' | jq -e '.provider == "brave" and .count >= 1 and has("cached") and has("cache_ttl_seconds") and (.results[0].evidence_ref | startswith("uiai-search:brave:")) and .results[0].rank == 1' >/dev/null
+fetch_auth -X POST "$ENGINE_URL/api/search" -H "Content-Type: application/json" -d '{"query":"browser automation","provider":"wikipedia","limit":1}' | jq -e '.provider == "wikipedia" and .count >= 1 and has("cached") and has("cache_ttl_seconds") and (.results[0].evidence_ref | startswith("uiai-search:wikipedia:")) and .results[0].rank == 1' >/dev/null
 node --check "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/mcp/browser-session-mcp.mjs" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-mcp-tool-routes.sh" >/dev/null
 "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-mcp-structured-failure.sh" >/dev/null
