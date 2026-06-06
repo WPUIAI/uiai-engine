@@ -36,6 +36,8 @@ uiai_errors limit=20 source="browser_session"
 
 Only then retry with better selectors/actions.
 
+URL safety boundary: live/default engines block private/internal targets (`localhost`, `127.*`, RFC1918, link-local) unless `vision.allow_private_urls: true` is explicitly configured for local/dev. Treat `url_not_allowed` as expected policy evidence, not a browser flake.
+
 Cleanup:
 
 ```text
@@ -119,7 +121,7 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai session close <sid>'
 
 ## Local regression gates
 
-Run after browser/session/action/error changes:
+Run after browser/session/action/error changes. These scripts use isolated temporary configs and may enable private URLs only for their local test site; live release smoke remains hardened by default.
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-browser-error-regressions.sh'
@@ -127,6 +129,8 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-failed-network-diag
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && SESSIONS=4 ROUNDS=10 OUT=/tmp/uiai-local-diagnostics-4x10.json scripts/stress-browser-diagnostics.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && DURATION_SECONDS=30 CONCURRENCY=2 OUT=/tmp/uiai-local-soak.json scripts/soak-browser-flakiness.sh'
 ```
+
+For a live local/dev engine that intentionally allows private URLs, add `UIAI_ALLOW_PRIVATE_SMOKES=1` to `scripts/release-service-smoke.sh --check-only` or `scripts/smoke-agent-integrations.sh`.
 
 Full reliability:
 

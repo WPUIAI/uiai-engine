@@ -1,10 +1,10 @@
 ---
 name: vision
-description: Screenshot and browser automation via local Rod pool on localhost:7456.
+description: Screenshot and browser automation via UIAI Engine Rod pool; public targets by default, private/internal targets require explicit local/dev policy.
 ---
 # Vision Skill — Screenshot & Browser Automation
 
-Take screenshots, interact with pages, and automate browser tasks via the local Go engine's Rod browser pool. No API key needed — runs on `localhost:7456`.
+Take screenshots, interact with pages, and automate browser tasks via the UIAI Engine Rod browser pool. Local loopback engine access usually needs no API key, but remote engine access needs `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`. Public web targets work by default; private/internal targets (`localhost`, `127.*`, RFC1918, link-local) are blocked unless `vision.allow_private_urls: true` is explicitly configured for local/dev.
 
 **Three modes:**
 1. **One-shot** (`/api/screenshot`) — navigate → snap → forget. Best for single checks.
@@ -23,6 +23,14 @@ Take screenshots, interact with pages, and automate browser tasks via the local 
 **Reliability runbook:** `/home/wpuiai/uiai-engine/docs/BROWSER_RELIABILITY_RUNBOOK.md` covers diagnostics stress, mixed soak, release gates, artifacts, and long-async eval mitigation.
 
 **Focusa packet handoff:** after search/read/snapshot/diagnostics proof, call `POST /api/agent/research-packet` (or Pi `uiai_focusa_packet_compose`) with the existing UIAI responses, then pass `recommended_focusa.args_preview` to `focusa_evidence_capture` or `focusa_browser_diagnostics_intake`.
+
+## URL safety policy
+
+- Engine URL (`UIAI_ENGINE_URL`, usually `http://localhost:7456`) is not the same as browser target URL.
+- Public `http://`/`https://` targets are the default agent path.
+- Private/internal targets return `url_not_allowed` unless the engine config explicitly sets `vision.allow_private_urls: true` for local/dev.
+- Auth headers allow remote engine access; they do not bypass private-target blocking.
+- Release smokes use hardened public targets by default. Use `UIAI_ALLOW_PRIVATE_SMOKES=1` only with a local/dev engine configured to allow private URLs.
 
 ---
 

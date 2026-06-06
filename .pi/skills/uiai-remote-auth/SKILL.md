@@ -25,8 +25,10 @@ Canonical docs:
 
 - Never paste real keys, bearer tokens, cookies, authorization headers, or webhook secrets into docs, bead notes, Focusa state, screenshots, packet examples, or final reports.
 - Use env var names and placeholders only.
-- Prefer loopback URLs for local agent work: `http://127.0.0.1:7456`.
+- Prefer loopback engine URLs for local agent work: `http://127.0.0.1:7456`.
+- Browser target URLs are separate from engine URLs: private/internal targets are blocked by default unless `vision.allow_private_urls: true` is explicitly configured for local/dev.
 - Remote/tunnel callers must send credentials for loopback-public remote-auth routes.
+- Credentials do not bypass the private/internal URL safety policy.
 - Public discovery endpoints are metadata/readiness only; do not infer that browser/session/search surfaces are public remotely.
 
 ## Auth boundary quick map
@@ -150,6 +152,7 @@ Remote scenario proof checklist:
 | Symptom | Likely cause | Action |
 |---|---|---|
 | Remote browser/search call returns `401` | missing remote credential | Set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`; rerun smoke. |
+| Browser/session call returns `url_not_allowed` | target URL is private/internal under hardened policy | Use a public target URL or switch only an explicit local/dev profile to `vision.allow_private_urls: true`. |
 | Public discovery works but session/search fails | route is loopback-public remote-auth, not public | Use auth header for remote call. |
 | Pi/MCP still uses old URL/token | session cached env/stdio process | Restart Pi/MCP client and reconnect bridge. |
 | Auth value appears in logs/docs | unsafe reporting | Redact immediately; replace with env var names and rotate if exposed. |

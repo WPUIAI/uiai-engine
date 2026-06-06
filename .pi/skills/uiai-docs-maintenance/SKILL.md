@@ -46,6 +46,7 @@ Read the smallest relevant source-of-truth docs:
 | Focusa packet field/mode/routing | `docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`, `docs/FOCUSA_PACKET_EXAMPLES_GALLERY.md`, packet skill, Session API | `scripts/check-focusa-packet-drift.sh`, `scripts/check-focusa-packet-examples.py`, packet builder tests |
 | CLI behavior | README CLI section, quickstart/cookbook, parity matrix | `bash -n scripts/uiai`, `scripts/uiai smoke agent`, `scripts/check-tool-parity.sh` |
 | Browser/session workflow | `docs/SESSION_API.md`, quickstart/cookbook, vision skill, browser debug skill | browser error/regression smokes, `make browser-reliability` when relevant |
+| URL safety/private target policy | README, Session API, quickstart, release runbook/checklist, release/browser-debug/remote-auth/vision skills | release-service smoke, private URL negative proof, CI reliability smoke with temp config override |
 | Release/deploy workflow | release runbook, proof checklist, release skill | release-service smoke, CI watch proof |
 | Repo-local skill | README skill list, `docs/SKILL_SOURCE_OF_TRUTH_POLICY.md`, sibling skill references | docs completeness, relevant workflow gates |
 

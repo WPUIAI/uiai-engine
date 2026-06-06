@@ -123,6 +123,8 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-failed-network-diag
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && make browser-reliability'
 ```
 
+Live agent-surface proof uses hardened public-target smokes by default. Private/internal target browsing requires an explicit local/dev config with `vision.allow_private_urls: true`; use `UIAI_ALLOW_PRIVATE_SMOKES=1` only for that profile.
+
 ## Docs completeness gate
 
 When adding or changing an agent-facing route/tool/skill/smoke, run:
@@ -151,8 +153,8 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-regist
 
 ## Auth and environment reminders
 
-- Loopback callers may access browser/session/search/packet/error/frame routes without remote tokens.
-- Remote callers need `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` for loopback-public remote-auth route families.
+- Loopback callers may access browser/session/search/packet/error/frame routes without remote tokens, but private/internal target URLs are still blocked by default.
+- Remote callers need `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` for loopback-public remote-auth route families; auth does not bypass `vision.allow_private_urls: false`.
 - Discovery endpoints are public and safe for low-context bootstrap.
 - Do not print secret values. Reference env var names and config paths only.
 

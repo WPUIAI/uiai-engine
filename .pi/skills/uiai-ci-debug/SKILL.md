@@ -95,6 +95,7 @@ Common Browser Reliability artifacts:
 |---|---|---|
 | VPS-only CI path | permission denied for `/home/wpuiai/...` or `/var/log/uiai...` | Rewrite temp config paths in smoke/stress script. |
 | Browser pool starvation | session opens take minutes, queue depth high, timeout | Match temp pool size to concurrency or reduce concurrency. |
+| Hardened URL policy blocks local CI site | all session opens fail with `url_not_allowed`/HTTP 400 against `127.0.0.1:<port>` | Enable `allow_private_urls: true` only in the temporary smoke/stress config, not in live release config. |
 | Missing immediate logs | failed step only shows curl/timeout | Print bounded engine/site logs before startup exit. |
 | Packet drift | `Focusa packet drift check failed` | Update paired schema/docs/tools/smokes or drift script. |
 | MCP advertised-but-unrouted | route parity smoke names tool | Add `tools/call` route or remove stale metadata. |
@@ -135,6 +136,7 @@ CI scripts that start temp engines should:
 
 - use deterministic `/tmp/uiai-*-engine.log` and `/tmp/uiai-*-site.log`
 - rewrite VPS-only paths to temp dirs/files
+- explicitly enable private URLs only when the temp test site is local/private
 - wait for `/health`
 - print bounded engine/site logs on startup failure
 - write JSON reports

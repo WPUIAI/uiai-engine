@@ -56,12 +56,18 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-mcp-tool-routes.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-agent-integrations.sh'
 ```
 
-Browser/session/error behavior changes also require:
+Browser/session/error behavior changes also require reliability gates. These isolated scripts start temporary engines and enable private URLs only inside their temp configs; they do not weaken the live `vision.allow_private_urls: false` default.
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-browser-error-regressions.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-failed-network-diagnostics.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && make browser-reliability'
+```
+
+Only when deliberately testing a live local/dev engine configured with `vision.allow_private_urls: true`, opt into private localhost smokes:
+
+```bash
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && UIAI_ALLOW_PRIVATE_SMOKES=1 scripts/release-service-smoke.sh --check-only'
 ```
 
 Packet behavior changes also require:
@@ -111,9 +117,9 @@ journalctl -u uiai-engine.service -n 120 --no-pager
 
 Fix source/config/unit issue, rebuild, restart, and repeat health.
 
-## 6. Live localhost proof
+## 6. Live service proof
 
-Bundled proof against the current running service:
+Bundled proof against the current running service. Default proof is compatible with hardened `vision.allow_private_urls: false`: public browser targets are used and private localhost browser smokes are skipped.
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/release-service-smoke.sh --check-only'
@@ -137,7 +143,7 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-regist
 Expected:
 
 - `focusa packet smoke ok`.
-- `agent integration smoke ok`.
+- `agent integration smoke ok` plus the hardened-default skip note for private localhost browser smokes unless `UIAI_ALLOW_PRIVATE_SMOKES=1` is set.
 - `mcp tool route parity ok`.
 - `pi skill smoke ok`.
 - `open result smoke ok`.
