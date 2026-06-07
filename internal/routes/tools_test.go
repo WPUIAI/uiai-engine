@@ -36,6 +36,16 @@ func TestRankedToolSearchKeepsDiagnosticsDiscoverable(t *testing.T) {
 	}
 }
 
+func TestRankedToolSearchHandlesMultiTokenVisualFailureDiagnostics(t *testing.T) {
+	matches := rankedToolSearch(openAITools(), "visual failure diagnostics")
+	if len(matches) == 0 {
+		t.Fatal("expected multi-token visual failure diagnostics search matches")
+	}
+	if got := matches[0]["name"]; got != "browser_diagnostics" {
+		t.Fatalf("expected browser_diagnostics first, got %v", got)
+	}
+}
+
 func TestAgentBootstrapCardOrientsLocalAndRemoteAgents(t *testing.T) {
 	card := agentBootstrapCard()
 	if got := card["service"]; got != "uiai-engine" {

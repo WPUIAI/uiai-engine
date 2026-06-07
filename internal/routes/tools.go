@@ -229,7 +229,8 @@ func toolSearchScore(name, desc, query string) int {
 		score = max(score, 800)
 	}
 	// Token-ish aliases help users search by the suffix after browser_.
-	for _, part := range strings.FieldsFunc(nameLower, func(r rune) bool { return r == '_' || r == '-' || r == '.' }) {
+	nameParts := strings.FieldsFunc(nameLower, func(r rune) bool { return r == '_' || r == '-' || r == '.' })
+	for _, part := range nameParts {
 		if part == q {
 			score = max(score, 700)
 		}
@@ -237,7 +238,49 @@ func toolSearchScore(name, desc, query string) int {
 	if strings.Contains(descLower, q) {
 		score = max(score, 100)
 	}
+	queryTokens := searchTokens(q)
+	if len(queryTokens) > 1 {
+		matched := 0
+		nameMatches := 0
+		for _, token := range queryTokens {
+			if containsTokenish(nameLower, nameParts, token) {
+				matched++
+				nameMatches++
+			} else if strings.Contains(descLower, token) {
+				matched++
+			}
+		}
+		if matched == len(queryTokens) {
+			score = max(score, 260+nameMatches*60+matched*20)
+		} else if matched > 0 {
+			score = max(score, matched*30+nameMatches*40)
+		}
+	}
 	return score
+}
+
+func searchTokens(query string) []string {
+	parts := strings.FieldsFunc(query, func(r rune) bool { return r == '_' || r == '-' || r == '.' || r == ' ' || r == '/' })
+	tokens := make([]string, 0, len(parts))
+	seen := map[string]bool{}
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if len(part) < 3 || seen[part] {
+			continue
+		}
+		seen[part] = true
+		tokens = append(tokens, part)
+	}
+	return tokens
+}
+
+func containsTokenish(haystack string, parts []string, token string) bool {
+	for _, part := range parts {
+		if part == token {
+			return true
+		}
+	}
+	return strings.Contains(haystack, token)
 }
 
 // containsCI is defined in intelligence.go (shared within routes package)
