@@ -49,12 +49,38 @@ func TestBrowserHealthPayloadIncludesAgentPressure(t *testing.T) {
 	if browser["pressure"] == "" {
 		t.Fatalf("missing browser pressure: %#v", browser)
 	}
+	capacity := pressure["current_capacity"].(map[string]any)
+	if capacity["capacity_available"] == nil || capacity["remaining_page_slots"] == nil {
+		t.Fatalf("missing current capacity split: %#v", pressure)
+	}
+	history := pressure["historical_pressure"].(map[string]any)
+	if history["queue_p95_wait_ms"] == nil || history["note"] == "" {
+		t.Fatalf("missing historical pressure split: %#v", pressure)
+	}
 	if pressure["overall_pressure"] == "" || pressure["recommended_action"] == "" {
 		t.Fatalf("missing recommended action: %#v", pressure)
 	}
 	actions := pressure["recommended_actions"].([]string)
 	if len(actions) == 0 {
 		t.Fatalf("missing recommended_actions: %#v", pressure)
+	}
+}
+
+func TestAgentPressureSummaryDoesNotLookSaturatedWhenCapacityAvailable(t *testing.T) {
+	pressure := agentPressureSummary(map[string]any{
+		"active_pages":    1,
+		"available_pages": 0,
+		"max_pages":       2,
+		"fail_count":      int64(0),
+		"queue":           map[string]any{"depth": 0, "rejected": 0, "p95_wait_ms": 0},
+	})
+	browser := pressure["browser"].(map[string]any)
+	capacity := pressure["current_capacity"].(map[string]any)
+	if browser["pressure"] == "saturated" || browser["pressure"] == "constrained" {
+		t.Fatalf("capacity-available health must not look saturated/constrained: %#v", pressure)
+	}
+	if capacity["capacity_available"] != true || capacity["remaining_page_slots"] != 1 {
+		t.Fatalf("expected explicit available capacity: %#v", capacity)
 	}
 }
 

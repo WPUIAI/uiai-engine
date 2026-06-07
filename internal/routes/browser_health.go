@@ -36,7 +36,9 @@ func agentPressureSummary(browserStats map[string]any) map[string]any {
 
 	searchSummary := searchPressureSummary()
 	searchPressure := stringFromAny(searchSummary["pressure"], "unknown")
-	browserPressure := browserPressureLevel(activePages, availablePages, maxPages, failCount, queueDepth, queueRejected, queueP95WaitMs)
+	currentCapacity := currentBrowserCapacity(activePages, availablePages, maxPages, queueDepth)
+	historicalPressure := historicalBrowserPressure(queue, failCount)
+	browserPressure := browserPressureLevel(activePages, maxPages, failCount, queueDepth, queueRejected, queueP95WaitMs)
 	errorPressure := errorPressureLevel(observability.Count())
 	overallPressure := maxPressureLevel(browserPressure, searchPressure, cachePressure, errorPressure)
 	actions := pressureRecommendedActions(overallPressure, browserPressure, searchPressure, cachePressure, errorPressure)
@@ -54,16 +56,20 @@ func agentPressureSummary(browserStats map[string]any) map[string]any {
 			"composition_status": "pi_http_mcp_cli_available",
 			"authority":          "proposal_only_until_focusa_capture",
 		},
-		"search": searchSummary,
+		"search":              searchSummary,
+		"current_capacity":    currentCapacity,
+		"historical_pressure": historicalPressure,
 		"browser": map[string]any{
-			"pressure":        browserPressure,
-			"active_pages":    activePages,
-			"available_pages": availablePages,
-			"max_pages":       maxPages,
-			"fail_count":      failCount,
-			"queue_depth":     queueDepth,
-			"queue_rejected":  queueRejected,
-			"queue_p95_ms":    queueP95WaitMs,
+			"pressure":            browserPressure,
+			"current_capacity":    currentCapacity,
+			"historical_pressure": historicalPressure,
+			"active_pages":        activePages,
+			"available_pages":     availablePages,
+			"max_pages":           maxPages,
+			"fail_count":          failCount,
+			"queue_depth":         queueDepth,
+			"queue_rejected":      queueRejected,
+			"queue_p95_ms":        queueP95WaitMs,
 		},
 		"cache":               cacheSummary,
 		"errors":              map[string]any{"pressure": errorPressure, "stored_count": observability.Count()},
@@ -112,11 +118,40 @@ func stringFromAny(value any, fallback string) string {
 	return fallback
 }
 
-func browserPressureLevel(activePages, availablePages, maxPages int, failCount int64, queueDepth, queueRejected, queueP95WaitMs int) string {
+func currentBrowserCapacity(activePages, availablePages, maxPages, queueDepth int) map[string]any {
+	remainingSlots := 0
+	if maxPages > activePages {
+		remainingSlots = maxPages - activePages
+	}
+	return map[string]any{
+		"active_pages":         activePages,
+		"available_idle_pages": availablePages,
+		"max_pages":            maxPages,
+		"remaining_page_slots": remainingSlots,
+		"queue_depth":          queueDepth,
+		"capacity_available":   remainingSlots > 0 && queueDepth == 0,
+		"status":               map[bool]string{true: "available", false: "busy"}[remainingSlots > 0 && queueDepth == 0],
+	}
+}
+
+func historicalBrowserPressure(queue map[string]any, failCount int64) map[string]any {
+	return map[string]any{
+		"queue_served":      intFromAny(queue["served"]),
+		"queue_rejected":    intFromAny(queue["rejected"]),
+		"queue_avg_wait_ms": intFromAny(queue["avg_wait_ms"]),
+		"queue_p95_wait_ms": intFromAny(queue["p95_wait_ms"]),
+		"queue_p99_wait_ms": intFromAny(queue["p99_wait_ms"]),
+		"queue_max_wait_ms": intFromAny(queue["max_wait_ms"]),
+		"fail_count":        failCount,
+		"note":              "historical pressure is retained for detail; current_capacity controls immediate availability",
+	}
+}
+
+func browserPressureLevel(activePages, maxPages int, failCount int64, queueDepth, queueRejected, queueP95WaitMs int) string {
 	if maxPages > 0 && activePages >= maxPages || queueRejected > 0 || queueP95WaitMs >= 5000 {
 		return "saturated"
 	}
-	if (availablePages == 0 && activePages > 0) || queueDepth > 0 || failCount >= 3 {
+	if queueDepth > 0 || failCount >= 3 {
 		return "constrained"
 	}
 	return "normal"
@@ -202,6 +237,13 @@ func browserHealthPayload(pool *vision.Pool) map[string]any {
 	} else if state == "dead" {
 		status = "unavailable"
 	}
+	queue := mapFromAny(stats["queue"])
+	activePages := intFromAny(stats["active_pages"])
+	availablePages := intFromAny(stats["available_pages"])
+	maxPages := intFromAny(stats["max_pages"])
+	failCount := int64FromAny(stats["fail_count"])
+	currentCapacity := currentBrowserCapacity(activePages, availablePages, maxPages, intFromAny(queue["depth"]))
+	historicalPressure := historicalBrowserPressure(queue, failCount)
 	return map[string]any{
 		"status":              status,
 		"service":             "uiai-browser",
@@ -216,6 +258,8 @@ func browserHealthPayload(pool *vision.Pool) map[string]any {
 		"screenshot_count":    stats["screenshot_count"],
 		"fail_count":          stats["fail_count"],
 		"queue":               stats["queue"],
+		"current_capacity":    currentCapacity,
+		"historical_pressure": historicalPressure,
 		"diagnostics_enabled": true,
 		"eval_async_enabled":  true,
 		"agent_pressure":      agentPressureSummary(stats),
