@@ -631,3 +631,505 @@ The top 5 from Round 2 (in priority order):
    for state setup)
 5. **axe-core integration** (`uiai_browser_a11y_check` for one-call
    a11y audits)
+
+---
+
+## Round 3 — Focusa ↔ UIAI Integration (and remaining items)
+
+After 4+ hours of intensive E2E work, the largest remaining DX win is
+**deepening the Focusa↔UIAI integration**. Today the two systems are
+loosely coupled — Focusa knows about workpoints, evidence, and
+predictions, but UIAI is a black box that emits base64 JPEGs that
+agents manually translate into Focusa evidence refs.
+
+This round catalogues the integration gaps, the remaining tool-surface
+items, and a north-star vision for what UIAI could become as a
+first-class agent browser.
+
+### Focusa ↔ UIAI integration gaps
+
+### 70. Every UIAI screenshot needs manual translation into Focusa evidence
+
+**Today**:
+```python
+screenshot_json = uiai_browser_screenshot()           # returns JSON envelope
+b64 = jq -r .screenshot screenshot.json               # extract
+open file.jpg with base64 -d                          # write file
+read file.jpg                                        # load into context
+focusa_evidence_capture(target_ref, result, evidence_ref)  # link by hand
+```
+
+That's 4-5 tool calls per screenshot, plus a string-typed
+`evidence_ref` that means nothing to the system.
+
+**Fix**: Add a `uiai_browser_capture_evidence` that:
+- Takes the screenshot
+- Writes to a server-known path
+- Returns a structured `evidence_handle` that Focusa can resolve
+- Auto-invokes `focusa_evidence_capture` with the right `target_ref`
+
+```json
+{
+  "uiai_browser_capture_evidence": {
+    "viewport": [1280, 800],
+    "target_ref": "https://wpuiai.com/admin.php?page=wpuiai",
+    "result": "WPUIAI Settings page rendered with DevConsole settings card",
+    "auto_attach_to_workpoint": true
+  }
+}
+```
+
+Returns:
+```json
+{
+  "evidence_handle": "uiai:session=X:screenshot=N",
+  "workpoint_attached": true,
+  "context_window_saved_bytes": 46000
+}
+```
+
+### 71. UIAI sessions are not first-class Focusa objects
+
+`uiai_browser_open` returns `LgwqFy4b` as a session ID. Focusa has
+no knowledge of it. If an agent switches contexts, it has to
+remember which session was open, what page it was on, what
+viewports it was testing, and which auth profile was in use.
+
+**Fix**: Treat UIAI sessions as `focusa_active_object_resolve`-able
+resources:
+
+```json
+{
+  "object_type": "uiai_session",
+  "object_ref": "LgwqFy4b",
+  "properties": {
+    "url": "https://wpuiai.com/wp-admin/admin.php?page=wpuiai-settings",
+    "viewport": [1280, 800],
+    "auth_profile": "wpuiai-test-admin",
+    "created_at": "2026-06-09T22:01:00Z",
+    "last_used": "2026-06-09T22:14:32Z"
+  }
+}
+```
+
+Then `focusa_active_object_resolve` can return sessions as
+inspectable, linkable objects in the trajectory. A new "WebSession"
+object type would integrate naturally with the existing ontology.
+
+### 72. No bi-directional workpoint → browser context
+
+When Focusa has an active workpoint with `current_action: "submit_form_for_tab=ai&setting=max_iterations"`, UIAI has no way to know this. The agent must manually translate workpoint state into UIAI tool calls.
+
+**Fix**: Implement `focusa_to_uiai_bridge` that, given a workpoint
+current_action, generates the right sequence of UIAI tool calls:
+
+```python
+focusa_to_uiai_bridge(workpoint_id)
+# Returns:
+{
+  "action_sequence": [
+    {"uiai_browser_navigate": {"url": "https://wpuiai.com/wp-admin/admin.php?page=wpuiai-settings&tab=ai"}},
+    {"uiai_browser_fill": {"selector": "[name=uiai_autopilot_max_iterations]", "value": "5"}},
+    {"uiai_browser_click": {"selector": "input[name=submit]"}},
+    {"uiai_browser_expect": {"selector": ".notice", "text": "Saved"}}
+  ]
+}
+```
+
+### 73. Diagnostics are anonymous to Focusa
+
+When UIAI reports "1 failed network request" in diagnostics, Focusa
+has no way to correlate it to the action that caused it. The
+diagnostic event has no `cause_action_id`, no `workpoint_id`, no
+`active_object_ref`. The agent has to be the bridge.
+
+**Fix**: When UIAI emits a diagnostic event, it should be tagged with
+the action that produced it:
+
+```json
+{
+  "diagnostic_event": {
+    "type": "network_failure",
+    "url": "/admin-ajax.php",
+    "status": 400,
+    "action_id": "uiai:fill:uiai_unsplash_app_id:999888777",
+    "workpoint_id": "019eae3c-...",
+    "session_id": "LgwqFy4b"
+  }
+}
+```
+
+`focusa_browser_diagnostics_intake` should auto-link each event to the
+right Focusa evidence/workpoint.
+
+### 74. `focusa_tool_doctor` doesn't know about UIAI
+
+When UIAI hangs or returns "operation was aborted", the agent
+should be able to ask `focusa_tool_doctor("uiai_browser_click hung after Start button")` and get back a structured recovery plan.
+
+**Fix**: `focusa_tool_doctor` should accept a `tool_family: "uiai"`
+parameter and return:
+
+```json
+{
+  "diagnosis": "uiai_session_hang",
+  "root_cause": "long-running_backend_op",
+  "recovery_actions": [
+    {"action": "uiai_browser_close", "params": {"session_id": "...", "force": true}},
+    {"action": "uiai_browser_open", "params": {"auth_profile": "wpuiai-test-admin"}},
+    {"action": "uiai_browser_navigate", "params": {"url": "..."}}
+  ]
+}
+```
+
+### 75. No shared auth model between Focusa and UIAI
+
+UIAI has no concept of `auth_profile`. Every UIAI session requires
+the agent to manually re-authenticate with username/password. Focusa
+has a `continuity_id` and knows the agent's identity, but the
+browser never inherits that.
+
+**Fix**: Introduce auth profiles that both systems share:
+
+```json
+{
+  "uiai_browser_open": {
+    "auth_profile": "wpuiai-test-admin",
+    "url": "https://wpuiai.com/wp-admin/"
+  }
+}
+```
+
+Focusa would store the profile under `focusa://auth/wpuiai-test-admin`
+and pass credentials automatically. CI systems configure the
+profile once, every subsequent audit reuses it.
+
+### 76. Evidence capture is one-way
+
+I can `focusa_evidence_capture(screenshot, target_ref)` but I can't
+`focusa_evidence_retrieve(target_ref, type='screenshot')` and have
+it open a UIAI session to re-shoot for comparison.
+
+**Fix**: Add a `uiai_browser_recapture({evidence_ref: "..."})` that
+finds the evidence, parses out the URL/viewport/selector context,
+opens a session, navigates, and re-screenshots. Returns a new
+evidence handle and a visual diff.
+
+### 77. No "what changed" between evidence points
+
+When I do `focusa_evidence_capture` twice, Focusa has both but no
+diff. To compare I have to download both, run `compare -metric`
+manually, interpret. A `focusa_evidence_diff` would do this
+natively.
+
+### 78. No way to scope UIAI sessions to Focusa workpoints
+
+When a workpoint is the current Focusa context, UIAI should know:
+- Which auth profile to use
+- Which URL to start at (from workpoint.target_objects)
+- Which evidence_handle to attach new evidence to
+- When the workpoint advances, the session should follow (e.g. close
+  when workpoint ends)
+
+**Fix**: `uiai_browser_open({workpoint: "019eae3c-..."})` would
+pre-fill all this.
+
+### 79. No way to report UIAI state into Focusa trajectory
+
+When UIAI does a long action and the workpoint is "verify
+critique-page-375px", the trajectory should know:
+- UIAI started the action
+- UIAI captured screenshot evidence
+- UIAI reported OK/FAIL
+
+Today this is all manual. `uiai_action_log` should auto-feed
+`focusa_trajectory_view` so the trajectory shows what the agent did
+on the browser.
+
+### 80. No "session memory" between Focusa sessions
+
+When a Focusa continuity resumes (after compaction or model swap),
+UIAI sessions opened by the previous agent are forgotten. The
+agent has to re-discover, re-open, re-navigate, re-auth.
+
+**Fix**: When `focusa_workpoint_resume` is called, also resume the
+UIAI session that was last active. Store `last_uiai_session_id` in
+the workpoint packet.
+
+### 81. No "uiai session as Focusa context" pattern
+
+Focusa has a powerful "context" abstraction (workpoint, current
+action, evidence, predictions). UIAI has session state. They're
+disjoint. A unified mental model would be:
+
+```
+Workpoint
+├── trajectory
+│   ├── waypoints[]
+│   ├── workpoints[]
+├── active_object (current_url)
+├── evidence (uiai screenshots + uiai DOM snapshots)
+├── state (uiai session_id, viewport, auth_profile, localStorage)
+└── next_action (uiai tool sequence)
+```
+
+Currently the agent has to manually maintain all of these in their
+context window.
+
+### Remaining tool-surface items
+
+### 82. No way to detect if a button is disabled before clicking
+
+`uiai_browser_click(disabled_button)` silently fails. An
+`is_enabled` / `is_visible` / `is_in_viewport` check before click
+would prevent wasted attempts.
+
+### 83. No "double-click" or "right-click" primitives
+
+Some admin UIs (e.g. context menus, double-click edit) need these.
+
+### 84. No "key sequence" primitive
+
+`uiai_browser_press('Tab')` works, but `uiai_browser_press_seq(['Tab','Tab','Tab','Enter'])` for form submission via keyboard would be useful.
+
+### 85. No way to mock `Date.now()` / `setTimeout` for time-traveling tests
+
+For testing scheduled actions, autopilot runs, cron jobs.
+
+### 86. No "freeze UI" / "throttle animations" mode
+
+Animations make screenshots non-deterministic. UIAI should
+auto-pause CSS animations / Web Animations API during screenshots.
+
+### 87. No "stable screenshot" primitive
+
+`uiai_browser_screenshot({stable: true})` should wait for:
+- `requestAnimationFrame` quiescent for 100ms
+- No pending `setTimeout` / `fetch`
+- No CSS animations running
+- All images loaded
+- All web fonts loaded
+
+This eliminates the need for explicit `sleep` calls.
+
+### 88. `fill` with select elements requires `select_option`, not `fill`
+
+Inconsistent API surface for different form controls. A unified
+`uiai_browser_set({selector, value})` with smart field-type
+detection would be cleaner.
+
+### 89. No "find all interactive elements" primitive
+
+`uiai_browser_list_buttons` / `_list_inputs` / `_list_links` would
+be a fast way to discover a page's affordances without evaluating
+JS or full snapshot.
+
+### 90. No "scroll to element" before screenshot
+
+I had to do `eval(el.scrollIntoView())` before screenshot. A
+`screenshot({selector, scroll_to: true})` would be one call.
+
+### 91. Console-message capture is lossy
+
+Only the last N messages are kept. Long-running operations can
+lose context.
+
+### 92. Network response bodies are not captured for success
+
+Only failure responses show their body. For perf audits or
+"what's the API returning?" questions, success-body capture would
+help.
+
+### 93. No way to take a screenshot of a specific element only
+
+`uiai_browser_screenshot({selector: ".uiai-settings-card"})` would
+clip to a region, save tokens, and focus the audit.
+
+### 94. No "compare against saved baseline" workflow
+
+A `.uiai baseline/` directory convention where `uiai_browser_screenshot` automatically diffs against a saved baseline and returns the diff percentage.
+
+### 95. No "generate accessibility report" primitive
+
+axe-core integration would be a one-call way to surface
+accessibility issues alongside visual audits.
+
+### 96. No "test keyboard nav" primitive
+
+`uiai_browser_keyboard_nav({start: "first_input", direction: "tab"})` would test that tab order is sensible.
+
+### 97. No "check focus trap" for modals
+
+`uiai_browser_focus_trap({modal: ".uiai-modal"})` would test
+that focus stays within the modal.
+
+### 98. No "check color contrast" for text
+
+`uiai_browser_contrast({selector: "h1", min_aa: 4.5})` would
+audit WCAG compliance on rendered text.
+
+### Workflow / DX patterns
+
+### 99. The skill at `/root/.pi/skills/wpuiai-workflow` doesn't have a "common UIAI patterns" section
+
+The skill is named `wpuiai-workflow` not `uiai-engine` — confusing.
+It also lacks a "UIAI cookbook" subsection for common E2E patterns
+(responsive audit, form test, navigation tree, etc.).
+
+### 100. No "starter template" for E2E audit scenarios
+
+A canonical "responsive visual audit" JSON template with placeholders
+for URL, selectors, viewports would let new agents ramp up
+immediately.
+
+### 101. No replay/redo for failed interactions
+
+When `uiai_browser_click` fails, the agent has to manually retry.
+A `uiai_browser_retry` with exponential backoff and selector
+relaxation (e.g. drop `:nth-child(2)`) would be a huge win.
+
+### 102. No structured "scenario diff"
+
+After running scenario A and scenario B on the same page, agents
+have no way to know what changed. `uiai_scenario_diff({a, b})`
+would surface a structured diff (which elements changed, which
+events fired, which network calls happened).
+
+### 103. No way to export a session as a replayable script
+
+A UIAI audit should be able to:
+```bash
+uiai audit run --url=... --viewports=375,768,1024,1440 \
+  --output=audit-2026-06-09.json
+uiai audit replay --input=audit-2026-06-09.json
+```
+
+So the audit is reproducible. Today, the audit is one-shot and
+not replayable.
+
+### 104. No "lint" for the test session itself
+
+If an agent's E2E pattern has 5 redundant tool calls (e.g.
+"check state, check state again, check state again, click"), a
+linter would flag it.
+
+### 105. No way to mark a screenshot as "golden" / "baseline"
+
+Once a designer approves a screenshot, the agent should be able to
+mark it as the baseline for future diffs. `uiai_browser_save_golden({evidence_ref: "..."})` would do this.
+
+### Aesthetics of the tool itself
+
+### 106. The `format: jpeg` default is silent
+
+When `uiai_browser_screenshot` is called, the response includes
+`"format": "jpeg"` but not "this is base64-encoded". A new agent
+has to read the docs to find out.
+
+### 107. Tool names are inconsistent
+
+`uiai_browser_screenshot` (verb), `uiai_browser_diagnostics`
+(noun), `uiai_browser_open` (verb), `uiai_browser_health` (noun).
+Pick one convention.
+
+### 108. Parameter naming inconsistent
+
+`viewport: [375, 800]` vs `width: 375, height: 800` (used elsewhere)
+vs `at_size: 375,800`. Pick one.
+
+### 109. The "screenshot" tool's success response is just metadata
+
+A new agent would expect the screenshot bytes. Returning
+`width, height, format, size, url, title, duration_ms` looks like
+an error. A first-line note would help: "screenshot captured; use
+jq to extract".
+
+### 110. No `--help` parameter to see tool schema
+
+Agents have to read README or skill docs to learn parameters.
+Inline help would speed onboarding.
+
+### Reliability concerns
+
+### 111. Session pool is bounded at 2
+
+`max_pages: 2` is a hard limit. Agents with parallel investigations
+need to wait. A queue with `priority` parameter would help.
+
+### 112. "This operation was aborted" is the only error
+
+There's no 504 vs 502 vs timeout distinction. Agents retry blindly.
+
+### 113. No automatic session recovery
+
+When a session dies mid-action, the agent has to manually re-open
+and re-navigate. A "auto-resume" mode would re-open with the same
+cookies/URL.
+
+### 114. The `127.0.0.1:7456` only works from one machine
+
+If the agent's tool call goes through a different host (e.g. a CI
+runner), it fails. The skill doesn't document this constraint.
+
+### 115. No way to know the engine's health before opening a session
+
+`uiai_browser_health` exists, but it returns capacity stats, not
+readiness (e.g. "is the engine process running?"). Agents open
+sessions blind.
+
+### North-star vision
+
+### 116. **UIAI as a "do this on the web" primitive, not a browser controller**
+
+The biggest shift would be moving from "control a Chromium browser"
+to "do this on the web". Higher-level primitives:
+- `uiai_do({intent: "log in to wpuiai.com", then: "click Settings", then: "fill license key"})`
+- `uiai_scenario({actions: [...]})` with semantic intent per action
+- `uiai_extract({url, query: "what's the user's subscription plan?"})`
+
+### 117. **Focusa-aware UIAI: the UIAI session IS the workpoint's web context**
+
+Today: Workpoint is abstract, UIAI is a separate tool.
+Tomorrow: A UIAI session is the concrete realization of a workpoint's
+"web context". Workpoint advances → browser navigates. Browser
+captures evidence → workpoint gains evidence. Browser hits an
+error → workpoint knows to backtrack.
+
+### 118. **UIAI should learn from past audits**
+
+The same E2E audit (11 pages, 4 viewports, 5 input tests) shouldn't
+be re-discovered every time. A `uiai_audit_history` that suggests
+"you ran this scenario yesterday; replay?" would be 10x faster than
+re-deriving the action list.
+
+### 119. **Per-tool surface contract tests**
+
+Each UIAI tool should have a small self-test that runs on engine
+startup. If `uiai_browser_diagnostics` is broken (e.g. `level`
+filter ignored), an admin should see a warning, not just a confused
+agent.
+
+### 120. **A "UIAI playground" in the engine repo**
+
+A static HTML page in `uiai-engine/playground/` with all primitives
+exercised in a single page, useful for both human onboarding and
+CI smoke tests. Currently agents have to set up a real WordPress
+admin to test UIAI workflows.
+
+### Final tally
+
+- **Rounds 1+2+3**: 120 distinct feedback items
+- **Top 5 from Round 3 (Focusa↔UIAI integration)**:
+  1. `uiai_browser_capture_evidence` — auto-route to Focusa evidence
+  2. UIAI sessions as first-class Focusa objects
+  3. `focusa_tool_doctor` understands UIAI failures
+  4. Shared `auth_profile` between Focusa and UIAI
+  5. `focusa_to_uiai_bridge` — generate UIAI action sequences from workpoints
+
+If UIAI implemented the top 5 from each round (15 total), an agent
+E2E audit would drop from:
+
+- Today: ~200 calls, ~500KB context, 30 min wall
+- Tomorrow: ~15 calls, ~5KB context, 3 min wall
+
+That is the "north star" for the engine.
