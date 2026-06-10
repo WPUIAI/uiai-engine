@@ -12,6 +12,12 @@ the wrong tab, but I have to wait for it to ask me a question or
 fail". The proposed feature collapses that feedback loop from
 many-minutes to sub-second.
 
+> **Phase 1 (MVP) is a PWA, not a native app.** See
+> `UIAI_AGENT_FPV_PWA_SPEC_2026-06-09.md` for the PWA variant that
+> ships first: zero install, mobile-native, shareable link, PWA
+> installable. The Mac app / Tauri / IDE-embedded versions come
+> in Phase 2.
+
 ---
 
 ## 1. Why this matters
@@ -281,7 +287,11 @@ Command channel (reverse direction):
 
 ---
 
-## 5. Mac app spec
+## 5. Mac app spec (Phase 2)
+
+> **Phase 1 is the PWA, not the Mac app.** See
+> `UIAI_AGENT_FPV_PWA_SPEC_2026-06-09.md` for what actually ships
+> first. This Mac-app spec is the long-term Phase 2.
 
 ### 5.1 Tech stack
 
