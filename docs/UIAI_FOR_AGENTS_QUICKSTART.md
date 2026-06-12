@@ -1,14 +1,16 @@
 # UIAI for Agents Quickstart
 
-This is the shortest end-to-end path for using UIAI Engine as an agent browser, research, diagnostics, and Focusa evidence backend. For public cohort users, UIAI is the browser/proof engine and Focusa is the project memory/Workpoint/evidence engine. Planned FPV/PWA work will add live share-link oversight and steering on top of the current browser/session surfaces. For repeatable operator/agent recipes, see [Agent UX Cookbook](AGENT_UX_COOKBOOK.md).
+This is the shortest end-to-end path for using UIAI Engine as the proof browser for Focusa-powered agents: browser, research, diagnostics, and Focusa evidence backend in one workflow. UIAI is the browser/proof engine; Focusa is the project memory, Workpoint, Trajectory, evidence, prediction, metacog, and recovery engine. Planned FPV/PWA work will add live share-link oversight and steering on top of the current browser/session surfaces. For repeatable operator/agent recipes, see [Agent UX Cookbook](AGENT_UX_COOKBOOK.md).
 
 ## Highest-value agent benefits
 
 ### Why Focusa + UIAI together
 
+UIAI Engine should be introduced as the proof browser for Focusa-powered agents, not as generic browser automation.
+
 - **UIAI observes:** browser sessions, source reads, snapshots, screenshots, console/network diagnostics, and search results.
 - **UIAI proves:** stable evidence handles, redacted packets, Source-to-Markdown records, WPUIAI research cards, and diagnostics summaries.
-- **Focusa remembers:** project identity, trajectory, Workpoints, evidence links, predictions, metacog lessons, and next actions.
+- **Focusa remembers:** ProjectIdentity, Trajectory, Workpoints, evidence links, predictions, metacog lessons, recovery state, and next actions.
 - **Agents improve:** browser work becomes auditable, resumable, and tied to a durable goal instead of buried in chat history.
 
 

@@ -2,7 +2,7 @@
 
 **Status:** draft iterative product/engineering spec  
 **Date:** 2026-06-04  
-**HLT alignment:** make UIAI Engine the agent-compatible browser/intelligence platform that Pi can operate fluently and Focusa can use as evidence, Workpoint, trajectory, prediction, and metacognition substrate.  
+**HLT alignment:** make UIAI Engine the proof browser for Focusa-powered agents: Pi operates the browser workflow, UIAI executes browser/search/session/media/diagnostics and emits stable evidence handles, and Focusa turns that proof into Workpoint, Trajectory, evidence, prediction, metacognition, and recovery context.  
 **Primary repos inspected:**
 
 - UIAI Engine: `/home/wpuiai/uiai-engine`
@@ -14,7 +14,7 @@
 
 ## 1. Thesis
 
-UIAI is most valuable with Focusa and Pi when it behaves as the **agent browser + research + diagnostics + proof engine**:
+UIAI is most valuable with Focusa and Pi when it behaves as the **proof browser for Focusa-powered agents** — the agent browser + research + diagnostics + proof engine:
 
 1. **Pi** is the fast operator/agent harness: it chooses UIAI tools, interacts with web pages, displays compact results, and keeps the UX thin.
 2. **UIAI Engine** owns browser/search/session/media/diagnostics execution and emits bounded, stable evidence handles.

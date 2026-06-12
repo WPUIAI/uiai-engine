@@ -1,10 +1,10 @@
 # UIAI Agent Discovery Index
 
-Purpose: one-page index for how agents discover UIAI Engine features without loading the whole repo or guessing tool names.
+Purpose: one-page index for how agents discover UIAI Engine features without loading the whole repo or guessing tool names. Public positioning should lead with UIAI Engine as the proof browser for Focusa-powered agents: UIAI executes browser/search/session/diagnostics and emits evidence handles; Focusa preserves project memory, Workpoints, Trajectory, evidence, prediction, metacog, and recovery.
 
 ## Highest-value public benefits
 
-Public docs and cards should lead with these benefits:
+Public docs and cards should lead with these proof-browser benefits:
 
 | Benefit | Why agents care | Discovery path |
 |---|---|---|

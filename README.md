@@ -1,10 +1,10 @@
 # UIAI Engine
 
-UIAI Engine is the agent-compatible browser and intelligence backend for WPUIAI. It gives agents a safer browser surface, source-to-proof research, diagnostics-first debugging, visual checks, and clean evidence handoff to Pi, MCP clients, Focusa, WPUIAI, and remote agents. For a public cohort, UIAI is the browser agents can use without guessing; Focusa is the memory, trajectory, Workpoint, prediction, and evidence layer that keeps that browser work accountable.
+UIAI Engine is the **proof browser for Focusa-powered agents** and the agent-compatible browser/intelligence backend for WPUIAI. It gives agents a safer browser surface, source-to-proof research, diagnostics-first debugging, visual checks, and clean evidence handoff to Pi, MCP clients, Focusa, WPUIAI, and remote agents. UIAI owns browser/search/session/media/diagnostics execution and stable evidence handles; Focusa owns cognitive continuity: ProjectIdentity, Workpoints, Trajectory, evidence linkage, predictions, metacog, and recovery.
 
 ## Clearest benefits
 
-Start here. These are the main reasons to use UIAI Engine:
+Start here. These are the main reasons to use UIAI Engine as the proof browser for Focusa-powered agents:
 
 | Benefit | What you get |
 |---|---|
@@ -13,7 +13,7 @@ Start here. These are the main reasons to use UIAI Engine:
 | **Agents can browse real sites reliably** | Persistent browser sessions keep state across reads, snapshots, @ref actions, forms, navigation, cookies, auth state, and diagnostics. |
 | **Debugging starts from evidence** | Console errors, exceptions, failed requests, structured error envelopes, and `uiai_errors` reduce screenshot-only guessing. |
 | **Research flows hand off cleanly** | Search → browse → read/snapshot → diagnostics → redacted Focusa/Pi packet → evidence capture. |
-| **Focusa + UIAI is the power combo** | UIAI sees and proves what happened in the browser; Focusa remembers the project goal, Workpoint, evidence, prediction, and next action. |
+| **Focusa-powered agents get a proof browser** | UIAI sees and proves what happened in the browser; Focusa remembers the project goal, Workpoint, evidence, prediction, metacog lesson, and next action. |
 | **Cohort access has guardrails** | Hardened auth, redaction, URL safety, public-target smokes, diagnostics, and release proof make browser access safer to share with real users. |
 | **FPV co-pilot is the roadmap** | Planned PWA share links will let operators watch and steer live agent browser sessions from mobile before native app work. |
 | **Visual QA has artifacts** | Screenshots, device frames, shares, browser reliability checks, and release proof scripts produce reviewable output. |
@@ -25,7 +25,7 @@ Legacy parity, old route retirement, and compatibility inventories are maintenan
 
 ## Public browser cohort positioning
 
-Use UIAI Engine when agents need a browser they can explain, prove, and hand off. The cohort value proposition is simple:
+Use UIAI Engine when Focusa-powered agents need a browser they can explain, prove, and hand off. The cohort value proposition is simple:
 
 1. **See the web now:** persistent browser sessions, screenshots, snapshots, @ref actions, reads, forms, cookies, auth state, and diagnostics.
 2. **Turn activity into proof:** useful reads, searches, diagnostics, screenshots, and packets get stable evidence handles instead of raw transcript blobs.
@@ -40,7 +40,7 @@ For users, this means less “the agent clicked around somewhere” and more “
 
 UIAI Engine serves as a single local or remote API surface for:
 
-- **Agent integrations:** Pi extension tools, MCP browser-session bridge, OpenAI/MCP tool schemas, compact agent cards, provider-neutral web search, tool search, tool graph metadata, and [Focusa](https://github.com/Startempire-Wire/focusa)-aware evidence routes.
+- **Agent integrations:** Pi extension tools, MCP browser-session bridge, OpenAI/MCP tool schemas, compact agent cards, provider-neutral web search, tool search, tool graph metadata, and [Focusa](https://github.com/Startempire-Wire/focusa)-aware evidence routes that make UIAI the proof browser inside Focusa-powered workflows.
 - **Visual automation:** one-shot screenshots, persistent browser sessions, DOM snapshots, page text extraction, click/type/fill/select/press actions, CSS injection, viewport changes, cookies/auth save-load, diagnostics, and shareable artifacts.
 - **WPUIAI plugin cloud calls:** critique, UI reverse/reference analysis, section detection, layout comparison, style enhancement, copilot chat, intake, workflow orchestration, and usage reporting.
 - **Design/build pipelines:** design-system extraction, content mapping, block recipes, five-way comparison, migration helpers, and SSE events.
