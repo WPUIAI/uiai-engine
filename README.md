@@ -77,6 +77,7 @@ Start here by task:
 | Need | Read |
 |---|---|
 | HLT ledger and current trajectory | [`docs/HLT_LEDGER.md`](docs/HLT_LEDGER.md) |
+| Licensing: BSL 1.1, Additional Use Grant, Founders Forge access, commercial licensing | [`LICENSE`](LICENSE), [`docs/LICENSING.md`](docs/LICENSING.md) |
 | Agent discovery index: `/api/tools/agent-card`, `pi_uiai_agent_card`, cards, search, graph, docs endpoint, Pi/MCP/CLI discovery, gaps | [`docs/AGENT_DISCOVERY_INDEX.md`](docs/AGENT_DISCOVERY_INDEX.md) |
 | Agent quickstart: Pi, MCP, CLI, HTTP, browser workflow, Focusa packet handoff | [`docs/UIAI_FOR_AGENTS_QUICKSTART.md`](docs/UIAI_FOR_AGENTS_QUICKSTART.md) |
 | Agent UX cookbook: search/read, @refs, diagnostics, packets, visual QA, release proof | [`docs/AGENT_UX_COOKBOOK.md`](docs/AGENT_UX_COOKBOOK.md) |
@@ -517,6 +518,15 @@ scripts/trim-runtime-logs.sh
 ```
 
 Cross-links: [`docs/BROWSER_RELIABILITY_RUNBOOK.md`](docs/BROWSER_RELIABILITY_RUNBOOK.md), [`docs/SESSION_API.md`](docs/SESSION_API.md), [`docs/DEVICE_FRAME_INTEGRATION.md`](docs/DEVICE_FRAME_INTEGRATION.md)
+
+
+## Licensing
+
+UIAI Engine is the **proof browser for Focusa-powered agents** and is licensed under the [Business Source License 1.1](LICENSE). The repo is source-available, not open source until the Change License takes effect for a version.
+
+The license includes an Additional Use Grant for personal, educational, research, evaluation, demonstration, and other non-commercial use, plus Founders Forge included access for participant/portfolio internal product development and evaluation. Commercial production, hosted/SaaS, resale, paid service, commercial browser automation, commercial agent infrastructure, or paid product-feature use requires a separate commercial license.
+
+See [docs/LICENSING.md](docs/LICENSING.md) for the readable summary. The [LICENSE](LICENSE) file controls.
 
 ## Configuration
 
