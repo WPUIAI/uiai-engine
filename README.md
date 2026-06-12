@@ -19,7 +19,7 @@ UIAI Engine is the **proof browser for [Focusa](https://github.com/Startempire-W
 
 ## Browser in action
 
-![Focusa governing a Pi agent workflow for UIAI Engine: project identity, canonical Workpoint resume, context cognition, and next safe action](docs/assets/screenshots/uiai-engine-readme-badges.jpg)
+![Actual Pi session excerpt showing Focusa tool calls: Workpoint checkpoint and evidence capture for UIAI Engine](docs/assets/screenshots/uiai-engine-readme-badges.jpg)
 
 ## Clearest benefits
 
