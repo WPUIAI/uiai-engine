@@ -16,6 +16,11 @@
 
 UIAI Engine is the **proof browser for [Focusa](https://github.com/Startempire-Wire/focusa)-powered agents** and the agent-compatible browser/intelligence backend for WPUIAI. It gives agents a safer browser surface, source-to-proof research, diagnostics-first debugging, visual checks, and clean evidence handoff to Pi, MCP clients, [Focusa](https://github.com/Startempire-Wire/focusa), WPUIAI, and remote agents. UIAI owns browser/search/session/media/diagnostics execution and stable evidence handles; [Focusa](https://github.com/Startempire-Wire/focusa) owns cognitive continuity: ProjectIdentity, Workpoints, Trajectory, evidence linkage, predictions, metacog, and recovery.
 
+
+## Browser in action
+
+![UIAI Engine browser session showing the public GitHub README, badges, and Focusa proof-browser positioning](docs/assets/screenshots/uiai-engine-readme-badges.jpg)
+
 ## Clearest benefits
 
 Start here. These are the main reasons to use UIAI Engine as the proof browser for [Focusa](https://github.com/Startempire-Wire/focusa)-powered agents:
