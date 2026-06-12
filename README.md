@@ -1,6 +1,6 @@
 # UIAI Engine
 
-UIAI Engine is the agent-compatible browser and intelligence backend for WPUIAI. It turns web pages, browser sessions, diagnostics, and visual checks into clean, discoverable, evidence-backed outputs for Pi, MCP clients, Focusa, WPUIAI, and remote agents.
+UIAI Engine is the agent-compatible browser and intelligence backend for WPUIAI. It gives agents a safer browser surface, source-to-proof research, diagnostics-first debugging, visual checks, and clean evidence handoff to Pi, MCP clients, Focusa, WPUIAI, and remote agents. For a public cohort, UIAI is the browser agents can use without guessing; Focusa is the memory, trajectory, Workpoint, prediction, and evidence layer that keeps that browser work accountable.
 
 ## Clearest benefits
 
@@ -13,12 +13,28 @@ Start here. These are the main reasons to use UIAI Engine:
 | **Agents can browse real sites reliably** | Persistent browser sessions keep state across reads, snapshots, @ref actions, forms, navigation, cookies, auth state, and diagnostics. |
 | **Debugging starts from evidence** | Console errors, exceptions, failed requests, structured error envelopes, and `uiai_errors` reduce screenshot-only guessing. |
 | **Research flows hand off cleanly** | Search → browse → read/snapshot → diagnostics → redacted Focusa/Pi packet → evidence capture. |
+| **Focusa + UIAI is the power combo** | UIAI sees and proves what happened in the browser; Focusa remembers the project goal, Workpoint, evidence, prediction, and next action. |
+| **Cohort access has guardrails** | Hardened auth, redaction, URL safety, public-target smokes, diagnostics, and release proof make browser access safer to share with real users. |
+| **FPV co-pilot is the roadmap** | Planned PWA share links will let operators watch and steer live agent browser sessions from mobile before native app work. |
 | **Visual QA has artifacts** | Screenshots, device frames, shares, browser reliability checks, and release proof scripts produce reviewable output. |
 | **WPUIAI gets product-ready outputs** | Research cards, proof reports, critique/design/reference support, workflow support, and usage/accounting surfaces. |
 
 Primary entry points: `/api/tools/agent-card`, `/api/tools/search`, `/api/tools/graph`, `/api/tools/docs`, `/api/markdown`, `/api/session/*`, `/api/agent/research-packet`, Pi `pi_uiai_agent_card`, Pi `uiai_source_to_markdown`, MCP `source_to_markdown`, and `scripts/uiai`.
 
 Legacy parity, old route retirement, and compatibility inventories are maintenance references below the primary product/agent benefits.
+
+## Public browser cohort positioning
+
+Use UIAI Engine when agents need a browser they can explain, prove, and hand off. The cohort value proposition is simple:
+
+1. **See the web now:** persistent browser sessions, screenshots, snapshots, @ref actions, reads, forms, cookies, auth state, and diagnostics.
+2. **Turn activity into proof:** useful reads, searches, diagnostics, screenshots, and packets get stable evidence handles instead of raw transcript blobs.
+3. **Keep agents on track with Focusa:** Focusa binds browser evidence to project identity, Workpoints, trajectory, predictions, metacog lessons, and next actions.
+4. **Share safely:** remote/browser access requires auth where appropriate, private/internal targets are blocked by default, and `url_not_allowed` is captured as policy evidence.
+5. **Ship product output:** Source-to-Markdown and research packets produce WPUIAI research cards/reports plus Focusa-ready capture arguments.
+6. **Plan live co-pilot oversight:** the FPV/PWA specs describe the next cohort-facing leap: a mobile share link where an operator can watch, annotate, and steer an agent browser session without installing an app.
+
+For users, this means less “the agent clicked around somewhere” and more “the agent inspected these sources, captured this evidence, diagnosed these failures, and Focusa knows what to do next.” The current product already supports browser proof and Focusa handoff; the planned FPV/PWA layer adds live operator oversight on top of that foundation.
 
 ## What this engine does
 
@@ -72,6 +88,9 @@ Start here by task:
 | Remote auth examples for curl, CLI, Pi, and MCP | [`docs/REMOTE_AUTH_EXAMPLES.md`](docs/REMOTE_AUTH_EXAMPLES.md) |
 | Browser/session API, agent tools, MCP formats, security boundaries, portability helpers | [`docs/SESSION_API.md`](docs/SESSION_API.md) |
 | UIAI × Focusa × Pi hand-in-glove research/diagnostics/evidence packet spec | [`docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md) |
+| Agent FPV Co-Pilot spec for live operator oversight of browser sessions | [`docs/UIAI_AGENT_FPV_COPILOT_SPEC_2026-06-09.md`](docs/UIAI_AGENT_FPV_COPILOT_SPEC_2026-06-09.md) |
+| Agent FPV PWA fast-path for cohort-friendly mobile share links | [`docs/UIAI_AGENT_FPV_PWA_SPEC_2026-06-09.md`](docs/UIAI_AGENT_FPV_PWA_SPEC_2026-06-09.md) |
+| Browser UX/DX feedback and recommendation conflict inventory | [`docs/UIAI_BROWSER_UX_DX_FEEDBACK_2026-06-09.md`](docs/UIAI_BROWSER_UX_DX_FEEDBACK_2026-06-09.md), [`docs/UIAI_BROWSER_RECOMMENDATION_CONFLICTS_2026-06-09.md`](docs/UIAI_BROWSER_RECOMMENDATION_CONFLICTS_2026-06-09.md) |
 | Cross-surface interoperability contracts, acceptance matrix, and proof gates | [`docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md`](docs/UIAI_ENGINE_INTEROPERABILITY_QUALITY_SPEC.md) |
 | Agent-surface release proof checklist | [`docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md`](docs/AGENT_SURFACE_RELEASE_PROOF_CHECKLIST.md) |
 | Release/deploy/push/watch-CI runbook | [`docs/RELEASE_DEPLOY_RUNBOOK.md`](docs/RELEASE_DEPLOY_RUNBOOK.md) |
