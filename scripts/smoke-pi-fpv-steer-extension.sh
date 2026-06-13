@@ -14,6 +14,7 @@ required = [
     'pi.registerCommand("fpv-unwatch"',
     'pi.registerCommand("fpv-watch-status"',
     'pi.on("session_start"',
+    'function authHeaders()',
     '/api/fpv/events?since_seq=',
     'deliverAs: "steer"',
     '/m/${encodeURIComponent(token)}/status',

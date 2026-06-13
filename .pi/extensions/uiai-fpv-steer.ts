@@ -21,13 +21,20 @@ function engineUrl(): string {
 	return (process.env.UIAI_ENGINE_URL || DEFAULT_ENGINE_URL).replace(/\/$/, "");
 }
 
+function authHeaders(): Record<string, string> {
+	const headers: Record<string, string> = {};
+	if (process.env.UIAI_API_KEY) headers["X-API-Key"] = process.env.UIAI_API_KEY;
+	if (process.env.UIAI_BEARER_TOKEN) headers.Authorization = `Bearer ${process.env.UIAI_BEARER_TOKEN}`;
+	return headers;
+}
+
 function auditText(event: any): string {
 	return String(event?.message || event?.text || event?.note || "").trim();
 }
 
 
 async function fetchEvents(sinceSeq: number): Promise<any> {
-	const res = await fetch(`${engineUrl()}/api/fpv/events?since_seq=${sinceSeq}&limit=100`, { cache: "no-store" });
+	const res = await fetch(`${engineUrl()}/api/fpv/events?since_seq=${sinceSeq}&limit=100`, { cache: "no-store", headers: authHeaders() });
 	const text = await res.text();
 	const data = text ? JSON.parse(text) : {};
 	if (!res.ok) throw new Error(data?.error || `FPV events ${res.status}`);
@@ -35,7 +42,7 @@ async function fetchEvents(sinceSeq: number): Promise<any> {
 }
 
 async function fetchStatus(token: string): Promise<any> {
-	const res = await fetch(`${engineUrl()}/m/${encodeURIComponent(token)}/status`, { cache: "no-store" });
+	const res = await fetch(`${engineUrl()}/m/${encodeURIComponent(token)}/status`, { cache: "no-store", headers: authHeaders() });
 	const text = await res.text();
 	const data = text ? JSON.parse(text) : {};
 	if (!res.ok) throw new Error(data?.error || `FPV status ${res.status}`);
