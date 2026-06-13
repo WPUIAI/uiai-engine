@@ -431,6 +431,10 @@ Observed patterns to adapt:
 - Show “stopped/expired” as a calm state; do not keep polling aggressively.
 
 
+## Pi active steering bridge
+
+Project-local Pi extension: `.pi/extensions/uiai-fpv-steer.ts`. After `/reload`, run `/fpv-watch <token>` in Pi for a controls-enabled FPV share. The watcher polls audited FPV notes and injects them with `pi.sendUserMessage()`; if the agent is busy, it uses `deliverAs: "steer"` so operator notes actively steer the running turn instead of waiting for manual polling. Use `/fpv-unwatch <token>` or `/fpv-unwatch all` to stop.
+
 ## Implemented interaction standard
 
 Current FPV UI implements these cockpit interactions:
