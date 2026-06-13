@@ -331,7 +331,7 @@ func toolRelations() map[string][]string {
 		"browser_search":             {"source_to_markdown", "browser_open", "browser_read", "browser_diagnostics", "uiai_focusa_packet_build", "uiai_tool_search"},
 		"browser_open":               {"browser_read", "browser_snapshot", "browser_diagnostics", "uiai_focusa_packet_build", "focusa_browser_diagnostics_intake", "browser_close"},
 		"browser_read":               {"browser_snapshot", "browser_text", "browser_diagnostics", "uiai_focusa_packet_build", "browser_close"},
-		"browser_snapshot":           {"browser_click", "browser_fill", "browser_hover", "browser_text", "browser_diagnostics"},
+		"browser_snapshot":           {"browser_selector_resolve", "browser_click", "browser_fill", "browser_hover", "browser_text", "browser_diagnostics"},
 		"browser_click":              {"browser_snapshot", "browser_read", "browser_diagnostics", "browser_wait"},
 		"browser_fill":               {"browser_snapshot", "browser_press", "browser_diagnostics", "uiai_2fa_code"},
 		"browser_type":               {"browser_snapshot", "browser_fill", "browser_diagnostics"},
@@ -581,13 +581,26 @@ func openAITools() []map[string]any {
 			},
 		},
 		{
+			"name":        "browser_selector_resolve",
+			"description": "Resolve @ref, text=..., text/..., or role=...;name=... helper selectors into concrete CSS selectors before click/fill/read.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+					"selector":   map[string]string{"type": "string", "description": "@ref, text=..., text/..., role=...;name=..., or CSS selector"},
+				},
+				"required": []string{"session_id", "selector"},
+			},
+		},
+		{
 			"name":        "browser_click",
 			"description": "Click an element. Accepts CSS selector OR @ref from browser_snapshot (e.g. \"@e3\"). Uses bounded retry/backoff to reduce late-render selector flakiness. Returns screenshot. After failed clicks, unexpected UI, or navigation/API errors, call browser_diagnostics.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"session_id": map[string]string{"type": "string", "description": "Session ID"},
-					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref (e.g. \"@e3\")"},
+					"session_id":   map[string]string{"type": "string", "description": "Session ID"},
+					"selector":     map[string]string{"type": "string", "description": "CSS selector, @ref, text=..., text/..., or role=...;name=..."},
+					"auto_wait_ms": map[string]any{"type": "integer", "description": "Optional bounded post-action settle wait, max 5000ms", "default": 0},
 				},
 				"required": []string{"session_id", "selector"},
 			},
@@ -702,8 +715,9 @@ func openAITools() []map[string]any {
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"session_id": map[string]string{"type": "string", "description": "Session ID"},
-					"url":        map[string]string{"type": "string", "description": "URL to navigate to"},
+					"session_id":   map[string]string{"type": "string", "description": "Session ID"},
+					"url":          map[string]string{"type": "string", "description": "URL to navigate to"},
+					"auto_wait_ms": map[string]any{"type": "integer", "description": "Optional bounded post-navigation settle wait, max 5000ms", "default": 0},
 				},
 				"required": []string{"session_id", "url"},
 			},
@@ -752,9 +766,10 @@ func openAITools() []map[string]any {
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"session_id": map[string]string{"type": "string", "description": "Session ID"},
-					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref"},
-					"text":       map[string]string{"type": "string", "description": "Text to fill"},
+					"session_id":   map[string]string{"type": "string", "description": "Session ID"},
+					"selector":     map[string]string{"type": "string", "description": "CSS selector, @ref, text=..., text/..., or role=...;name=..."},
+					"text":         map[string]string{"type": "string", "description": "Text to fill"},
+					"auto_wait_ms": map[string]any{"type": "integer", "description": "Optional bounded post-action settle wait, max 5000ms", "default": 0},
 				},
 				"required": []string{"session_id", "selector", "text"},
 			},
@@ -765,9 +780,10 @@ func openAITools() []map[string]any {
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"session_id": map[string]string{"type": "string", "description": "Session ID"},
-					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref of <select> element"},
-					"values":     map[string]any{"type": "array", "items": map[string]string{"type": "string"}, "description": "Option value(s) or text to select"},
+					"session_id":   map[string]string{"type": "string", "description": "Session ID"},
+					"selector":     map[string]string{"type": "string", "description": "CSS selector, @ref, text=..., text/..., or role=...;name=..."},
+					"values":       map[string]any{"type": "array", "items": map[string]string{"type": "string"}, "description": "Option value(s) or text to select"},
+					"auto_wait_ms": map[string]any{"type": "integer", "description": "Optional bounded post-action settle wait, max 5000ms", "default": 0},
 				},
 				"required": []string{"session_id", "selector", "values"},
 			},

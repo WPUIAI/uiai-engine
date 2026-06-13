@@ -701,9 +701,9 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "uiai_browser_navigate",
 		label: "UIAI Browser Navigate",
 		description: "Navigate an existing UIAI browser session to a new URL. Use read/snapshot after navigation, diagnostics on failures.",
-		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), url: Type.String({ description: "Destination URL" }) }),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), url: Type.String({ description: "Destination URL" }), auto_wait_ms: Type.Optional(Type.Number({ description: "Optional bounded post-action settle wait in ms, max 5000" })) }),
 		async execute(_toolCallId, params) {
-			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/navigate`, { url: params.url })), { endpoint: "/api/session/{id}/navigate" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/navigate`, { url: params.url, auto_wait_ms: params.auto_wait_ms })), { endpoint: "/api/session/{id}/navigate" });
 		},
 	});
 
@@ -711,9 +711,9 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "uiai_browser_click",
 		label: "UIAI Browser Click",
 		description: "Click a CSS selector or @ref from uiai_browser_snapshot. Read diagnostics after unexpected UI or failed actions.",
-		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref, e.g. @e3" }) }),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector, @ref, text=..., text/..., or role=...;name=..." }), auto_wait_ms: Type.Optional(Type.Number({ description: "Optional bounded post-action settle wait in ms, max 5000" })) }),
 		async execute(_toolCallId, params) {
-			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/click`, { selector: params.selector })), { endpoint: "/api/session/{id}/click" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/click`, { selector: params.selector, auto_wait_ms: params.auto_wait_ms })), { endpoint: "/api/session/{id}/click" });
 		},
 	});
 
@@ -721,9 +721,9 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "uiai_browser_hover",
 		label: "UIAI Browser Hover",
 		description: "Hover a CSS selector or @ref from uiai_browser_snapshot.",
-		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref" }) }),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector, @ref, text=..., text/..., or role=...;name=..." }), auto_wait_ms: Type.Optional(Type.Number({ description: "Optional bounded post-action settle wait in ms, max 5000" })) }),
 		async execute(_toolCallId, params) {
-			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/hover`, { selector: params.selector })), { endpoint: "/api/session/{id}/hover" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/hover`, { selector: params.selector, auto_wait_ms: params.auto_wait_ms })), { endpoint: "/api/session/{id}/hover" });
 		},
 	});
 
@@ -741,9 +741,9 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "uiai_browser_fill",
 		label: "UIAI Browser Fill",
 		description: "Replace an input value using a CSS selector or @ref. Prefer this over type when setting form values.",
-		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref" }), text: Type.String({ description: "Text value to fill" }) }),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector, @ref, text=..., text/..., or role=...;name=..." }), text: Type.String({ description: "Text value to fill" }), auto_wait_ms: Type.Optional(Type.Number({ description: "Optional bounded post-action settle wait in ms, max 5000" })) }),
 		async execute(_toolCallId, params) {
-			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/fill`, { selector: params.selector, text: params.text })), { endpoint: "/api/session/{id}/fill" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/fill`, { selector: params.selector, text: params.text, auto_wait_ms: params.auto_wait_ms })), { endpoint: "/api/session/{id}/fill" });
 		},
 	});
 
@@ -751,9 +751,9 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		name: "uiai_browser_select",
 		label: "UIAI Browser Select",
 		description: "Select dropdown option values or visible text by selector or @ref.",
-		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector or @ref of select element" }), values: Type.Array(Type.String({ description: "Option value or text" })) }),
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "CSS selector, @ref, text=..., text/..., or role=...;name=..." }), values: Type.Array(Type.String({ description: "Option value or text" })), auto_wait_ms: Type.Optional(Type.Number({ description: "Optional bounded post-action settle wait in ms, max 5000" })) }),
 		async execute(_toolCallId, params) {
-			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/select`, { selector: params.selector, values: params.values })), { endpoint: "/api/session/{id}/select" });
+			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/select`, { selector: params.selector, values: params.values, auto_wait_ms: params.auto_wait_ms })), { endpoint: "/api/session/{id}/select" });
 		},
 	});
 
@@ -880,6 +880,16 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		async execute(_toolCallId, params) {
 			const { session_id, ...body } = params;
 			return textResult(await post(`/api/session/${session_id}/cookies`, body), { endpoint: "/api/session/{id}/cookies" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_selector_resolve",
+		label: "UIAI Browser Selector Resolve",
+		description: "Resolve @ref, text=..., text/..., or role=...;name=... into a concrete CSS selector before click/fill/read.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), selector: Type.String({ description: "Selector helper to resolve" }) }),
+		async execute(_toolCallId, params) {
+			return textResult(await post(`/api/session/${params.session_id}/selector/resolve`, { selector: params.selector }), { endpoint: "/api/session/{id}/selector/resolve" });
 		},
 	});
 

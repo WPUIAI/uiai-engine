@@ -145,7 +145,8 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			var body struct {
-				URL string `json:"url"`
+				URL        string `json:"url"`
+				AutoWaitMs int    `json:"auto_wait_ms"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.URL == "" {
@@ -156,6 +157,10 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			snap, err := sess.Navigate(body.URL)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
+				return
+			}
+			if err := applyAutoWait(sess, body.AutoWaitMs); err != nil {
+				writeSessionError(w, 500, "auto_wait_failed", err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -201,7 +206,8 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			var body struct {
-				Selector string `json:"selector"`
+				Selector   string `json:"selector"`
+				AutoWaitMs int    `json:"auto_wait_ms"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" {
@@ -209,10 +215,18 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 
-			resolved := sess.ResolveRef(body.Selector)
+			resolved, resolveErr := sess.ResolveSelector(body.Selector)
+			if resolveErr != nil {
+				writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "click", "selector": body.Selector})
+				return
+			}
 			snap, err := sess.Click(resolved)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "click", "selector": body.Selector, "resolved_selector": resolved})
+				return
+			}
+			if err := applyAutoWait(sess, body.AutoWaitMs); err != nil {
+				writeSessionError(w, 500, "auto_wait_failed", err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -226,7 +240,8 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			var body struct {
-				Selector string `json:"selector"`
+				Selector   string `json:"selector"`
+				AutoWaitMs int    `json:"auto_wait_ms"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" {
@@ -234,10 +249,18 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 
-			resolved := sess.ResolveRef(body.Selector)
+			resolved, resolveErr := sess.ResolveSelector(body.Selector)
+			if resolveErr != nil {
+				writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "hover", "selector": body.Selector})
+				return
+			}
 			snap, err := sess.Hover(resolved)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "hover", "selector": body.Selector, "resolved_selector": resolved})
+				return
+			}
+			if err := applyAutoWait(sess, body.AutoWaitMs); err != nil {
+				writeSessionError(w, 500, "auto_wait_failed", err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -251,8 +274,9 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			var body struct {
-				Selector string `json:"selector"`
-				Text     string `json:"text"`
+				Selector   string `json:"selector"`
+				Text       string `json:"text"`
+				AutoWaitMs int    `json:"auto_wait_ms"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" || body.Text == "" {
@@ -260,7 +284,12 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			originalSelector := body.Selector
-			body.Selector = sess.ResolveRef(body.Selector)
+			if resolved, resolveErr := sess.ResolveSelector(body.Selector); resolveErr == nil {
+				body.Selector = resolved
+			} else {
+				writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "read", "selector": body.Selector})
+				return
+			}
 
 			snap, err := sess.Type(body.Selector, body.Text)
 			if err != nil {
@@ -393,18 +422,27 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			var body struct {
-				Selector string `json:"selector"`
-				Text     string `json:"text"`
+				Selector   string `json:"selector"`
+				Text       string `json:"text"`
+				AutoWaitMs int    `json:"auto_wait_ms"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" || body.Text == "" {
 				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) and text required"})
 				return
 			}
-			resolved := sess.ResolveRef(body.Selector)
+			resolved, resolveErr := sess.ResolveSelector(body.Selector)
+			if resolveErr != nil {
+				writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "fill", "selector": body.Selector})
+				return
+			}
 			snap, err := sess.Fill(resolved, body.Text)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "fill", "selector": body.Selector, "resolved_selector": resolved})
+				return
+			}
+			if err := applyAutoWait(sess, body.AutoWaitMs); err != nil {
+				writeSessionError(w, 500, "auto_wait_failed", err, sess)
 				return
 			}
 			writeJSON(w, 200, snap)
@@ -418,15 +456,20 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			var body struct {
-				Selector string   `json:"selector"`
-				Values   []string `json:"values"`
+				Selector   string   `json:"selector"`
+				Values     []string `json:"values"`
+				AutoWaitMs int      `json:"auto_wait_ms"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" || len(body.Values) == 0 {
 				writeJSON(w, 400, map[string]string{"error": "selector and values required"})
 				return
 			}
-			resolved := sess.ResolveRef(body.Selector)
+			resolved, resolveErr := sess.ResolveSelector(body.Selector)
+			if resolveErr != nil {
+				writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "select", "selector": body.Selector})
+				return
+			}
 			snap, err := sess.Select(resolved, body.Values)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "select", "selector": body.Selector, "resolved_selector": resolved, "values": body.Values})
@@ -503,7 +546,11 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) required"})
 				return
 			}
-			resolved := sess.ResolveRef(body.Selector)
+			resolved, resolveErr := sess.ResolveSelector(body.Selector)
+			if resolveErr != nil {
+				writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "text", "selector": body.Selector})
+				return
+			}
 			text, err := sess.TextContent(resolved)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "text", "selector": body.Selector, "resolved_selector": resolved})
@@ -522,7 +569,12 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			var body vision.ReadOptions
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector != "" {
-				body.Selector = sess.ResolveRef(body.Selector)
+				if resolved, resolveErr := sess.ResolveSelector(body.Selector); resolveErr == nil {
+					body.Selector = resolved
+				} else {
+					writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "read", "selector": body.Selector})
+					return
+				}
 			}
 			result, err := sess.ReadPage(body)
 			if err != nil {
@@ -628,6 +680,29 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 
 			sess.StoreRefs(snap.Refs)
 			writeJSON(w, 200, snap)
+		})
+
+		// Selector resolve — convert @ref, text=..., text/..., or role=...;name=... into a concrete CSS selector.
+		r.Post("/selector/resolve", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector string `json:"selector"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if strings.TrimSpace(body.Selector) == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector required"})
+				return
+			}
+			resolved, err := sess.ResolveSelector(body.Selector)
+			if err != nil {
+				writeSessionError(w, 404, "selector_not_found", err, sess, map[string]any{"action": "selector_resolve", "selector": body.Selector})
+				return
+			}
+			writeJSON(w, 200, map[string]string{"selector": body.Selector, "resolved_selector": resolved})
 		})
 
 		// Diagnostics — bounded console, exception, and network evidence (no screenshot)
@@ -797,6 +872,13 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 	event = observability.Record(event)
 	resp := observability.NewErrorEnvelope(event, err.Error(), details)
 	writeJSON(w, status, resp)
+}
+
+func applyAutoWait(sess *vision.Session, timeoutMs int) error {
+	if timeoutMs <= 0 {
+		return nil
+	}
+	return sess.AutoWait(timeoutMs)
 }
 
 func suggestedNextSessionAction(class string) string {

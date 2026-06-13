@@ -101,6 +101,8 @@ short and we capture mid-load, too long and we waste time.
 Returns when ready. Or add `uiai_browser_wait_for` primitive with a
 selector + timeout.
 
+**Implementation status (2026-06-12)**: Partial done. Navigation/click/hover/fill/select now accept optional `auto_wait_ms` (bounded max 5000ms) for post-action settling. Explicit wait remains available for page-specific selectors.
+
 ### 5. Text-based selectors
 
 `uiai_browser_click` only supports CSS selectors — no `:has-text()`,
@@ -119,6 +121,8 @@ This is fragile (matching exact text including whitespace) and verbose.
 - `selector: ".class"` — CSS (current)
 - `selector: "text=Submit"` — Playwright-style text match
 - `selector: "role=button[name=Save]"` — ARIA-based
+
+**Implementation status (2026-06-12)**: Done for `text=...`, `text/...`, and `role=...;name=...` helper selectors. `/api/session/{id}/selector/resolve` plus Pi `uiai_browser_selector_resolve` resolve helpers into concrete CSS selectors; click/hover/fill/select/text/read use the resolver.
 
 ---
 

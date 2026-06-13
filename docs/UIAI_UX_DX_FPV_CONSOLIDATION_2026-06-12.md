@@ -63,6 +63,8 @@ Smoke:
 
 ### Bead C — Auto-wait and text selector ergonomics
 
+Status: implemented in current slice.
+
 Scope:
 - Add optional auto-wait behavior to navigate/read/click/fill where safe.
 - Add text/role selector support or a safe helper endpoint that resolves text to @ref/CSS.

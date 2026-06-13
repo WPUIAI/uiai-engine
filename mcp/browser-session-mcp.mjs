@@ -373,19 +373,19 @@ async function toolsCall(name, args) {
     case "browser_click":
       url = `${ENGINE}/api/session/${args.session_id}/click`;
       method = "POST";
-      body = { selector: args.selector };
+      body = { selector: args.selector, auto_wait_ms: args.auto_wait_ms };
       break;
 
     case "browser_hover":
       url = `${ENGINE}/api/session/${args.session_id}/hover`;
       method = "POST";
-      body = { selector: args.selector };
+      body = { selector: args.selector, auto_wait_ms: args.auto_wait_ms };
       break;
 
     case "browser_type":
       url = `${ENGINE}/api/session/${args.session_id}/type`;
       method = "POST";
-      body = { selector: args.selector, text: args.text };
+      body = { selector: args.selector, text: args.text, auto_wait_ms: args.auto_wait_ms };
       break;
 
     case "browser_eval":
@@ -404,6 +404,12 @@ async function toolsCall(name, args) {
       url = `${ENGINE}/api/session/${args.session_id}/snapshot`;
       method = "POST";
       body = { interactive: args.interactive, compact: args.compact, max_depth: args.max_depth, selector: args.selector };
+      break;
+
+    case "browser_selector_resolve":
+      url = `${ENGINE}/api/session/${args.session_id}/selector/resolve`;
+      method = "POST";
+      body = { selector: args.selector };
       break;
 
     case "browser_diagnostics": {
@@ -427,13 +433,13 @@ async function toolsCall(name, args) {
     case "browser_fill":
       url = `${ENGINE}/api/session/${args.session_id}/fill`;
       method = "POST";
-      body = { selector: args.selector, text: args.text };
+      body = { selector: args.selector, text: args.text, auto_wait_ms: args.auto_wait_ms };
       break;
 
     case "browser_select":
       url = `${ENGINE}/api/session/${args.session_id}/select`;
       method = "POST";
-      body = { selector: args.selector, values: args.values };
+      body = { selector: args.selector, values: args.values, auto_wait_ms: args.auto_wait_ms };
       break;
 
     case "browser_press":
@@ -485,7 +491,7 @@ async function toolsCall(name, args) {
     case "browser_navigate":
       url = `${ENGINE}/api/session/${args.session_id}/navigate`;
       method = "POST";
-      body = { url: args.url };
+      body = { url: args.url, auto_wait_ms: args.auto_wait_ms };
       break;
 
     case "browser_resize":
