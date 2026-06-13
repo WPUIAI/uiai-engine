@@ -11,3 +11,6 @@ data/usage.json
 
 # Local config backups
 config.yaml.bak.*
+
+# FPV runtime bearer-token registry
+data/fpv-shares.json

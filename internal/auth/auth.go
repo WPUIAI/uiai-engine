@@ -116,7 +116,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 }
 
 func isLoopbackToolPath(path string) bool {
-	return path == "/api/screenshot" || strings.HasPrefix(path, "/api/screenshot/") || strings.HasPrefix(path, "/api/session") || path == "/api/search" || strings.HasPrefix(path, "/api/search/") || path == "/api/markdown" || strings.HasPrefix(path, "/api/markdown/") || path == "/api/agent/research-packet" || path == "/api/fpv/share" || strings.HasPrefix(path, "/api/media/frame/") || path == "/api/errors" || strings.HasPrefix(path, "/api/errors/")
+	return path == "/api/screenshot" || strings.HasPrefix(path, "/api/screenshot/") || strings.HasPrefix(path, "/api/session") || path == "/api/search" || strings.HasPrefix(path, "/api/search/") || path == "/api/markdown" || strings.HasPrefix(path, "/api/markdown/") || path == "/api/agent/research-packet" || path == "/api/fpv/share" || path == "/api/fpv/revoke" || strings.HasPrefix(path, "/api/media/frame/") || path == "/api/errors" || strings.HasPrefix(path, "/api/errors/")
 }
 
 func isLoopbackRequest(r *http.Request) bool {

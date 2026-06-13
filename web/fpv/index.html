@@ -4,9 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>UIAI FPV</title>
-  <link rel="preconnect" href="https://unpkg.com">
-  <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <link rel="stylesheet" href="/m/assets/fpv.css?v=2">
+  <link rel="stylesheet" href="/m/assets/fpv.css?v=3">
 </head>
 <body data-token="{{.Token}}" data-session="{{.SessionID}}">
   <div class="app-shell">
@@ -32,7 +30,7 @@
             <div class="url-field"><i data-lucide="lock-keyhole"></i><span id="address">Loading URL…</span></div>
             <div class="toolbar-meta" id="chromeMeta">Live</div>
           </div>
-          <div class="browser-stage"><img id="shot" alt="Live browser screenshot"></div>
+          <div class="browser-stage" id="browserStage"><img id="shot" alt="Live browser screenshot"><div id="overlay" class="overlay-layer"></div></div>
         </div>
       </section>
 
@@ -45,16 +43,16 @@
           <div class="session-chip"><i data-lucide="fingerprint"></i><span>{{.SessionID}}</span></div>
         </div>
 
-        <nav class="tabbar" aria-label="Inspector tabs">
-          <button class="tab active" data-tab="live"><i data-lucide="activity"></i><span>Live</span></button>
-          <button class="tab" data-tab="health"><i data-lucide="heart-pulse"></i><span>Health</span></button>
-          <button class="tab" data-tab="actions"><i data-lucide="mouse-pointer-click"></i><span>Actions</span></button>
-          <button class="tab" data-tab="repo"><i data-lucide="git-branch"></i><span>Repo</span></button>
-          <button class="tab" data-tab="focusa"><i data-lucide="sparkles"></i><span>Focusa</span></button>
-          <button class="tab" data-tab="history"><i data-lucide="list-tree"></i><span>History</span></button>
+        <nav class="tabbar" role="tablist" aria-label="Inspector tabs">
+          <button class="tab active" role="tab" aria-controls="live" aria-selected="true" data-tab="live"><i data-lucide="activity"></i><span>Live</span></button>
+          <button class="tab" role="tab" aria-controls="health" aria-selected="false" data-tab="health"><i data-lucide="heart-pulse"></i><span>Health</span></button>
+          <button class="tab" role="tab" aria-controls="actions" aria-selected="false" data-tab="actions"><i data-lucide="mouse-pointer-click"></i><span>Actions</span></button>
+          <button class="tab" role="tab" aria-controls="repo" aria-selected="false" data-tab="repo"><i data-lucide="git-branch"></i><span>Repo</span></button>
+          <button class="tab" role="tab" aria-controls="focusa" aria-selected="false" data-tab="focusa"><i data-lucide="sparkles"></i><span>Focusa</span></button>
+          <button class="tab" role="tab" aria-controls="history" aria-selected="false" data-tab="history"><i data-lucide="list-tree"></i><span>History</span></button>
         </nav>
 
-        <div class="panel active" id="live">
+        <div class="panel active" id="live" role="tabpanel">
           <div class="panel-title"><span>Live signal</span><code>/m/{{.Token}}</code></div>
           <div class="metric-grid">
             <article class="metric hero"><span class="tag">RAF</span><i data-lucide="gauge"></i><label>Frame rate</label><strong id="fpsNum">0.0</strong><small>Client refresh cadence</small></article>
@@ -69,7 +67,7 @@
           <div class="viz-card"><div class="viz-title">Glyph signal grid <code>LIVE</code></div><div id="glyphGrid" class="glyph-grid"></div></div>
         </div>
 
-        <div class="panel" id="health">
+        <div class="panel" id="health" role="tabpanel">
           <div class="panel-title"><span>Runtime health</span><code>ERR/NET</code></div>
           <div class="metric-grid">
             <article class="metric"><i data-lucide="terminal"></i><label>Console errors</label><strong id="consoleErrors" class="ok">0</strong></article>
@@ -80,22 +78,22 @@
           <div class="viz-card"><div class="viz-title">Health matrix <code>ERR/NET</code></div><div id="healthGrid" class="health-grid"></div></div>
         </div>
 
-        <div class="panel" id="actions">
+        <div class="panel" id="actions" role="tabpanel">
           <div class="panel-title"><span>Operator actions</span><code>AUDITED</code></div>
           <div class="quality-switch"><button id="qSmooth" class="active" data-quality="smooth">Smooth</button><button id="qBalanced" data-quality="balanced">Balanced</button><button id="qSaver" data-quality="saver">Saver</button></div>
           <textarea id="msg" placeholder="Send a note to the audit stream"></textarea>
           <button class="primary" id="noteBtn"><i data-lucide="send"></i>Send audited note</button>
-          <div class="control-grid"><input id="selector" placeholder="Selector, e.g. text=Learn more"><input id="fillText" placeholder="Text for fill/type"></div>
+          <div class="control-grid"><input id="selector" placeholder="Selector, e.g. text=Learn more"><input id="fillText" placeholder="Text for fill/type"></div><div class="quality-switch"><button id="pickBtn">Pick target</button><button id="clickPointBtn">Click picked point</button><button id="clearPickBtn">Clear pick</button></div>
           <div class="button-grid"><button id="clickBtn">Click selector</button><button id="fillBtn">Fill selector</button><button data-key="Enter">Enter</button><button data-key="Escape">Esc</button><button data-key="Tab">Tab</button><button data-key="ArrowDown">↓</button></div>
           <div id="controlResult" class="result-line">Controls are audited server-side.</div>
         </div>
 
-        <div class="panel" id="repo"><div class="panel-title"><span>Repository</span><code>LIVE</code></div><div id="repoGrid" class="metric-grid"></div><div class="tree-card"><div class="viz-title">Active tree</div><pre id="repoTree">Loading…</pre></div></div>
-        <div class="panel" id="focusa"><div class="panel-title"><span>Focusa</span><code>CONTEXT</code></div><div id="focusaGrid" class="metric-grid"></div></div>
-        <div class="panel" id="history"><div class="panel-title"><span>History</span><code>FILTERED</code></div><div class="filters"><button class="active" data-filter="all">All</button><button data-filter="frame">Frames</button><button data-filter="action">Actions</button><button data-filter="git">Git</button><button data-filter="focusa">Focusa</button></div><div id="stream" class="timeline"></div></div>
+        <div class="panel" id="repo" role="tabpanel"><div class="panel-title"><span>Repository</span><code>LIVE</code></div><div id="repoGrid" class="metric-grid"></div><div class="tree-card"><div class="viz-title">Active tree</div><pre id="repoTree">Loading…</pre></div></div>
+        <div class="panel" id="focusa" role="tabpanel"><div class="panel-title"><span>Focusa</span><code>CONTEXT</code></div><div id="focusaGrid" class="metric-grid"></div></div>
+        <div class="panel" id="history" role="tabpanel"><div class="panel-title"><span>History</span><code>FILTERED</code></div><div class="filters"><button class="active" data-filter="all">All</button><button data-filter="frame">Frames</button><button data-filter="action">Actions</button><button data-filter="git">Git</button><button data-filter="focusa">Focusa</button></div><div id="stream" class="timeline"></div></div>
       </aside>
     </main>
   </div>
-  <script src="/m/assets/fpv.js?v=2"></script>
+  <script src="/m/assets/fpv.js?v=3"></script>
 </body>
 </html>

@@ -481,6 +481,51 @@ func (s *Session) ScrollTo(x, y int) (*SnapResult, error) {
 	}, nil
 }
 
+// SelectorAt returns a best-effort selector for the element at viewport coordinates.
+func (s *Session) SelectorAt(x, y int) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.page == nil {
+		return "", fmt.Errorf("session closed")
+	}
+	js := fmt.Sprintf(`() => {
+		const el = document.elementFromPoint(%d, %d);
+		if (!el) return "";
+		if (el.id) return "#" + CSS.escape(el.id);
+		const attr = ["data-testid","data-test","aria-label","name","role"].find(a => el.getAttribute(a));
+		if (attr) return el.tagName.toLowerCase() + "[" + attr + "=" + JSON.stringify(el.getAttribute(attr)) + "]";
+		const text = (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 60);
+		if (text) return "text=" + text;
+		let path = el.tagName.toLowerCase();
+		let n = el;
+		while (n.parentElement && n.parentElement !== document.body && path.length < 120) {
+			const parent = n.parentElement;
+			const idx = Array.from(parent.children).indexOf(n) + 1;
+			path = parent.tagName.toLowerCase() + " > " + path + ":nth-child(" + idx + ")";
+			n = parent;
+		}
+		return path;
+	}`, x, y)
+	res, err := s.page.Eval(js)
+	if err != nil {
+		return "", err
+	}
+	return res.Value.Str(), nil
+}
+
+// ClickAt clicks the element at viewport coordinates and returns a screenshot after.
+func (s *Session) ClickAt(x, y int) (*SnapResult, string, error) {
+	selector, err := s.SelectorAt(x, y)
+	if err != nil {
+		return nil, "", err
+	}
+	if selector == "" {
+		return nil, "", fmt.Errorf("no element at %d,%d", x, y)
+	}
+	snap, err := s.Click(selector)
+	return snap, selector, err
+}
+
 // Click clicks a CSS-selected element and returns a screenshot after.
 func (s *Session) Click(selector string) (*SnapResult, error) {
 	s.mu.Lock()

@@ -1,7 +1,7 @@
 (() => {
   const token = document.body.dataset.token;
   const sessionId = document.body.dataset.session;
-  let frames = 0, started = Date.now(), active = true, frameErrors = 0, frameMs = 250, frameTimer = null, eventFilter = 'all', streamMode = 'mjpeg', lastFrameAt = 0;
+  let frames = 0, started = Date.now(), active = true, frameErrors = 0, frameMs = 250, frameTimer = null, eventFilter = 'all', streamMode = 'mjpeg', lastFrameAt = 0, picking = false, picked = null;
   let stream = [];
   const $ = (id) => document.getElementById(id);
   const text = (id, v) => { const el = $(id); if (el) el.textContent = v ?? '—'; };
@@ -64,6 +64,7 @@
     text('controlResult', r.ok ? 'Fill sent' : `Fill rejected: ${r.error || 'failed'}`);
     addStream('Control fill', selector, '✍'); await statusTick();
   }
+  async function sendPoint(action='selector_at') { if(!picked) return; const r=await fpvControl(action,{x:picked.x,y:picked.y}); if(r.audit?.selector) $('selector').value=r.audit.selector; text('controlResult', r.ok ? (action==='click_xy'?'Point clicked':'Selector picked') : 'Point action failed: '+(r.audit?.error||r.error||'failed')); addStream(action==='click_xy'?'Control point click':'Selector picked', `${picked.x},${picked.y} ${r.audit?.selector||''}`, '⌖'); await statusTick(); }
   async function sendKey(key) {
     const r = await fpvControl('press', { key });
     text('controlResult', r.ok ? `${key} sent` : `Key rejected: ${r.error || 'failed'}`);
@@ -156,10 +157,10 @@
     img.src = `/m/${token}/screenshot.jpg?t=${Date.now()}`;
   }
   function bind() {
-    document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn)); document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === btn.dataset.tab)); }));
+    document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.tab').forEach(b => { b.classList.toggle('active', b === btn); b.setAttribute('aria-selected', b === btn ? 'true' : 'false'); }); document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === btn.dataset.tab)); }));
     document.querySelectorAll('.filters button').forEach(btn => btn.addEventListener('click', () => { eventFilter = btn.dataset.filter; document.querySelectorAll('.filters button').forEach(b => b.classList.toggle('active', b === btn)); renderStream(); }));
     document.querySelectorAll('.quality-switch button').forEach(btn => btn.addEventListener('click', () => setQuality(btn.dataset.quality)));
-    $('noteBtn')?.addEventListener('click', sendMsg); $('clickBtn')?.addEventListener('click', sendClick); $('fillBtn')?.addEventListener('click', sendFill);
+    $('noteBtn')?.addEventListener('click', sendMsg); $('clickBtn')?.addEventListener('click', sendClick); $('fillBtn')?.addEventListener('click', sendFill); $('pickBtn')?.addEventListener('click', () => { picking=true; $('overlay').classList.add('picking'); text('controlResult','Click the browser view to pick a target'); }); $('clickPointBtn')?.addEventListener('click', () => sendPoint('click_xy')); $('clearPickBtn')?.addEventListener('click', () => { picked=null; $('overlay').innerHTML=''; $('selector').value=''; }); $('overlay')?.addEventListener('click', (ev)=>{ if(!picking) return; const r=$('overlay').getBoundingClientRect(); picked={x:Math.round(ev.clientX-r.left), y:Math.round(ev.clientY-r.top)}; $('overlay').innerHTML=`<span class="target-dot" style="left:${picked.x}px;top:${picked.y}px"></span>`; picking=false; $('overlay').classList.remove('picking'); sendPoint('selector_at'); });
     document.querySelectorAll('[data-key]').forEach(btn => btn.addEventListener('click', () => sendKey(btn.dataset.key)));
   }
   bind(); initIcons(); addStream('Viewer connected', 'FPV cockpit online', '◉'); statusTick(); startMJPEG(); setInterval(statusTick, 1500);

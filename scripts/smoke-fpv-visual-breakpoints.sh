@@ -3,6 +3,9 @@ set -euo pipefail
 ENGINE_URL=${ENGINE_URL:-http://127.0.0.1:7456}
 PUBLIC_HOST=${PUBLIC_HOST:-fpv.wpuiai.com}
 OUT_DIR=${OUT_DIR:-/tmp/uiai-fpv-visual}
+BASELINE_DIR=${BASELINE_DIR:-tests/fixtures/fpv-visual-baselines}
+UPDATE_BASELINE=${UPDATE_BASELINE:-0}
+DIFF_THRESHOLD=${DIFF_THRESHOLD:-0.28}
 mkdir -p "$OUT_DIR"
 
 cleanup() {
@@ -30,7 +33,19 @@ for spec in 375x812 768x1024 1024x900 1440x1000; do
   sleep 2
   shot=$(curl -fsS -X POST "$ENGINE_URL/api/session/$vid/screenshot" -H 'Content-Type: application/json' -d '{"format":"jpeg","quality":70}')
   printf '%s' "$shot" | jq -r .screenshot > "$OUT_DIR/$spec.b64"
-  [ -s "$OUT_DIR/$spec.b64" ] || { echo "missing screenshot for $spec" >&2; exit 1; }
+  base64 -d "$OUT_DIR/$spec.b64" > "$OUT_DIR/$spec.jpg"
+  [ -s "$OUT_DIR/$spec.jpg" ] || { echo "missing screenshot for $spec" >&2; exit 1; }
+  if [ "$UPDATE_BASELINE" = "1" ]; then
+    mkdir -p "$BASELINE_DIR"
+    cp "$OUT_DIR/$spec.jpg" "$BASELINE_DIR/$spec.jpg"
+  elif [ -f "$BASELINE_DIR/$spec.jpg" ] && command -v compare >/dev/null 2>&1; then
+    metric=$(compare -metric RMSE "$BASELINE_DIR/$spec.jpg" "$OUT_DIR/$spec.jpg" null: 2>&1 | awk '{print $2}' | tr -d '()' || true)
+    python3 - <<PY
+m=float("${metric:-0}")
+th=float("$DIFF_THRESHOLD")
+assert m <= th, f"visual diff $spec RMSE normalized {m} > {th}"
+PY
+  fi
   diag=$(curl -fsS "$ENGINE_URL/api/session/$vid/diagnostics?level=error&limit=40")
   printf '%s' "$diag" | jq -e '(.exceptions|length)==0 and (.console|length)==0' >/dev/null
   curl -fsS -X DELETE "$ENGINE_URL/api/session/$vid" >/dev/null || true
