@@ -21,6 +21,20 @@ UIAI Engine is the **proof browser for [Focusa](https://github.com/Startempire-W
 
 ![Actual Pi session excerpt showing Focusa tool calls: Workpoint checkpoint and evidence capture for UIAI Engine](docs/assets/screenshots/uiai-engine-readme-badges.jpg)
 
+
+## What is new in the current browser/FPV release
+
+UIAI Engine now includes a first-person operator cockpit for agent browser sessions, not just screenshots and JSON diagnostics:
+
+- **Every new browser session is watchable immediately** — `POST /api/session` returns an `fpv_share` with a short-lived, controls-enabled `/m/{token}` link.
+- **Public FPV PWA** — operators can open `https://fpv.wpuiai.com/m/{token}` on phone/desktop to see the live browser, URL/title/status, diagnostics, repo context, Focusa context, and event timeline.
+- **Audited operator steering** — notes, selector clicks, point clicks, fills, and keypresses are gated by the share token, recorded in the audit stream, and reflected in the UI.
+- **Automatic Pi steering bridge** — the project-local Pi extension watches private FPV audit events and injects operator notes with `pi.sendUserMessage()`; if the agent is busy it uses `deliverAs: "steer"`. No manual `/fpv-watch` is required for normal use after Pi reloads the extension.
+- **Live-feeling transport** — CDP screencast/MJPEG streaming is primary, screenshot polling remains as fallback, and the UI shows client-observed FPS/latency.
+- **Mobile cockpit polish** — bottom-sheet-style inspector, 44px touch targets, swipe tab switching, and responsive visual smoke coverage at 375 / 768 / 1024 / 1440.
+- **Focusa-ready context** — session `focusa_scope` is summarized in FPV; optional `FOCUSA_DAEMON_URL` hydrates compact Workpoint/Trajectory summaries with graceful degraded states.
+- **Visual regression proof** — FPV baseline capture and RMSE comparison are wired through `scripts/smoke-fpv-visual-breakpoints.sh`.
+
 ## Clearest benefits
 
 Start here. These are the main reasons to use UIAI Engine as the proof browser for [Focusa](https://github.com/Startempire-Wire/focusa)-powered agents:
@@ -29,7 +43,8 @@ Start here. These are the main reasons to use UIAI Engine as the proof browser f
 |---|---|
 | **Agents discover features fast** | Agent cards, tool search, tool graph, docs metadata, OpenAI/MCP schemas, Pi cards, MCP cards, and CLI discovery. |
 | **Public sources become usable proof** | Source-to-Markdown converts URLs into clean Markdown, records, metadata, diagnostics, [Focusa](https://github.com/Startempire-Wire/focusa) evidence refs, and WPUIAI research cards/reports. |
-| **Agents can browse real sites reliably** | Persistent browser sessions keep state across reads, snapshots, @ref actions, forms, navigation, cookies, auth state, and diagnostics. |
+| **Agents can browse real sites reliably** | Persistent browser sessions keep state across reads, snapshots, @ref actions, forms, navigation, cookies, auth state, and diagnostics; every session now includes an FPV share link. |
+| **Operators can steer from FPV** | Public `/m/{token}` links show the live browser and send audited notes/actions back to Pi automatically through the FPV event bridge. |
 | **Debugging starts from evidence** | Console errors, exceptions, failed requests, structured error envelopes, and `uiai_errors` reduce screenshot-only guessing. |
 | **Research flows hand off cleanly** | Search → browse → read/snapshot → diagnostics → redacted [Focusa](https://github.com/Startempire-Wire/focusa)/Pi packet → evidence capture. |
 | **[Focusa](https://github.com/Startempire-Wire/focusa)-powered agents get a proof browser** | UIAI sees and proves what happened in the browser; [Focusa](https://github.com/Startempire-Wire/focusa) remembers the project goal, Workpoint, evidence, prediction, metacog lesson, and next action. |
@@ -189,7 +204,7 @@ Persistent sessions keep a browser page alive across calls. They are optimized f
 | Method | Route | Purpose |
 |---|---|---|
 | `GET` | `/api/session` | List active sessions. |
-| `POST` | `/api/session` | Open a session and navigate to a URL. |
+| `POST` | `/api/session` | Open a session, navigate to a URL, and return a controls-enabled `fpv_share`. |
 | `GET` | `/api/session/{id}` | Session metadata. |
 | `DELETE` | `/api/session/{id}` | Close session. |
 | `POST` | `/api/session/{id}/screenshot` | Instant screenshot of current page. |
@@ -220,6 +235,24 @@ Persistent sessions keep a browser page alive across calls. They are optimized f
 | `POST` | `/api/session/{id}/captcha/solve` | Session-scoped captcha solve. |
 
 Cross-links: [`docs/SESSION_API.md`](docs/SESSION_API.md), [`docs/BROWSER_DIAGNOSTICS_SPEC.md`](docs/BROWSER_DIAGNOSTICS_SPEC.md), [`docs/BROWSER_RELIABILITY_RUNBOOK.md`](docs/BROWSER_RELIABILITY_RUNBOOK.md), [`docs/CAPTCHA_SOLVER_SPEC.md`](docs/CAPTCHA_SOLVER_SPEC.md)
+
+
+### FPV operator cockpit and steering
+
+FPV routes are tokenized and intentionally narrow. Agents create/open sessions through local `/api/*`; operators use `/m/{token}`. Public production exposure should proxy only `/m/*`, never the full API surface.
+
+| Method | Route | Purpose |
+|---|---|---|
+| `POST` | `/api/fpv/share` | Create an explicit tokenized FPV share for an existing session. `POST /api/session` already creates one automatically. |
+| `GET` | `/m/{token}` | Public FPV PWA cockpit: live viewport, diagnostics, repo context, Focusa summary, controls, and timeline. |
+| `GET` | `/m/{token}/status` | Tokenized status contract: session metadata, transport URLs, diagnostics summary, audit log, context, and share lifecycle. |
+| `GET` | `/m/{token}/stream.cdp.mjpg` | Primary live stream using CDP screencast frames wrapped as MJPEG. |
+| `GET` | `/m/{token}/stream.mjpg` | Screenshot/MJPEG fallback stream. |
+| `GET` | `/m/{token}/screenshot.jpg` | One-frame screenshot fallback. |
+| `POST` | `/m/{token}/control` | Audited operator notes/actions; mutating controls require `controls=true` on the share. |
+| `GET` | `/api/fpv/events` | Private loopback event feed consumed by the Pi auto-steering extension. |
+
+Useful docs: [`docs/FPV_BROWSER_STYLE_GUIDE.md`](docs/FPV_BROWSER_STYLE_GUIDE.md), [`docs/FPV_PUBLIC_ROUTE_DEPLOY_PLAN.md`](docs/FPV_PUBLIC_ROUTE_DEPLOY_PLAN.md), and [`docs/FPV_REMAINING_GAPS_SPEC.md`](docs/FPV_REMAINING_GAPS_SPEC.md).
 
 ### One-shot screenshot, share, and vision interactive APIs
 
@@ -425,6 +458,7 @@ Implementation anchors: [`internal/intelligence/`](internal/intelligence/), [`in
 ## Agent integration highlights
 
 - Project-local Pi extension: [`.pi/extensions/uiai-engine.ts`](.pi/extensions/uiai-engine.ts) registers a full Pi-facing mirror of the MCP/browser tool surface: agent card/tool search/graph, provider web search, Source-to-Markdown, browser sessions/actions/diagnostics, one-shot screenshots, and frame catalog/render helpers. `/uiai research <query>`, `/uiai proof <url>`, and `/uiai diagnose <session_id>` execute guided packet workflows and insert [Focusa](https://github.com/Startempire-Wire/focusa) args previews; `/uiai off` persists hidden widget state for the session; `/uiai on`/`show`/`enable` restores and persists the widget.
+- Project-local FPV steering extension: [`.pi/extensions/uiai-fpv-steer.ts`](.pi/extensions/uiai-fpv-steer.ts) starts an automatic FPV event watcher on Pi session start. It listens to private `/api/fpv/events`, shows notifications, and injects audited operator notes as user/steer messages so FPV steering is acknowledged without manual polling.
 - Project-local Pi skills: [`.pi/skills/uiai-agent/SKILL.md`](.pi/skills/uiai-agent/SKILL.md) is the main UIAI agent workflow skill; [`.pi/skills/uiai-focusa-packet/SKILL.md`](.pi/skills/uiai-focusa-packet/SKILL.md) is the [Focusa](https://github.com/Startempire-Wire/focusa) packet proof/handoff playbook; [`.pi/skills/uiai-release/SKILL.md`](.pi/skills/uiai-release/SKILL.md) is the release/deploy/push/CI proof workflow; [`.pi/skills/uiai-mcp/SKILL.md`](.pi/skills/uiai-mcp/SKILL.md) is the MCP setup/reconnect/route-parity workflow; [`.pi/skills/uiai-remote-auth/SKILL.md`](.pi/skills/uiai-remote-auth/SKILL.md) is the authenticated remote/tunnel workflow; [`.pi/skills/uiai-docs-maintenance/SKILL.md`](.pi/skills/uiai-docs-maintenance/SKILL.md) is the docs/parity/drift maintenance workflow; [`.pi/skills/uiai-ci-debug/SKILL.md`](.pi/skills/uiai-ci-debug/SKILL.md) is the GitHub Actions failure diagnostics workflow; [`.pi/skills/uiai-browser-debug/SKILL.md`](.pi/skills/uiai-browser-debug/SKILL.md) is the diagnostics-first browser failure workflow; [`.pi/skills/vision/SKILL.md`](.pi/skills/vision/SKILL.md) is the browser/vision workflow skill. Global copies under `~/.pi/skills/` are convenience installs only and should be refreshed from repo copies when UIAI workflows change.
 - MCP bridge: [`mcp/browser-session-mcp.mjs`](mcp/browser-session-mcp.mjs) exposes browser/session tools plus `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, `uiai_health`, `uiai_status`, `uiai_errors`, `uiai_focusa_packet_compose`, `critique_models`, `critique_dimensions`, `source_to_markdown`, `browser_search`, `browser_read`, `frame_catalog`, and `frame_render`; `tools/list` normalizes these core tools even when a running engine returns stale metadata. MCP clients commonly cache `tools/list` for the lifetime of the stdio process, so after adding/removing/renaming tools restart/reconnect the MCP server/client (and reload Pi sessions that use `pi-mcp-adapter`) before expecting fresh tool metadata.
 - Agent web surfing: persistent sessions include `/api/session/{id}/read` / `browser_read` for bounded text or Markdown extraction plus @ref actions for navigation and forms; `POST /api/markdown` provides one-shot public URL to `uiai.source_markdown.v1` with diagnostics, [Focusa](https://github.com/Startempire-Wire/focusa)-ready evidence, and `wpuiai.research_card` / `wpuiai.report` productization objects.
@@ -531,6 +565,9 @@ Useful smoke/reliability scripts:
 
 ```bash
 scripts/smoke-agent-integrations.sh
+scripts/release-service-smoke.sh --check-only
+scripts/smoke-fpv-visual-breakpoints.sh
+scripts/smoke-pi-fpv-steer-extension.sh
 scripts/stress-browser-diagnostics.sh
 scripts/smoke-browser-error-regressions.sh
 scripts/soak-browser-flakiness.sh
@@ -586,6 +623,13 @@ Security notes:
 - Error responses classify blocked URLs as `url_not_allowed` and guide agents to policy-safe targets.
 
 Cross-link: [`docs/SESSION_API.md#security--remote-exposure-boundaries`](docs/SESSION_API.md#security--remote-exposure-boundaries)
+
+
+FPV exposure rules:
+
+- `fpv.wpuiai.com` should expose only `/m/*` through the Cloudflare Tunnel.
+- `/api/fpv/events` is for local/Pi event bridging; loopback requests may read it, remote callers still need normal API authentication.
+- FPV control actions require a tokenized share with `controls=true` and are audit logged.
 
 ## Operational files
 
