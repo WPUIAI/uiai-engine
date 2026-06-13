@@ -329,6 +329,7 @@ func toolRelations() map[string][]string {
 		"uiai_2fa_code":              {"browser_open", "browser_fill", "browser_press", "browser_diagnostics", "uiai_tool_search"},
 		"source_to_markdown":         {"browser_open", "browser_read", "browser_diagnostics", "uiai_focusa_packet_compose", "focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
 		"browser_search":             {"source_to_markdown", "browser_open", "browser_read", "browser_diagnostics", "uiai_focusa_packet_build", "uiai_tool_search"},
+		"browser_fpv_share":          {"browser_open", "browser_screenshot", "browser_diagnostics"},
 		"browser_open":               {"browser_read", "browser_snapshot", "browser_diagnostics", "uiai_focusa_packet_build", "focusa_browser_diagnostics_intake", "browser_close"},
 		"browser_read":               {"browser_snapshot", "browser_text", "browser_diagnostics", "uiai_focusa_packet_build", "browser_close"},
 		"browser_snapshot":           {"browser_selector_resolve", "browser_click", "browser_fill", "browser_hover", "browser_text", "browser_diagnostics"},
@@ -532,6 +533,18 @@ func openAITools() []map[string]any {
 					"focusa_scope":   map[string]any{"type": "object", "description": "Optional Focusa scope echoed into read metadata"},
 				},
 				"required": []string{"url"},
+			},
+		},
+		{
+			"name":        "browser_fpv_share",
+			"description": "Create a short-lived read-only FPV PWA share link for an existing browser session. Returns mirror_url, status_url, screenshot_url, and expiry.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id":      map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"expires_minutes": map[string]any{"type": "integer", "description": "Share TTL minutes, max 240", "default": 60},
+				},
+				"required": []string{"session_id"},
 			},
 		},
 		{

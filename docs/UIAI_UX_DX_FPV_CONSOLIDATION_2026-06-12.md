@@ -79,6 +79,8 @@ Smoke:
 
 ### Bead D — FPV PWA read-only MVP
 
+Status: implemented in current slice.
+
 Scope:
 - Add a session share endpoint that returns a short-lived URL/token for read-only live session view.
 - Add minimal PWA page: current screenshot stream/poll, URL/title, session status, diagnostics summary.

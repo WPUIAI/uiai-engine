@@ -90,7 +90,8 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			strings.HasPrefix(p, "/api/tools") || // Tool discovery: agents search/discover tools
 			p == "/api/media/jobs" || // Media job list: read-only
 			strings.HasPrefix(p, "/api/media/status/") || // Media status: read-only poll
-			strings.HasPrefix(p, "/api/share/") { // Share viewing is public
+			strings.HasPrefix(p, "/api/share/") || // Share viewing is public
+			strings.HasPrefix(p, "/m/") { // FPV PWA read-only share links are public by signed token path
 			// Try to extract identity if credentials present, but don't block
 			if id, err := a.Authenticate(r); err == nil {
 				ctx := context.WithValue(r.Context(), ctxKey{}, id)
@@ -115,7 +116,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 }
 
 func isLoopbackToolPath(path string) bool {
-	return path == "/api/screenshot" || strings.HasPrefix(path, "/api/screenshot/") || strings.HasPrefix(path, "/api/session") || path == "/api/search" || strings.HasPrefix(path, "/api/search/") || path == "/api/markdown" || strings.HasPrefix(path, "/api/markdown/") || path == "/api/agent/research-packet" || strings.HasPrefix(path, "/api/media/frame/") || path == "/api/errors" || strings.HasPrefix(path, "/api/errors/")
+	return path == "/api/screenshot" || strings.HasPrefix(path, "/api/screenshot/") || strings.HasPrefix(path, "/api/session") || path == "/api/search" || strings.HasPrefix(path, "/api/search/") || path == "/api/markdown" || strings.HasPrefix(path, "/api/markdown/") || path == "/api/agent/research-packet" || path == "/api/fpv/share" || strings.HasPrefix(path, "/api/media/frame/") || path == "/api/errors" || strings.HasPrefix(path, "/api/errors/")
 }
 
 func isLoopbackRequest(r *http.Request) bool {

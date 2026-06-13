@@ -252,6 +252,12 @@ func (e *Engine) mountRoutes() {
 	r.Route("/api/share", func(r chi.Router) {
 		routes.MountShareReal(r, e.cfg, e.vision)
 	})
+	r.Route("/api/fpv", func(r chi.Router) {
+		routes.MountFPVRoutes(r, e.sessions)
+	})
+	r.Route("/m", func(r chi.Router) {
+		routes.MountFPVPublicRoutes(r, e.sessions)
+	})
 
 	// Vision Interactive (replaces PHP daemon at port 3011)
 	r.Route("/vision", func(r chi.Router) {

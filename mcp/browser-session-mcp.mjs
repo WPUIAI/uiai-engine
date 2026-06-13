@@ -352,6 +352,12 @@ async function toolsCall(name, args) {
       body = { query: args.query, provider: args.provider, limit: args.limit };
       break;
 
+    case "browser_fpv_share":
+      url = `${ENGINE}/api/fpv/share`;
+      method = "POST";
+      body = { session_id: args.session_id, expires_minutes: args.expires_minutes };
+      break;
+
     case "browser_open":
       url = `${ENGINE}/api/session`;
       method = "POST";

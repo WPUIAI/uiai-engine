@@ -35,6 +35,7 @@ Local-token env support: `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_A
 | `/api/media/frame`, `/api/media/frame/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestMediaFrameToolPathLoopbackPublicRemoteAuth` | Frame catalog/render agent helpers. |
 | `/api/errors`, `/api/errors/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestErrorsToolPathLoopbackPublicRemoteAuth` | Bounded redacted troubleshooting events. |
 | `/api/share/*`, `/v/{token}` | public | `internal/auth/auth.go` share exception; server viewer route | Share viewing is public by design. Review mutating share routes before expanding. |
+| `/m/{token}`, `/m/{token}/status`, `/m/{token}/screenshot.jpg` | public | `internal/auth/auth.go` `/m/` exception; tokenized FPV public routes | Read-only FPV PWA share links; creation remains authenticated/loopback via `/api/fpv/share`. |
 | `/api/media/jobs`, `/api/media/status/*` | public read | `internal/auth/auth.go` media read exceptions | Read-only polling/listing. Media production remains authenticated. |
 | `/api/media/produce` and non-frame/non-status media writes | authenticated | falls through middleware | Potentially paid/mutating media generation. |
 | `/api/extension/verify`, `/api/extension/token` | handler-auth | `internal/auth/auth.go` exception; `internal/routes/extension.go` | Handler validates extension token behavior. Other extension routes fall through unless explicitly excepted. |

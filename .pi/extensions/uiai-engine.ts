@@ -620,6 +620,32 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "uiai_fpv_share",
+		label: "UIAI FPV Share",
+		description: "Create a short-lived read-only FPV PWA share link for an existing browser session.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			expires_minutes: Type.Optional(Type.Number({ description: "Share TTL minutes, max 240", default: 60 })),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await post("/api/fpv/share", params), { endpoint: "/api/fpv/share" });
+		},
+	});
+
+	pi.registerTool({
+		name: "browser_fpv_share",
+		label: "UIAI FPV Share",
+		description: "Create a short-lived read-only FPV PWA share link for an existing browser session. Mirror of uiai_fpv_share for MCP/Pi parity.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			expires_minutes: Type.Optional(Type.Number({ description: "Share TTL minutes, max 240", default: 60 })),
+		}),
+		async execute(_toolCallId, params) {
+			return textResult(await post("/api/fpv/share", params), { endpoint: "/api/fpv/share" });
+		},
+	});
+
+	pi.registerTool({
 		name: "uiai_browser_open",
 		label: "UIAI Browser Open",
 		description: "Open a persistent UIAI browser session for public http/https targets. Private/internal targets require explicit local/dev allow_private_urls; prefer read/snapshot @refs and diagnostics-first debugging.",
