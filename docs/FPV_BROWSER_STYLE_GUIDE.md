@@ -158,6 +158,32 @@ Every datum needs a plain-English label, a short value, and optional helper text
 | request count | Network requests | informational. |
 | exceptions | JS exceptions | `0 = ok`, `>0 = error`. |
 
+
+## Tabbed data rail standard
+
+The realtime rail must not be one long scrolling dump. It is a professional tabbed cockpit.
+
+Required tabs:
+
+| Tab | Purpose |
+|---|---|
+| Overview | Live signal, access mode, current page, viewport, expiry, stream quality. |
+| Health | Diagnostics metrics and Nullframe-style health matrix. |
+| Repo | Project, branch/head, public host, active file tree. |
+| Focusa | Objective, evidence, drift guard, compact cognitive context. |
+| Timeline | Realtime frame/action/audit/status history. |
+| Control | Safe operator actions and audited notes. |
+
+Typography and spacing rules:
+
+- Tabs use 11.5–12.5px bold text with glyph icons and 31–32px height.
+- Cards use 13px base text, 15–17px values, and at least 112px mobile / 116px desktop vertical rhythm.
+- Labels are uppercase, 11px, high weight, and never crowd values.
+- Helper text uses 1.35 line-height.
+- Header title/subtitle must truncate cleanly instead of wrapping awkwardly.
+- At 1024px, the rail uses single-column cards for readability; 2-column card grids are reserved for wider desktop rails.
+- Shimmer/sweep effects must be contained inside card bounds and must not create layout overflow.
+
 ## Required data panels
 
 ### 1. Browser panel
