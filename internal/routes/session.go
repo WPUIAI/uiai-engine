@@ -1,11 +1,15 @@
 package routes
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
@@ -22,7 +26,7 @@ import (
 //   - Minimal required params, sensible defaults
 //   - Session ID in URL path (clear resource identity)
 //   - DOM info included so LLM can reason about interactive elements
-func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManager, solver ...*captcha.Solver) {
+func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager, solver ...*captcha.Solver) {
 	if sm == nil {
 		return
 	}
@@ -96,7 +100,8 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 
 		// Screenshot — instant re-snap of current state
 		r.Post("/screenshot", func(w http.ResponseWriter, req *http.Request) {
-			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			sessionID := chi.URLParam(req, "sessionID")
+			sess, ok := sm.Get(sessionID)
 			if !ok {
 				writeJSON(w, 404, map[string]string{"error": "session not found"})
 				return
@@ -105,6 +110,7 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				Format   string `json:"format"`
 				Quality  int    `json:"quality"`
 				FullPage bool   `json:"fullPage"`
+				Output   string `json:"output"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 
@@ -119,7 +125,16 @@ func MountSessionRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManage
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeScreenshotOutput(w, req, cfg, sessionID, snap, body.Output)
+		})
+
+		r.Get("/screenshot/artifacts/{name}", func(w http.ResponseWriter, req *http.Request) {
+			path, ok := screenshotArtifactPath(cfg, chi.URLParam(req, "name"))
+			if !ok {
+				writeJSON(w, 400, map[string]string{"error": "invalid artifact name"})
+				return
+			}
+			http.ServeFile(w, req, path)
 		})
 
 		// Navigate to new URL
@@ -820,4 +835,96 @@ func classifySessionError(err error) string {
 	default:
 		return "action_failed"
 	}
+}
+
+func writeScreenshotOutput(w http.ResponseWriter, req *http.Request, cfg *config.Config, sessionID string, snap *vision.SnapResult, output string) {
+	mode := strings.ToLower(strings.TrimSpace(output))
+	if mode == "" || mode == "json" {
+		writeJSON(w, 200, snap)
+		return
+	}
+	if mode != "file" && mode != "url" {
+		writeJSON(w, 400, map[string]string{"error": "output must be json, file, or url"})
+		return
+	}
+	name, path, err := saveScreenshotArtifact(cfg, sessionID, snap)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	artifactURL := fmt.Sprintf("/api/session/%s/screenshot/artifacts/%s", sessionID, name)
+	resp := map[string]any{
+		"artifact_path": path,
+		"artifact_url":  artifactURL,
+		"format":        snap.Format,
+		"size":          snap.Size,
+		"width":         snap.Width,
+		"height":        snap.Height,
+		"url":           snap.URL,
+		"title":         snap.Title,
+		"duration":      snap.Duration,
+		"output":        mode,
+	}
+	if mode == "file" {
+		writeJSON(w, 200, resp)
+		return
+	}
+	writeJSON(w, 200, resp)
+	_ = req
+}
+
+func saveScreenshotArtifact(cfg *config.Config, sessionID string, snap *vision.SnapResult) (string, string, error) {
+	data, err := base64.StdEncoding.DecodeString(snap.Screenshot)
+	if err != nil {
+		return "", "", fmt.Errorf("decode screenshot: %w", err)
+	}
+	dir := screenshotArtifactDir(cfg)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", "", fmt.Errorf("create screenshot artifact dir: %w", err)
+	}
+	ext := strings.ToLower(snap.Format)
+	if ext != "png" {
+		ext = "jpeg"
+	}
+	name := fmt.Sprintf("%s-%d.%s", safeArtifactName(sessionID), time.Now().UnixNano(), ext)
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, data, 0o640); err != nil {
+		return "", "", fmt.Errorf("write screenshot artifact: %w", err)
+	}
+	return name, path, nil
+}
+
+func screenshotArtifactDir(cfg *config.Config) string {
+	if cfg != nil && strings.TrimSpace(cfg.Vision.ShareDir) != "" {
+		return filepath.Join(cfg.Vision.ShareDir, "session-screenshots")
+	}
+	return filepath.Join(os.TempDir(), "uiai-session-screenshots")
+}
+
+func screenshotArtifactPath(cfg *config.Config, name string) (string, bool) {
+	clean := filepath.Base(name)
+	if clean == "." || clean == string(filepath.Separator) || clean != name {
+		return "", false
+	}
+	return filepath.Join(screenshotArtifactDir(cfg), clean), true
+}
+
+func safeArtifactName(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "session"
+	}
+	var b strings.Builder
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			b.WriteRune(r)
+			continue
+		}
+		b.WriteByte('-')
+	}
+	out := b.String()
+	if out == "" {
+		return "session"
+	}
+	return out
 }

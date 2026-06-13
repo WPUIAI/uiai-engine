@@ -204,8 +204,10 @@ uiai_screenshot url="<url>" width=1280 height=800 format="jpeg" quality=70
 Session screenshot:
 
 ```text
-uiai_browser_screenshot session_id="<sid>" fullPage=true
+uiai_browser_screenshot session_id="<sid>" fullPage=true output="file"
 ```
+
+Use `output="file"` or `output="url"` for agent/human review so the response returns `artifact_path` / `artifact_url` without embedding base64. Use `output="json"` only when a downstream tool explicitly needs the raw `screenshot` string.
 
 Share artifact:
 

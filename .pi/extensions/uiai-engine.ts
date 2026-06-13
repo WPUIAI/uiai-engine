@@ -644,11 +644,12 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 			format: Type.Optional(Type.String({ description: "Image format, jpeg or png" })),
 			quality: Type.Optional(Type.Number({ description: "JPEG quality 1-100" })),
 			fullPage: Type.Optional(Type.Boolean({ description: "Capture entire page" })),
+			output: Type.Optional(Type.String({ description: "Return mode: json (base64), file (artifact_path), or url (artifact_url)" })),
 		}),
 		async execute(_toolCallId, params) {
 			const { session_id, ...body } = params;
 			const data = await post(`/api/session/${session_id}/screenshot`, body);
-			return textResult(withoutScreenshot(data), { endpoint: "/api/session/{id}/screenshot", has_screenshot: Boolean(data.screenshot) });
+			return textResult(withoutScreenshot(data), { endpoint: "/api/session/{id}/screenshot", has_screenshot: Boolean(data.screenshot), artifact_path: data.artifact_path, artifact_url: data.artifact_url });
 		},
 	});
 

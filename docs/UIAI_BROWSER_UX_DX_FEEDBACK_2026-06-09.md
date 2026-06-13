@@ -43,6 +43,8 @@ instead of 44.
   can `read` later
 - `output: "url"` → return a server URL the agent can fetch
 
+**Implementation status (2026-06-12)**: Done for session screenshots via `/api/session/{id}/screenshot`, Pi `uiai_browser_screenshot`, MCP `browser_screenshot`, and tool discovery. Artifact files are written under `vision.share_dir/session-screenshots` and can be fetched through the returned `artifact_url`.
+
 ### 2. Multi-viewport batch screenshot
 
 For responsive visual audits, agents need 4 viewports per page. Today
