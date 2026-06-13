@@ -15,8 +15,11 @@ Implemented baseline:
 - Audited note/click/fill/key controls.
 - Dynamic repo/Focusa context summary.
 - Visual breakpoint smoke at 375 / 768 / 1024 / 1440.
+- Bundled FPV asset build via `make fpv-assets`, served from `web/fpv/dist/` under `/m/assets/`.
+- Optional FPV visual baseline comparison/update via `make fpv-visual-smoke` and `make fpv-visual-baselines`.
+- Mobile bottom-sheet-style inspector, 44px touch targets, and swipe tab switching.
 
-Remaining gaps below require explicit beads.
+Remaining gaps below require explicit beads. Gaps marked implemented here remain listed for traceability.
 
 ## Gap 1 — WebRTC/CDP screencast transport
 
@@ -31,7 +34,7 @@ Acceptance:
 
 ## Gap 2 — Bundled frontend build
 
-Current assets are plain CSS/JS plus CDN Lucide fallback. Introduce a build pipeline only if it keeps deployment simple.
+Status: implemented. `make fpv-assets` copies the dependency-free FPV CSS/JS into `web/fpv/dist/`, writes an asset manifest, and fails if CDN/runtime dependencies are introduced. `/m/assets/{file}` serves generated dist files first with source fallback.
 
 Acceptance:
 
@@ -127,7 +130,7 @@ Acceptance:
 
 ## Gap 11 — Mobile interaction design
 
-Responsive layout exists, but mobile controls need native-feeling interaction.
+Status: implemented. Mobile FPV uses a bottom-sheet-style inspector, 44px touch targets, horizontal swipe tab switching, horizontal scroll snapping for dense controls, and verified 375px visual smoke.
 
 Acceptance:
 
@@ -138,7 +141,7 @@ Acceptance:
 
 ## Gap 12 — Visual baseline comparison
 
-Smoke captures screenshots but does not compare to approved baselines.
+Status: implemented. `scripts/smoke-fpv-visual-breakpoints.sh` supports `BASELINE_DIR`, `UPDATE_BASELINE=1`, `DIFF_THRESHOLD`, ImageMagick RMSE comparison, and failure output with baseline/current/diff artifact paths.
 
 Acceptance:
 

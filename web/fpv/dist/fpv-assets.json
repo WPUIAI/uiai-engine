@@ -1,0 +1,9 @@
+{
+  "schema": "uiai.fpv_assets.v1",
+  "source_dir": "web/fpv",
+  "assets": {
+    "fpv.css": { "sha256": "6973458a656d03babcdf9deb071309b253dda37d1ac48fc2852c230488de71b5" },
+    "fpv.js": { "sha256": "cb02a694bb573cd7905d4e93cdc0bee4bfe619287d808c139189945829dec31b" }
+  },
+  "external_runtime_dependencies": false
+}

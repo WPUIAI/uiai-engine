@@ -447,14 +447,16 @@ Rules:
 - Repo and Focusa context must render graceful empty states if unavailable.
 - Timeline entries must be short, filterable, and copy-friendly.
 - Stream quality controls change client polling cadence only; they do not widen public API exposure.
+- On mobile, inspector controls behave like a bottom sheet, touch targets stay at least 44px tall, and horizontal swipes switch tabs.
 
 ## Implemented product upgrades
 
 - Primary transport: `/m/{token}/stream.mjpg` MJPEG stream.
 - Fallback transport: `/m/{token}/screenshot.jpg` polling.
 - Status contract advertises `transport.primary`, `stream_url`, `fallback_url`, and quality modes.
-- Visual regression smoke: `scripts/smoke-fpv-visual-breakpoints.sh` captures 375 / 768 / 1024 / 1440 FPV views and checks route isolation.
-- UI assets are split into `web/fpv/index.html`, `web/fpv/fpv.css`, and `web/fpv/fpv.js`; route code remains data/serving logic.
+- Visual regression smoke: `scripts/smoke-fpv-visual-breakpoints.sh` captures 375 / 768 / 1024 / 1440 FPV views, checks route isolation, and compares optional baselines with RMSE threshold.
+- Baseline capture/update command: `make fpv-visual-baselines` (or `UPDATE_BASELINE=1 scripts/smoke-fpv-visual-breakpoints.sh`). Failures print `baseline=`, `current=`, and `diff=` artifact paths.
+- UI assets are split into `web/fpv/index.html`, `web/fpv/fpv.css`, and `web/fpv/fpv.js`; `make fpv-assets` generates `/m/assets/`-served files in `web/fpv/dist/` and rejects CDN/runtime dependencies.
 
 ## Implementation checklist
 

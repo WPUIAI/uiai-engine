@@ -1,7 +1,16 @@
-.PHONY: test browser-stress browser-soak browser-reliability release-browser-reliability
+.PHONY: test fpv-assets fpv-visual-smoke fpv-visual-baselines browser-stress browser-soak browser-reliability release-browser-reliability
 
 test:
 	go test ./...
+
+fpv-assets:
+	scripts/build-fpv-assets.sh
+
+fpv-visual-smoke:
+	scripts/smoke-fpv-visual-breakpoints.sh
+
+fpv-visual-baselines:
+	UPDATE_BASELINE=1 scripts/smoke-fpv-visual-breakpoints.sh
 
 browser-stress:
 	SESSIONS=$${SESSIONS:-4} ROUNDS=$${ROUNDS:-10} OUT=$${OUT:-/tmp/uiai-browser-diagnostics-4x10.json} scripts/stress-browser-diagnostics.sh

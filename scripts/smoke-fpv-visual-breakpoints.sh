@@ -38,13 +38,27 @@ for spec in 375x812 768x1024 1024x900 1440x1000; do
   if [ "$UPDATE_BASELINE" = "1" ]; then
     mkdir -p "$BASELINE_DIR"
     cp "$OUT_DIR/$spec.jpg" "$BASELINE_DIR/$spec.jpg"
-  elif [ -f "$BASELINE_DIR/$spec.jpg" ] && command -v compare >/dev/null 2>&1; then
-    metric=$(compare -metric RMSE "$BASELINE_DIR/$spec.jpg" "$OUT_DIR/$spec.jpg" null: 2>&1 | awk '{print $2}' | tr -d '()' || true)
-    python3 - <<PY
+  elif [ -f "$BASELINE_DIR/$spec.jpg" ]; then
+    if ! command -v compare >/dev/null 2>&1; then
+      echo "ImageMagick compare is required for FPV baseline diff when $BASELINE_DIR/$spec.jpg exists" >&2
+      exit 1
+    fi
+    diff_path="$OUT_DIR/$spec.diff.jpg"
+    metric=$(compare -metric RMSE "$BASELINE_DIR/$spec.jpg" "$OUT_DIR/$spec.jpg" "$diff_path" 2>&1 | awk '{print $2}' | tr -d '()' || true)
+    if ! python3 - <<PY
 m=float("${metric:-0}")
 th=float("$DIFF_THRESHOLD")
-assert m <= th, f"visual diff $spec RMSE normalized {m} > {th}"
+assert m <= th
 PY
+    then
+      echo "visual diff failed for $spec: RMSE normalized ${metric:-unknown} > $DIFF_THRESHOLD" >&2
+      echo "baseline=$BASELINE_DIR/$spec.jpg" >&2
+      echo "current=$OUT_DIR/$spec.jpg" >&2
+      echo "diff=$diff_path" >&2
+      exit 1
+    fi
+  else
+    echo "fpv visual $spec baseline missing; set UPDATE_BASELINE=1 to capture $BASELINE_DIR/$spec.jpg"
   fi
   diag=$(curl -fsS "$ENGINE_URL/api/session/$vid/diagnostics?level=error&limit=40")
   printf '%s' "$diag" | jq -e '(.exceptions|length)==0 and (.console|length)==0' >/dev/null

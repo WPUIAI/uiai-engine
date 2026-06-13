@@ -121,12 +121,12 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 	fpvLoadRegistry()
 	r.Get("/assets/{file}", func(w http.ResponseWriter, req *http.Request) {
-		file := filepath.Base(chi.URLParam(req, "file"))
-		if file != "fpv.css" && file != "fpv.js" {
+		assetPath, ok := fpvAssetPath(filepath.Base(chi.URLParam(req, "file")))
+		if !ok {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset not found"})
 			return
 		}
-		http.ServeFile(w, req, filepath.Join("web", "fpv", file))
+		http.ServeFile(w, req, assetPath)
 	})
 	r.Get("/{token}", func(w http.ResponseWriter, req *http.Request) {
 		entry, ok := fpvEntry(chi.URLParam(req, "token"))
@@ -386,6 +386,21 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			}
 		}
 	})
+}
+
+func fpvAssetPath(file string) (string, bool) {
+	switch file {
+	case "fpv.css", "fpv.js", "fpv-assets.json":
+	default:
+		return "", false
+	}
+	for _, dir := range []string{filepath.Join("web", "fpv", "dist"), filepath.Join("web", "fpv")} {
+		path := filepath.Join(dir, file)
+		if _, err := os.Stat(path); err == nil {
+			return path, true
+		}
+	}
+	return "", false
 }
 
 func fpvAllowedViews(entry *fpvShare) int {
