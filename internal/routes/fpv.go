@@ -531,13 +531,7 @@ func fpvContext(sess *vision.Session) map[string]any {
 			{"path": "/etc/cloudflared/wpuiai.yml", "kind": "ops", "active": false, "label": "Cloudflare /m/* ingress"},
 		},
 		"history": fpvHistory(recent),
-		"focusa": map[string]any{
-			"objective":   "Professional realtime FPV browser cockpit",
-			"next_step":   "Validate true-stream transport, dynamic context, and operator controls",
-			"evidence":    []string{"fpv.wpuiai.com/m/{token}", "git:" + head},
-			"prediction":  "MJPEG stream should feel smoother than screenshot polling while preserving /m/* isolation",
-			"drift_guard": "Keep fpv.wpuiai.com path-gated to /m/*; do not expose /api/*",
-		},
+		"focusa":  fpvFocusaContext(sess, head),
 		"lifecycle": map[string]any{
 			"expired_state": "Shows Session ended and stops polling/stream retries",
 			"reopen_hint":   "Create a fresh share from a live local /api/fpv/share call",

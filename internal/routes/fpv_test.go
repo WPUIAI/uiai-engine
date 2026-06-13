@@ -59,6 +59,15 @@ func TestFPVFocusaContextUsesSessionScope(t *testing.T) {
 	}
 }
 
+func TestFPVContextUsesFocusaScopeAdapter(t *testing.T) {
+	sess := &vision.Session{FocusaScope: &vision.FocusaScope{WorkpointID: "wp1", ContinuityID: "cont1", ProjectRoot: "/project", EvidenceRef: "ev1"}}
+	ctx := fpvContext(sess)
+	focusa, ok := ctx["focusa"].(map[string]any)
+	if !ok || focusa["workpoint"] != "wp1" || focusa["status"] != "linked" {
+		t.Fatalf("expected fpv context to use focusa scope adapter, got %#v", ctx["focusa"])
+	}
+}
+
 func TestFPVLiveFocusaContextUsesDaemon(t *testing.T) {
 	var paths []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
