@@ -2,8 +2,8 @@
   "schema": "uiai.fpv_assets.v1",
   "source_dir": "web/fpv",
   "assets": {
-    "fpv.css": { "sha256": "6973458a656d03babcdf9deb071309b253dda37d1ac48fc2852c230488de71b5" },
-    "fpv.js": { "sha256": "cb02a694bb573cd7905d4e93cdc0bee4bfe619287d808c139189945829dec31b" }
+    "fpv.css": { "sha256": "c767c09b260c86b168c4f69879f50b4c939ac592e31af1a1eaf46b29c76cdbc9" },
+    "fpv.js": { "sha256": "81942fcf3c05ee2ea726bee61fb1e07308245b9b3c03cc01a6b8518b1bc9d020" }
   },
   "external_runtime_dependencies": false
 }

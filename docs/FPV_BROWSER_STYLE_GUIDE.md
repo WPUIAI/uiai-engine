@@ -445,7 +445,7 @@ Rules:
 
 - Click/fill/press controls must remain audited server-side.
 - Repo and Focusa context must render graceful empty states if unavailable.
-- Timeline entries must be short, filterable, and copy-friendly.
+- Timeline entries must be short, filterable, copy-friendly, and linked to viewport markers when actions have visual context.
 - Stream quality controls change client polling cadence only; they do not widen public API exposure.
 - On mobile, inspector controls behave like a bottom sheet, touch targets stay at least 44px tall, and horizontal swipes switch tabs.
 

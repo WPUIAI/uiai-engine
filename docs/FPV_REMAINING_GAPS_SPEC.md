@@ -18,6 +18,7 @@ Implemented baseline:
 - Bundled FPV asset build via `make fpv-assets`, served from `web/fpv/dist/` under `/m/assets/`.
 - Optional FPV visual baseline comparison/update via `make fpv-visual-smoke` and `make fpv-visual-baselines`.
 - Mobile bottom-sheet-style inspector, 44px touch targets, and swipe tab switching.
+- Action timeline rows link to transient viewport markers, with graceful no-coordinate markers.
 
 Remaining gaps below require explicit beads. Gaps marked implemented here remain listed for traceability.
 
@@ -56,7 +57,7 @@ Acceptance:
 
 ## Gap 4 — Visual action overlay
 
-Actions should appear over the browser viewport and be linked to timeline events.
+Status: implemented. Click/fill/key/point actions create transient viewport markers; timeline rows carry marker ids and hover/click highlights the related marker. Selector/key actions without coordinates fall back to a no-coordinate marker.
 
 Acceptance:
 

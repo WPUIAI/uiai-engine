@@ -1,7 +1,7 @@
 (() => {
   const token = document.body.dataset.token;
   const sessionId = document.body.dataset.session;
-  let frames = 0, started = Date.now(), active = true, frameErrors = 0, frameMs = 250, frameTimer = null, eventFilter = 'all', streamMode = 'cdp_screencast', lastFrameAt = 0, streamUrl = `/m/${token}/stream.cdp.mjpg`, picking = false, picked = null;
+  let frames = 0, started = Date.now(), active = true, frameErrors = 0, frameMs = 250, frameTimer = null, eventFilter = 'all', streamMode = 'cdp_screencast', lastFrameAt = 0, streamUrl = `/m/${token}/stream.cdp.mjpg`, picking = false, picked = null, markerSeq = 0;
   let stream = [];
   const $ = (id) => document.getElementById(id);
   const text = (id, v) => { const el = $(id); if (el) el.textContent = v ?? '—'; };
@@ -34,13 +34,23 @@
   function renderStream() {
     const el = $('stream'); if (!el) return;
     const rows = visibleEvents();
-    el.innerHTML = rows.length ? rows.map(e => `<div class="event" title="${escapeHtml(e.msg)}"><div class="glyph">${e.glyph}</div><div><div class="event-title">${escapeHtml(e.kind)}</div><div class="event-meta">${e.t.toLocaleTimeString()} · ${escapeHtml(e.msg)}</div></div></div>`).join('') : '<div class="empty">No events in this filter.</div>';
+    el.innerHTML = rows.length ? rows.map(e => `<div class="event" data-marker="${e.markerId || ''}" title="${escapeHtml(e.msg)}"><div class="glyph">${e.glyph}</div><div><div class="event-title">${escapeHtml(e.kind)}</div><div class="event-meta">${e.t.toLocaleTimeString()} · ${escapeHtml(e.msg)}</div></div></div>`).join('') : '<div class="empty">No events in this filter.</div>';
+    el.querySelectorAll('[data-marker]').forEach(row => { const id = row.dataset.marker; if (!id) return; row.addEventListener('mouseenter', () => highlightMarker(id)); row.addEventListener('mouseleave', () => clearMarker(id)); row.addEventListener('click', () => highlightMarker(id, 900)); });
   }
-  function addStream(kind, msg, glyph = '↯') {
-    stream.unshift({ t: new Date(), kind, msg, glyph, type: eventType(kind) });
+  function addStream(kind, msg, glyph = '↯', markerId = '') {
+    stream.unshift({ t: new Date(), kind, msg, glyph, type: eventType(kind), markerId });
     stream = stream.slice(0, 30);
     renderStream();
   }
+  function showActionMarker(label, x, y) {
+    const overlay = $('overlay'); if (!overlay) return '';
+    const id = `action-marker-${++markerSeq}`;
+    const marker = document.createElement('span'); marker.id = id; marker.className = 'action-marker'; marker.textContent = label;
+    if (Number.isFinite(x) && Number.isFinite(y)) { marker.style.left = `${x}px`; marker.style.top = `${y}px`; } else { marker.classList.add('no-coord'); }
+    overlay.append(marker); setTimeout(() => marker.remove(), 6500); return id;
+  }
+  function highlightMarker(id, ms = 0) { const marker = document.getElementById(id); if (!marker) return; marker.classList.add('pulse'); if (ms) setTimeout(() => clearMarker(id), ms); }
+  function clearMarker(id) { document.getElementById(id)?.classList.remove('pulse'); }
   function escapeHtml(s = '') { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   async function fpvControl(action, payload = {}) {
     return fetch(`/m/${token}/control`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...payload }) }).then(r => r.json());
