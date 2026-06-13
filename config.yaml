@@ -40,7 +40,7 @@ vision:
   idle_timeout: 300s
   screenshot_quality: 65
   share_dir: "/home/wpuiai/ai-api/shares"
-  allow_private_urls: true  # enabled for local testing of focusa menubar app
+  allow_private_urls: false
 
 media:
   script_dir: "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"
