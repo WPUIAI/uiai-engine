@@ -14,9 +14,9 @@
 ![Pull Requests](https://img.shields.io/github/issues-pr/WPUIAI/uiai-engine)
 ![Stars](https://img.shields.io/github/stars/WPUIAI/uiai-engine?style=social)
 
-UIAI Engine gives operators **FPV for AI agents**: a live first-person browser cockpit where you see what the agent sees while it creates software. Like flying and steering an FPV drone, but the camera is the agent's browser session and the controls are audited notes, clicks, fills, and keypresses that flow back into Pi automatically.
+UIAI Engine is an **agent-first browser and proof backend**: it lets AI agents open persistent browser sessions, inspect pages, act through selectors and `@ref`s, capture screenshots, read diagnostics, research public sources, and hand off stable evidence to Pi, MCP clients, [Focusa](https://github.com/Startempire-Wire/focusa), WPUIAI, and remote agents while creating software.
 
-It is also the **proof browser for [Focusa](https://github.com/Startempire-Wire/focusa)-powered agents** and the agent-compatible browser/intelligence backend for WPUIAI: persistent browser sessions, source-to-proof research, diagnostics-first debugging, visual checks, MCP/Pi tools, and stable evidence handoff to Pi, MCP clients, [Focusa](https://github.com/Startempire-Wire/focusa), WPUIAI, and remote agents. UIAI owns browser/search/session/media/diagnostics execution and stable evidence handles; [Focusa](https://github.com/Startempire-Wire/focusa) owns cognitive continuity: ProjectIdentity, Workpoints, Trajectory, evidence linkage, predictions, metacog, and recovery.
+Its FPV cockpit is the operator layer for that agent-first browser: a live first-person view where humans see what the agent sees and can steer the session with audited notes, clicks, fills, and keypresses. Like flying an FPV drone, but the camera is the agent's browser session and the steering flows back into Pi automatically. UIAI owns browser/search/session/media/diagnostics execution and stable evidence handles; [Focusa](https://github.com/Startempire-Wire/focusa) owns cognitive continuity: ProjectIdentity, Workpoints, Trajectory, evidence linkage, predictions, metacog, and recovery.
 
 
 ## Browser in action
