@@ -416,6 +416,24 @@ Observed patterns to adapt:
 - Disable repeated motion under `prefers-reduced-motion: reduce`.
 - Show “stopped/expired” as a calm state; do not keep polling aggressively.
 
+
+## Implemented interaction standard
+
+Current FPV UI implements these cockpit interactions:
+
+- Quality modes: Smooth, Balanced, Saver.
+- Safe operator controls: audited note, selector click, selector fill, common keypresses.
+- Dynamic context in `/m/{token}/status`: repo project/branch/head/dirty status, active tree, recent git history, compact Focusa context.
+- Timeline filtering: All, Frames, Actions, Git, Focusa.
+- Expired/stopped state: polling stops after unavailable status or repeated frame errors.
+
+Rules:
+
+- Click/fill/press controls must remain audited server-side.
+- Repo and Focusa context must render graceful empty states if unavailable.
+- Timeline entries must be short, filterable, and copy-friendly.
+- Stream quality controls change client polling cadence only; they do not widen public API exposure.
+
 ## Implementation checklist
 
 Before marking FPV UI work complete:
