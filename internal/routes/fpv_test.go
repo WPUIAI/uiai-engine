@@ -58,3 +58,26 @@ func TestFPVFocusaContextUsesSessionScope(t *testing.T) {
 		t.Fatalf("expected evidence ref in context, got %#v", ctx["evidence"])
 	}
 }
+
+func TestFPVLiveFocusaContextUsesDaemon(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"completed","rendered_summary":"live focusa ok"}`))
+	}))
+	defer srv.Close()
+	t.Setenv("FOCUSA_DAEMON_URL", srv.URL)
+	sess := &vision.Session{FocusaScope: &vision.FocusaScope{WorkpointID: "wp1", ContinuityID: "cont1", ProjectRoot: "/project", EvidenceRef: "ev1"}}
+	ctx := fpvFocusaContext(sess, "abc123")
+	if ctx["status"] != "live" {
+		t.Fatalf("expected live focusa context, got %#v", ctx)
+	}
+	live, ok := ctx["live"].(map[string]any)
+	if !ok || live["status"] != "linked" {
+		t.Fatalf("expected linked live context, got %#v", ctx["live"])
+	}
+	if len(paths) != 2 || paths[0] != "/v1/workpoint/resume" || paths[1] != "/v1/trajectory/view" {
+		t.Fatalf("unexpected focusa paths: %#v", paths)
+	}
+}

@@ -1,11 +1,13 @@
 package routes
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -574,7 +576,96 @@ func fpvFocusaContext(sess *vision.Session, head string) map[string]any {
 	base["trajectory"] = map[string]string{"project_root": scope.ProjectRoot, "continuity_id": scope.ContinuityID, "status": "scope_linked"}
 	base["prediction"] = map[string]string{"status": "scope_linked", "continuity_id": scope.ContinuityID}
 	base["evidence"] = evidence
+	live := fpvLiveFocusaContext(scope)
+	base["live"] = live
+	if live["status"] == "linked" {
+		base["status"] = "live"
+		base["objective"] = "Live Focusa adapter linked for this UIAI browser session"
+		base["trajectory"] = live["trajectory"]
+		base["prediction"] = map[string]any{"status": "live_adapter", "continuity_id": scope.ContinuityID, "live_status": live["status"]}
+	}
 	return base
+}
+
+func fpvLiveFocusaContext(scope *vision.FocusaScope) map[string]any {
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("FOCUSA_DAEMON_URL")), "/")
+	if baseURL == "" {
+		return map[string]any{"status": "disabled", "degraded": true, "reason": "FOCUSA_DAEMON_URL unset"}
+	}
+	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
+		return map[string]any{"status": "degraded", "degraded": true, "reason": "FOCUSA_DAEMON_URL must be http(s)"}
+	}
+	payload := map[string]any{
+		"project_root":  scope.ProjectRoot,
+		"continuity_id": scope.ContinuityID,
+		"workpoint_id":  scope.WorkpointID,
+	}
+	client := &http.Client{Timeout: 1200 * time.Millisecond}
+	workpoint := fpvPostFocusa(client, baseURL+"/v1/workpoint/resume", withPayload(payload, "mode", "compact_prompt"))
+	trajectory := fpvPostFocusa(client, baseURL+"/v1/trajectory/view", withPayload(payload, "mode", "summary"))
+	status := "linked"
+	if workpoint["status"] != "ok" && trajectory["status"] != "ok" {
+		status = "degraded"
+	}
+	return map[string]any{
+		"status":     status,
+		"degraded":   status != "linked",
+		"source":     "FOCUSA_DAEMON_URL",
+		"workpoint":  workpoint,
+		"trajectory": trajectory,
+	}
+}
+
+func withPayload(src map[string]any, key string, value any) map[string]any {
+	copy := map[string]any{}
+	for k, v := range src {
+		if v != "" {
+			copy[k] = v
+		}
+	}
+	copy[key] = value
+	return copy
+}
+
+func fpvPostFocusa(client *http.Client, url string, payload map[string]any) map[string]any {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return map[string]any{"status": "degraded", "error": "encode_failed"}
+	}
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return map[string]any{"status": "degraded", "error": "request_failed"}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return map[string]any{"status": "degraded", "error": "unreachable"}
+	}
+	defer resp.Body.Close()
+	var decoded map[string]any
+	_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&decoded)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return map[string]any{"status": "degraded", "http_status": resp.StatusCode, "summary": fpvCompactFocusaSummary(decoded)}
+	}
+	return map[string]any{"status": "ok", "http_status": resp.StatusCode, "summary": fpvCompactFocusaSummary(decoded)}
+}
+
+func fpvCompactFocusaSummary(decoded map[string]any) string {
+	if len(decoded) == 0 {
+		return "no compact payload"
+	}
+	for _, key := range []string{"rendered_summary", "summary", "status", "trajectory_id", "workpoint_id", "current_action", "next_action"} {
+		if v, ok := decoded[key]; ok {
+			text := strings.TrimSpace(fmt.Sprint(v))
+			if len(text) > 180 {
+				return text[:180] + "…"
+			}
+			if text != "" {
+				return text
+			}
+		}
+	}
+	return "compact payload available"
 }
 
 func fpvGit(args ...string) string {

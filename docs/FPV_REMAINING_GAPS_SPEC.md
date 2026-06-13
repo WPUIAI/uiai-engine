@@ -88,7 +88,7 @@ Acceptance:
 
 ## Gap 7 — Live Focusa integration
 
-Status: partially implemented. FPV status now adapts session `focusa_scope` into compact Workpoint/evidence/prediction/trajectory-linked fields and renders a graceful degraded state when no scope is present. Remaining depth: direct live Focusa daemon surface hydration beyond the session scope link.
+Status: implemented. FPV status adapts session `focusa_scope` into compact Workpoint/evidence/prediction/trajectory-linked fields, optionally hydrates live Workpoint/Trajectory summaries through `FOCUSA_DAEMON_URL`, and renders graceful degraded states when scope or daemon access is unavailable.
 
 Acceptance:
 
