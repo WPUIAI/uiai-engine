@@ -26,6 +26,12 @@ Long-term target: split into versioned static assets:
 - `web/fpv/fpv.js` — polling, state normalization, UI rendering.
 - `docs/FPV_BROWSER_STYLE_GUIDE.md` — design contract.
 
+## Hard visual constraints
+
+- No colored left-border accent treatments. Use full-card borders, glyphs, chips, and background motion instead.
+- Container `border-radius` must not exceed `5px`. Small signal cells may use `2px`; avoid pill-shaped containers unless explicitly approved.
+- Data animations must be Nullframe-inspired signal animations, not generic decorative motion. Required primitives: seismograph bars, glyph/cell-slam grids, health matrix, sweep tags, and ticker/status cadence.
+
 ## Design principles
 
 | Principle | Meaning |
@@ -340,11 +346,11 @@ Reference: `https://project-nullframe.vercel.app/`.
 
 Observed patterns to adapt:
 
-1. **Pulse LEDs** — small live indicators pulse calmly.
-2. **Card shimmer/sweep** — cards show a diagonal shine on hover or fresh data.
-3. **Bento telemetry cards** — dense but clean cards with uppercase labels and strong values.
-4. **Activity stream cadence** — timestamped events create a sense of life.
-5. **Seismograph/glyph feel** — data should feel like signals moving through a system.
+1. **Pulse LEDs** — small live indicators pulse calmly; not a substitute for data animations.
+2. **Card shimmer/sweep** — Nullframe-style `shine` strip on hover or fresh data, using `null-shimmer` left-to-right sweep.
+3. **Bento telemetry cards** — dense but clean cards with uppercase labels, glyphs, and strong values.
+4. **Activity stream cadence** — timestamped events create a sense of life via compact ticker/timeline rows.
+5. **Seismograph/glyph feel** — required for realtime data: animated bar channels, glyph grids, and health matrices.
 6. **RAF/FPS metrics** — show the live cadence transparently.
 7. **Composite-safe animation** — animate opacity, transform, and background-position; avoid layout-heavy animation.
 
@@ -357,6 +363,16 @@ Observed patterns to adapt:
 --sweep-fast: 1.05s;
 --stream-in: .42s;
 ```
+
+### Required Nullframe data animations
+
+| Animation | FPV use |
+|---|---|
+| Seismograph bars | Frame cadence / realtime browser signal. |
+| Glyph grid with `cell-slam` | Live browser data energy / session heartbeat. |
+| Health matrix with `streak-wave` | Diagnostics severity and network health. |
+| Sweep tags / shine strip | Card hover and fresh data updates. |
+| Ticker cadence | Compact live text stream for frame/control/status events. |
 
 ### Required keyframes
 
