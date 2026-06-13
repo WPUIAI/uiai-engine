@@ -517,6 +517,18 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "uiai_2fa_code",
+		label: "UIAI 2FA Code",
+		description: "Retrieve a short-lived OTP code from a configured portable two_factor profile. Supports native TOTP profiles and optional aegis command adapter from Granddave/aegis-rs; never pass raw secrets in chat.",
+		parameters: Type.Object({
+			profile: Type.String({ description: "Configured two_factor profile name, e.g. github or wpuiai-admin" }),
+			issuer: Type.Optional(Type.String({ description: "Optional issuer override/filter for Aegis-backed profiles" })),
+			name: Type.Optional(Type.String({ description: "Optional account/name override/filter for Aegis-backed profiles" })),
+		}),
+		execute: async (params: any) => textResult(await post("/api/2fa/code", params), { endpoint: "/api/2fa/code" }),
+	});
+
+	pi.registerTool({
 		name: "uiai_search",
 		label: "UIAI Web Search",
 		description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with uiai_browser_open, then uiai_browser_read.",

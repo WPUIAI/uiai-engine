@@ -27,6 +27,7 @@ Local-token env support: `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_A
 | `/api/ui-reverse/models`, `/api/ui-reverse/operations` | public | `internal/auth/auth.go` public list | Metadata only. |
 | `/api/copilot/health`, `/api/intelligence/health` | public | `internal/auth/auth.go` public list | Health/readiness only. |
 | `/api/screenshot`, `/api/screenshot/*` | loopback-public remote-auth | `isLoopbackToolPath`; `internal/auth/auth_test.go` pattern | Local visual tool surface; remote callers authenticate. |
+| `/api/2fa/code` | authenticated | global `/api/*` middleware; no loopback-public exception | Optional agent 2FA helper; returns short-lived OTP code from configured profile only. Keep disabled unless deployment needs it. |
 | `/api/session`, `/api/session/*` | loopback-public remote-auth | `isLoopbackToolPath` | Persistent browser automation; remote callers authenticate. |
 | `/api/search`, `/api/search/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestSearchToolPathLoopbackPublicRemoteAuth` | Provider-neutral search; remote callers authenticate. |
 | `/api/markdown`, `/api/markdown/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestMarkdownToolPathLoopbackPublicRemoteAuth` | Source-to-Markdown browser capture; remote callers authenticate. |

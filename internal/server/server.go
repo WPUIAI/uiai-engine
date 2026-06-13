@@ -235,6 +235,9 @@ func (e *Engine) mountRoutes() {
 	r.Route("/api/training", func(r chi.Router) {
 		routes.MountTrainingReal(r, e.cfg)
 	})
+	r.Route("/api/2fa", func(r chi.Router) {
+		routes.MountTwoFactor(r, e.cfg)
+	})
 
 	// Media production (mockups, GIFs, videos)
 	r.Route("/api/media", func(r chi.Router) {

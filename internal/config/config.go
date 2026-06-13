@@ -22,6 +22,7 @@ type Config struct {
 	CORS       CORSConfig      `yaml:"cors"`
 	Media      MediaConfig     `yaml:"media"`
 	Captcha    CaptchaYAML     `yaml:"captcha"`
+	TwoFactor  TwoFactorConfig `yaml:"two_factor"`
 }
 
 // CaptchaYAML mirrors the YAML structure for captcha config loading.
@@ -87,6 +88,26 @@ type AIProviderConfig struct {
 	APIVersion string `yaml:"api_version,omitempty"`
 	SiteURL    string `yaml:"site_url,omitempty"`
 	SiteName   string `yaml:"site_name,omitempty"`
+}
+
+type TwoFactorConfig struct {
+	Enabled  bool                        `yaml:"enabled"`
+	Profiles map[string]TwoFactorProfile `yaml:"profiles"`
+}
+
+type TwoFactorProfile struct {
+	Provider     string `yaml:"provider"` // totp | aegis/aegis-rs | command
+	Secret       string `yaml:"secret,omitempty"`
+	OTPAuthURL   string `yaml:"otpauth_url,omitempty"`
+	Issuer       string `yaml:"issuer,omitempty"`
+	Name         string `yaml:"name,omitempty"`
+	Algorithm    string `yaml:"algorithm,omitempty"`
+	Digits       int    `yaml:"digits,omitempty"`
+	Period       int    `yaml:"period,omitempty"`
+	Command      string `yaml:"command,omitempty"`
+	VaultFile    string `yaml:"vault_file,omitempty"`
+	Password     string `yaml:"password,omitempty"`
+	PasswordFile string `yaml:"password_file,omitempty"`
 }
 
 type VisionConfig struct {
@@ -191,6 +212,21 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Logging.Level == "" {
 		c.Logging.Level = "info"
+	}
+	for name, profile := range c.TwoFactor.Profiles {
+		if profile.Provider == "" {
+			profile.Provider = "totp"
+		}
+		if profile.Digits == 0 {
+			profile.Digits = 6
+		}
+		if profile.Period == 0 {
+			profile.Period = 30
+		}
+		if profile.Algorithm == "" {
+			profile.Algorithm = "SHA1"
+		}
+		c.TwoFactor.Profiles[name] = profile
 	}
 }
 

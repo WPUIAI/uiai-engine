@@ -187,6 +187,19 @@ const BRIDGE_CORE_TOOLS = [
     },
   },
   {
+    name: "uiai_2fa_code",
+    description: "Retrieve a short-lived OTP code from a configured portable two_factor profile. Supports native TOTP profiles and optional aegis command adapter from Granddave/aegis-rs; never pass raw secrets in chat.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        profile: { type: "string", description: "Configured two_factor profile name" },
+        issuer: { type: "string", description: "Optional issuer override/filter for Aegis-backed profiles" },
+        name: { type: "string", description: "Optional account/name override/filter for Aegis-backed profiles" },
+      },
+      required: ["profile"],
+    },
+  },
+  {
     name: "browser_search",
     description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with browser_open, then browser_read.",
     inputSchema: {
@@ -325,6 +338,12 @@ async function toolsCall(name, args) {
         cleanup_session_id: args.cleanup_session_id,
         expandable_json_ref: args.expandable_json_ref,
       };
+      break;
+
+    case "uiai_2fa_code":
+      url = `${ENGINE}/api/2fa/code`;
+      method = "POST";
+      body = { profile: args.profile, issuer: args.issuer, name: args.name };
       break;
 
     case "browser_search":
