@@ -14,7 +14,9 @@
 ![Pull Requests](https://img.shields.io/github/issues-pr/WPUIAI/uiai-engine)
 ![Stars](https://img.shields.io/github/stars/WPUIAI/uiai-engine?style=social)
 
-UIAI Engine is the **proof browser for [Focusa](https://github.com/Startempire-Wire/focusa)-powered agents** and the agent-compatible browser/intelligence backend for WPUIAI. It gives agents a safer browser surface, source-to-proof research, diagnostics-first debugging, visual checks, and clean evidence handoff to Pi, MCP clients, [Focusa](https://github.com/Startempire-Wire/focusa), WPUIAI, and remote agents. UIAI owns browser/search/session/media/diagnostics execution and stable evidence handles; [Focusa](https://github.com/Startempire-Wire/focusa) owns cognitive continuity: ProjectIdentity, Workpoints, Trajectory, evidence linkage, predictions, metacog, and recovery.
+UIAI Engine gives operators **FPV for AI agents**: a live first-person browser cockpit where you see what the agent sees while it creates software. Like flying and steering an FPV drone, but the camera is the agent's browser session and the controls are audited notes, clicks, fills, and keypresses that flow back into Pi automatically.
+
+It is also the **proof browser for [Focusa](https://github.com/Startempire-Wire/focusa)-powered agents** and the agent-compatible browser/intelligence backend for WPUIAI: persistent browser sessions, source-to-proof research, diagnostics-first debugging, visual checks, MCP/Pi tools, and stable evidence handoff to Pi, MCP clients, [Focusa](https://github.com/Startempire-Wire/focusa), WPUIAI, and remote agents. UIAI owns browser/search/session/media/diagnostics execution and stable evidence handles; [Focusa](https://github.com/Startempire-Wire/focusa) owns cognitive continuity: ProjectIdentity, Workpoints, Trajectory, evidence linkage, predictions, metacog, and recovery.
 
 
 ## Browser in action
