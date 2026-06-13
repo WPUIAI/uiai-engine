@@ -2,6 +2,8 @@
 
 Use this runbook before claiming a UIAI Engine release that changes HTTP routes, Pi tools, MCP routes, CLI commands, browser/session behavior, Focusa packet/evidence flows, auth, docs, or repo-local skills.
 
+For public/mobile FPV PWA exposure, also follow [FPV Public Route Deployment Plan](FPV_PUBLIC_ROUTE_DEPLOY_PLAN.md); do not expose the full engine publicly.
+
 ## Scope and safety boundaries
 
 - Project root: `/home/wpuiai/uiai-engine`.
