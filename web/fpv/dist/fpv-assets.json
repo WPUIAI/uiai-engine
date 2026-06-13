@@ -3,7 +3,7 @@
   "source_dir": "web/fpv",
   "assets": {
     "fpv.css": { "sha256": "c767c09b260c86b168c4f69879f50b4c939ac592e31af1a1eaf46b29c76cdbc9" },
-    "fpv.js": { "sha256": "81942fcf3c05ee2ea726bee61fb1e07308245b9b3c03cc01a6b8518b1bc9d020" }
+    "fpv.js": { "sha256": "34d698b188eabed59dbc3676f3661d6d6abb4a00aaedc2e7a0b18bd906ca6bdb" }
   },
   "external_runtime_dependencies": false
 }

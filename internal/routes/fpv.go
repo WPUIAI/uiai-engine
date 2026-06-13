@@ -192,7 +192,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 				"quality_modes": []string{"smooth", "balanced", "saver"},
 				"max_viewers":   3,
 			},
-			"context": fpvContext(),
+			"context": fpvContext(sess),
 		})
 	})
 
@@ -508,7 +508,7 @@ func fpvScreenshotJPEG(sess *vision.Session) ([]byte, error) {
 	return data, nil
 }
 
-func fpvContext() map[string]any {
+func fpvContext(sess *vision.Session) map[string]any {
 	branch := fpvGit("rev-parse", "--abbrev-ref", "HEAD")
 	head := fpvGit("rev-parse", "--short", "HEAD")
 	status := fpvGit("status", "--short")
@@ -541,6 +541,40 @@ func fpvContext() map[string]any {
 			"reopen_hint":   "Create a fresh share from a live local /api/fpv/share call",
 		},
 	}
+}
+
+func fpvFocusaContext(sess *vision.Session, head string) map[string]any {
+	base := map[string]any{
+		"source":      "session.focusa_scope",
+		"evidence":    []string{"fpv.wpuiai.com/m/{token}", "git:" + head},
+		"drift_guard": "Keep fpv.wpuiai.com path-gated to /m/*; do not expose /api/*",
+	}
+	if sess == nil || sess.FocusaScope == nil || (sess.FocusaScope.WorkpointID == "" && sess.FocusaScope.ContinuityID == "" && sess.FocusaScope.ProjectRoot == "" && sess.FocusaScope.EvidenceRef == "") {
+		base["status"] = "degraded"
+		base["degraded"] = true
+		base["objective"] = "No Focusa scope attached to this UIAI session"
+		base["next_step"] = "Open or share the session with focusa_scope for Workpoint/evidence/prediction/trajectory linkage"
+		base["workpoint"] = "unavailable"
+		base["trajectory"] = "unavailable"
+		base["prediction"] = "unavailable"
+		return base
+	}
+	scope := sess.FocusaScope
+	evidence := []string{"fpv.wpuiai.com/m/{token}", "git:" + head}
+	if scope.EvidenceRef != "" {
+		evidence = append(evidence, scope.EvidenceRef)
+	}
+	base["status"] = "linked"
+	base["degraded"] = false
+	base["objective"] = "Linked Focusa scope for this UIAI browser session"
+	base["next_step"] = "Resolve compact Workpoint/evidence/prediction/trajectory surfaces by project_root plus continuity_id"
+	base["workpoint"] = scope.WorkpointID
+	base["continuity_id"] = scope.ContinuityID
+	base["project_root"] = scope.ProjectRoot
+	base["trajectory"] = map[string]string{"project_root": scope.ProjectRoot, "continuity_id": scope.ContinuityID, "status": "scope_linked"}
+	base["prediction"] = map[string]string{"status": "scope_linked", "continuity_id": scope.ContinuityID}
+	base["evidence"] = evidence
+	return base
 }
 
 func fpvGit(args ...string) string {

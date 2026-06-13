@@ -106,8 +106,8 @@
     const p = ctx.project || {}, repo = $('repoGrid');
     if (repo) repo.innerHTML = metric('Project', p.name, `Root: ${p.root || 'unknown'}`, '⌘') + metric('Branch', p.branch, '', '⑂') + metric('Head', p.head, p.dirty ? 'Working tree modified' : 'Working tree clean', '●') + metric('Public host', 'fpv.wpuiai.com', 'Path-gated to /m/*', '◧');
     const tree = $('repoTree'); if (tree) tree.textContent = (ctx.tree || []).map(i => `├─ ${i.path}  ${i.active ? 'active' : ''}`).join('\n') || 'No tree context available';
-    const f = ctx.focusa || {}, fg = $('focusaGrid');
-    if (fg) fg.innerHTML = metric('Current objective', f.objective, 'Compact Focusa summary', '✦') + metric('Next step', f.next_step, '', '➜') + metric('Evidence', (f.evidence || []).join(', '), '', '✓') + metric('Prediction', f.prediction, '', '◌') + metric('Drift guard', f.drift_guard, '', '⛨');
+    const f = ctx.focusa || {}, fg = $('focusaGrid'), pred = typeof f.prediction === 'object' ? `${f.prediction.status || 'linked'} ${f.prediction.continuity_id || ''}` : f.prediction;
+    if (fg) fg.innerHTML = metric('Focusa status', f.status || 'unknown', f.degraded ? 'Graceful degraded state' : (f.source || 'scope linked'), '✦') + metric('Workpoint', f.workpoint || 'unavailable', f.project_root || '', '⌘') + metric('Next step', f.next_step, '', '➜') + metric('Evidence', (f.evidence || []).join(', '), '', '✓') + metric('Prediction', pred || 'unavailable', '', '◌') + metric('Drift guard', f.drift_guard, '', '⛨');
     (ctx.history || []).slice(0, 5).forEach(h => { const msg = `${h.ref}: ${h.title}`; if (!stream.some(e => e.msg === msg)) addStream('Git history', msg, '⌘'); });
   }
 
