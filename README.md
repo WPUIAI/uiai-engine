@@ -21,6 +21,10 @@ Its FPV cockpit is the operator layer for that agent-first browser: a live first
 
 ## Browser in action
 
+![UIAI Engine FPV cockpit showing a live first-person browser session with operator controls, diagnostics, repo context, and Focusa context](docs/assets/screenshots/uiai-fpv-cockpit.jpg)
+
+The FPV cockpit is the operator view of an agent browser session: the agent keeps the browser-first workflow, while humans can see the same first-person perspective and steer with audited notes/actions when needed.
+
 ![Actual Pi session excerpt showing Focusa tool calls: Workpoint checkpoint and evidence capture for UIAI Engine](docs/assets/screenshots/uiai-engine-readme-badges.jpg)
 
 
