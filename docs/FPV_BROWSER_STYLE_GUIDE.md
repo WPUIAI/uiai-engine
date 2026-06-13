@@ -19,11 +19,12 @@ The FPV viewer is not just a screenshot mirror. It is an operator cockpit that s
 
 Current implementation source: `internal/routes/fpv.go` inline `fpvPageTemplate`.
 
-Long-term target: split into versioned static assets:
+Implemented asset split:
 
-- `internal/routes/fpv.go` — route/data contract only.
-- `web/fpv/fpv.css` — tokens, layout, components, motion.
-- `web/fpv/fpv.js` — polling, state normalization, UI rendering.
+- `internal/routes/fpv.go` — route/data contract and asset serving only.
+- `web/fpv/index.html` — semantic FPV shell.
+- `web/fpv/fpv.css` — Mac-beauty tokens, layout, components, motion.
+- `web/fpv/fpv.js` — polling, state normalization, controls, context rendering.
 - `docs/FPV_BROWSER_STYLE_GUIDE.md` — design contract.
 
 ## Hard visual constraints
@@ -31,6 +32,19 @@ Long-term target: split into versioned static assets:
 - No colored left-border accent treatments. Use full-card borders, glyphs, chips, and background motion instead.
 - Container `border-radius` must not exceed `5px`. Small signal cells may use `2px`; avoid pill-shaped containers unless explicitly approved.
 - Data animations must be Nullframe-inspired signal animations, not generic decorative motion. Required primitives: seismograph bars, glyph/cell-slam grids, health matrix, sweep tags, and ticker/status cadence.
+
+
+## Mac beauty standard
+
+FPV should feel like a native, premium macOS operations cockpit:
+
+- SF-style typography stack: `-apple-system`, `BlinkMacSystemFont`, `SF Pro Display`, `SF Pro Text`, fallback sans.
+- Crisp glass surfaces, restrained gradients, no loud decorative borders.
+- 5px maximum container radius, per operator constraint.
+- Clean toolbar/sidebar/detail split.
+- Lucide icon library when available, with local glyph fallback so icons never disappear.
+- Route code remains clean; UI complexity belongs in `web/fpv` assets, not `internal/routes/fpv.go`.
+
 
 ## Design principles
 
