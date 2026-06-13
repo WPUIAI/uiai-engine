@@ -10,7 +10,7 @@
 > (`UIAI_AGENT_FPV_COPILOT_SPEC_2026-06-09.md`). The Mac app /
 > Tauri / IDE-embedded versions come in Phase 2.
 
-**Implementation status (2026-06-12)**: Read-only MVP implemented. Agents create a share with `POST /api/fpv/share` / Pi `uiai_fpv_share`; operators open `/m/{token}` for a public tokenized PWA that polls session status, diagnostics summary, and screenshot frames. Steering remains intentionally out of scope until the co-pilot controls slice.
+**Implementation status (2026-06-12)**: MVP implemented. Agents create a share with `POST /api/fpv/share` / Pi `uiai_fpv_share`; operators open `/m/{token}` for a public tokenized PWA that polls session status, diagnostics summary, and screenshot frames. Shares default to read-only; `controls=true` enables the audited co-pilot control endpoint.
 
 ---
 

@@ -95,6 +95,8 @@ Smoke:
 
 ### Bead E — FPV co-pilot steering controls
 
+Status: implemented in current slice.
+
 Scope:
 - Add typed operator commands for click/type/press/draw annotations through the share session.
 - Gate controls behind explicit token permission and audit log.

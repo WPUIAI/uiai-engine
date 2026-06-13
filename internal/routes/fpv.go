@@ -16,11 +16,24 @@ import (
 )
 
 type fpvShare struct {
-	Token     string    `json:"token"`
-	SessionID string    `json:"session_id"`
-	CreatedAt time.Time `json:"created_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Views     int       `json:"views"`
+	Token     string        `json:"token"`
+	SessionID string        `json:"session_id"`
+	CreatedAt time.Time     `json:"created_at"`
+	ExpiresAt time.Time     `json:"expires_at"`
+	Views     int           `json:"views"`
+	Controls  bool          `json:"controls"`
+	Audit     []fpvAuditLog `json:"audit,omitempty"`
+}
+
+type fpvAuditLog struct {
+	TS       time.Time      `json:"ts"`
+	Action   string         `json:"action"`
+	Selector string         `json:"selector,omitempty"`
+	Key      string         `json:"key,omitempty"`
+	Message  string         `json:"message,omitempty"`
+	OK       bool           `json:"ok"`
+	Error    string         `json:"error,omitempty"`
+	Meta     map[string]any `json:"meta,omitempty"`
 }
 
 var fpvShares sync.Map
@@ -34,6 +47,7 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 		var body struct {
 			SessionID      string `json:"session_id"`
 			ExpiresMinutes int    `json:"expires_minutes"`
+			Controls       bool   `json:"controls"`
 		}
 		_ = json.NewDecoder(req.Body).Decode(&body)
 		if body.SessionID == "" {
@@ -53,7 +67,7 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		entry := &fpvShare{Token: token, SessionID: body.SessionID, CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Duration(minutes) * time.Minute)}
+		entry := &fpvShare{Token: token, SessionID: body.SessionID, CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Duration(minutes) * time.Minute), Controls: body.Controls}
 		fpvShares.Store(token, entry)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"token":                 token,
@@ -62,7 +76,7 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			"status_url":            "/m/" + token + "/status",
 			"screenshot_url":        "/m/" + token + "/screenshot.jpg",
 			"mirror_url_expires_at": entry.ExpiresAt,
-			"mode":                  "read_only",
+			"mode":                  fpvMode(entry.Controls),
 		})
 	})
 }
@@ -93,7 +107,9 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"token":       entry.Token,
 			"session_id":  entry.SessionID,
-			"mode":        "read_only",
+			"mode":        fpvMode(entry.Controls),
+			"controls":    entry.Controls,
+			"audit_count": len(entry.Audit),
 			"url":         sess.URL,
 			"title":       sess.Title,
 			"width":       sess.Width,
@@ -102,6 +118,69 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			"diagnostics": diag.Summary,
 		})
 	})
+
+	r.Post("/{token}/control", func(w http.ResponseWriter, req *http.Request) {
+		entry, ok := fpvEntry(chi.URLParam(req, "token"))
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share not found or expired"})
+			return
+		}
+		if !entry.Controls {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "fpv share is read-only"})
+			return
+		}
+		sess, ok := sm.Get(entry.SessionID)
+		if !ok {
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			return
+		}
+		var body struct {
+			Action   string `json:"action"`
+			Selector string `json:"selector"`
+			Text     string `json:"text"`
+			Key      string `json:"key"`
+			Message  string `json:"message"`
+		}
+		_ = json.NewDecoder(req.Body).Decode(&body)
+		log := fpvAuditLog{TS: time.Now().UTC(), Action: body.Action, Selector: body.Selector, Key: body.Key, Message: body.Message}
+		var err error
+		switch body.Action {
+		case "message", "annotate":
+			log.OK = true
+		case "click":
+			var resolved string
+			resolved, err = sess.ResolveSelector(body.Selector)
+			if err == nil {
+				_, err = sess.Click(resolved)
+			}
+		case "fill", "type":
+			var resolved string
+			resolved, err = sess.ResolveSelector(body.Selector)
+			if err == nil {
+				_, err = sess.Fill(resolved, body.Text)
+			}
+		case "press":
+			_, err = sess.Press(body.Key)
+		default:
+			err = fmt.Errorf("unsupported fpv action %q", body.Action)
+		}
+		if err != nil {
+			log.Error = err.Error()
+		} else {
+			log.OK = true
+		}
+		entry.Audit = append(entry.Audit, log)
+		if len(entry.Audit) > 100 {
+			entry.Audit = entry.Audit[len(entry.Audit)-100:]
+		}
+		fpvShares.Store(entry.Token, entry)
+		status := http.StatusOK
+		if err != nil {
+			status = http.StatusBadRequest
+		}
+		writeJSON(w, status, map[string]any{"ok": log.OK, "audit": log, "mode": fpvMode(entry.Controls)})
+	})
+
 	r.Get("/{token}/screenshot.jpg", func(w http.ResponseWriter, req *http.Request) {
 		entry, ok := fpvEntry(chi.URLParam(req, "token"))
 		if !ok {
@@ -127,6 +206,13 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(data)
 	})
+}
+
+func fpvMode(controls bool) string {
+	if controls {
+		return "control"
+	}
+	return "read_only"
 }
 
 func fpvEntry(token string) (*fpvShare, bool) {
@@ -156,6 +242,7 @@ var fpvPageTemplate = template.Must(template.New("fpv").Parse(`<!doctype html>
 <body><header><strong>● Watching UIAI session {{.SessionID}}</strong><div class="muted">read-only FPV share</div></header><main><img id="shot" alt="live browser screenshot"><pre id="status">loading…</pre></main>
 <script>
 const token={{printf "%q" .Token}};
+async function fpvControl(action, payload={}){ return fetch('/m/'+token+'/control', {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, ...payload})}).then(r=>r.json()); }
 async function tick(){
   const st=await fetch('/m/'+token+'/status',{cache:'no-store'}).then(r=>r.json());
   document.getElementById('status').textContent=JSON.stringify(st,null,2);

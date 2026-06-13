@@ -18,6 +18,8 @@ many-minutes to sub-second.
 > installable. The Mac app / Tauri / IDE-embedded versions come
 > in Phase 2.
 
+**Implementation status (2026-06-12)**: Initial PWA co-pilot controls implemented behind explicit `controls=true` share creation. Tokenized `/m/{token}/control` supports audited `message`, `annotate`, `click`, `fill`/`type`, and `press` actions; read-only shares remain the default.
+
 ---
 
 ## 1. Why this matters
