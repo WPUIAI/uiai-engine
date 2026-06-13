@@ -97,6 +97,7 @@ Start here by task:
 |---|---|
 | HLT ledger and current trajectory | [`docs/HLT_LEDGER.md`](docs/HLT_LEDGER.md) |
 | Licensing: BSL 1.1, Additional Use Grant, Founders Forge access, commercial licensing | [`LICENSE`](LICENSE), [`docs/LICENSING.md`](docs/LICENSING.md) |
+| rbw Secret Integration: optional Bitwarden-backed config secrets | [`docs/RBW_SECRET_INTEGRATION.md`](docs/RBW_SECRET_INTEGRATION.md) |
 | Agent discovery index: `/api/tools/agent-card`, `pi_uiai_agent_card`, cards, search, graph, docs endpoint, Pi/MCP/CLI discovery, gaps | [`docs/AGENT_DISCOVERY_INDEX.md`](docs/AGENT_DISCOVERY_INDEX.md) |
 | Agent quickstart: Pi, MCP, CLI, HTTP, browser workflow, [Focusa](https://github.com/Startempire-Wire/focusa) packet handoff | [`docs/UIAI_FOR_AGENTS_QUICKSTART.md`](docs/UIAI_FOR_AGENTS_QUICKSTART.md) |
 | Agent UX cookbook: search/read, @refs, diagnostics, packets, visual QA, release proof | [`docs/AGENT_UX_COOKBOOK.md`](docs/AGENT_UX_COOKBOOK.md) |
@@ -567,7 +568,7 @@ Default config lives in [`config.yaml`](config.yaml). Important sections:
 
 Security notes:
 
-- Secrets should be referenced through environment variables or an external systemd environment file such as `/etc/wpuiai/ai-api.env`, not committed literal values.
+- Secrets should be referenced through environment variables, optional `${rbw:item}` / `${rbw:item:field}` config references, or an external systemd environment file such as `/etc/wpuiai/ai-api.env`, not committed literal values. See [`docs/RBW_SECRET_INTEGRATION.md`](docs/RBW_SECRET_INTEGRATION.md).
 - `vision.allow_private_urls: false` is the hardened default and blocks private/internal navigation. Set it to `true` only in explicit local/dev profiles, then run private localhost smokes with `UIAI_ALLOW_PRIVATE_SMOKES=1`.
 - Browser/session, screenshot, provider search, and `/api/agent/research-packet` APIs are loopback-public only; remote callers must authenticate. The Pi extension can send `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` for authenticated remote/media helpers. Local VPS deployments may configure an eternal env-backed `UIAI_LOCAL_API_TOKEN` accepted as `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`.
 

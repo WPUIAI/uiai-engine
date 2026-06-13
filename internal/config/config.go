@@ -134,10 +134,11 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("read config %s: %w", path, err)
 	}
 
-	// Expand ${ENV_VAR} references
-	expanded := os.Expand(string(data), func(key string) string {
-		return os.Getenv(key)
-	})
+	// Expand ${ENV_VAR} and explicit secret-provider references such as ${rbw:item}.
+	expanded, err := expandConfigRefs(string(data))
+	if err != nil {
+		return nil, fmt.Errorf("expand config %s: %w", path, err)
+	}
 
 	cfg := &Config{}
 	if err := yaml.Unmarshal([]byte(expanded), cfg); err != nil {
