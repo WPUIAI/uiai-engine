@@ -1,7 +1,7 @@
 (() => {
   const token = document.body.dataset.token;
   const sessionId = document.body.dataset.session;
-  let frames = 0, started = Date.now(), active = true, frameErrors = 0, frameMs = 250, frameTimer = null, eventFilter = 'all', streamMode = 'mjpeg', lastFrameAt = 0, picking = false, picked = null;
+  let frames = 0, started = Date.now(), active = true, frameErrors = 0, frameMs = 250, frameTimer = null, eventFilter = 'all', streamMode = 'cdp_screencast', lastFrameAt = 0, streamUrl = `/m/${token}/stream.cdp.mjpg`, picking = false, picked = null;
   let stream = [];
   const $ = (id) => document.getElementById(id);
   const text = (id, v) => { const el = $(id); if (el) el.textContent = v ?? '—'; };
@@ -104,7 +104,7 @@
   function render(st) {
     const mode = st.mode === 'control' ? 'Control enabled' : 'Read-only';
     text('mode', mode); text('modeCard', mode); text('address', st.url); text('pageUrl', st.url); text('pageTitle', st.title); text('viewportSize', `${st.width || '?'} × ${st.height || '?'}`); text('expires', new Date(st.expires_at).toLocaleString()); text('views', st.views); text('chromeMeta', st.title || 'FPV Live');
-    const d = st.diagnostics || {}, errTotal = (d.console_errors || 0) + (d.failed_requests || 0) + (d.http_4xx || 0) + (d.http_5xx || 0);
+    if (st.transport?.stream_url) { streamUrl = st.transport.stream_url; streamMode = st.transport.primary || streamMode; } const d = st.diagnostics || {}, errTotal = (d.console_errors || 0) + (d.failed_requests || 0) + (d.http_4xx || 0) + (d.http_5xx || 0);
     renderGlyph('healthGrid', Math.min(8, errTotal || 1), (d.http_5xx || 0) > 0);
     text('consoleErrors', d.console_errors || 0); text('failedRequests', d.failed_requests || 0); text('httpErrors', `${d.http_4xx || 0} / ${d.http_5xx || 0}`); text('requests', d.requests || 0);
     tone('consoleErrors', (d.console_errors || 0) === 0); tone('failedRequests', (d.failed_requests || 0) === 0); tone('httpErrors', (d.http_4xx || 0) + (d.http_5xx || 0) === 0, (d.http_5xx || 0) > 0);
@@ -122,12 +122,12 @@
       if (lastFrameAt) text('latencyMs', `${now - lastFrameAt} ms`);
       lastFrameAt = now;
       const fps = (frames / ((now - started) / 1000)).toFixed(1);
-      text('fps', `${fps} FPS`); text('fpsNum', fps); text('transportMode', 'MJPEG stream'); text('streamQuality', Number(fps) > 2 ? 'Excellent' : 'Healthy');
+      text('fps', `${fps} FPS`); text('fpsNum', fps); text('transportMode', streamMode === 'cdp_screencast' ? 'CDP screencast' : 'MJPEG stream'); text('streamQuality', Number(fps) > 2 ? 'Excellent' : 'Healthy');
       renderSeismo(); renderGlyph('glyphGrid', Math.max(1, Math.min(8, Math.round(Number(fps) || 1)))); sweepCards();
       if (frames % 16 === 0) addStream('Frame stream', 'MJPEG frame received', '↻');
     };
     img.onerror = () => { frameErrors++; text('transportMode', 'Polling fallback'); addStream('Frame stream', 'MJPEG unavailable; using polling fallback', '⚠'); startPolling(); };
-    img.src = `/m/${token}/stream.mjpg?t=${Date.now()}`;
+    img.src = `${streamUrl}?t=${Date.now()}`;
   }
   function startPolling() {
     streamMode = 'polling';

@@ -90,7 +90,7 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			"mirror_url":            "/m/" + token,
 			"status_url":            "/m/" + token + "/status",
 			"screenshot_url":        "/m/" + token + "/screenshot.jpg",
-			"stream_url":            "/m/" + token + "/stream.mjpg",
+			"stream_url":            "/m/" + token + "/stream.cdp.mjpg",
 			"mirror_url_expires_at": entry.ExpiresAt,
 			"mode":                  fpvMode(entry.Controls),
 			"one_time":              entry.OneTime,
@@ -185,8 +185,9 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			"expires_at":  entry.ExpiresAt,
 			"diagnostics": diag.Summary,
 			"transport": map[string]any{
-				"primary":       "mjpeg",
-				"stream_url":    "/m/" + entry.Token + "/stream.mjpg",
+				"primary":       "cdp_screencast",
+				"stream_url":    "/m/" + entry.Token + "/stream.cdp.mjpg",
+				"mjpeg_url":     "/m/" + entry.Token + "/stream.mjpg",
 				"fallback_url":  "/m/" + entry.Token + "/screenshot.jpg",
 				"quality_modes": []string{"smooth", "balanced", "saver"},
 				"max_viewers":   3,
@@ -289,6 +290,55 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 		w.Header().Set("Content-Type", "image/jpeg")
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(data)
+	})
+
+	r.Get("/{token}/stream.cdp.mjpg", func(w http.ResponseWriter, req *http.Request) {
+		entry, ok := fpvEntry(chi.URLParam(req, "token"))
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share not found or expired"})
+			return
+		}
+		sess, ok := sm.Get(entry.SessionID)
+		if !ok {
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			return
+		}
+		if !fpvAcquireViewer(entry.Token) {
+			writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many viewers for share"})
+			return
+		}
+		defer fpvReleaseViewer(entry.Token)
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "streaming unsupported"})
+			return
+		}
+		w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Accel-Buffering", "no")
+		frames, stop, err := sess.CDPScreencast(req.Context(), 60, 1)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		defer stop()
+		for {
+			select {
+			case <-req.Context().Done():
+				return
+			case data, ok := <-frames:
+				if !ok {
+					return
+				}
+				if _, alive := fpvEntry(entry.Token); !alive {
+					return
+				}
+				_, _ = fmt.Fprintf(w, "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))
+				_, _ = w.Write(data)
+				_, _ = fmt.Fprint(w, "\r\n")
+				flusher.Flush()
+			}
+		}
 	})
 
 	r.Get("/{token}/stream.mjpg", func(w http.ResponseWriter, req *http.Request) {

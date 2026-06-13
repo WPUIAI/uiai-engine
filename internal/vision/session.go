@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"context"
 	cryptorand "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -479,6 +480,49 @@ func (s *Session) ScrollTo(x, y int) (*SnapResult, error) {
 		Title:      s.Title,
 		Duration:   time.Since(start).Milliseconds(),
 	}, nil
+}
+
+// CDPScreencast starts Chrome DevTools Protocol screencast and returns JPEG frames.
+func (s *Session) CDPScreencast(ctx context.Context, quality int, everyNthFrame int) (<-chan []byte, func(), error) {
+	s.mu.Lock()
+	if s.page == nil {
+		s.mu.Unlock()
+		return nil, nil, fmt.Errorf("session closed")
+	}
+	page := s.page
+	s.mu.Unlock()
+	if quality <= 0 || quality > 100 {
+		quality = 60
+	}
+	if everyNthFrame <= 0 {
+		everyNthFrame = 1
+	}
+	frames := make(chan []byte, 8)
+	ctx, cancel := context.WithCancel(ctx)
+	wait := page.Context(ctx).EachEvent(func(e *proto.PageScreencastFrame) {
+		_ = proto.PageScreencastFrameAck{SessionID: e.SessionID}.Call(page)
+		select {
+		case frames <- e.Data:
+		default:
+		}
+	})
+	done := make(chan struct{})
+	go func() {
+		wait()
+		close(done)
+		close(frames)
+	}()
+	if err := (proto.PageStartScreencast{Format: proto.PageStartScreencastFormatJpeg, Quality: &quality, EveryNthFrame: &everyNthFrame}).Call(page); err != nil {
+		cancel()
+		<-done
+		return nil, nil, err
+	}
+	stop := func() {
+		_ = proto.PageStopScreencast{}.Call(page)
+		cancel()
+		<-done
+	}
+	return frames, stop, nil
 }
 
 // SelectorAt returns a best-effort selector for the element at viewport coordinates.

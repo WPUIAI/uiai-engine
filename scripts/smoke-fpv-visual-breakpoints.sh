@@ -22,7 +22,7 @@ token=$(printf '%s' "$share_json" | jq -r .token)
 url="https://$PUBLIC_HOST/m/$token"
 
 status_json=$(curl -ksS "$url/status")
-printf '%s' "$status_json" | jq -e '.mode and .transport.primary == "mjpeg" and .context.project.name == "uiai-engine"' >/dev/null
+printf '%s' "$status_json" | jq -e '.mode and .transport.primary == "cdp_screencast" and .transport.mjpeg_url and .context.project.name == "uiai-engine"' >/dev/null
 api_code=$(curl -ksS -o /dev/null -w '%{http_code}' "https://$PUBLIC_HOST/api/health" || true)
 [ "$api_code" = "404" ] || { echo "expected $PUBLIC_HOST/api/health 404, got $api_code" >&2; exit 1; }
 
