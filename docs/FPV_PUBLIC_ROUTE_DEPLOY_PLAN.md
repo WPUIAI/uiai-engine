@@ -4,11 +4,14 @@ Last updated: 2026-06-12
 
 ## Current status
 
-External/mobile FPV validation is blocked by deployment topology, not by the FPV PWA implementation:
+Cloudflare FPV front door is deployed:
 
-- `uiai-engine` listens on `127.0.0.1:7456` only.
-- Public `https://wpuiai.com/m/not-a-real-token` currently returns the WordPress 404 page.
-- Local FPV routes already pass smoke tests:
+- `fpv.wpuiai.com` is a proxied Cloudflare CNAME to the existing `wpuiai` Cloudflare Tunnel.
+- `/etc/cloudflared/wpuiai.yml` routes only `fpv.wpuiai.com/m/*` to `http://localhost:7456`.
+- `fpv.wpuiai.com` paths outside `/m/*` return Cloudflare Tunnel `404`, so `/api/*` is not exposed through the FPV hostname.
+- `uiai-engine` still listens on `127.0.0.1:7456` only.
+- Public `https://wpuiai.com/m/*` is not the supported FPV route; use `https://fpv.wpuiai.com/m/{token}`.
+- FPV routes pass local and Cloudflare validation:
   - `POST /api/fpv/share`
   - `GET /m/{token}`
   - `GET /m/{token}/status`
@@ -19,9 +22,9 @@ External/mobile FPV validation is blocked by deployment topology, not by the FPV
 
 Expose the FPV PWA to an operator phone/browser without exposing the full local agent surface.
 
-## Recommended public route shape
+## Deployed public route shape
 
-Use a narrow reverse proxy from the public host to the loopback engine:
+Use the narrow Cloudflare Tunnel ingress from `fpv.wpuiai.com` to the loopback engine:
 
 | Public route | Upstream | Auth posture | Notes |
 |---|---|---|---|
@@ -40,27 +43,19 @@ Keep these routes private or authenticated:
 
 ## Safe deployment options
 
-### Option A — LiteSpeed/Apache reverse-proxy path on `wpuiai.com`
+### Implemented option — Cloudflare Tunnel dedicated hostname
 
-Map only `/m/` to `127.0.0.1:7456`.
+`fpv.wpuiai.com` is routed through Cloudflare Tunnel with path-gated ingress:
 
-Required checks before enabling:
+```yaml
+- hostname: fpv.wpuiai.com
+  path: /m/*
+  service: http://localhost:7456
+- hostname: fpv.wpuiai.com
+  service: http_status:404
+```
 
-1. Confirm cPanel/LiteSpeed proxy syntax for this host.
-2. Preserve WordPress routes outside `/m/`.
-3. Set no-cache/no-store for `/m/*` responses if supported at proxy layer.
-4. Verify invalid token still returns engine JSON 404 or safe PWA error, not WordPress.
-5. Verify `POST /m/{token}/control` is not blocked by WAF when `controls=true` is intentionally used.
-
-### Option B — Dedicated subdomain
-
-Create a dedicated hostname, e.g. `fpv.wpuiai.com`, and proxy all requests on that hostname to `127.0.0.1:7456`, but allow only `/m/*` at the proxy layer.
-
-This is cleaner than path-sharing with WordPress and reduces route collision risk.
-
-### Option C — Temporary tunnel for validation only
-
-Use a short-lived operator-approved tunnel that exposes only `/m/*` for a single validation run. Do not expose `/api/session*` or broad engine routes through the tunnel.
+This is cleaner than path-sharing with WordPress and reduces route collision risk. Do not add a broad `fpv.wpuiai.com -> localhost:7456` rule without a path gate.
 
 ## Validation checklist
 
@@ -78,7 +73,7 @@ After proxy is enabled:
      -H 'Content-Type: application/json' \
      -d '{"session_id":"SESSION_ID","expires_minutes":5}'
    ```
-3. Open the public `/m/{token}` URL from phone/non-local browser.
+3. Open the public `https://fpv.wpuiai.com/m/{token}` URL from phone/non-local browser.
 4. Confirm:
    - PWA page loads.
    - Screenshot refreshes.

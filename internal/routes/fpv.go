@@ -241,7 +241,7 @@ var fpvPageTemplate = template.Must(template.New("fpv").Parse(`<!doctype html>
 <title>UIAI FPV</title><style>body{font-family:system-ui;margin:0;background:#111;color:#eee}header{padding:12px;background:#1d1d1d;position:sticky;top:0}main{padding:12px}img{width:100%;height:auto;border:1px solid #333;background:#000}.muted{color:#aaa;font-size:12px}pre{white-space:pre-wrap;background:#181818;padding:8px;border-radius:8px}</style></head>
 <body><header><strong>● Watching UIAI session {{.SessionID}}</strong><div class="muted">read-only FPV share</div></header><main><img id="shot" alt="live browser screenshot"><pre id="status">loading…</pre></main>
 <script>
-const token={{printf "%q" .Token}};
+const token='{{.Token}}';
 async function fpvControl(action, payload={}){ return fetch('/m/'+token+'/control', {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, ...payload})}).then(r=>r.json()); }
 async function tick(){
   const st=await fetch('/m/'+token+'/status',{cache:'no-store'}).then(r=>r.json());
