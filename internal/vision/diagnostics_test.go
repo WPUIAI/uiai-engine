@@ -204,3 +204,41 @@ func TestBuildSnapshotFocusaMetadata(t *testing.T) {
 		t.Fatalf("secret leaked: %+v", meta)
 	}
 }
+
+func TestDiagnosticsOptionsCategorySinceAndSummary(t *testing.T) {
+	s := &Session{ID: "sid", URL: "https://example.test", Title: "Example"}
+	s.diagnostics = newDiagnosticsRecorder()
+	s.diagnostics.seq = 6
+	s.diagnostics.console = []ConsoleEvent{
+		{Seq: 1, Level: "log", Text: "old"},
+		{Seq: 2, Level: "error", Text: "boom"},
+	}
+	s.diagnostics.exceptions = []ExceptionEvent{{Seq: 3, Text: "TypeError"}}
+	s.diagnostics.network = []NetworkEvent{
+		{Seq: 4, URL: "https://example.test/ok", Status: 200},
+		{Seq: 5, URL: "https://example.test/fail", Failed: true, FailureReason: "blocked"},
+		{Seq: 6, URL: "https://example.test/bad", Status: 500},
+	}
+
+	network := s.DiagnosticsWithOptions(DiagnosticsOptions{Limit: 10, Category: "network", SinceSeq: 4})
+	if len(network.Console) != 0 || len(network.Exceptions) != 0 {
+		t.Fatalf("network category leaked non-network events: %+v", network)
+	}
+	if got := len(network.Network); got != 2 {
+		t.Fatalf("network events after since_seq: got %d want 2", got)
+	}
+	if network.Network[0].Seq != 5 || network.Network[1].Seq != 6 {
+		t.Fatalf("unexpected network seqs: %+v", network.Network)
+	}
+
+	summary := s.DiagnosticsWithOptions(DiagnosticsOptions{Limit: 10, Category: "all", Format: "summary"})
+	if summary.Mode != "summary" {
+		t.Fatalf("mode=%q want summary", summary.Mode)
+	}
+	if len(summary.Console) != 0 || len(summary.Exceptions) != 0 || len(summary.Network) != 0 || len(summary.FailedRequests) != 0 {
+		t.Fatalf("summary mode should omit event arrays: %+v", summary)
+	}
+	if summary.Summary.ConsoleErrors != 1 || summary.Summary.Exceptions != 1 || summary.Summary.HTTP5xx != 1 {
+		t.Fatalf("unexpected summary counts: %+v", summary.Summary)
+	}
+}

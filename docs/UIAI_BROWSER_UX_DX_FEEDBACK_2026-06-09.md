@@ -81,7 +81,9 @@ diagnostics get context-blowout.
 - `format: "summary"` — return just `{console: 3, exceptions: 0,
   network_4xx: 1, network_5xx: 0}`
 
-Default to `format: "summary"`, opt-in to verbose.
+Implementation keeps `format: "full"` as the backward-compatible default; agents should request `format: "summary"` when they need bounded counts only.
+
+**Implementation status (2026-06-12)**: Done for `uiai_browser_diagnostics` / `/api/session/{id}/diagnostics`: `category`, `since_seq`, `format=summary|full`, `level`, and `failed_only` are server-side filters. Pi/MCP/tool discovery forward the new parameters.
 
 ### 4. Auto-wait on navigate
 

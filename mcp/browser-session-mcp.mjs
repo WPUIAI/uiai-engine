@@ -410,6 +410,9 @@ async function toolsCall(name, args) {
       const q = new URLSearchParams();
       if (args.limit !== undefined) q.set("limit", String(args.limit));
       if (args.level !== undefined) q.set("level", String(args.level));
+      if (args.category !== undefined) q.set("category", String(args.category));
+      if (args.since_seq !== undefined) q.set("since_seq", String(args.since_seq));
+      if (args.format !== undefined) q.set("format", String(args.format));
       if (args.failed_only !== undefined) q.set("failed_only", args.failed_only ? "true" : "false");
       url = `${ENGINE}/api/session/${args.session_id}/diagnostics${q.toString() ? `?${q.toString()}` : ""}`;
       method = "GET";

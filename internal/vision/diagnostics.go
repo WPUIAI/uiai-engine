@@ -75,6 +75,8 @@ type DiagnosticsSnapshot struct {
 	Title          string                     `json:"title"`
 	Seq            uint64                     `json:"seq"`
 	GeneratedAt    string                     `json:"generated_at"`
+	Mode           string                     `json:"mode,omitempty"`
+	Filters        map[string]any             `json:"filters,omitempty"`
 	FocusaScope    *FocusaScope               `json:"focusa_scope,omitempty"`
 	Console        []ConsoleEvent             `json:"console"`
 	Exceptions     []ExceptionEvent           `json:"exceptions"`
@@ -82,6 +84,15 @@ type DiagnosticsSnapshot struct {
 	FailedRequests []NetworkEvent             `json:"failed_requests"`
 	Summary        DiagnosticsSummary         `json:"summary"`
 	Focusa         *DiagnosticsFocusaMetadata `json:"focusa,omitempty"`
+}
+
+type DiagnosticsOptions struct {
+	Limit      int
+	Level      string
+	FailedOnly bool
+	Category   string
+	SinceSeq   uint64
+	Format     string
 }
 
 type DiagnosticsFocusaMetadata struct {
@@ -151,8 +162,21 @@ func (s *Session) ClearDiagnostics() {
 }
 
 func (s *Session) Diagnostics(limit int, level string, failedOnly bool) DiagnosticsSnapshot {
+	return s.DiagnosticsWithOptions(DiagnosticsOptions{Limit: limit, Level: level, FailedOnly: failedOnly})
+}
+
+func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSnapshot {
+	limit := opts.Limit
 	if limit <= 0 || limit > 300 {
 		limit = 100
+	}
+	format := strings.ToLower(strings.TrimSpace(opts.Format))
+	if format == "" {
+		format = "full"
+	}
+	category := strings.ToLower(strings.TrimSpace(opts.Category))
+	if category == "" {
+		category = "all"
 	}
 	if s.diagnostics == nil {
 		s.diagnostics = newDiagnosticsRecorder()
@@ -160,19 +184,64 @@ func (s *Session) Diagnostics(limit int, level string, failedOnly bool) Diagnost
 	s.diagnostics.mu.Lock()
 	defer s.diagnostics.mu.Unlock()
 
-	console := filterConsole(s.diagnostics.console, limit, level)
-	exceptions := tailExceptions(s.diagnostics.exceptions, limit)
-	network := filterNetwork(s.diagnostics.network, limit, failedOnly)
-	failed := filterNetwork(s.diagnostics.network, limit, true)
+	console := filterConsoleSince(s.diagnostics.console, limit, opts.Level, opts.SinceSeq)
+	exceptions := tailExceptionsSince(s.diagnostics.exceptions, limit, opts.SinceSeq)
+	network := filterNetworkSince(s.diagnostics.network, limit, opts.FailedOnly, opts.SinceSeq)
+	failed := filterNetworkSince(s.diagnostics.network, limit, true, opts.SinceSeq)
 
-	summary := summarizeDiagnostics(s.diagnostics.console, s.diagnostics.exceptions, s.diagnostics.network)
+	switch category {
+	case "console":
+		exceptions = []ExceptionEvent{}
+		network = []NetworkEvent{}
+		failed = []NetworkEvent{}
+	case "exceptions", "exception":
+		console = []ConsoleEvent{}
+		network = []NetworkEvent{}
+		failed = []NetworkEvent{}
+	case "network":
+		console = []ConsoleEvent{}
+		exceptions = []ExceptionEvent{}
+	case "failed", "failed_requests":
+		console = []ConsoleEvent{}
+		exceptions = []ExceptionEvent{}
+		network = []NetworkEvent{}
+	case "all":
+	default:
+		category = "all"
+	}
+
+	summary := summarizeDiagnostics(console, exceptions, network)
+	if category == "all" && opts.SinceSeq == 0 {
+		// Backward compatibility: legacy diagnostics summaries counted the full
+		// buffers even when event arrays were limited or level-filtered.
+		summary = summarizeDiagnostics(s.diagnostics.console, s.diagnostics.exceptions, s.diagnostics.network)
+	}
+	if category == "failed" || category == "failed_requests" {
+		summary = summarizeDiagnostics(nil, nil, failed)
+	}
 	seq := s.diagnostics.seq
+	if format == "summary" {
+		console = []ConsoleEvent{}
+		exceptions = []ExceptionEvent{}
+		network = []NetworkEvent{}
+		failed = []NetworkEvent{}
+	} else {
+		format = "full"
+	}
 	return DiagnosticsSnapshot{
-		SessionID:      s.ID,
-		URL:            redactURL(s.URL),
-		Title:          s.Title,
-		Seq:            seq,
-		GeneratedAt:    time.Now().UTC().Format(time.RFC3339),
+		SessionID:   s.ID,
+		URL:         redactURL(s.URL),
+		Title:       s.Title,
+		Seq:         seq,
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+		Mode:        format,
+		Filters: map[string]any{
+			"limit":       limit,
+			"level":       opts.Level,
+			"failed_only": opts.FailedOnly,
+			"category":    category,
+			"since_seq":   opts.SinceSeq,
+		},
 		FocusaScope:    s.FocusaScope,
 		Console:        console,
 		Exceptions:     exceptions,
@@ -335,10 +404,17 @@ func appendBounded[T any](items []T, item T, max int) []T {
 }
 
 func filterConsole(items []ConsoleEvent, limit int, level string) []ConsoleEvent {
+	return filterConsoleSince(items, limit, level, 0)
+}
+
+func filterConsoleSince(items []ConsoleEvent, limit int, level string, sinceSeq uint64) []ConsoleEvent {
 	out := make([]ConsoleEvent, 0, minInt(limit, len(items)))
 	level = strings.ToLower(level)
 	for i := len(items) - 1; i >= 0 && len(out) < limit; i-- {
 		item := items[i]
+		if sinceSeq > 0 && item.Seq <= sinceSeq {
+			continue
+		}
 		if level == "" || level == "all" || strings.ToLower(item.Level) == level || (level == "warning" && strings.ToLower(item.Level) == "warn") {
 			out = append(out, item)
 		}
@@ -348,15 +424,33 @@ func filterConsole(items []ConsoleEvent, limit int, level string) []ConsoleEvent
 }
 
 func tailExceptions(items []ExceptionEvent, limit int) []ExceptionEvent {
-	if len(items) <= limit {
-		return append([]ExceptionEvent{}, items...)
+	return tailExceptionsSince(items, limit, 0)
+}
+
+func tailExceptionsSince(items []ExceptionEvent, limit int, sinceSeq uint64) []ExceptionEvent {
+	out := make([]ExceptionEvent, 0, minInt(limit, len(items)))
+	for i := len(items) - 1; i >= 0 && len(out) < limit; i-- {
+		if sinceSeq > 0 && items[i].Seq <= sinceSeq {
+			continue
+		}
+		out = append(out, items[i])
 	}
-	return append([]ExceptionEvent{}, items[len(items)-limit:]...)
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out
 }
 
 func filterNetwork(items []NetworkEvent, limit int, failedOnly bool) []NetworkEvent {
+	return filterNetworkSince(items, limit, failedOnly, 0)
+}
+
+func filterNetworkSince(items []NetworkEvent, limit int, failedOnly bool, sinceSeq uint64) []NetworkEvent {
 	out := make([]NetworkEvent, 0, minInt(limit, len(items)))
 	for i := len(items) - 1; i >= 0 && len(out) < limit; i-- {
+		if sinceSeq > 0 && items[i].Seq <= sinceSeq {
+			continue
+		}
 		if !failedOnly || items[i].Failed {
 			out = append(out, items[i])
 		}

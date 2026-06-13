@@ -891,12 +891,18 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 			session_id: Type.String({ description: "UIAI browser session id" }),
 			limit: Type.Optional(Type.Number({ description: "Max events per category", default: 100 })),
 			level: Type.Optional(Type.String({ description: "all, error, warning, info" })),
+			category: Type.Optional(Type.String({ description: "Filter category: all, console, exceptions, network, or failed" })),
+			since_seq: Type.Optional(Type.Number({ description: "Only return events with seq greater than this value" })),
+			format: Type.Optional(Type.String({ description: "full or summary", default: "full" })),
 			failed_only: Type.Optional(Type.Boolean({ description: "Only failed network events" })),
 		}),
 		async execute(_toolCallId, params) {
 			const q = new URLSearchParams();
 			if (params.limit !== undefined) q.set("limit", String(params.limit));
 			if (params.level !== undefined) q.set("level", params.level);
+			if (params.category !== undefined) q.set("category", params.category);
+			if (params.since_seq !== undefined) q.set("since_seq", String(params.since_seq));
+			if (params.format !== undefined) q.set("format", params.format);
 			if (params.failed_only !== undefined) q.set("failed_only", params.failed_only ? "true" : "false");
 			return textResult(await callEngine(`/api/session/${params.session_id}/diagnostics${q.toString() ? `?${q.toString()}` : ""}`), { endpoint: "/api/session/{id}/diagnostics" });
 		},

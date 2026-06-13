@@ -47,6 +47,8 @@ Smoke:
 
 ### Bead B — Diagnostics filtering + summary
 
+Status: implemented in current slice.
+
 Scope:
 - Add server-side filters for diagnostics: `level`, `category`, `since_seq`, `failed_only`, `format=summary|full`.
 - Keep one diagnostics tool; wrappers can come later.

@@ -638,9 +638,17 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
+			sinceSeq, _ := strconv.ParseUint(req.URL.Query().Get("since_seq"), 10, 64)
 			level := req.URL.Query().Get("level")
 			failedOnly := req.URL.Query().Get("failed_only") == "true" || req.URL.Query().Get("failed_only") == "1"
-			writeJSON(w, 200, sess.Diagnostics(limit, level, failedOnly))
+			writeJSON(w, 200, sess.DiagnosticsWithOptions(vision.DiagnosticsOptions{
+				Limit:      limit,
+				Level:      level,
+				FailedOnly: failedOnly,
+				Category:   req.URL.Query().Get("category"),
+				SinceSeq:   sinceSeq,
+				Format:     req.URL.Query().Get("format"),
+			}))
 		})
 
 		// Diagnostics clear — reset session diagnostic buffers
