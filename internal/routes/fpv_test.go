@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestFPVToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fpvToken returned error: %v", err)
 	}
-	if len(token) != 24 {
-		t.Fatalf("token len=%d want 24", len(token))
+	if !regexp.MustCompile(`^[a-z]+-[a-z]+-[0-9a-f]{4}$`).MatchString(token) {
+		t.Fatalf("token %q is not human-friendly slug format", token)
 	}
 }
