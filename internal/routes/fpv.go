@@ -77,6 +77,7 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			"mirror_url":            "/m/" + token,
 			"status_url":            "/m/" + token + "/status",
 			"screenshot_url":        "/m/" + token + "/screenshot.jpg",
+			"stream_url":            "/m/" + token + "/stream.mjpg",
 			"mirror_url_expires_at": entry.ExpiresAt,
 			"mode":                  fpvMode(entry.Controls),
 		})
@@ -134,7 +135,13 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			"height":      sess.Height,
 			"expires_at":  entry.ExpiresAt,
 			"diagnostics": diag.Summary,
-			"context":     fpvContext(),
+			"transport": map[string]any{
+				"primary":       "mjpeg",
+				"stream_url":    "/m/" + entry.Token + "/stream.mjpg",
+				"fallback_url":  "/m/" + entry.Token + "/screenshot.jpg",
+				"quality_modes": []string{"smooth", "balanced", "saver"},
+			},
+			"context": fpvContext(),
 		})
 	})
 
@@ -211,20 +218,68 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
 			return
 		}
-		snap, err := sess.Screenshot("jpeg", 60)
+		data, err := fpvScreenshotJPEG(sess)
 		if err != nil {
 			writeSessionError(w, http.StatusInternalServerError, classifySessionError(err), err, sess)
-			return
-		}
-		data, err := base64.StdEncoding.DecodeString(snap.Screenshot)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "decode screenshot"})
 			return
 		}
 		w.Header().Set("Content-Type", "image/jpeg")
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(data)
 	})
+
+	r.Get("/{token}/stream.mjpg", func(w http.ResponseWriter, req *http.Request) {
+		entry, ok := fpvEntry(chi.URLParam(req, "token"))
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share not found or expired"})
+			return
+		}
+		sess, ok := sm.Get(entry.SessionID)
+		if !ok {
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			return
+		}
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "streaming unsupported"})
+			return
+		}
+		w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Accel-Buffering", "no")
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-req.Context().Done():
+				return
+			case <-ticker.C:
+				if _, alive := fpvEntry(entry.Token); !alive {
+					return
+				}
+				data, err := fpvScreenshotJPEG(sess)
+				if err != nil {
+					return
+				}
+				_, _ = fmt.Fprintf(w, "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))
+				_, _ = w.Write(data)
+				_, _ = fmt.Fprint(w, "\r\n")
+				flusher.Flush()
+			}
+		}
+	})
+}
+
+func fpvScreenshotJPEG(sess *vision.Session) ([]byte, error) {
+	snap, err := sess.Screenshot("jpeg", 60)
+	if err != nil {
+		return nil, err
+	}
+	data, err := base64.StdEncoding.DecodeString(snap.Screenshot)
+	if err != nil {
+		return nil, fmt.Errorf("decode screenshot: %w", err)
+	}
+	return data, nil
 }
 
 func fpvContext() map[string]any {
@@ -250,9 +305,14 @@ func fpvContext() map[string]any {
 		"history": fpvHistory(recent),
 		"focusa": map[string]any{
 			"objective":   "Professional realtime FPV browser cockpit",
-			"next_step":   "Validate streaming quality and operator controls",
+			"next_step":   "Validate true-stream transport, dynamic context, and operator controls",
 			"evidence":    []string{"fpv.wpuiai.com/m/{token}", "git:" + head},
+			"prediction":  "MJPEG stream should feel smoother than screenshot polling while preserving /m/* isolation",
 			"drift_guard": "Keep fpv.wpuiai.com path-gated to /m/*; do not expose /api/*",
+		},
+		"lifecycle": map[string]any{
+			"expired_state": "Shows Session ended and stops polling/stream retries",
+			"reopen_hint":   "Create a fresh share from a live local /api/fpv/share call",
 		},
 	}
 }

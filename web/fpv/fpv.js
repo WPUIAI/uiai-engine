@@ -1,7 +1,7 @@
 (() => {
   const token = document.body.dataset.token;
   const sessionId = document.body.dataset.session;
-  let frames = 0, started = Date.now(), active = true, frameErrors = 0, frameMs = 250, frameTimer = null, eventFilter = 'all';
+  let frames = 0, started = Date.now(), active = true, frameErrors = 0, frameMs = 250, frameTimer = null, eventFilter = 'all', streamMode = 'mjpeg', lastFrameAt = 0;
   let stream = [];
   const $ = (id) => document.getElementById(id);
   const text = (id, v) => { const el = $(id); if (el) el.textContent = v ?? '—'; };
@@ -10,7 +10,7 @@
     if (window.lucide) window.lucide.createIcons();
     if (document.querySelector('svg.lucide')) return;
     const glyphs = {
-      'radio-tower':'⌁','shield-check':'⛨','fingerprint':'◎','activity':'↯','heart-pulse':'♡','mouse-pointer-click':'⌖','git-branch':'⑂','sparkles':'✦','list-tree':'☷','lock-keyhole':'●','gauge':'↻','badge-check':'✓','globe-2':'◉','scan':'▣','timer':'⏱','eye':'👁','wifi':'⌁','terminal':'⌘','cloud-off':'⇣','server-crash':'⚠','network':'⇄','send':'➤'
+      'radio-tower':'⌁','shield-check':'⛨','fingerprint':'◎','activity':'↯','heart-pulse':'♡','mouse-pointer-click':'⌖','git-branch':'⑂','sparkles':'✦','list-tree':'☷','lock-keyhole':'●','gauge':'↻','badge-check':'✓','globe-2':'◉','scan':'▣','timer':'⏱','eye':'👁','wifi':'⌁','terminal':'⌘','cloud-off':'⇣','server-crash':'⚠','network':'⇄','send':'➤','timer-reset':'⏱'
     };
     document.querySelectorAll('i[data-lucide]').forEach(i => {
       i.className = 'glyph-fallback';
@@ -72,7 +72,7 @@
   function setQuality(q) {
     frameMs = q === 'smooth' ? 250 : q === 'balanced' ? 500 : 1000;
     document.querySelectorAll('.quality-switch button').forEach(b => b.classList.toggle('active', b.dataset.quality === q));
-    clearInterval(frameTimer); frameTimer = setInterval(frameTick, frameMs);
+    if (streamMode === 'polling') { clearInterval(frameTimer); frameTimer = setInterval(frameTick, frameMs); }
     addStream('Stream quality', `${q} mode`, '⌁');
   }
   function renderSeismo() {
@@ -96,7 +96,7 @@
     if (repo) repo.innerHTML = metric('Project', p.name, `Root: ${p.root || 'unknown'}`, '⌘') + metric('Branch', p.branch, '', '⑂') + metric('Head', p.head, p.dirty ? 'Working tree modified' : 'Working tree clean', '●') + metric('Public host', 'fpv.wpuiai.com', 'Path-gated to /m/*', '◧');
     const tree = $('repoTree'); if (tree) tree.textContent = (ctx.tree || []).map(i => `├─ ${i.path}  ${i.active ? 'active' : ''}`).join('\n') || 'No tree context available';
     const f = ctx.focusa || {}, fg = $('focusaGrid');
-    if (fg) fg.innerHTML = metric('Current objective', f.objective, 'Compact Focusa summary', '✦') + metric('Next step', f.next_step, '', '➜') + metric('Evidence', (f.evidence || []).join(', '), '', '✓') + metric('Drift guard', f.drift_guard, '', '⛨');
+    if (fg) fg.innerHTML = metric('Current objective', f.objective, 'Compact Focusa summary', '✦') + metric('Next step', f.next_step, '', '➜') + metric('Evidence', (f.evidence || []).join(', '), '', '✓') + metric('Prediction', f.prediction, '', '◌') + metric('Drift guard', f.drift_guard, '', '⛨');
     (ctx.history || []).slice(0, 5).forEach(h => { const msg = `${h.ref}: ${h.title}`; if (!stream.some(e => e.msg === msg)) addStream('Git history', msg, '⌘'); });
   }
   function tone(id, good, bad = false) { const el = $(id); if (el) el.className = bad ? 'bad' : good ? 'ok' : 'warn'; }
@@ -111,11 +111,34 @@
     const audit = st.audit || [], last = audit[audit.length - 1];
     if (last) { const msg = `${last.action}: ${last.message || last.selector || last.key || last.error || ''}`; if (!stream[0] || stream[0].msg !== msg) addStream('Audit event', msg, '✓'); }
   }
+  function startMJPEG() {
+    streamMode = 'mjpeg';
+    clearInterval(frameTimer);
+    const img = $('shot');
+    img.onload = () => {
+      const now = Date.now();
+      frames++;
+      if (lastFrameAt) text('latencyMs', `${now - lastFrameAt} ms`);
+      lastFrameAt = now;
+      const fps = (frames / ((now - started) / 1000)).toFixed(1);
+      text('fps', `${fps} FPS`); text('fpsNum', fps); text('transportMode', 'MJPEG stream'); text('streamQuality', Number(fps) > 2 ? 'Excellent' : 'Healthy');
+      renderSeismo(); renderGlyph('glyphGrid', Math.max(1, Math.min(8, Math.round(Number(fps) || 1)))); sweepCards();
+      if (frames % 16 === 0) addStream('Frame stream', 'MJPEG frame received', '↻');
+    };
+    img.onerror = () => { frameErrors++; text('transportMode', 'Polling fallback'); addStream('Frame stream', 'MJPEG unavailable; using polling fallback', '⚠'); startPolling(); };
+    img.src = `/m/${token}/stream.mjpg?t=${Date.now()}`;
+  }
+  function startPolling() {
+    streamMode = 'polling';
+    clearInterval(frameTimer);
+    frameTimer = setInterval(frameTick, frameMs);
+    frameTick();
+  }
   async function statusTick() {
     if (!active) return;
     try {
       const r = await fetch(`/m/${token}/status`, { cache: 'no-store' }); const st = await r.json();
-      if (!r.ok || st.error) { active = false; text('mode', 'Session ended'); text('fps', 'Stopped'); addStream('Session ended', st.error || 'share unavailable', '⏱'); return; }
+      if (!r.ok || st.error) { active = false; text('mode', 'Session ended'); text('fps', 'Stopped'); text('streamQuality', 'Stopped'); text('transportMode', 'Session ended'); $('shot').removeAttribute('src'); addStream('Session ended', st.error || 'share unavailable', '⏱'); return; }
       render(st);
     } catch (_) { text('mode', 'Offline'); addStream('Status', 'metadata retrying', '⚠'); }
   }
@@ -139,5 +162,5 @@
     $('noteBtn')?.addEventListener('click', sendMsg); $('clickBtn')?.addEventListener('click', sendClick); $('fillBtn')?.addEventListener('click', sendFill);
     document.querySelectorAll('[data-key]').forEach(btn => btn.addEventListener('click', () => sendKey(btn.dataset.key)));
   }
-  bind(); initIcons(); addStream('Viewer connected', 'FPV cockpit online', '◉'); statusTick(); frameTick(); setInterval(statusTick, 1500); frameTimer = setInterval(frameTick, frameMs);
+  bind(); initIcons(); addStream('Viewer connected', 'FPV cockpit online', '◉'); statusTick(); startMJPEG(); setInterval(statusTick, 1500);
 })();

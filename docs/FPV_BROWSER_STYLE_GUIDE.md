@@ -448,6 +448,14 @@ Rules:
 - Timeline entries must be short, filterable, and copy-friendly.
 - Stream quality controls change client polling cadence only; they do not widen public API exposure.
 
+## Implemented product upgrades
+
+- Primary transport: `/m/{token}/stream.mjpg` MJPEG stream.
+- Fallback transport: `/m/{token}/screenshot.jpg` polling.
+- Status contract advertises `transport.primary`, `stream_url`, `fallback_url`, and quality modes.
+- Visual regression smoke: `scripts/smoke-fpv-visual-breakpoints.sh` captures 375 / 768 / 1024 / 1440 FPV views and checks route isolation.
+- UI assets are split into `web/fpv/index.html`, `web/fpv/fpv.css`, and `web/fpv/fpv.js`; route code remains data/serving logic.
+
 ## Implementation checklist
 
 Before marking FPV UI work complete:
