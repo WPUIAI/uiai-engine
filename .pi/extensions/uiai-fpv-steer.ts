@@ -2,10 +2,17 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 
 const DEFAULT_ENGINE_URL = "http://127.0.0.1:7456";
 const POLL_MS = Number(process.env.UIAI_FPV_STEER_POLL_MS || 1200);
+const AUTO_WATCH = process.env.UIAI_FPV_AUTO_WATCH !== "0";
 
 type WatchState = {
 	token: string;
 	lastAuditCount: number;
+	timer?: ReturnType<typeof setInterval>;
+	ctx?: ExtensionContext;
+};
+
+type EventFeedState = {
+	lastSeq: number;
 	timer?: ReturnType<typeof setInterval>;
 	ctx?: ExtensionContext;
 };
@@ -16,6 +23,15 @@ function engineUrl(): string {
 
 function auditText(event: any): string {
 	return String(event?.message || event?.text || event?.note || "").trim();
+}
+
+
+async function fetchEvents(sinceSeq: number): Promise<any> {
+	const res = await fetch(`${engineUrl()}/api/fpv/events?since_seq=${sinceSeq}&limit=100`, { cache: "no-store" });
+	const text = await res.text();
+	const data = text ? JSON.parse(text) : {};
+	if (!res.ok) throw new Error(data?.error || `FPV events ${res.status}`);
+	return data;
 }
 
 async function fetchStatus(token: string): Promise<any> {
@@ -37,6 +53,41 @@ function steerPrompt(token: string, event: any, text: string): string {
 
 export default function uiaiFpvSteerExtension(pi: ExtensionAPI) {
 	const watches = new Map<string, WatchState>();
+	let eventFeed: EventFeedState | undefined;
+
+	async function pollEventFeed(state: EventFeedState) {
+		const data = await fetchEvents(state.lastSeq);
+		state.lastSeq = Number(data.latest_seq || state.lastSeq || 0);
+		const events = Array.isArray(data.events) ? data.events : [];
+		for (const event of events) {
+			const text = auditText(event);
+			if (!text) continue;
+			const token = String(event?.meta?.token || "auto");
+			state.ctx?.ui.notify(`FPV note: ${text}`, "info");
+			if (state.ctx?.isIdle()) {
+				pi.sendUserMessage(steerPrompt(token, event, text));
+			} else {
+				pi.sendUserMessage(steerPrompt(token, event, text), { deliverAs: "steer" });
+			}
+		}
+	}
+
+	async function startEventFeed(ctx: ExtensionContext) {
+		if (!AUTO_WATCH) return;
+		if (eventFeed?.timer) clearInterval(eventFeed.timer);
+		eventFeed = { lastSeq: 0, ctx };
+		try {
+			const data = await fetchEvents(0);
+			eventFeed.lastSeq = Number(data.latest_seq || 0);
+		} catch (err: any) {
+			ctx.ui.notify(`FPV auto-watch unavailable: ${err.message}`, "warning");
+		}
+		eventFeed.timer = setInterval(() => {
+			if (!eventFeed) return;
+			pollEventFeed(eventFeed).catch((err) => ctx.ui.notify(`FPV auto-watch failed: ${err.message}`, "warning"));
+		}, POLL_MS);
+		ctx.ui.notify("FPV auto-watch active for all audited notes", "info");
+	}
 
 	function stop(token: string): boolean {
 		const state = watches.get(token);
@@ -107,11 +158,17 @@ export default function uiaiFpvSteerExtension(pi: ExtensionAPI) {
 		description: "Show active FPV note watches",
 		handler: async (_args, ctx) => {
 			const tokens = [...watches.keys()];
-			ctx.ui.notify(tokens.length ? `FPV watches: ${tokens.join(", ")}` : "No active FPV watches", "info");
+			ctx.ui.notify(tokens.length ? `FPV token watches: ${tokens.join(", ")}; auto-watch=${eventFeed ? "on" : "off"}` : `No token-specific FPV watches; auto-watch=${eventFeed ? "on" : "off"}`, "info");
 		},
+	});
+
+	pi.on("session_start", async (_event, ctx) => {
+		await startEventFeed(ctx);
 	});
 
 	pi.on("session_end", async () => {
 		for (const key of [...watches.keys()]) stop(key);
+		if (eventFeed?.timer) clearInterval(eventFeed.timer);
+		eventFeed = undefined;
 	});
 }

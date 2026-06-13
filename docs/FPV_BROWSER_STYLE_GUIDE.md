@@ -433,12 +433,13 @@ Observed patterns to adapt:
 
 ## Pi active steering bridge
 
-Project-local Pi extension: `.pi/extensions/uiai-fpv-steer.ts`. After `/reload`, run `/fpv-watch <token>` in Pi for a controls-enabled FPV share. The watcher polls audited FPV notes and injects them with `pi.sendUserMessage()`; if the agent is busy, it uses `deliverAs: "steer"` so operator notes actively steer the running turn instead of waiting for manual polling. Use `/fpv-unwatch <token>` or `/fpv-unwatch all` to stop.
+Project-local Pi extension: `.pi/extensions/uiai-fpv-steer.ts`. After `/reload`, FPV auto-watch starts by default and polls private `/api/fpv/events` for all audited FPV notes. Notes are injected with `pi.sendUserMessage()`; if the agent is busy, delivery uses `deliverAs: "steer"` so operator notes actively steer the running turn instead of waiting for manual polling. `/fpv-watch <token>` remains available only as an optional token-specific fallback; `/fpv-unwatch <token>` or `/fpv-unwatch all` stops manual token watches.
 
 ## Implemented interaction standard
 
 Current FPV UI implements these cockpit interactions:
 
+- Every new UIAI browser session returns a controls-enabled `fpv_share` so the session is watchable without a separate share command.
 - Quality modes: Smooth, Balanced, Saver.
 - Safe operator controls: audited note, selector click, selector fill, common keypresses.
 - Dynamic context in `/m/{token}/status`: repo project/branch/head/dirty status, active tree, recent git history, compact Focusa context.

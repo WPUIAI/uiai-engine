@@ -90,3 +90,32 @@ func TestFPVLiveFocusaContextUsesDaemon(t *testing.T) {
 		t.Fatalf("unexpected focusa paths: %#v", paths)
 	}
 }
+
+func TestFPVCreateSharePayloadIncludesPublicURLAndControls(t *testing.T) {
+	share, err := fpvCreateShare("sid-auto", 5, true, false, 0)
+	if err != nil {
+		t.Fatalf("fpvCreateShare returned error: %v", err)
+	}
+	if share["controls"] != true || share["mode"] != "control" || share["public_url"] == "" {
+		t.Fatalf("unexpected share payload: %#v", share)
+	}
+	if _, ok := fpvEntry(share["token"].(string)); !ok {
+		t.Fatalf("expected share token to resolve: %#v", share)
+	}
+}
+
+func TestFPVAuditEventsSince(t *testing.T) {
+	before := fpvAuditSeq
+	logged := fpvRecordAuditEvent("tok1", "sid1", fpvAuditLog{TS: time.Now().UTC(), Action: "message", Message: "hello"})
+	if logged.Seq <= before {
+		t.Fatalf("expected seq increment, got before=%d logged=%d", before, logged.Seq)
+	}
+	events, latest := fpvAuditEventsSince(before, 10)
+	if latest < logged.Seq || len(events) == 0 || events[len(events)-1].Message != "hello" {
+		t.Fatalf("expected audit event, latest=%d events=%#v", latest, events)
+	}
+	meta := events[len(events)-1].Meta
+	if meta["token"] != "tok1" || meta["session_id"] != "sid1" {
+		t.Fatalf("expected token/session metadata, got %#v", meta)
+	}
+}

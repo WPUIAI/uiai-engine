@@ -13,6 +13,9 @@ required = [
     'pi.registerCommand("fpv-watch"',
     'pi.registerCommand("fpv-unwatch"',
     'pi.registerCommand("fpv-watch-status"',
+    'pi.on("session_start"',
+    '/api/fpv/events?since_seq=',
+    'deliverAs: "steer"',
     '/m/${encodeURIComponent(token)}/status',
 ]
 missing = [item for item in required if item not in src]
