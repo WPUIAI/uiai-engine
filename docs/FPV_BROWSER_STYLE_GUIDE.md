@@ -476,11 +476,4 @@ Before marking FPV UI work complete:
 
 ## Next implementation targets
 
-1. Extend `/m/{token}/status` with optional `context.project`, `context.tree`, `context.history`, and `context.focusa`.
-2. Build the repo context, tree, history, and Focusa panels in the right rail.
-3. Add stream-quality state based on frame success/error counters.
-4. Add operator-selectable quality modes:
-   - Smooth: 250ms poll,
-   - Balanced: 500ms poll,
-   - Saver: 1000ms poll.
-5. Move inline CSS/JS to static assets once route asset serving is ready.
+Remaining work is tracked in [FPV Remaining Gaps Spec](FPV_REMAINING_GAPS_SPEC.md) and corresponding beads.
