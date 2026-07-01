@@ -66,13 +66,23 @@ FIXES = [
         "id": "fix-cockpit-rollup-darwin-arm64-optional",
         "match": "Cannot find module @rollup/rollup-darwin-arm64",
         "description": (
-            "npm optional-dependency bug drops @rollup/rollup-darwin-arm64 on the "
-            "macOS GitHub runner. Replace `npm ci` with `npm ci --include=optional` "
-            "in the CI install step so rollup's darwin-arm64 native binary is fetched."
+            "npm's optional-dependency resolution drops platform binaries that "
+            "match the runner's host but not its architecture in some npm versions. "
+            "Install @rollup/rollup-darwin-arm64 explicitly as a follow-up step on "
+            "macOS runners so vite's rollup native call succeeds."
         ),
         "files": [".github/workflows/cockpit.yml"],
-        "bad": "npm ci",
-        "good": "npm ci --include=optional",
+        "bad": "run: npm ci\n      - name: Typecheck",
+        "good": (
+            "run: npm ci\n"
+            "      - name: Ensure rollup darwin-arm64 native binary\n"
+            "        if: runner.os == 'macOS'\n"
+            "        working-directory: apps/cockpit\n"
+            "        run: |\n"
+            "          npm install --no-save --no-package-lock \\\n"
+            "            @rollup/rollup-darwin-arm64@4.62.2\n"
+            "      - name: Typecheck"
+        ),
     },
 ]
 

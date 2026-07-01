@@ -22,9 +22,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
         working-directory: apps/cockpit
-        # --include=optional ensures @rollup/rollup-darwin-arm64 native binary
-        # is installed on macOS GitHub runners (npm optional-deps bug).
-        run: npm ci --include=optional
+        run: npm ci
+      - name: Ensure rollup darwin-arm64 native binary
+        if: runner.os == 'macOS'
+        working-directory: apps/cockpit
+        run: |
+          # npm's optional-dependency resolution drops platform binaries
+          # that match the runner's host but not the runner's architecture
+          # in some npm versions. Install the binary explicitly so vite's
+          # rollup native call does not fail with the known npm cli #4828.
+          npm install --no-save --no-package-lock \
+            @rollup/rollup-darwin-arm64@4.62.2
       - name: Typecheck
         working-directory: apps/cockpit
         run: npm run check
