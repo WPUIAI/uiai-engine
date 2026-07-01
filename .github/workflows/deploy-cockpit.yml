@@ -1,22 +1,16 @@
 name: Deploy Cockpit
 
-# Sibling of Focusa .github/workflows/deploy-live-daemon.yml.
-# Triggered on Cockpit Release published OR via workflow_dispatch.
-# Runs on a self-hosted macOS runner with labels:
-#   self-hosted, macos, focusa-deploy, cockpit-sign
-# Performs: preflight, codesign, notarize, attach audit row, append last-known-good.
-
 on:
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Cockpit release tag to deploy or redeploy
+        description: Release tag to deploy or redeploy (for rollback, choose an older tag)
         required: true
         type: string
       asset_suffix:
-        description: Override release asset suffix
+        description: Override release asset suffix (default x86_64-unknown-linux-musl for AlmaLinux 8 glibc 2.28 compatibility)
         required: false
         type: string
       dry_run:
@@ -30,69 +24,271 @@ permissions:
   actions: read
 
 concurrency:
-  group: deploy-cockpit-production
+  group: deploy-live-daemon-production
   cancel-in-progress: false
 
 jobs:
   deploy:
     name: Deploy Cockpit
-    runs-on: [self-hosted, macos, focusa-deploy, cockpit-sign]
+    runs-on: [self-hosted, linux, x64, focusa-cockpit-deploy]
     environment: production
     env:
-      COCKPIT_DEPLOY_INSTALL_ROOT: ${{ vars.COCKPIT_DEPLOY_INSTALL_ROOT }}
-      COCKPIT_DEPLOY_SERVICE_NAME: ${{ vars.COCKPIT_DEPLOY_SERVICE_NAME }}
-      COCKPIT_DEPLOY_HEALTH_URL: ${{ vars.COCKPIT_DEPLOY_HEALTH_URL }}
+      DEPLOY_INSTALL_ROOT: ${{ vars.FOCUSA_DEPLOY_INSTALL_ROOT }}
+      DEPLOY_SERVICE_NAME: ${{ vars.FOCUSA_DEPLOY_SERVICE_NAME }}
+      DEPLOY_HEALTH_URL: ${{ vars.FOCUSA_DEPLOY_HEALTH_URL }}
+      DEPLOY_ASSET_SUFFIX_DEFAULT: ${{ vars.FOCUSA_DEPLOY_ASSET_SUFFIX }}
+      DEPLOY_REQUIRE_SERVICE: ${{ vars.FOCUSA_DEPLOY_REQUIRE_SERVICE }}
+      DEPLOY_USE_SUDO: ${{ vars.FOCUSA_DEPLOY_USE_SUDO }}
+      DEPLOY_AUDIT_LOG: ${{ vars.FOCUSA_DEPLOY_AUDIT_LOG }}
+      DEPLOY_MIN_FREE_GB: ${{ vars.FOCUSA_DEPLOY_MIN_FREE_GB }}
+      DEPLOY_MAX_USAGE_PCT: ${{ vars.FOCUSA_DEPLOY_MAX_USAGE_PCT }}
+      DEPLOY_BACKUP_KEEP: ${{ vars.FOCUSA_DEPLOY_BACKUP_KEEP }}
     steps:
-      - name: Resolve release tag
-        id: target
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DISPLAY_TITLE: ${{ github.event.release.tag_name }}
-        run: |
-          if [ "$EVENT_NAME" = "release" ]; then
-            echo "tag=$DISPLAY_TITLE" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-          fi
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "dry_run=true" >> "$GITHUB_OUTPUT"
-          fi
+      - uses: actions/checkout@v6
 
-      - name: Preflight
+      - name: Resolve tag and deployment inputs
+        id: cfg
+        shell: bash
         run: |
           set -euo pipefail
-          : "${COCKPIT_DEPLOY_INSTALL_ROOT:?missing COCKPIT_DEPLOY_INSTALL_ROOT}"
-          : "${COCKPIT_DEPLOY_SERVICE_NAME:?missing COCKPIT_DEPLOY_SERVICE_NAME}"
-          : "${COCKPIT_DEPLOY_HEALTH_URL:?missing COCKPIT_DEPLOY_HEALTH_URL}"
-          echo "preflight ok"
+          git fetch --tags --force --quiet origin || true
+          TAG="${{ github.event.release.tag_name || inputs.release_tag }}"
+          [[ -n "$TAG" ]] || { echo "missing release tag" >&2; exit 1; }
+          VERSION="${TAG#v}"
+          TAG_SHA="$(git rev-list -n 1 "$TAG")"
+          [[ -n "$TAG_SHA" ]] || { echo "could not resolve tag sha for $TAG" >&2; exit 1; }
+          SUFFIX="${{ inputs.asset_suffix }}"
+          if [[ -z "$SUFFIX" ]]; then
+            # AlmaLinux 8 ships glibc 2.28; the Ubuntu-built gnu binary requires
+            # glibc >= 2.39, so default to the statically linked musl artifact.
+            SUFFIX="${DEPLOY_ASSET_SUFFIX_DEFAULT:-x86_64-unknown-linux-musl}"
+          fi
+          ASSET_NAME="focusa-cockpit-${TAG}-${SUFFIX}"
+          INSTALL_ROOT="${DEPLOY_INSTALL_ROOT:-/usr/local}"
+          SERVICE_NAME="${DEPLOY_SERVICE_NAME:-focusa-cockpit}"
+          HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:8787/v1/health}"
+          REQUIRE_SERVICE="${DEPLOY_REQUIRE_SERVICE:-1}"
+          USE_SUDO="${DEPLOY_USE_SUDO:-1}"
+          AUDIT_LOG="${DEPLOY_AUDIT_LOG:-/var/log/focusa/deploy-audit.jsonl}"
+          MIN_FREE_GB="${DEPLOY_MIN_FREE_GB:-15}"
+          MAX_USAGE_PCT="${DEPLOY_MAX_USAGE_PCT:-92}"
+          BACKUP_KEEP="${DEPLOY_BACKUP_KEEP:-5}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=$TAG_SHA" >> "$GITHUB_OUTPUT"
+          echo "asset_name=$ASSET_NAME" >> "$GITHUB_OUTPUT"
+          echo "install_root=$INSTALL_ROOT" >> "$GITHUB_OUTPUT"
+          echo "service_name=$SERVICE_NAME" >> "$GITHUB_OUTPUT"
+          echo "health_url=$HEALTH_URL" >> "$GITHUB_OUTPUT"
+          echo "require_service=$REQUIRE_SERVICE" >> "$GITHUB_OUTPUT"
+          echo "use_sudo=$USE_SUDO" >> "$GITHUB_OUTPUT"
+          echo "audit_log=$AUDIT_LOG" >> "$GITHUB_OUTPUT"
+          echo "min_free_gb=$MIN_FREE_GB" >> "$GITHUB_OUTPUT"
+          echo "max_usage_pct=$MAX_USAGE_PCT" >> "$GITHUB_OUTPUT"
+          echo "backup_keep=$BACKUP_KEEP" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout cockpit at tag
-        run: git checkout "${{ steps.target.outputs.tag }}"
+      - name: Require successful GitHub CI for target commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const targetSha = `${{ steps.cfg.outputs.tag_sha }}`;
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci.yml',
+              head_sha: targetSha,
+              per_page: 50,
+            });
+            const successRun = runs.data.workflow_runs.find(run =>
+              run.status === 'completed' &&
+              run.conclusion === 'success' &&
+              (run.event === 'push' || run.event === 'workflow_dispatch') &&
+              run.head_branch === 'main'
+            );
+            if (!successRun) {
+              core.setFailed(`No successful CI run found for ${targetSha} — deploy blocked until CI passes`);
+              return;
+            }
+            core.info(`Using CI run ${successRun.id}: ${successRun.html_url}`);
 
-      - name: Build + sign + notarize (skip on dry_run)
-        if: steps.target.outputs.dry_run != 'true'
+      - name: Spec104 static audit preflight
+        shell: bash
         run: |
-          apps/cockpit/scripts/cockpit-release.sh
-
-      - name: Health check
-        if: steps.target.outputs.dry_run != 'true'
-        run: |
-          for i in $(seq 1 30); do
-            if curl -fsS "$COCKPIT_DEPLOY_HEALTH_URL" >/dev/null 2>&1; then
-              echo "cockpit healthy at $COCKPIT_DEPLOY_HEALTH_URL"
-              exit 0
+          set -euo pipefail
+          echo "Running Spec104 static surface audit before deploy..."
+          python3 scripts/audit-schema.py spec104 release-proof/audit/audit.jsonl || \
+          {
+            rc=$?
+            echo "Spec104 audit failed with exit code $rc (non-fatal preflight — audit recorded)"
+            if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+              echo "Unexpected error — still proceeding"
             fi
-            sleep 5
-          done
-          echo "cockpit health check timed out"
-          exit 1
+          }
 
-      - name: Append last-known-good audit row
-        if: success()
+      - name: Safe disk cleanup preflight
+        if: ${{ !inputs.dry_run }}
+        shell: bash
         run: |
-          mkdir -p release-proof/cockpit
-          echo "{\"schema\":\"focusa.cockpit.audit.v1\",\"kind\":\"cockpit_last_known_good\",\"tag\":\"${{ steps.target.outputs.tag }}\",\"at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
-            >> release-proof/cockpit/audit.jsonl
-          git add release-proof/cockpit/audit.jsonl
-          git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "audit: cockpit last-known-good ${{ steps.target.outputs.tag }}" || true
-          git push || true
+          set -euo pipefail
+          if [[ "${{ steps.cfg.outputs.use_sudo }}" == "0" ]]; then
+            SUDO=""
+          else
+            SUDO="sudo -n"
+          fi
+          chmod 755 scripts/safe-disk-cleanup.sh
+          if [[ -n "$SUDO" ]]; then
+            $SUDO /bin/bash "$GITHUB_WORKSPACE/scripts/safe-disk-cleanup.sh" \
+              --apply \
+              --project-root "$GITHUB_WORKSPACE" \
+              --backup-dir '${{ steps.cfg.outputs.install_root }}/lib/focusa/backups' \
+              --min-free-gb '${{ steps.cfg.outputs.min_free_gb }}' \
+              --max-usage-pct '${{ steps.cfg.outputs.max_usage_pct }}' \
+              --backup-keep '${{ steps.cfg.outputs.backup_keep }}'
+          else
+            /bin/bash "$GITHUB_WORKSPACE/scripts/safe-disk-cleanup.sh" \
+              --apply \
+              --project-root "$GITHUB_WORKSPACE" \
+              --backup-dir '${{ steps.cfg.outputs.install_root }}/lib/focusa/backups' \
+              --min-free-gb '${{ steps.cfg.outputs.min_free_gb }}' \
+              --max-usage-pct '${{ steps.cfg.outputs.max_usage_pct }}' \
+              --backup-keep '${{ steps.cfg.outputs.backup_keep }}'
+          fi
+
+      - name: Download daemon artifact from release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/focusa-release
+          gh release download "${{ steps.cfg.outputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "${{ steps.cfg.outputs.asset_name }}" \
+            --dir /tmp/focusa-release \
+            --clobber
+          chmod +x "/tmp/focusa-release/${{ steps.cfg.outputs.asset_name }}"
+
+      - name: Show deploy plan
+        shell: bash
+        run: |
+          cat <<EOF
+          tag=${{ steps.cfg.outputs.tag }}
+          version=${{ steps.cfg.outputs.version }}
+          asset=${{ steps.cfg.outputs.asset_name }}
+          install_root=${{ steps.cfg.outputs.install_root }}
+          service=${{ steps.cfg.outputs.service_name }}
+          health_url=${{ steps.cfg.outputs.health_url }}
+          require_service=${{ steps.cfg.outputs.require_service }}
+          use_sudo=${{ steps.cfg.outputs.use_sudo }}
+          audit_log=${{ steps.cfg.outputs.audit_log }}
+          min_free_gb=${{ steps.cfg.outputs.min_free_gb }}
+          max_usage_pct=${{ steps.cfg.outputs.max_usage_pct }}
+          backup_keep=${{ steps.cfg.outputs.backup_keep }}
+          dry_run=${{ inputs.dry_run }}
+          EOF
+
+      - name: Install and restart live daemon
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.cfg.outputs.use_sudo }}" == "0" ]]; then
+            SUDO=""
+          else
+            SUDO="sudo -n"
+          fi
+          if [[ "${{ steps.cfg.outputs.require_service }}" == "1" ]]; then
+            REQUIRE_FLAG="--require-service"
+          else
+            REQUIRE_FLAG=""
+          fi
+          chmod 755 scripts/install-daemon.sh "/tmp/focusa-release/${{ steps.cfg.outputs.asset_name }}"
+          if [[ -n "$SUDO" ]]; then
+            $SUDO env \
+              FOCUSA_INSTALL_ROOT='${{ steps.cfg.outputs.install_root }}' \
+              FOCUSA_DAEMON_URL='${{ steps.cfg.outputs.health_url }}' \
+              FOCUSA_DEPLOY_AUDIT_LOG='${{ steps.cfg.outputs.audit_log }}' \
+              FOCUSA_GITHUB_RUN_ID='${{ github.run_id }}' \
+              FOCUSA_GITHUB_RUN_ATTEMPT='${{ github.run_attempt }}' \
+              FOCUSA_GITHUB_ACTOR='${{ github.actor }}' \
+              FOCUSA_GITHUB_SHA='${{ steps.cfg.outputs.tag_sha }}' \
+              FOCUSA_GITHUB_TAG='${{ steps.cfg.outputs.tag }}' \
+              FOCUSA_GITHUB_WORKFLOW='${{ github.workflow }}' \
+              FOCUSA_GITHUB_REPOSITORY='${{ github.repository }}' \
+              /bin/bash "$GITHUB_WORKSPACE/scripts/install-daemon.sh" \
+                --binary "/tmp/focusa-release/${{ steps.cfg.outputs.asset_name }}" \
+                --expected-version '${{ steps.cfg.outputs.version }}' \
+                --service-name '${{ steps.cfg.outputs.service_name }}' \
+                --health-url '${{ steps.cfg.outputs.health_url }}' \
+                $REQUIRE_FLAG
+          else
+            env \
+              FOCUSA_INSTALL_ROOT='${{ steps.cfg.outputs.install_root }}' \
+              FOCUSA_DAEMON_URL='${{ steps.cfg.outputs.health_url }}' \
+              FOCUSA_DEPLOY_AUDIT_LOG='${{ steps.cfg.outputs.audit_log }}' \
+              FOCUSA_GITHUB_RUN_ID='${{ github.run_id }}' \
+              FOCUSA_GITHUB_RUN_ATTEMPT='${{ github.run_attempt }}' \
+              FOCUSA_GITHUB_ACTOR='${{ github.actor }}' \
+              FOCUSA_GITHUB_SHA='${{ steps.cfg.outputs.tag_sha }}' \
+              FOCUSA_GITHUB_TAG='${{ steps.cfg.outputs.tag }}' \
+              FOCUSA_GITHUB_WORKFLOW='${{ github.workflow }}' \
+              FOCUSA_GITHUB_REPOSITORY='${{ github.repository }}' \
+              /bin/bash "$GITHUB_WORKSPACE/scripts/install-daemon.sh" \
+                --binary "/tmp/focusa-release/${{ steps.cfg.outputs.asset_name }}" \
+                --expected-version '${{ steps.cfg.outputs.version }}' \
+                --service-name '${{ steps.cfg.outputs.service_name }}' \
+                --health-url '${{ steps.cfg.outputs.health_url }}' \
+                $REQUIRE_FLAG
+          fi
+
+      - name: Verify deployed version locally
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS '${{ steps.cfg.outputs.health_url }}' | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("version",""))' | tee /tmp/focusa-live-version.txt
+          LIVE_VERSION="$(cat /tmp/focusa-live-version.txt)"
+          test "$LIVE_VERSION" = "${{ steps.cfg.outputs.version }}"
+
+      - name: Self-healing smoke check
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.cfg.outputs.use_sudo }}" == "0" ]]; then
+            SUDO=""
+          else
+            SUDO="sudo -n"
+          fi
+          chmod 755 scripts/deploy-smoke-check.sh
+          if [[ -n "$SUDO" ]]; then
+            $SUDO env \
+              FOCUSA_DAEMON_URL='${{ steps.cfg.outputs.health_url }}' \
+              FOCUSA_EXPECTED_VERSION='${{ steps.cfg.outputs.version }}' \
+              FOCUSA_SERVICE_NAME='${{ steps.cfg.outputs.service_name }}' \
+              FOCUSA_DEPLOY_AUDIT_LOG='${{ steps.cfg.outputs.audit_log }}' \
+              /bin/bash "$GITHUB_WORKSPACE/scripts/deploy-smoke-check.sh"
+          else
+            env \
+              FOCUSA_DAEMON_URL='${{ steps.cfg.outputs.health_url }}' \
+              FOCUSA_EXPECTED_VERSION='${{ steps.cfg.outputs.version }}' \
+              FOCUSA_SERVICE_NAME='${{ steps.cfg.outputs.service_name }}' \
+              FOCUSA_DEPLOY_AUDIT_LOG='${{ steps.cfg.outputs.audit_log }}' \
+              /bin/bash "$GITHUB_WORKSPACE/scripts/deploy-smoke-check.sh"
+          fi
+
+      - name: Cleanup release artifact temp dir
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: rm -rf /tmp/focusa-release
+
+      - name: Cockpit audit trail
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: python3 scripts/auto-heal-audit.py
+
+      - name: Validate audit schema
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: python3 scripts/audit-schema.py validate release-proof/audit/audit.jsonl

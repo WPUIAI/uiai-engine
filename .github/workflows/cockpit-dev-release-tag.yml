@@ -1,15 +1,12 @@
 name: Create Dev Cockpit Release Tag
 
-# Sibling of Focusa .github/workflows/dev-release-tag.yml.
-# Computes next cockpit-vX.Y.Z-dev tag, stamps version, pushes tag and main.
-
 on:
   workflow_dispatch:
     inputs:
       base:
-        description: 'Major/minor release lane, e.g. 0.1'
+        description: 'Major/minor release lane, e.g. 0.9'
         required: true
-        default: '0.1'
+        default: '0.9'
       push:
         description: 'Push the computed tag and main'
         required: true
@@ -41,7 +38,7 @@ jobs:
       - name: Create next dev tag
         run: |
           if [ "${{ inputs.push }}" = "true" ]; then
-            apps/cockpit/scripts/create-cockpit-dev-release-tag.sh --base "${{ inputs.base }}" --push
+            scripts/create-dev-release-tag.sh --base "${{ inputs.base }}" --push
           else
-            apps/cockpit/scripts/create-cockpit-dev-release-tag.sh --base "${{ inputs.base }}" --dry-run
+            scripts/create-dev-release-tag.sh --base "${{ inputs.base }}" --dry-run
           fi

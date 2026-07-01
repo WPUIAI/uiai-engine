@@ -8,3 +8,4 @@ src-tauri/gen/
 smoke-report.json
 release-proof/
 Cargo.lock
+smoke-report.json
