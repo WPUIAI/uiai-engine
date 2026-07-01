@@ -4,9 +4,11 @@
 # and emits release-metadata.json + checksums into release-proof/cockpit/.
 
 set -euo pipefail
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+set -euo pipefail
+SELF="$(readlink -f "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 APPS_COCKPIT="${REPO_ROOT}/apps/cockpit"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STAMP="$SCRIPT_DIR/stamp-cockpit-version/stamp-cockpit-version"
 TAG="${TAG:-cockpit-v0.1.0}"
 

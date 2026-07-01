@@ -6,11 +6,11 @@
 #   scripts/create-cockpit-dev-release-tag.sh --base 0.1 --push   # create + push
 
 set -euo pipefail
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SELF="$(readlink -f "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
-# Resolve sibling script path from the same scripts/ dir
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STAMP="$SCRIPT_DIR/stamp-cockpit-version/stamp-cockpit-version"
 
 BASE="0.1"
