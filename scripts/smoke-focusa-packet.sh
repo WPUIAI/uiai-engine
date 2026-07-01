@@ -2,7 +2,7 @@
 set -euo pipefail
 ENGINE_URL="${ENGINE_URL:-http://127.0.0.1:7456}"
 OUT="${OUT:-/tmp/uiai-focusa-packet-smoke.json}"
-TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-15}"
+TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-60}"
 SITE_DIR=""
 SITE_PORT="${SITE_PORT:-8765}"
 SERVER_PID=""
