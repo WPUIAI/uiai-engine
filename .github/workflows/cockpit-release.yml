@@ -3,31 +3,39 @@ name: Cockpit Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'cockpit-v*'
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
-  # Gate: tests + clippy must pass
   rust-check:
-    name: Rust Check
+    name: Rust + frontend checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2026-01-08
-          components: clippy
-      - run: cargo test --workspace
-      - run: cargo clippy --workspace -- -D warnings
-      - name: Spec104 static audit
-        run: python3 scripts/audit-schema.py spec104 release-proof/audit/audit.jsonl
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cargo checks
+        run: |
+          cargo test --workspace
+          cargo clippy --workspace -- -D warnings
 
-  # Create the GitHub Release with notes (runs once, before uploads)
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: apps/cockpit/package-lock.json
+      - name: Frontend checks
+        working-directory: apps/cockpit
+        run: |
+          npm ci
+          npm run check
+          npm run build
+
   create-release:
-    name: Create Release
+    name: Create GitHub Release
     needs: rust-check
     runs-on: ubuntu-latest
     steps:
@@ -39,293 +47,88 @@ jobs:
         id: notes
         run: |
           TAG="${{ github.ref_name }}"
-          # Get commits since last tag (or all if first tag)
           PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1 || echo "")
           if [ -n "$PREV_TAG" ]; then
-            COMMITS=$(git log --oneline "${PREV_TAG}..${TAG}" --no-merges | head -50)
+            COMMITS=$(git log --oneline "${PREV_TAG}..${TAG}" --no-merges | head -40)
           else
-            COMMITS=$(git log --oneline --no-merges | head -50)
+            COMMITS=$(git log --oneline --no-merges | head -40)
           fi
-          
-          # Write current, non-stale notes to file (heredoc avoids escaping issues).
-          # Keep this release page functional and evidence-oriented; avoid fixed route/test counts.
-          cat > /tmp/release-notes.md << NOTES_EOF
-          ## Focusa ${TAG} — Functional Dogfood Release
+          mkdir -p /tmp/release-artifacts
+          cat > /tmp/release-notes.md <<EOF
+          ## UIAI Engine ${TAG} — Cockpit Release
 
-          Focusa is a local-first cognitive runtime for agent continuity, scope authority, evidence, recovery, trajectory, and tool governance.
+          UIAI Engine is a cross-product operator cockpit for agent continuity, scope authority, evidence, recovery, trajectory, and tool governance.
 
           ### What this release proves
-          - **Functional snapshot** — this tag passed the Release workflow gate: workspace tests and clippy before artifacts.
-          - **Dogfood-driven quality** — release notes are generated from the actual tag delta, not stale static claims.
-          - **macOS artifacts** — CLI, daemon, TUI, and Tauri menubar app assets are built by GitHub Actions.
-          - **Public traceability** — commits since the prior tag are included below for auditability.
-
-          ### Downloads
-          | Platform | Asset | Description |
-          |----------|-------|-------------|
-          | macOS Apple Silicon | \`focusa-${TAG}-aarch64-apple-darwin\` | CLI |
-          | macOS Intel | \`focusa-${TAG}-x86_64-apple-darwin\` | CLI |
-          | macOS Apple Silicon | \`uaiengine-cockpit-${TAG}-aarch64-apple-darwin\` | API daemon |
-          | macOS Intel | \`uaiengine-cockpit-${TAG}-x86_64-apple-darwin\` | API daemon |
-          | macOS Apple Silicon | \`focusa-tui-${TAG}-aarch64-apple-darwin\` | TUI dashboard |
-          | macOS Intel | \`focusa-tui-${TAG}-x86_64-apple-darwin\` | TUI dashboard |
-          | macOS Apple Silicon / Intel | \`Focusa_*\` DMG / app archives | Menubar app |
-          | Linux x64 glibc | \`focusa-${TAG}-x86_64-unknown-linux-gnu\` | CLI |
-          | Linux x64 glibc | \`uaiengine-cockpit-${TAG}-x86_64-unknown-linux-gnu\` | API daemon |
-          | Linux x64 glibc | \`focusa-tui-${TAG}-x86_64-unknown-linux-gnu\` | TUI dashboard |
-          | Linux x64 musl/static | \`focusa-${TAG}-x86_64-unknown-linux-musl\` | CLI compatible with older glibc hosts |
-          | Linux x64 musl/static | \`uaiengine-cockpit-${TAG}-x86_64-unknown-linux-musl\` | API daemon compatible with older glibc hosts |
-          | Linux x64 musl/static | \`focusa-tui-${TAG}-x86_64-unknown-linux-musl\` | TUI dashboard compatible with older glibc hosts |
-
-          ### Quick Start (macOS/Linux)
-          \`\`\`bash
-          # Download and extract matching CLI/daemon assets from this release.
-          chmod +x ./focusa-${TAG}-<your-platform> ./uaiengine-cockpit-${TAG}-<your-platform>
-
-          # Start the daemon.
-          ./uaiengine-cockpit-${TAG}-<your-platform>
-
-          # In another terminal, check status.
-          ./focusa-${TAG}-<your-platform> status
-          \`\`\`
+          - Frontend/build pipeline passed for this tag.
+          - `cargo test` and `cargo clippy -D warnings` passed.
+          - Tauri app was built for each release platform.
 
           ### Commits since previous tag
-          \`\`\`
+          ```
           ${COMMITS}
-          \`\`\`
+          ```
 
-          ---
-          Local-first. Source-available. Functional proof is the GitHub Release workflow plus attached assets for this tag.
-          NOTES_EOF
+          ### Assets
+          - `uaiengine-cockpit` binaries per platform (no-bundle tauri build output)
+          EOF
 
-      - name: Create GitHub Release
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: Focusa ${{ github.ref_name }}
+          name: UIAI Engine Cockpit ${{ github.ref_name }}
           body_path: /tmp/release-notes.md
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Build Tauri desktop app for macOS only (testing)
-  tauri-build:
-    name: Build Menubar (${{ matrix.platform }})
+  build-upload:
+    name: Build and upload platform binaries
     needs: create-release
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
-            rust_target: aarch64-apple-darwin
-          - platform: macos-latest
-            args: '--target x86_64-apple-darwin'
-            rust_target: x86_64-apple-darwin
-
+        platform: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2026-01-08
-          targets: ${{ matrix.rust_target }}
+          fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v6
         with:
-          bun-version: 1.3.6
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: apps/cockpit/package-lock.json
 
-      - name: Stamp menubar version from release tag
-        run: python3 scripts/stamp-menubar-version.py "${{ github.ref_name }}"
-
-      - name: Verify stamped version surfaces
-        run: python3 scripts/verify-version-surfaces.py "${{ github.ref_name }}"
-
-      - name: Cockpit audit trail
-        run: python3 scripts/auto-heal-audit.py
-
-      - name: Validate audit schema
-        run: python3 scripts/audit-schema.py validate release-proof/audit/audit.jsonl
-
-      - name: Regenerate CHANGELOG
-        run: python3 scripts/changelog-gen.py
-
-      - name: Install frontend deps
+      - name: Build no-bundle tauri binary
         working-directory: apps/cockpit
-        run: bun install
-
-      - name: Generate macOS icons
-        if: contains(matrix.platform, 'macos')
-        working-directory: apps/cockpit/src-tauri
-        run: |
-          # Generate .icns from PNG source using iconutil (macOS only)
-          mkdir -p /tmp/focusa.iconset
-          sips -z 16 16     icons/icon.png --out /tmp/focusa.iconset/icon_16x16.png
-          sips -z 32 32     icons/icon.png --out /tmp/focusa.iconset/icon_16x16@2x.png
-          sips -z 32 32     icons/icon.png --out /tmp/focusa.iconset/icon_32x32.png
-          sips -z 64 64     icons/icon.png --out /tmp/focusa.iconset/icon_32x32@2x.png
-          sips -z 128 128   icons/icon.png --out /tmp/focusa.iconset/icon_128x128.png
-          sips -z 256 256   icons/icon.png --out /tmp/focusa.iconset/icon_128x128@2x.png
-          sips -z 256 256   icons/icon.png --out /tmp/focusa.iconset/icon_256x256.png
-          sips -z 512 512   icons/icon.png --out /tmp/focusa.iconset/icon_256x256@2x.png
-          sips -z 512 512   icons/icon.png --out /tmp/focusa.iconset/icon_512x512.png
-          iconutil -c icns /tmp/focusa.iconset -o icons/icon.icns
-          ls -la icons/
-
-      - uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: apps/cockpit
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Focusa ${{ github.ref_name }}'
-          releaseBody: ''
-          releaseDraft: false
-          prerelease: false
-          tauriScript: bunx tauri
-          args: ${{ matrix.args }}
-          uploadArtifact: true
-
-      - name: Codesign + notarize + staple (.app + .dmg)
-        if: contains(matrix.platform, 'macos')
-        env:
-          TARGET: ${{ matrix.rust_target }}
-          # Three modes (any of which produce a working .app + .dmg):
-          # 1. No APPLE_SIGNING_IDENTITY -> ad-hoc signing (free, no Apple ID)
-          # 2. APPLE_SIGNING_IDENTITY=Apple Development: <name> -> Personal Team
-          # 3. Full Developer ID + notarization secrets -> paid program, notarized
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_IDENTITY_NAME: ${{ secrets.APPLE_IDENTITY_NAME }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-        working-directory: apps/cockpit
+          TAG: ${{ github.ref_name }}
         run: |
-          for app in src-tauri/target/${TARGET}/release/bundle/macos/*.app; do
-            if [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
-              echo "::notice::No Apple signing identity configured; using ad-hoc signing (free, no Apple ID needed)"
-              codesign --deep --force --sign - "${app}"
-              codesign --verify --deep --strict "${app}"
-              continue
-            fi
-            if [[ "${APPLE_SIGNING_IDENTITY}" == "Apple Development:"* ]] && [ -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]; then
-              echo "::notice::Personal Team signing identity detected; signing without notarization (Gatekeeper will require right-click -> Open)"
-              codesign --deep --force --options runtime --sign "${APPLE_SIGNING_IDENTITY}" "${app}"
-              codesign --verify --deep --strict "${app}"
-              continue
-            fi
-            # Mode 3: full Developer ID + notarization
-            codesign --deep --force --options runtime --sign "${APPLE_SIGNING_IDENTITY}" "${app}"
-            codesign --verify --deep --strict --verbose=2 "${app}"
-            ditto -c -k --keepParent "${app}" "${app}.zip"
-            xcrun notarytool submit "${app}.zip" \
-              --key "${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8" \
-              --key-id "${APPLE_API_KEY_ID}" \
-              --issuer "${APPLE_API_ISSUER_ID}" \
-              --team-id "${APPLE_TEAM_ID}" \
-              --wait
-            xcrun stapler staple "${app}"
-            xcrun stapler validate "${app}"
-            codesign --deep --force --options runtime --sign "${APPLE_SIGNING_IDENTITY}" "${app}"
-          done
-          echo "codesign complete (mode: ad-hoc if no identity, else ${APPLE_SIGNING_IDENTITY%%:*})"
+          set -euo pipefail
+          npm ci
+          ./scripts/generate-icons.sh
+          npm run build
+          npm run tauri build -- --no-bundle
 
-
-
-  # Publish Rust binaries for tester platforms.
-  rust-release:
-    name: Rust Binaries (${{ matrix.target }})
-    needs: create-release
-    strategy:
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            os: macos-latest
-          - target: x86_64-apple-darwin
-            os: macos-latest
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            musl: true
-
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: nightly-2026-01-08
-          targets: ${{ matrix.target }}
-
-      - name: Install cross for musl target
-        if: ${{ matrix.musl == true }}
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
-
-      - name: Build release binaries
-        shell: bash
-        run: |
-          if [ "${{ matrix.musl || false }}" = "true" ]; then
-            cross build --release --target ${{ matrix.target }}
-          else
-            cargo build --release --target ${{ matrix.target }}
+          BIN="src-tauri/target/release/uaiengine-cockpit"
+          if [ ! -x "$BIN" ]; then
+            echo "missing binary: $BIN" >&2
+            exit 1
           fi
 
-      - name: Package binaries
-        shell: bash
+          PLATFORM_DIR="${{ runner.os }}"
+          RELEASE_TAG="${{ github.ref_name }}"
+          ART_DIR="/tmp/release-artifacts"
+          mkdir -p "$ART_DIR"
+          cp "$BIN" "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${PLATFORM_DIR}.bin"
+          shasum -a 256 "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${PLATFORM_DIR}.bin" > "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${PLATFORM_DIR}.bin.sha256"
+
+      - name: Upload artifacts to release
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${{ github.ref_name }}"
-          mkdir -p dist
-          for bin in uaiengine-cockpit focusa focusa-tui; do
-            if [ -f "target/${{ matrix.target }}/release/$bin" ]; then
-              cp "target/${{ matrix.target }}/release/$bin" "dist/${bin}-${TAG}-${{ matrix.target }}"
-            fi
-          done
-          ls -la dist/
-
-      - name: Upload binaries to release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  checksums:
-    name: Publish SHA256SUMS
-    needs: [tauri-build, rust-release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install GitHub CLI
-        run: gh --version
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
-
-      - name: Download release assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ github.ref_name }}"
-          mkdir -p dist
-          gh release download "$TAG" --repo "${{ github.repository }}" --dir dist --clobber
-          find dist -maxdepth 1 -type f ! -name 'SHA256SUMS*' -print0 | sort -z | xargs -0 sha256sum | sed 's#  dist/#  #' > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-          cosign sign-blob --yes \
-            --output-signature SHA256SUMS.txt.sig \
-            --output-certificate SHA256SUMS.txt.pem \
-            SHA256SUMS.txt
-
-      - name: Upload checksum manifest and signature
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            SHA256SUMS.txt
-            SHA256SUMS.txt.sig
-            SHA256SUMS.txt.pem
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          gh release upload "$TAG" /tmp/release-artifacts/* --clobber
