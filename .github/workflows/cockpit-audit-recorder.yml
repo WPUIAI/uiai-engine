@@ -28,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Record CI failure (self-triggered)
+      - name: Record CI failure (self-triggered) + Self-heal
         if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure'
         env:
           RUN_ID: ${{ github.event.workflow_run.id }}
@@ -39,15 +39,20 @@ jobs:
           ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           LOG_URL: ${{ github.event.workflow_run.html_url }}
           TS: ${{ github.event.workflow_run.updated_at }}
-          AUDIT_PATH: release-proof/audit/audit.jsonl
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
-        run: python3 scripts/record-workflow-failure.py
+        run: |
+          # Append the failure row, then run the real self-heal: pull logs,
+          # match against known anti-patterns, apply a targeted fix on a
+          # new branch, push, and re-dispatch the failed workflow.
+          mkdir -p release-proof/cockpit
+          cat >> release-proof/cockpit/audit.jsonl <<EOF
+          {"schema":"focusa.cockpit.audit.v1","kind":"cockpit_ci_failure","workflow":"${WORKFLOW}","run_id":"${RUN_ID}","head_sha":"${HEAD_SHA}","branch":"${BRANCH}","at":"${TS}","log_url":"${LOG_URL}"}
+          EOF
+          python3 apps/cockpit/scripts/auto-heal-cockpit-audit.py "${RUN_ID}" "failure" "${WORKFLOW}"
 
       - name: Spec104 static surface audit
         run: python3 scripts/audit-schema.py spec104 release-proof/audit/audit.jsonl || echo "(audit result recorded; non-fatal warning)"
-
-      - name: Self-heal audit trail
-        run: python3 scripts/auto-heal-audit.py
 
       - name: Validate audit schema
         run: python3 scripts/audit-schema.py validate release-proof/audit/audit.jsonl
@@ -56,12 +61,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- release-proof/audit/audit.jsonl; then
+          if git diff --quiet -- release-proof/cockpit/audit.jsonl; then
             echo "[audit-recorder] no audit changes"
             exit 0
           fi
-          git config user.name 'focusa-bot'
-          git config user.email 'bot@focusa.local'
-          git add release-proof/audit/audit.jsonl
-          git commit -m "audit: self-heal append from ${{ github.event_name }} @ ${{ github.run_id }}"
+          git config user.name 'focusa-cockpit-bot'
+          git config user.email 'focusa-cockpit-bot@users.noreply.github.com'
+          git add release-proof/cockpit/audit.jsonl
+          git commit -m "audit(cockpit): self-heal append from ${{ github.event_name }} @ ${{ github.run_id }}"
           git push

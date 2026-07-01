@@ -1,93 +1,211 @@
 #!/usr/bin/env python3
-"""Focusa auto-heal audit hook.
+"""Focusa Cockpit self-heal — real fix, not just a claim.
 
-Reads the append-only audit ledger and emits one self-heal synthesis
-row per failure that does not yet have a matching self_heal row.
+Pipeline (workflow_run: completed triggers this from
+cockpit-audit-recorder.yml when a cockpit CI/release run fails):
+
+  1. Pull failed workflow logs via gh API.
+  2. Match against known anti-patterns in the cockpit pipeline.
+  3. Apply a targeted fix.
+  4. Commit the fix on a new branch and push.
+  5. Re-dispatch the failed workflow.
+  6. Write an audit row that records the actual fix that was applied
+     (not just a self_heal claim).
 
 Usage:
-  python3 scripts/auto-heal-audit.py [audit.jsonl]
+  python3 scripts/auto-heal-cockpit-audit.py <run_id> <conclusion> <workflow>
 """
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
-DEFAULT_AUDIT_FILE = "release-proof/audit/audit.jsonl"
+REPO = os.environ.get("GITHUB_REPOSITORY", "WPUIAI/uiai-engine")
+AUDIT_FILE = Path("release-proof/cockpit/audit.jsonl")
+SCHEMA = "focusa.cockpit.audit.v1"
+
+# Each fix has: id, match (substring in log), apply (Python lambda path -> bool).
+# Fixes are applied in order; first match wins.
+FIXES = [
+    {
+        "id": "fix-cockpit-script-resolve-via-readlink",
+        "match": "cd: apps/cockpit/scripts: No such file or directory",
+        "description": (
+            "Bash scripts invoked with relative paths fail because "
+            "`cd $(dirname $0)/../..` walks up too many levels. "
+            "Replace with absolute resolution via `readlink -f`."
+        ),
+        "files": [
+            "apps/cockpit/scripts/create-cockpit-dev-release-tag.sh",
+            "apps/cockpit/scripts/cockpit-release.sh",
+        ],
+        "bad": 'REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"\ncd "$REPO_ROOT"',
+        "good": (
+            'set -euo pipefail\n'
+            'SELF="$(readlink -f "$0")"\n'
+            'SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"\n'
+            'REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"\n'
+            'cd "$REPO_ROOT"'
+        ),
+    },
+    {
+        "id": "fix-cockpit-tokens-frontend-dist",
+        "match": "frontendDist: ../build",
+        "description": (
+            "tauri.conf.json frontendDist must be `../build` relative to src-tauri/."
+        ),
+        "files": ["apps/cockpit/src-tauri/tauri.conf.json"],
+        "validate": lambda content: '"frontendDist": "../build"' in content,
+    },
+]
 
 
-def load_entries(path: Path) -> list[dict]:
-    out: list[dict] = []
-    with path.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                out.append(json.loads(line))
-            except json.JSONDecodeError:
-                print(f"[focusa-audit] skipping malformed line: {line[:80]!r}", file=sys.stderr)
-    return out
+def gh(*args: str, check: bool = True) -> str:
+    r = subprocess.run(["gh", *args], capture_output=True, text=True)
+    if check and r.returncode != 0:
+        print(f"  gh {' '.join(args)}: {r.stderr.strip()}", file=sys.stderr)
+        raise SystemExit(r.returncode)
+    return (r.stdout or "").strip()
 
 
-def heal_id(failure_id: str) -> str:
-    return f"heal-{failure_id}" if failure_id else "heal-unknown"
+def fetch_run_logs(run_id: str) -> str:
+    """Pull all logs for a run via gh api (zip on the API side, plain text on gh)."""
+    try:
+        r = subprocess.run(
+            ["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/logs"],
+            capture_output=True, text=True,
+        )
+        return r.stdout
+    except Exception as e:
+        print(f"[auto-heal] log fetch failed: {e}", file=sys.stderr)
+        return ""
 
 
-def synthesize(failure: dict, audit_path: Path) -> dict:
-    return {
-        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "event": "self_heal",
-        "subsystem": "ops",
-        "scope": failure.get("scope", ""),
-        "category": failure.get("category", ""),
-        "derived_from": failure.get("id", ""),
-        "symptom": failure.get("symptom", ""),
-        "root_cause": failure.get("root_cause", ""),
-        "fix": failure.get("fix", ""),
-        "guard": failure.get("guard", ""),
-        "test": failure.get("test", ""),
-        "linked_run": failure.get("linked_run", ""),
-        "auto_generated": True,
-    }
+def detect_fix(log_blob: str) -> dict | None:
+    for fix in FIXES:
+        if fix["match"] in log_blob:
+            return fix
+    return None
 
 
-def write_synthesis(audit_path: Path, row: dict) -> None:
-    with audit_path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(row, separators=(",", ":")) + "\n")
+def apply_fix(fix: dict) -> bool:
+    """Apply a fix; return True if any file changed."""
+    changed = False
+    for path in fix["files"]:
+        p = Path(path)
+        if not p.exists():
+            print(f"[auto-heal] missing file: {path}")
+            continue
+        content = p.read_text()
+        if "bad" in fix and fix["bad"] in content:
+            new = content.replace(fix["bad"], fix["good"], 1)
+            if new != content:
+                p.write_text(new)
+                print(f"[auto-heal] patched {path}")
+                changed = True
+    return changed
+
+
+def commit_and_push(branch: str, message: str) -> None:
+    subprocess.run(["git", "checkout", "-b", branch], check=True)
+    subprocess.run(["git", "add", "-A"], check=True)
+    subprocess.run(
+        [
+            "git", "-c", "user.name=focusa-cockpit-bot",
+            "-c", "user.email=focusa-cockpit-bot@users.noreply.github.com",
+            "commit", "-m", message,
+        ],
+        check=False,  # may be nothing to commit
+    )
+    subprocess.run(["git", "push", "origin", branch], check=True)
+
+
+def write_audit_row(row: dict) -> None:
+    AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with AUDIT_FILE.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row) + "\n")
 
 
 def main() -> int:
-    if len(sys.argv) > 1:
-        audit_path = Path(sys.argv[1])
-    else:
-        repo_root = Path(__file__).resolve().parents[1]
-        audit_path = repo_root / DEFAULT_AUDIT_FILE
-
-    if not audit_path.exists():
-        print(f"audit file missing: {audit_path}", file=sys.stderr)
+    if len(sys.argv) < 4:
+        print("usage: auto-heal-cockpit-audit.py <run_id> <conclusion> <workflow>")
         return 1
 
-    entries = load_entries(audit_path)
-    heals = {e.get("derived_from") for e in entries if e.get("event") == "self_heal"}
-    failures = [e for e in entries if e.get("event") == "failure"]
+    run_id, conclusion, workflow = sys.argv[1], sys.argv[2], sys.argv[3]
+    if conclusion != "failure":
+        print(f"[auto-heal] conclusion={conclusion}; no action")
+        write_audit_row({
+            "schema": SCHEMA,
+            "kind": "self_heal_no_op",
+            "workflow": workflow,
+            "run_id": run_id,
+            "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "reason": "non-failure conclusion",
+        })
+        return 0
 
-    written = 0
-    for f in failures:
-        fid = f.get("id")
-        if not fid or fid in heals:
-            continue
-        row = synthesize(f, audit_path)
-        write_synthesis(audit_path, row)
-        print(f"[focusa-audit] self_heal synthesized for {fid} ({f.get('category', 'unknown')})")
-        heals.add(fid)
-        written += 1
+    print(f"[auto-heal] workflow={workflow} run_id={run_id} failure detected")
+    logs = fetch_run_logs(run_id)
+    print(f"[auto-heal] fetched {len(logs)} bytes of logs")
 
-    if written == 0:
-        print("[focusa-audit] audit trail fully self-heal-synchronized")
-    else:
-        print(f"[focusa-audit] synthesized {written} self_heal row(s)")
+    fix = detect_fix(logs)
+    if not fix:
+        print(f"[auto-heal] no known fix for {workflow} run_id={run_id}")
+        write_audit_row({
+            "schema": SCHEMA,
+            "kind": "self_heal_no_match",
+            "workflow": workflow,
+            "run_id": run_id,
+            "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "match_attempted": [f["id"] for f in FIXES],
+        })
+        return 0
+
+    print(f"[auto-heal] matched fix: {fix['id']}")
+    print(f"[auto-heal] description: {fix['description']}")
+
+    changed = apply_fix(fix)
+    if not changed:
+        print(f"[auto-heal] fix already applied or no-op")
+        write_audit_row({
+            "schema": SCHEMA,
+            "kind": "self_heal_no_change",
+            "workflow": workflow,
+            "run_id": run_id,
+            "fix_id": fix["id"],
+            "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        })
+        return 0
+
+    branch = f"auto-heal/{fix['id']}/{run_id}"
+    commit_and_push(
+        branch,
+        f"auto-heal(cockpit): {fix['id']}\n\nWorkflow: {workflow}\nRun: {run_id}\nFix: {fix['description']}",
+    )
+
+    print(f"[auto-heal] pushed branch {branch}; re-dispatching {workflow}")
+    subprocess.run(
+        ["gh", "workflow", "run", f"{workflow}.yml", "--ref", branch],
+        check=True,
+    )
+
+    write_audit_row({
+        "schema": SCHEMA,
+        "kind": "self_heal_applied",
+        "workflow": workflow,
+        "run_id": run_id,
+        "fix_id": fix["id"],
+        "branch": branch,
+        "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "description": fix["description"],
+        "re_dispatched": True,
+    })
+
     return 0
 
 
