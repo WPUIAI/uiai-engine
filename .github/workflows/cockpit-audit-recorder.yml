@@ -2,8 +2,9 @@ name: Audit Recorder (self-heal trigger)
 
 on:
   workflow_run:
-    workflows: ["CI", "Release", "Deploy Live Daemon"]
+    workflows: ["Cockpit CI", "Cockpit Release", "Deploy Cockpit"]
     types: [completed]
+  workflow_dispatch:
   schedule:
     # Hourly drift check; auto-heal will keep the trail synchronized even
     # if a workflow did not run.
