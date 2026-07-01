@@ -62,6 +62,18 @@ FIXES = [
         "files": ["apps/cockpit/src-tauri/tauri.conf.json"],
         "validate": lambda content: '"frontendDist": "../build"' in content,
     },
+    {
+        "id": "fix-cockpit-rollup-darwin-arm64-optional",
+        "match": "Cannot find module @rollup/rollup-darwin-arm64",
+        "description": (
+            "npm optional-dependency bug drops @rollup/rollup-darwin-arm64 on the "
+            "macOS GitHub runner. Replace `npm ci` with `npm ci --include=optional` "
+            "in the CI install step so rollup's darwin-arm64 native binary is fetched."
+        ),
+        "files": [".github/workflows/cockpit.yml"],
+        "bad": "npm ci",
+        "good": "npm ci --include=optional",
+    },
 ]
 
 
