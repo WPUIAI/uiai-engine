@@ -19,6 +19,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
 	"github.com/WPUIAI/uiai-engine/internal/intelligence"
+	"github.com/WPUIAI/uiai-engine/internal/license"
 	"github.com/WPUIAI/uiai-engine/internal/media"
 	"github.com/WPUIAI/uiai-engine/internal/observability"
 	"github.com/WPUIAI/uiai-engine/internal/ratelimit"
@@ -188,21 +189,27 @@ func (e *Engine) mountRoutes() {
 
 	// AI endpoints — critique is real, rest are stubs until implemented
 	r.Route("/api/critique", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureCritique))
 		routes.MountCritiqueReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/ui-reverse", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureUIReverse))
 		routes.MountUIReverseReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/section-detect", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureSectionDetect))
 		routes.MountSectionDetectReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/layout-compare", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureLayoutCompare))
 		routes.MountLayoutCompareReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/style-enhance", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureStyleEnhance))
 		routes.MountStyleEnhanceReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/copilot", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureCopilot))
 		routes.MountCopilotReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 
@@ -226,6 +233,7 @@ func (e *Engine) mountRoutes() {
 		routes.MountAdminReal(r, e.cfg, e.usage, e.limiter, e.auth)
 	})
 	r.Route("/api/reference", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureReferenceAccess))
 		routes.MountReferenceReal(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/intelligence", func(r chi.Router) {
@@ -241,6 +249,7 @@ func (e *Engine) mountRoutes() {
 
 	// Media production (mockups, GIFs, videos)
 	r.Route("/api/media", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureMediaAccess))
 		routes.MountMediaReal(r, e.cfg, e.credits, e.limiter, e.usage, e.mediaJobs)
 	})
 
@@ -250,6 +259,7 @@ func (e *Engine) mountRoutes() {
 		routes.MountScreenshotCompare(r, e.cfg, e.vision, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/share", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureShareAccess))
 		routes.MountShareReal(r, e.cfg, e.vision)
 	})
 	r.Route("/api/fpv", func(r chi.Router) {
@@ -305,20 +315,25 @@ func (e *Engine) mountRoutes() {
 
 	// Pipeline operations (cloud-capable build steps)
 	r.Route("/api/design-system", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureDesignSystem))
 		routes.MountDesignSystemRoute(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/content-map", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureContentMap))
 		routes.MountContentMapRoute(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/block-recipes", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureBlockRecipes))
 		routes.MountBlockRecipesRoute(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 	r.Route("/api/comparison", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureComparison))
 		routes.MountComparisonRoute(r, e.cfg, e.ai, e.credits, e.limiter, e.usage)
 	})
 
 	// Data migration API
 	r.Route("/api/migration", func(r chi.Router) {
+		r.Use(license.RequireFeatureMiddleware(license.FeatureMigration))
 		routes.MountMigrationAPI(r, e.cfg)
 	})
 
