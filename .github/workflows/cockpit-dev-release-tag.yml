@@ -38,7 +38,7 @@ jobs:
       - name: Create next dev tag
         run: |
           if [ "${{ inputs.push }}" = "true" ]; then
-            scripts/create-dev-release-tag.sh --base "${{ inputs.base }}" --push
+            apps/cockpit/scripts/create-cockpit-dev-release-tag.sh --base "${{ inputs.base }}" --push
           else
-            scripts/create-dev-release-tag.sh --base "${{ inputs.base }}" --dry-run
+            apps/cockpit/scripts/create-cockpit-dev-release-tag.sh --base "${{ inputs.base }}" --dry-run
           fi
