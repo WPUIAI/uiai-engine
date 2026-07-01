@@ -46,7 +46,7 @@ setTimeout(() => { const b=document.createElement('button'); b.id='late'; b.text
 HTML
 python3 -m http.server "$SITE_PORT" -d "$TMPDIR/site" >/tmp/uiai-soak-site.log 2>&1 & SITE_PID=$!
 "$ENGINE_BIN" -config "$TMPDIR/config.yaml" >/tmp/uiai-soak-engine.log 2>&1 & ENGINE_PID=$!
-for _ in $(seq 1 80); do curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null 2>&1 && break; sleep 0.25; done
+for _ in $(seq 1 120); do curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null 2>&1 && break; sleep 0.5; done
 curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null
 
 export ENGINE_PORT SITE_PORT DURATION_SECONDS CONCURRENCY OUT FOCUSA_WORKPOINT_ID="${FOCUSA_WORKPOINT_ID:-}" FOCUSA_CONTINUITY_ID="${FOCUSA_CONTINUITY_ID:-}" FOCUSA_PROJECT_ROOT="${FOCUSA_PROJECT_ROOT:-}" FOCUSA_EVIDENCE_REF="${FOCUSA_EVIDENCE_REF:-uiai-browser-flakiness-soak:$OUT}"
