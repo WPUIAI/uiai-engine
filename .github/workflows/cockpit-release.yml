@@ -1,0 +1,163 @@
+name: Cockpit Release
+
+# Sibling of Focusa .github/workflows/release.yml.
+# Tag-driven: pushes tagged 'cockpit-v*' (created by cockpit-dev-release-tag.yml)
+# trigger: Rust check + Spec 90 audit + macOS bundle proof + release-metadata.json
+#          + audit row + GitHub Release upload.
+
+on:
+  push:
+    tags:
+      - 'cockpit-v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  cockpit-rust-check:
+    name: Cockpit Rust Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - working-directory: apps/cockpit/src-tauri
+      - name: cargo test
+        run: cargo test --locked
+      - name: cargo clippy
+        run: cargo clippy --locked -- -D warnings
+      - name: Spec90 contract audit
+        run: |
+          node -e "
+            const m = require('./apps/cockpit/src/lib/cards/phase0-card-manifest.ts');
+          " || true
+          python3 scripts/auto-heal-cockpit-audit.py --kind spec90_audit --reason "cockpit release gate"
+
+  cockpit-create-release:
+    name: Create Cockpit Release
+    needs: cockpit-rust-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#cockpit-v}"
+          NOTES=$(git log -1 --pretty=%B)
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "# $TAG" >> "$GITHUB_OUTPUT"
+          echo "" >> "$GITHUB_OUTPUT"
+          echo "## Highlights" >> "$GITHUB_OUTPUT"
+          echo "Focusa Cockpit ${VERSION}." >> "$GITHUB_OUTPUT"
+          echo "" >> "$GITHUB_OUTPUT"
+          echo "## Required actions" >> "$GITHUB_OUTPUT"
+          echo "None." >> "$GITHUB_OUTPUT"
+          echo "EOF"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.notes }}
+          draft: true
+          files: |
+            apps/cockpit/release-proof/cockpit/*.json
+            apps/cockpit/release-proof/cockpit/*.txt
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Append audit row
+        run: |
+          mkdir -p release-proof/cockpit
+          echo "{\"schema\":\"focusa.cockpit.audit.v1\",\"kind\":\"cockpit_release_published\",\"tag\":\"${{ github.ref_name }}\",\"at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+            >> release-proof/cockpit/audit.jsonl
+          git add release-proof/cockpit/audit.jsonl
+          git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "audit: cockpit release ${{ github.ref_name }}"
+
+  cockpit-macos-bundle:
+    name: Cockpit macOS Bundle
+    needs: cockpit-create-release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: apps/cockpit/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install
+        working-directory: apps/cockpit
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        working-directory: apps/cockpit
+        run: pnpm build
+      - name: Tauri bundle
+        working-directory: apps/cockpit
+        run: pnpm tauri build -- --bundles app
+      - name: Validate macOS bundle
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find apps/cockpit/src-tauri/target/release/bundle/macos -name "*.app" | head -1)
+          test -n "$APP_PATH"
+          echo "Found bundle: $APP_PATH"
+          test -f "$APP_PATH/Contents/Info.plist"
+          /usr/bin/plutil -lint "$APP_PATH/Contents/Info.plist"
+
+      - name: Build release metadata
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#cockpit-v}"
+          CHANNEL="${VERSION##*-}"
+          APP_PATH=$(find apps/cockpit/src-tauri/target/release/bundle/macos -name "*.app" | head -1)
+          DMG_PATH=$(find apps/cockpit/src-tauri/target/release/bundle/dmg -name "*.dmg" 2>/dev/null | head -1 || true)
+          mkdir -p apps/cockpit/release-proof/cockpit
+          METADATA="apps/cockpit/release-proof/cockpit/${TAG}-metadata.json"
+          ARTIFACTS_JSON="[]"
+          if [ -n "$APP_PATH" ]; then
+            APP_SHA=$(shasum -a 256 "$APP_PATH" | awk '{print $1}')
+            ARTIFACTS_JSON=$(echo "$ARTIFACTS_JSON" | jq --arg p "$APP_PATH" --arg s "$APP_SHA" '. + [{"name": ($p | split("/") | last), "platform": "macos-aarch64", "sha256": $s, "signature": "n/a", "notarization": "n/a"}]')
+          fi
+          if [ -n "$DMG_PATH" ]; then
+            DMG_SHA=$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')
+            ARTIFACTS_JSON=$(echo "$ARTIFACTS_JSON" | jq --arg p "$DMG_PATH" --arg s "$DMG_SHA" '. + [{"name": ($p | split("/") | last), "platform": "macos-aarch64", "sha256": $s, "signature": "n/a", "notarization": "n/a"}]')
+          fi
+          echo "$ARTIFACTS_JSON" | jq --arg v "$VERSION" --arg c "$CHANNEL" --arg t "$TAG" '{
+            schema: "focusa.cockpit.release.v1",
+            app: "focusa-cockpit",
+            version: $v,
+            channel: $c,
+            tag: $t,
+            signed: false,
+            notarized: false,
+            artifacts: .
+          }' > "$METADATA"
+          echo "wrote $METADATA"
+          cat "$METADATA"
+      - name: Checksums
+        run: |
+          TAG="${{ github.ref_name }}"
+          CHECKSUMS="apps/cockpit/release-proof/cockpit/${TAG}-checksums.txt"
+          : > "$CHECKSUMS"
+          find apps/cockpit/src-tauri/target/release/bundle -type f \
+            \( -name "*.app" -o -name "*.dmg" \) -print0 \
+            | while IFS= read -r -d '' f; do
+                shasum -a 256 "$f" >> "$CHECKSUMS"
+              done
+          cat "$CHECKSUMS"
+
+      - name: Upload macOS bundle to release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ github.ref_name }}
+          files: |
+            apps/cockpit/release-proof/cockpit/*.json
+            apps/cockpit/release-proof/cockpit/*.txt
+            apps/cockpit/src-tauri/target/release/bundle/macos/*.app
+            apps/cockpit/src-tauri/target/release/bundle/dmg/*.dmg
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

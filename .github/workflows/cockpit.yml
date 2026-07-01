@@ -1,0 +1,54 @@
+name: Cockpit CI
+
+# Mirrors the menubar job shape from Focusa .github/workflows/ci.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cockpit:
+    name: Cockpit
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: apps/cockpit/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        working-directory: apps/cockpit
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        working-directory: apps/cockpit
+        run: pnpm run check
+      - name: Vitest
+        working-directory: apps/cockpit
+        run: pnpm run test
+      - name: Web build
+        working-directory: apps/cockpit
+        run: pnpm run build
+      - name: Tauri package proof
+        working-directory: apps/cockpit
+        run: pnpm run tauri build -- --bundles app
+      - name: Validate macOS bundle
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find apps/cockpit/src-tauri/target/release/bundle/macos -name "*.app" | head -1)
+          test -n "$APP_PATH"
+          echo "Found bundle: $APP_PATH"
+          test -f "$APP_PATH/Contents/Info.plist"
+          /usr/bin/plutil -lint "$APP_PATH/Contents/Info.plist"
+      - name: Backend smoke (mock external)
+        working-directory: apps/cockpit
+        run: pnpm run cockpit:smoke --mode local-only --mock-external
+      - name: Upload smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-smoke-report
+          path: apps/cockpit/smoke-report.json

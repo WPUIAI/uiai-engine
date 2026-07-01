@@ -1,0 +1,98 @@
+name: Deploy Cockpit
+
+# Sibling of Focusa .github/workflows/deploy-live-daemon.yml.
+# Triggered on Cockpit Release published OR via workflow_dispatch.
+# Runs on a self-hosted macOS runner with labels:
+#   self-hosted, macos, focusa-deploy, cockpit-sign
+# Performs: preflight, codesign, notarize, attach audit row, append last-known-good.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Cockpit release tag to deploy or redeploy
+        required: true
+        type: string
+      asset_suffix:
+        description: Override release asset suffix
+        required: false
+        type: string
+      dry_run:
+        description: Preflight only; do not upload/install
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-cockpit-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Cockpit
+    runs-on: [self-hosted, macos, focusa-deploy, cockpit-sign]
+    environment: production
+    env:
+      COCKPIT_DEPLOY_INSTALL_ROOT: ${{ vars.COCKPIT_DEPLOY_INSTALL_ROOT }}
+      COCKPIT_DEPLOY_SERVICE_NAME: ${{ vars.COCKPIT_DEPLOY_SERVICE_NAME }}
+      COCKPIT_DEPLOY_HEALTH_URL: ${{ vars.COCKPIT_DEPLOY_HEALTH_URL }}
+    steps:
+      - name: Resolve release tag
+        id: target
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPLAY_TITLE: ${{ github.event.release.tag_name }}
+        run: |
+          if [ "$EVENT_NAME" = "release" ]; then
+            echo "tag=$DISPLAY_TITLE" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Preflight
+        run: |
+          set -euo pipefail
+          : "${COCKPIT_DEPLOY_INSTALL_ROOT:?missing COCKPIT_DEPLOY_INSTALL_ROOT}"
+          : "${COCKPIT_DEPLOY_SERVICE_NAME:?missing COCKPIT_DEPLOY_SERVICE_NAME}"
+          : "${COCKPIT_DEPLOY_HEALTH_URL:?missing COCKPIT_DEPLOY_HEALTH_URL}"
+          echo "preflight ok"
+
+      - name: Checkout cockpit at tag
+        run: git checkout "${{ steps.target.outputs.tag }}"
+
+      - name: Build + sign + notarize (skip on dry_run)
+        if: steps.target.outputs.dry_run != 'true'
+        run: |
+          apps/cockpit/scripts/cockpit-release.sh
+
+      - name: Health check
+        if: steps.target.outputs.dry_run != 'true'
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "$COCKPIT_DEPLOY_HEALTH_URL" >/dev/null 2>&1; then
+              echo "cockpit healthy at $COCKPIT_DEPLOY_HEALTH_URL"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "cockpit health check timed out"
+          exit 1
+
+      - name: Append last-known-good audit row
+        if: success()
+        run: |
+          mkdir -p release-proof/cockpit
+          echo "{\"schema\":\"focusa.cockpit.audit.v1\",\"kind\":\"cockpit_last_known_good\",\"tag\":\"${{ steps.target.outputs.tag }}\",\"at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+            >> release-proof/cockpit/audit.jsonl
+          git add release-proof/cockpit/audit.jsonl
+          git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "audit: cockpit last-known-good ${{ steps.target.outputs.tag }}" || true
+          git push || true

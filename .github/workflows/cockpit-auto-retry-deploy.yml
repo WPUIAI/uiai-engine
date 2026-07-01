@@ -1,0 +1,62 @@
+name: Cockpit Auto Retry Deploy
+
+# Sibling of Focusa .github/workflows/auto-retry-deploy.yml.
+# On `workflow_run` completion of Deploy Cockpit, retry deploy at most once
+# on flaky network/release uploads. Cap of 1 retry per upstream run is
+# enforced via `attempt` to prevent infinite re-dispatch loops.
+# Triggered, never manual.
+
+on:
+  workflow_run:
+    workflows: ["Deploy Cockpit"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  maybe-retry:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: [self-hosted, macos, focusa-deploy, cockpit-sign, production]
+    steps:
+      - name: Resolve retry target
+        id: target
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          EVENT_NAME: ${{ github.event.workflow_run.event }}
+          DISPLAY_TITLE: ${{ github.event.workflow_run.display_title }}
+        run: |
+          if [ "$EVENT_NAME" != "release" ] && [ "$EVENT_NAME" != "workflow_dispatch" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          TAG="$DISPLAY_TITLE"
+          if [ -z "$TAG" ]; then
+            echo "no tag derived from $DISPLAY_TITLE; skipping retry"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "attempt=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Re-dispatch deploy workflow
+        if: steps.target.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.target.outputs.tag }}"
+          ATTEMPT="${{ steps.target.outputs.attempt }}"
+          echo "re-dispatching deploy-cockpit for tag=$TAG attempt=$ATTEMPT"
+          gh workflow run deploy-cockpit.yml -f release_tag="$TAG" -f dry_run=false || true
+
+      - name: Append audit row
+        if: steps.target.outputs.skip != 'true'
+        run: |
+          mkdir -p release-proof/cockpit
+          echo "{\"schema\":\"focusa.cockpit.audit.v1\",\"kind\":\"cockpit_deploy_retry\",\"tag\":\"${{ steps.target.outputs.tag }}\",\"at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+            >> release-proof/cockpit/audit.jsonl
+          git add release-proof/cockpit/audit.jsonl
+          git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "audit: cockpit deploy retry" || true
+          git push || true

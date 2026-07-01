@@ -1,0 +1,49 @@
+name: Cockpit Audit Recorder
+
+# Sibling of Focusa .github/workflows/audit-recorder.yml.
+# Runs on a schedule and on every PR/push to keep the cockpit audit trail
+# (release-proof/cockpit/audit.jsonl) healthy.
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  pull_request:
+    paths:
+      - 'apps/cockpit/**'
+      - '.github/workflows/cockpit-audit-recorder.yml'
+      - 'release-proof/cockpit/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit-cockpit:
+    name: Cockpit audit trail
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y python3 jq
+
+      - name: Ensure cockpit audit path
+        run: |
+          mkdir -p release-proof/cockpit
+          touch release-proof/cockpit/audit.jsonl
+
+      - name: Audit schema validate (cockpit)
+        run: python3 scripts/auto-heal-cockpit-audit.py --kind validate --reason "cockpit audit-recorder hourly"
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- release-proof/cockpit/audit.jsonl; then
+            echo "no cockpit audit changes"
+            exit 0
+          fi
+          git add release-proof/cockpit/audit.jsonl
+          git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "audit: cockpit audit-recorder tick" || true
+          git push || true
