@@ -90,11 +90,7 @@ jobs:
   build-upload:
     name: Build and upload platform binaries
     needs: create-release
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.platform }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
