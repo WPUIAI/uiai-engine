@@ -6,6 +6,8 @@
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APPS_COCKPIT="${REPO_ROOT}/apps/cockpit"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STAMP="$SCRIPT_DIR/stamp-cockpit-version/stamp-cockpit-version"
 TAG="${TAG:-cockpit-v0.1.0}"
 
 cd "${APPS_COCKPIT}"
@@ -14,7 +16,7 @@ VERSION="${TAG#cockpit-v}"
 VERSION="${VERSION%-dev}"
 
 echo "== stamping ${VERSION} =="
-apps/cockpit/scripts/stamp-cockpit-version/stamp-cockpit-version "$VERSION"
+"$STAMP" "$VERSION"
 
 echo "== npm ci =="
 npm ci

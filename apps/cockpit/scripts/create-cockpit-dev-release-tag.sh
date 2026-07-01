@@ -9,6 +9,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# Resolve sibling script path from the same scripts/ dir
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STAMP="$SCRIPT_DIR/stamp-cockpit-version/stamp-cockpit-version"
+
 BASE="0.1"
 PUSH=0
 
@@ -52,7 +56,7 @@ TAG="cockpit-v${NEXT}-dev"
 echo "computed next tag: $TAG"
 
 # Stamp version into apps/cockpit/src/lib/version.ts and tauri.conf.json
-apps/cockpit/scripts/stamp-cockpit-version/stamp-cockpit-version "$NEXT-dev"
+"$STAMP" "$NEXT-dev"
 
 if [ "$PUSH" = "0" ]; then
   echo "dry-run: would create + push tag $TAG"
