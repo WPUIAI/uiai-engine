@@ -23,7 +23,7 @@ permissions:
 jobs:
   maybe-retry:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
-    runs-on: [self-hosted, macos, focusa-cockpit-deploy, cockpit-sign, production]
+    runs-on: [self-hosted, macos, uaiengine-cockpit-deploy, cockpit-sign, production]
     steps:
       - name: Resolve retry target
         id: target

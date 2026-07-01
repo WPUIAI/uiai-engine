@@ -2,7 +2,7 @@
   import { phase0Cards } from "$lib/cards/phase0-card-manifest";
 </script>
 
-<h1>Focusa Cockpit</h1>
+<h1>UIAI Engine Cockpit</h1>
 <p class="muted">Backend-first shell (Slice 0). Phase 0 card manifest loaded into the navigator.</p>
 
 <section class="cards" aria-label="Phase 0 cards">

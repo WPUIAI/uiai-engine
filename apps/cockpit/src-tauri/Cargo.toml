@@ -1,8 +1,8 @@
 [package]
-name = "focusa-cockpit"
+name = "uaiengine-cockpit"
 version = "0.1.0-dev"
 edition = "2021"
-description = "Focusa Cockpit — Tauri desktop shell"
+description = "UIAI Engine Cockpit — Tauri desktop shell"
 license = "Commercial"
 
 [build-dependencies]

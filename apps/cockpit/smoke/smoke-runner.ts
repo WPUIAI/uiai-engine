@@ -58,12 +58,12 @@ async function runDiscovery() {
   record(
     "discover: Tailscale MagicDNS probe list present",
     true,
-    "would probe focusa-vps / focusa / focusa-daemon + user hint",
+    "would probe cockpit-vps / uaiengine-cockpit / uaiengine-cockpit-daemon + user hint",
   );
   if (mockExternal) {
     record("discover: Bonjour _focusa._tcp.local browse", true, "mocked");
   }
-  record("discover: FOCUSA_DAEMON_URL env hint adopted", true, "mocked");
+  record("discover: COCKPIT_DAEMON_URL env hint adopted", true, "mocked");
   record("discover: CLI paste fallback available", true, "mocked");
 }
 
@@ -166,7 +166,7 @@ async function main() {
   }
 
   const report = {
-    schema: "focusa.cockpit.smoke.v1",
+    schema: "uaiengine.cockpit.smoke.v1",
     started_at: new Date().toISOString(),
     ended_at: new Date().toISOString(),
     mode: mode.localOnly ? "local_only" : "cloud_profile",

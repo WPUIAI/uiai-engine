@@ -608,7 +608,7 @@ Smoke report schema:
 
 ```json
 {
-  "schema": "focusa.cockpit.smoke.v1",
+  "schema": "uaiengine.cockpit.smoke.v1",
   "mode": "local_only",
   "started_at": "...",
   "ended_at": "...",
@@ -720,8 +720,8 @@ Where `release-metadata.json` includes at minimum:
 
 ```json
 {
-  "schema": "focusa.cockpit.release.v1",
-  "app": "focusa-cockpit",
+  "schema": "uaiengine.cockpit.release.v1",
+  "app": "uaiengine-cockpit",
   "version": "0.1.0",
   "channel": "stable|preview|dev",
   "tauri_version": "2.x",
@@ -1298,7 +1298,7 @@ User-controlled, non-secret settings live in `lib/settings/` and are persisted v
 
 ```ts
 interface UserSettings {
-  schema: "focusa.cockpit.settings.v1";
+  schema: "uaiengine.cockpit.settings.v1";
   operating_profile: "local_only" | "cloud_profile";
   selected_node_id?: string;
   selected_scope?: {
@@ -1477,9 +1477,9 @@ scripts/deploy-smoke-check.sh                (already shared; reused for cockpit
 Required artifacts:
 
 ```text
-apps/cockpit/release-metadata.json   (schema focusa.cockpit.release.v1)
+apps/cockpit/release-metadata.json   (schema uaiengine.cockpit.release.v1)
 apps/cockpit/release-checksums.txt   (sha256 per artifact)
-apps/cockpit/smoke-report.json       (schema focusa.cockpit.smoke.v1)
+apps/cockpit/smoke-report.json       (schema uaiengine.cockpit.smoke.v1)
 dist/Focusa-Cockpit-*.dmg            (signed, notarized)
 dist/Focusa-Cockpit-*.app.tar.gz     (optional)
 release-proof/cockpit/audit.jsonl    (append-only cockpit audit)
@@ -1589,8 +1589,8 @@ Every public cockpit artifact must be checkable from a single source of truth.
 
 ```json
 {
-  "schema": "focusa.cockpit.bundle_manifest.v1",
-  "app": "focusa-cockpit",
+  "schema": "uaiengine.cockpit.bundle_manifest.v1",
+  "app": "uaiengine-cockpit",
   "version": "0.1.0",
   "channel": "stable",
   "tag": "cockpit-v0.1.0",
@@ -1981,7 +1981,7 @@ export default defineConfig({
   },
   "app": {
     "windows": [
-      { "label": "main", "title": "Focusa Cockpit", "width": 1280, "height": 800, "resizable": true, "decorations": true, "fullscreen": false }
+      { "label": "main", "title": "UIAI Engine Cockpit", "width": 1280, "height": 800, "resizable": true, "decorations": true, "fullscreen": false }
     ],
     "security": {
       "csp": "default-src 'self'; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost https://api.focusa.dev http://127.0.0.1:7456 http://127.0.0.1:8787"
@@ -2793,7 +2793,7 @@ Each resolved hard part (H1–H20) has a corresponding acceptance gate landed in
 - [ ] release-metadata.json sha256 matches release-checksums.txt.
 - [ ] audit row kind=`cockpit_release_published` appended.
 - [ ] rollback runbook reproducible from a single workflow_dispatch.
-- [ ] bundle manifest `focusa.cockpit.bundle_manifest.v1` re-validates on operator machine.
+- [ ] bundle manifest `uaiengine.cockpit.bundle_manifest.v1` re-validates on operator machine.
 
 ### 14.5 Operator-visible acceptance
 
@@ -2847,7 +2847,7 @@ Each gate corresponds 1:1 to a bead (H21–H52) tracked in `.beads/`.
 - [ ] V5: Pairing panel shows the two paths side-by-side; defaults: local_only suppresses Path B; cloud_profile surfaces Path B; AUTO_PAIR_DENY=1 forces Path A; AUTO_PAIR_QUIET=1 auto-accepts Path B; AUTO_PAIR=1 explicit CI opt-in for Path B without TTY check.
 - [ ] V6: Nightly integration test covers menubar + cockpit + daemon in three roles.
 - [ ] V7: Per-URL Path B dismiss persists 30 days; settings panel exposes re-enable auto-add suggestions toggle.
-- [ ] V8: After either path, Keychain has cockpit token under Focusa Cockpit Token; daemon ledger has cockpit device row; UserSettings.pairing_provenance is set.
+- [ ] V8: After either path, Keychain has cockpit token under UIAI Engine Cockpit Token; daemon ledger has cockpit device row; UserSettings.pairing_provenance is set.
 - [ ] V9: Mac B cockpit can resolve menubar's pairing via daemon's devices list after Mac B pairs; no Mac-A-specific Keychain needed.
 - [ ] V10: Both paths append the appropriate CockpitEvent with audit row schema validated.
 
@@ -2954,8 +2954,8 @@ Acceptance gate:
 Schema versioning for UserSettings:
 
 ```ts
-interface UserSettingsV1 { schema: "focusa.cockpit.settings.v1"; /* ... */ }
-// future: UserSettingsV2 { schema: "focusa.cockpit.settings.v2"; /* ... */ }
+interface UserSettingsV1 { schema: "uaiengine.cockpit.settings.v1"; /* ... */ }
+// future: UserSettingsV2 { schema: "uaiengine.cockpit.settings.v2"; /* ... */ }
 ```
 
 Rules:
@@ -3595,7 +3595,7 @@ cockpit ──HTTP/WS──▶ <daemon_url> ◀──HTTP/WS── menubar
 ```
 
 - Both apps have their **own** daemon-bound device token (Spec 53 / Spec 115 §9.3).
-- Cockpit's token is stored under macOS Keychain service `"Focusa Cockpit Token"`; menubar's remains under `"Focusa Menubar Device Token"` (Spec 53 §A.7).
+- Cockpit's token is stored under macOS Keychain service `"UIAI Engine Cockpit Token"`; menubar's remains under `"Focusa Menubar Device Token"` (Spec 53 §A.7).
 - Each app stores `daemon_url`, `daemon_token`, `device_id`, `scopes`, `expires_at`, `continuity_id` (if known) under **its own** Keychain service.
 - Authority (canonical vs observation) is governed by Focusa Spec 43 + Spec 104 + CRDT. No app-↔-app-talk to mutate canonical state.
 - Cockpit inherits menubar's `daemon_url` only when the operator clicks "Add this machine"; the **token + device_id remain distinct**.
@@ -3608,7 +3608,7 @@ Two interoperating paths:
 
 | Path | Trigger | Steps required | Use case |
 | --- | --- | --- | --- |
-| A — Replicated menubar pairing (first choice) | first-run or `Re-pair from menubar` | Tailscale → Bonjour → env → CLI paste fallback → bridge open → phone scans QR → VPS mints token → MAC stores in Keychain (`Focusa Cockpit Token`) | operator on a fresh machine, no menubar install, or operator prefers explicit pairing |
+| A — Replicated menubar pairing (first choice) | first-run or `Re-pair from menubar` | Tailscale → Bonjour → env → CLI paste fallback → bridge open → phone scans QR → VPS mints token → MAC stores in Keychain (`UIAI Engine Cockpit Token`) | operator on a fresh machine, no menubar install, or operator prefers explicit pairing |
 | B — Less-friction auto-add (side path) | A discovered a daemon_url AND `focusa-platform` Keychain hint matches that URL AND menubar's paired=true on that URL | 2 clicks: notification → Add | operator has menubar paired on the same Mac and wants the cockpit to inherit pairing without re-entering discovery |
 
 #### 17.3.1 Path A — replicated menubar pairing flow (first choice)
@@ -3628,7 +3628,7 @@ Step 4: show_qr — at this moment, IF menubar's Keychain hint matches the disco
               (§17.3.2), surface the auto-add side path before/with the QR code.
 Step 5: waiting_phone — operator scans QR with phone PWA, phone posts to /v1/connect/rooms + /mac-offer.
 Step 6: vps_wait — VPS creates room, Mac polls /v1/connect/rooms + /v1/connect/room/{id}/status every 1.5s.
-Step 7: connected — token returned via bridge callback OR /status poll. Token stored under Keychain service "Focusa Cockpit Token".
+Step 7: connected — token returned via bridge callback OR /status poll. Token stored under Keychain service "UIAI Engine Cockpit Token".
 ```
 
 Each step mirrors the menubar-first-run ladder exactly:
@@ -3668,7 +3668,7 @@ On `Add this machine`:
 - POST /v1/device/pair/start to <daemon_url> with client_type="cockpit" and the menubar Keychain device_id cross-reference (so the daemon can prove ownership).
 - Receive pair_token + nonce.
 - Skip the bridge / phone QR / VPS flow entirely.
-- Persist pair_token under "Focusa Cockpit Token" with provenance `source=auto_via_menubar`.
+- Persist pair_token under "UIAI Engine Cockpit Token" with provenance `source=auto_via_menubar`.
 - Append CockpitEvent kind=auto_pair_observed_via_menubar.
 - Notify the user: "Cockpit is now paired to <daemon_label>."
 ```
@@ -3739,7 +3739,7 @@ Manifest:
 ```json
 {
   "schema": "focusa.app.manifest.v1",
-  "app": "focusa-menubar" | "focusa-cockpit",
+  "app": "focusa-menubar" | "uaiengine-cockpit",
   "version": "0.9.51-dev",
   "channel": "stable | preview | dev",
   "build_id": "...",
@@ -3814,7 +3814,7 @@ Windows:  Windows Credential Manager via tauri-plugin-keyring (per-user)
 Sandbox:  app keychain via freedesktop.org Secret Service
 ```
 
-- All platforms store `{daemon_url, daemon_token, device_id, scopes, expires_at}` under service `"Focusa Cockpit Token"`.
+- All platforms store `{daemon_url, daemon_token, device_id, scopes, expires_at}` under service `"UIAI Engine Cockpit Token"`.
 - Shared `focusa-platform` hint entry holds `{daemon_url, last_verified_at, client_types_seen}`.
 - A platform must never fall back to plaintext local file storage for tokens.
 
@@ -3935,7 +3935,7 @@ macOS hardened runtime + sandbox can block a second Tauri binary from reading an
 </array>
 ```
 
-- `focusa-platform` and `Focusa Cockpit Token` entries are tagged with access group `$(AppIdentifierPrefix)com.focusa.shared-focusa` to grant read to both menubar and cockpit.
+- `focusa-platform` and `UIAI Engine Cockpit Token` entries are tagged with access group `$(AppIdentifierPrefix)com.focusa.shared-focusa` to grant read to both menubar and cockpit.
 - Both apps set `com.apple.security.app-sandbox=true` and add the same `application-groups` declaration.
 - Verified via macOS keychain ACL test (`security cms-find-identity-participating` not required; just verify `security find-generic-password -s focusa-platform` works as either user).
 - On Linux/Windows, secret-service / credential-manager isolation is per-user, which is the natural boundary.
@@ -3976,7 +3976,7 @@ Mac starts.
 │           │       [Add] [Details] [Not now]
 │           └── on Add:
 │                   ├── POST /v1/device/pair/start client_type=cockpit
-│                   ├── store token in "Focusa Cockpit Token"
+│                   ├── store token in "UIAI Engine Cockpit Token"
 │                   ├── append CockpitEvent auto_pair_observed_via_menubar
 │                   └── refresh pair-status card with ★ marker
 ├── menubar is installed but not paired

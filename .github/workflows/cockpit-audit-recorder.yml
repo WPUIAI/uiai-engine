@@ -47,7 +47,7 @@ jobs:
           # new branch, push, and re-dispatch the failed workflow.
           mkdir -p release-proof/cockpit
           cat >> release-proof/cockpit/audit.jsonl <<EOF
-          {"schema":"focusa.cockpit.audit.v1","kind":"cockpit_ci_failure","workflow":"${WORKFLOW}","run_id":"${RUN_ID}","head_sha":"${HEAD_SHA}","branch":"${BRANCH}","at":"${TS}","log_url":"${LOG_URL}"}
+          {"schema":"uaiengine.cockpit.audit.v1","kind":"cockpit_ci_failure","workflow":"${WORKFLOW}","run_id":"${RUN_ID}","head_sha":"${HEAD_SHA}","branch":"${BRANCH}","at":"${TS}","log_url":"${LOG_URL}"}
           EOF
           python3 apps/cockpit/scripts/auto-heal-cockpit-audit.py "${RUN_ID}" "failure" "${WORKFLOW}"
 
@@ -65,8 +65,8 @@ jobs:
             echo "[audit-recorder] no audit changes"
             exit 0
           fi
-          git config user.name 'focusa-cockpit-bot'
-          git config user.email 'focusa-cockpit-bot@users.noreply.github.com'
+          git config user.name 'uaiengine-cockpit-bot'
+          git config user.email 'uaiengine-cockpit-bot@users.noreply.github.com'
           git add release-proof/cockpit/audit.jsonl
           git commit -m "audit(cockpit): self-heal append from ${{ github.event_name }} @ ${{ github.run_id }}"
           git push

@@ -65,25 +65,25 @@ jobs:
           |----------|-------|-------------|
           | macOS Apple Silicon | \`focusa-${TAG}-aarch64-apple-darwin\` | CLI |
           | macOS Intel | \`focusa-${TAG}-x86_64-apple-darwin\` | CLI |
-          | macOS Apple Silicon | \`focusa-cockpit-${TAG}-aarch64-apple-darwin\` | API daemon |
-          | macOS Intel | \`focusa-cockpit-${TAG}-x86_64-apple-darwin\` | API daemon |
+          | macOS Apple Silicon | \`uaiengine-cockpit-${TAG}-aarch64-apple-darwin\` | API daemon |
+          | macOS Intel | \`uaiengine-cockpit-${TAG}-x86_64-apple-darwin\` | API daemon |
           | macOS Apple Silicon | \`focusa-tui-${TAG}-aarch64-apple-darwin\` | TUI dashboard |
           | macOS Intel | \`focusa-tui-${TAG}-x86_64-apple-darwin\` | TUI dashboard |
           | macOS Apple Silicon / Intel | \`Focusa_*\` DMG / app archives | Menubar app |
           | Linux x64 glibc | \`focusa-${TAG}-x86_64-unknown-linux-gnu\` | CLI |
-          | Linux x64 glibc | \`focusa-cockpit-${TAG}-x86_64-unknown-linux-gnu\` | API daemon |
+          | Linux x64 glibc | \`uaiengine-cockpit-${TAG}-x86_64-unknown-linux-gnu\` | API daemon |
           | Linux x64 glibc | \`focusa-tui-${TAG}-x86_64-unknown-linux-gnu\` | TUI dashboard |
           | Linux x64 musl/static | \`focusa-${TAG}-x86_64-unknown-linux-musl\` | CLI compatible with older glibc hosts |
-          | Linux x64 musl/static | \`focusa-cockpit-${TAG}-x86_64-unknown-linux-musl\` | API daemon compatible with older glibc hosts |
+          | Linux x64 musl/static | \`uaiengine-cockpit-${TAG}-x86_64-unknown-linux-musl\` | API daemon compatible with older glibc hosts |
           | Linux x64 musl/static | \`focusa-tui-${TAG}-x86_64-unknown-linux-musl\` | TUI dashboard compatible with older glibc hosts |
 
           ### Quick Start (macOS/Linux)
           \`\`\`bash
           # Download and extract matching CLI/daemon assets from this release.
-          chmod +x ./focusa-${TAG}-<your-platform> ./focusa-cockpit-${TAG}-<your-platform>
+          chmod +x ./focusa-${TAG}-<your-platform> ./uaiengine-cockpit-${TAG}-<your-platform>
 
           # Start the daemon.
-          ./focusa-cockpit-${TAG}-<your-platform>
+          ./uaiengine-cockpit-${TAG}-<your-platform>
 
           # In another terminal, check status.
           ./focusa-${TAG}-<your-platform> status
@@ -281,7 +281,7 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           mkdir -p dist
-          for bin in focusa-cockpit focusa focusa-tui; do
+          for bin in uaiengine-cockpit focusa focusa-tui; do
             if [ -f "target/${{ matrix.target }}/release/$bin" ]; then
               cp "target/${{ matrix.target }}/release/$bin" "dist/${bin}-${TAG}-${{ matrix.target }}"
             fi

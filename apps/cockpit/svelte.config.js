@@ -1,7 +1,7 @@
 import adapter from "@sveltejs/adapter-static";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 
-/** SvelteKit config for Focusa Cockpit.
+/** SvelteKit config for UIAI Engine Cockpit.
  *
  *  Static-adapter SPA: Tauri does not support server-based frontend
  *  solutions inside the app. Build output is `build/` which Tauri

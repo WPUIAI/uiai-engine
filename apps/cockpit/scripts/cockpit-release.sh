@@ -56,8 +56,8 @@ CHANNEL="stable"
 [[ "$VERSION" == *-preview ]] && CHANNEL="preview"
 
 echo "$ARTIFACTS_JSON" | jq --arg v "$VERSION" --arg c "$CHANNEL" --arg t "$TAG" '{
-  schema: "focusa.cockpit.release.v1",
-  app: "focusa-cockpit",
+  schema: "uaiengine.cockpit.release.v1",
+  app: "uaiengine-cockpit",
   version: $v,
   channel: $c,
   tag: $t,

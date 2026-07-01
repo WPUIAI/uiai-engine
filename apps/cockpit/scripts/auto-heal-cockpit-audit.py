@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focusa Cockpit self-heal — real fix, not just a claim.
+"""UIAI Engine Cockpit self-heal — real fix, not just a claim.
 
 Pipeline (workflow_run: completed triggers this from
 cockpit-audit-recorder.yml when a cockpit CI/release run fails):
@@ -27,7 +27,7 @@ from pathlib import Path
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "WPUIAI/uiai-engine")
 AUDIT_FILE = Path("release-proof/cockpit/audit.jsonl")
-SCHEMA = "focusa.cockpit.audit.v1"
+SCHEMA = "uaiengine.cockpit.audit.v1"
 
 # Each fix has: id, match (substring in log), apply (Python lambda path -> bool).
 # Fixes are applied in order; first match wins.
@@ -116,8 +116,8 @@ def commit_and_push(branch: str, message: str) -> None:
     subprocess.run(["git", "add", "-A"], check=True)
     subprocess.run(
         [
-            "git", "-c", "user.name=focusa-cockpit-bot",
-            "-c", "user.email=focusa-cockpit-bot@users.noreply.github.com",
+            "git", "-c", "user.name=uaiengine-cockpit-bot",
+            "-c", "user.email=uaiengine-cockpit-bot@users.noreply.github.com",
             "commit", "-m", message,
         ],
         check=False,  # may be nothing to commit

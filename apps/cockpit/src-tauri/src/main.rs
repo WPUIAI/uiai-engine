@@ -1,4 +1,4 @@
-//! Focusa Cockpit — Tauri v2 desktop shell.
+//! UIAI Engine Cockpit — Tauri v2 desktop shell.
 //!
 //! Bridge commands (§17.3.1, §17.6) and Bonjour discovery (§17.1)
 //! match the menubar FirstRunWizard implementation one-to-one.
@@ -18,5 +18,5 @@ fn main() {
         ])
         .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
-        .expect("error while running focusa-cockpit");
+        .expect("error while running uaiengine-cockpit");
 }

@@ -1,4 +1,6 @@
-//! Bridge commands — sibling of Focusa menubar FirstRunWizard.
+//! Bridge commands — sibling of Focusa menubar FirstRunWizard, but for the
+//! UIAI Engine Cockpit desktop app. Same wire format, same bridge protocol
+//! (`focusa-connect-v1`), same ScopeContext preservation (Spec 104 MBN-01).
 //! Spec 53 §2.0, Spec 54 §B.5, §17.3.1 Path A replicated pairing.
 
 use std::collections::{HashMap, HashSet};

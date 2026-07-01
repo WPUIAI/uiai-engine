@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create the next cockpit-vX.Y.Z-dev tag for Focusa Cockpit.
+# Create the next cockpit-vX.Y.Z-dev tag for UIAI Engine Cockpit.
 #
 # Usage:
 #   scripts/create-cockpit-dev-release-tag.sh --base 0.1          # dry-run

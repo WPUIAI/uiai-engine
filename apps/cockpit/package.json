@@ -1,9 +1,9 @@
 {
-  "name": "focusa-cockpit",
+  "name": "uaiengine-cockpit",
   "version": "0.1.0-dev",
   "private": true,
   "type": "module",
-  "description": "Focusa Cockpit — Svelte/Tauri developer/operator desktop client (Slice 0).",
+  "description": "UIAI Engine Cockpit — Svelte/Tauri developer/operator desktop client (Slice 0).",
   "engines": {
     "node": ">=20"
   },
