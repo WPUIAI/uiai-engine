@@ -39,19 +39,20 @@ jobs:
       - name: Web build
         working-directory: apps/cockpit
         run: npm run build
-      - name: Tauri build (no bundle, icon-independent)
+      - name: Generate icons (if missing)
         working-directory: apps/cockpit
-        # Use --no-bundle so the build does not require icons/* which are
-        # added by the release/tag pipeline. This proves the tauri compile
-        # graph is green without forcing icon assets into the CI image.
-        run: npm run tauri build -- --no-bundle
-      - name: Validate macOS binary
-        if: runner.os == 'macOS'
+        run: ./scripts/generate-icons.sh
+      - name: Tauri package proof
+        working-directory: apps/cockpit
+        run: npm run tauri build -- --bundles app
+      - name: Validate macOS bundle
         run: |
           set -euo pipefail
-          BIN=apps/cockpit/src-tauri/target/release/uaiengine-cockpit
-          test -x "$BIN" || { echo "missing binary"; exit 1; }
-          echo "Built binary: $($BIN --version 2>&1 | head -1)"
+          APP_PATH=$(find apps/cockpit/src-tauri/target/release/bundle/macos -name "*.app" | head -1)
+          test -n "$APP_PATH"
+          echo "Found bundle: $APP_PATH"
+          test -f "$APP_PATH/Contents/Info.plist"
+          /usr/bin/plutil -lint "$APP_PATH/Contents/Info.plist"
       - name: Vitest (optional)
         working-directory: apps/cockpit
         run: npm run test || true

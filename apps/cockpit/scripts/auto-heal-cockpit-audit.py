@@ -63,16 +63,23 @@ FIXES = [
         "validate": lambda content: '"frontendDist": "../build"' in content,
     },
     {
-        "id": "fix-cockpit-tauri-no-bundle-ci",
+        "id": "fix-cockpit-tauri-icons",
         "match": "failed to open icon",
         "description": (
-            "Tauri bundle step requires icons/* which are produced by the "
-            "release pipeline, not the public CI. Use `tauri build --no-bundle` "
-            "in CI and only bundle on tag push."
+            "Tauri's generate_context! macro requires icons/* before the build "
+            "macro runs (even with --no-bundle). Run apps/cockpit/scripts/"
+            "generate-icons.sh to create placeholder icons from a minimal PNG."
         ),
         "files": [".github/workflows/cockpit.yml"],
-        "bad": "npm run tauri build -- --bundles app",
-        "good": "npm run tauri build -- --no-bundle",
+        "bad": "- name: Typecheck\n        working-directory: apps/cockpit\n        run: npm run check",
+        "good": (
+            "- name: Generate icons (if missing)\n"
+            "        working-directory: apps/cockpit\n"
+            "        run: ./scripts/generate-icons.sh\n"
+            "      - name: Typecheck\n"
+            "        working-directory: apps/cockpit\n"
+            "        run: npm run check"
+        ),
     },
     {
         "id": "fix-cockpit-rollup-darwin-arm64-optional",

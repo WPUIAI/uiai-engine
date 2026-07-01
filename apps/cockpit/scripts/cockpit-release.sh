@@ -7,7 +7,7 @@ set -euo pipefail
 set -euo pipefail
 SELF="$(readlink -f "$0")"
 SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 APPS_COCKPIT="${REPO_ROOT}/apps/cockpit"
 STAMP="$SCRIPT_DIR/stamp-cockpit-version/stamp-cockpit-version"
 TAG="${TAG:-cockpit-v0.1.0}"

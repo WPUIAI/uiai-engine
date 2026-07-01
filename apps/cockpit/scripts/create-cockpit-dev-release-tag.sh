@@ -8,7 +8,7 @@
 set -euo pipefail
 SELF="$(readlink -f "$0")"
 SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 cd "$REPO_ROOT"
 
 STAMP="$SCRIPT_DIR/stamp-cockpit-version/stamp-cockpit-version"
