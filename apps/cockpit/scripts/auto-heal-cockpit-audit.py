@@ -86,16 +86,43 @@ def gh(*args: str, check: bool = True) -> str:
 
 
 def fetch_run_logs(run_id: str) -> str:
-    """Pull all logs for a run via gh api (zip on the API side, plain text on gh)."""
+    """Pull all logs for a run. Returns concatenated text across all log files.
+
+    GitHub returns a zip archive (PK\\x03\\x04 header), so download to a temp
+    file, extract with the stdlib zipfile module, and concatenate plain text.
+    """
+    import tempfile
+    import zipfile
+
     try:
-        r = subprocess.run(
-            ["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/logs"],
-            capture_output=True, text=True,
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+            tmp_path = tmp.name
+        subprocess.run(
+            ["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/logs",
+             "--output", tmp_path],
+            check=True, capture_output=True, text=True,
         )
-        return r.stdout
     except Exception as e:
         print(f"[auto-heal] log fetch failed: {e}", file=sys.stderr)
         return ""
+    finally:
+        pass
+
+    try:
+        with zipfile.ZipFile(tmp_path, "r") as zf:
+            chunks: list[str] = []
+            for name in zf.namelist():
+                with zf.open(name) as fh:
+                    chunks.append(fh.read().decode("utf-8", errors="replace"))
+            return "\n".join(chunks)
+    except Exception as e:
+        print(f"[auto-heal] log extract failed: {e}", file=sys.stderr)
+        return ""
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 def detect_fix(log_blob: str) -> dict | None:

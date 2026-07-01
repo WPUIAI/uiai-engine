@@ -22,7 +22,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
         working-directory: apps/cockpit
-        run: npm ci
+        # --include=optional ensures @rollup/rollup-darwin-arm64 native binary
+        # is installed on macOS GitHub runners (npm optional-deps bug).
+        run: npm ci --include=optional
       - name: Typecheck
         working-directory: apps/cockpit
         run: npm run check
