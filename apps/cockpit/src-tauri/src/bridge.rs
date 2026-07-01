@@ -35,7 +35,7 @@ fn best_local_ip() -> String {
         .unwrap_or_else(|_| "127.0.0.1".to_string())
 }
 
-fn read_http_body(mut stream: &mut TcpStream) -> Result<String, String> {
+fn read_http_body(stream: &mut TcpStream) -> Result<String, String> {
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|e| format!("callback read timeout setup failed: {e}"))?;
