@@ -31,7 +31,12 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text().replace('port: 7456', f'port: {sys.argv[2]}', 1)
 s = s.replace('allow_private_urls: false', 'allow_private_urls: true', 1)
-s = s.replace('data_dir: "/home/wpuiai/uiai-engine/data"', 'data_dir: "/tmp/uiai-soak-data"', 1)
+s = s.replace('data_dir: "/home/wpuiai/uiai-engine/data"', f'data_dir: "{p.parent / "data"}"', 1)
+s = s.replace('share_dir: "/home/wpuiai/ai-api/shares"', f'share_dir: "{p.parent / "shares"}"', 1)
+s = s.replace('script_dir: "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"', f'script_dir: "{p.parent / "device-templates"}"', 1)
+s = s.replace('health_file: "/var/log/uiai/ip-pool-health.json"', f'health_file: "{p.parent / "ip-pool-health.json"}"', 1)
+s = s.replace('log_file: "/var/log/uiai/captcha-stats.jsonl"', f'log_file: "{p.parent / "captcha-stats.jsonl"}"', 1)
+s = s.replace('file: "/var/log/uiai/engine.log"', f'file: "{p.parent / "engine.log"}"', 1)
 p.write_text(s)
 PY
 mkdir -p "$TMPDIR/site" /tmp/uiai-soak-data
