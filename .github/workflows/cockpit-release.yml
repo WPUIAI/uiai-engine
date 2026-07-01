@@ -18,9 +18,10 @@ jobs:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - name: Cargo checks
+        working-directory: apps/cockpit/src-tauri
         run: |
-          cargo test --workspace
-          cargo clippy --workspace -- -D warnings
+          cargo test
+          cargo clippy -- -D warnings
 
       - uses: actions/setup-node@v6
         with:
