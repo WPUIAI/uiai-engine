@@ -60,22 +60,19 @@ jobs:
           fi
           mkdir -p /tmp/release-artifacts
           cat > /tmp/release-notes.md <<EOF
-          ## UIAI Engine ${TAG} — Cockpit Release
+          ## UIAI Engine Cockpit ${TAG}
 
-          UIAI Engine is a cross-product operator cockpit for agent continuity, scope authority, evidence, recovery, trajectory, and tool governance.
+          Cross-platform UIAI Engine Cockpit binary release.
 
-          ### What this release proves
-          - Frontend/build pipeline passed for this tag.
-          - `cargo test` and `cargo clippy -D warnings` passed.
-          - Tauri app was built for each release platform.
+          ### Assets
+          - Linux x86_64 binary (no-bundle)
+          - macOS x86_64 binary (no-bundle)
+          - Checksums for each asset
 
           ### Commits since previous tag
           ```
           ${COMMITS}
           ```
-
-          ### Assets
-          - `uaiengine-cockpit` binaries per platform (no-bundle tauri build output)
           EOF
 
       - name: Create GitHub release
@@ -88,36 +85,57 @@ jobs:
           prerelease: false
 
   build-upload:
-    name: Build and upload platform binaries
+    name: Build and upload (${{ matrix.platform }})
     needs: create-release
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            artifact_name: Linux_x86_64
+          - platform: macos-latest
+            artifact_name: macOS_x86_64
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Install system deps
+      - name: Install system deps (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf 2>&1 | tail -5
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'x86_64-apple-darwin' || '' }}
+
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: apps/cockpit/package-lock.json
+          cache: ${{ matrix.platform == 'ubuntu-latest' && 'npm' || 'none' }}
+          cache-dependency-path: ${{ matrix.platform == 'ubuntu-latest' && 'apps/cockpit/package-lock.json' || '' }}
 
       - name: Build no-bundle tauri binary
         working-directory: apps/cockpit
         env:
           TAG: ${{ github.ref_name }}
+          ARTIFACT_NAME: ${{ matrix.artifact_name }}
         run: |
           set -euo pipefail
+
+          # Always do fresh npm ci — avoids architecture-mismatch native modules from cached node_modules
           npm ci
-          ./scripts/generate-icons.sh
+
+          # Generate icons (macOS: iconutil; Linux: skip or use fallback)
+          if [ "$(uname)" = "Darwin" ]; then
+            ./scripts/generate-icons.sh
+          fi
+
           npm run build
+
+          # Build tauri — native on each platform
           npm run tauri build -- --no-bundle
 
           BIN="src-tauri/target/release/uaiengine-cockpit"
@@ -126,12 +144,11 @@ jobs:
             exit 1
           fi
 
-          PLATFORM_DIR="${{ runner.os }}"
-          RELEASE_TAG="${{ github.ref_name }}"
           ART_DIR="/tmp/release-artifacts"
           mkdir -p "$ART_DIR"
-          cp "$BIN" "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${PLATFORM_DIR}.bin"
-          shasum -a 256 "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${PLATFORM_DIR}.bin" > "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${PLATFORM_DIR}.bin.sha256"
+          cp "$BIN" "$ART_DIR/uaiengine-cockpit-${{ github.ref_name }}-${ARTIFACT_NAME}.bin"
+          shasum -a 256 "$ART_DIR/uaiengine-cockpit-${{ github.ref_name }}-${ARTIFACT_NAME}.bin" \
+            > "$ART_DIR/uaiengine-cockpit-${{ github.ref_name }}-${ARTIFACT_NAME}.bin.sha256"
 
       - name: Upload artifacts to release
         env:
