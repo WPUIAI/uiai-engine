@@ -63,6 +63,18 @@ FIXES = [
         "validate": lambda content: '"frontendDist": "../build"' in content,
     },
     {
+        "id": "fix-cockpit-tauri-no-bundle-ci",
+        "match": "failed to open icon",
+        "description": (
+            "Tauri bundle step requires icons/* which are produced by the "
+            "release pipeline, not the public CI. Use `tauri build --no-bundle` "
+            "in CI and only bundle on tag push."
+        ),
+        "files": [".github/workflows/cockpit.yml"],
+        "bad": "npm run tauri build -- --bundles app",
+        "good": "npm run tauri build -- --no-bundle",
+    },
+    {
         "id": "fix-cockpit-rollup-darwin-arm64-optional",
         "match": "Cannot find module @rollup/rollup-darwin-arm64",
         "description": (
