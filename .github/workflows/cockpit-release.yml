@@ -112,10 +112,16 @@ jobs:
           targets: ${{ matrix.platform == 'macos-latest' && 'x86_64-apple-darwin' || '' }}
 
       - uses: actions/setup-node@v6
+        if: matrix.platform == 'ubuntu-latest'
         with:
           node-version: '22'
-          cache: ${{ matrix.platform == 'ubuntu-latest' && 'npm' || 'none' }}
-          cache-dependency-path: ${{ matrix.platform == 'ubuntu-latest' && 'apps/cockpit/package-lock.json' || '' }}
+          cache: 'npm'
+          cache-dependency-path: apps/cockpit/package-lock.json
+
+      - uses: actions/setup-node@v6
+        if: matrix.platform == 'macos-latest'
+        with:
+          node-version: '22'
 
       - name: Build no-bundle tauri binary
         working-directory: apps/cockpit
