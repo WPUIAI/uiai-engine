@@ -63,7 +63,8 @@ type Pool struct {
 	// Commercial deployments may set false to allow localhost screenshots.
 	blockPrivateURLs bool
 	// Periodic browser recycle to prevent Chrome memory bloat
-	screenshotCount int64 // atomic: total screenshots taken since last Chrome restart
+	screenshotCount int64      // atomic: total screenshots taken since last Chrome restart
+	screenshotMu    sync.Mutex // serializes page.Screenshot() calls within this pool
 }
 
 const (
@@ -129,6 +130,10 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 
 	return p, nil
 }
+
+// ScreenshotLock serializes page.Screenshot() within a single Pool/Chromium process.
+func (p *Pool) ScreenshotLock()   { p.screenshotMu.Lock() }
+func (p *Pool) ScreenshotUnlock() { p.screenshotMu.Unlock() }
 
 // launchBrowser starts (or restarts) the Chrome process.
 func (p *Pool) launchBrowser() error {
