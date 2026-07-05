@@ -1,0 +1,182 @@
+name: UIAI Engine Release + OVH Deploy
+
+on:
+  push:
+    tags:
+      - 'engine-v*'
+      - 'uiai-engine-v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing/new engine release tag, e.g. engine-v2.0.1
+        required: true
+        type: string
+      deploy_to_ovh:
+        description: Deploy release artifact to OVH worker after release
+        required: false
+        default: true
+        type: boolean
+      dry_run:
+        description: Preflight only; do not upload/install on OVH
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  ENGINE_ASSET_NAME: uiai-engine-linux-amd64
+
+jobs:
+  build-release:
+    name: Build parent UIAI Engine release
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      asset_name: ${{ env.ENGINE_ASSET_NAME }}
+      sha256: ${{ steps.hash.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.release_tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          case "$tag" in
+            engine-v*|uiai-engine-v*) ;;
+            *) echo "release tag must start with engine-v or uiai-engine-v: $tag" >&2; exit 2 ;;
+          esac
+          version="${tag#engine-v}"
+          version="${version#uiai-engine-v}"
+          echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Test parent engine
+        run: go test ./...
+
+      - name: Build linux/amd64 engine binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -trimpath \
+            -ldflags "-s -w -X main.version=${{ steps.meta.outputs.version }} -X main.buildTime=${{ steps.meta.outputs.build_time }}" \
+            -o "dist/${ENGINE_ASSET_NAME}" \
+            ./cmd/uiai-engine
+          chmod +x "dist/${ENGINE_ASSET_NAME}"
+          "dist/${ENGINE_ASSET_NAME}" -version
+
+      - name: Hash release artifact
+        id: hash
+        shell: bash
+        run: |
+          sha256sum "dist/${ENGINE_ASSET_NAME}" | tee "dist/${ENGINE_ASSET_NAME}.sha256"
+          echo "sha256=$(awk '{print $1}' dist/${ENGINE_ASSET_NAME}.sha256)" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+        shell: bash
+        run: |
+          notes="dist/release-notes.md"
+          cat > "$notes" <<NOTES
+          # UIAI Engine ${RELEASE_TAG}
+
+          Parent UIAI Engine worker release.
+
+          - Commit: ${GITHUB_SHA}
+          - Artifact: ${ENGINE_ASSET_NAME}
+          - SHA256: ${{ steps.hash.outputs.sha256 }}
+          - Deploy target: OVH worker (via deploy job; public domains unchanged)
+          NOTES
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" --clobber
+          else
+            gh release create "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" \
+              --title "UIAI Engine ${RELEASE_TAG}" \
+              --notes-file "$notes"
+          fi
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: uiai-engine-release-${{ steps.meta.outputs.release_tag }}
+          path: |
+            dist/${{ env.ENGINE_ASSET_NAME }}
+            dist/${{ env.ENGINE_ASSET_NAME }}.sha256
+
+  deploy-ovh:
+    name: Deploy parent UIAI Engine to OVH worker
+    needs: build-release
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || inputs.deploy_to_ovh }}
+    environment: production
+    concurrency:
+      group: uiai-engine-ovh-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: uiai-engine-release-${{ needs.build-release.outputs.release_tag }}
+          path: dist
+
+      - name: Configure SSH key
+        env:
+          OVH_UIAI_SSH_KEY: ${{ secrets.OVH_UIAI_SSH_KEY }}
+          OVH_UIAI_SSH_HOST: ${{ secrets.OVH_UIAI_SSH_HOST }}
+          OVH_UIAI_SSH_USER: ${{ secrets.OVH_UIAI_SSH_USER }}
+          OVH_UIAI_SSH_PORT: ${{ secrets.OVH_UIAI_SSH_PORT }}
+        shell: bash
+        run: |
+          test -n "$OVH_UIAI_SSH_KEY" || { echo "OVH_UIAI_SSH_KEY secret is required" >&2; exit 2; }
+          test -n "$OVH_UIAI_SSH_HOST" || { echo "OVH_UIAI_SSH_HOST secret is required" >&2; exit 2; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OVH_UIAI_SSH_KEY" > ~/.ssh/id_uiai_ovh
+          chmod 600 ~/.ssh/id_uiai_ovh
+          cat > ~/.ssh/config <<CFG
+          Host uiai-ovh
+            HostName ${OVH_UIAI_SSH_HOST}
+            User ${OVH_UIAI_SSH_USER:-root}
+            Port ${OVH_UIAI_SSH_PORT:-22}
+            IdentityFile ~/.ssh/id_uiai_ovh
+            StrictHostKeyChecking accept-new
+            BatchMode yes
+          CFG
+
+      - name: Deploy to OVH worker
+        env:
+          ASSET_PATH: dist/uiai-engine-linux-amd64
+          REMOTE_HOST: uiai-ovh
+          REMOTE_USER: ${{ secrets.OVH_UIAI_SSH_USER }}
+          REMOTE_PORT: ${{ secrets.OVH_UIAI_SSH_PORT }}
+          RELEASE_TAG: ${{ needs.build-release.outputs.release_tag }}
+          REMOTE_INSTALL_ROOT: ${{ vars.OVH_UIAI_INSTALL_ROOT }}
+          REMOTE_SERVICE_NAME: ${{ vars.OVH_UIAI_SERVICE_NAME }}
+          REMOTE_HEALTH_URL: ${{ vars.OVH_UIAI_HEALTH_URL }}
+          WORKFLOW_DRY_RUN: ${{ inputs.dry_run }}
+          RUN_BROWSER_SMOKE: "1"
+        shell: bash
+        run: |
+          export REMOTE_INSTALL_ROOT="${REMOTE_INSTALL_ROOT:-/home/wpuiai/uiai-engine}"
+          export REMOTE_SERVICE_NAME="${REMOTE_SERVICE_NAME:-uiai-engine-ovh.service}"
+          export REMOTE_HEALTH_URL="${REMOTE_HEALTH_URL:-http://127.0.0.1:7456/v1/health}"
+          if [[ "${WORKFLOW_DRY_RUN:-false}" == "true" ]]; then export DRY_RUN=1; else export DRY_RUN=0; fi
+          scripts/deploy-engine-ovh.sh
