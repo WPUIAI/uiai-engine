@@ -23,7 +23,7 @@ if [[ ! -f "$ASSET_PATH" ]]; then
 fi
 if ! command -v sha256sum >/dev/null; then echo "sha256sum missing" >&2; exit 2; fi
 
-LOCAL_SHA=$(sha256sum "$ASSET_PATH" | awk "{print \\$1}")
+LOCAL_SHA=$(sha256sum "$ASSET_PATH" | cut -d   -f1)
 ASSET_BASENAME=$(basename "$ASSET_PATH")
 REMOTE_TMP="/tmp/${ASSET_BASENAME}.${RELEASE_TAG}.${LOCAL_SHA}.tmp"
 
@@ -82,7 +82,7 @@ stamp=$(date -u +%Y%m%dT%H%M%SZ)
 
 install -d -o "$owner" -g "$group" "$backup_dir"
 test -f "$remote_tmp"
-remote_sha=$(sha256sum "$remote_tmp" | awk "{print \\$1}")
+remote_sha=$(sha256sum "$remote_tmp" | cut -d   -f1)
 if [[ "$remote_sha" != "$expected_sha" ]]; then
   echo "remote sha mismatch: $remote_sha != $expected_sha" >&2
   exit 3
