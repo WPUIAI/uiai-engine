@@ -23,6 +23,8 @@ const MaxSessions = 4
 // SessionTTL is how long an idle session stays alive before auto-cleanup.
 const SessionTTL = 10 * time.Minute
 
+var screenshotCaptureMu sync.Mutex
+
 const (
 	sessionOpenAttempts = 2
 	elementRetryBudget  = 5 * time.Second
@@ -346,10 +348,12 @@ func (s *Session) Screenshot(format string, quality int) (*SnapResult, error) {
 		quality = 60
 	}
 
-	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
+	screenshotCaptureMu.Lock()
+	data, err := s.page.Timeout(12*time.Second).Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  f,
 		Quality: gson(quality),
 	})
+	screenshotCaptureMu.Unlock()
 	if err != nil {
 		return nil, fmt.Errorf("screenshot failed: %w", err)
 	}
