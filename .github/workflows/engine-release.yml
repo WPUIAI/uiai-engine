@@ -139,6 +139,7 @@ jobs:
           path: dist
 
       - name: Configure SSH key
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         env:
           OVH_UIAI_SSH_KEY: ${{ secrets.OVH_UIAI_SSH_KEY }}
           OVH_UIAI_SSH_HOST: ${{ secrets.OVH_UIAI_SSH_HOST }}
