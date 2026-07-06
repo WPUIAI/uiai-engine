@@ -346,16 +346,10 @@ func (s *Session) Screenshot(format string, quality int) (*SnapResult, error) {
 		quality = 60
 	}
 
-	if s.pool != nil {
-		s.pool.ScreenshotLock()
-	}
 	data, err := s.page.Timeout(12*time.Second).Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  f,
 		Quality: gson(quality),
 	})
-	if s.pool != nil {
-		s.pool.ScreenshotUnlock()
-	}
 	if err != nil {
 		return nil, fmt.Errorf("screenshot failed: %w", err)
 	}
