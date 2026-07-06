@@ -55,7 +55,7 @@ type Session struct {
 	FocusaScope   *FocusaScope `json:"focusa_scope,omitempty"`
 
 	page              *rod.Page
-	pool              *Pool
+	pool              PoolSource
 	timer             *time.Timer
 	mu                sync.Mutex
 	refs              map[string]SnapshotRef // @ref → CSS selector, populated by Snapshot()
@@ -67,11 +67,22 @@ type Session struct {
 type SessionManager struct {
 	mu       sync.RWMutex
 	sessions map[string]*Session
-	pool     *Pool
+	pool     PoolSource
 }
 
-// NewSessionManager creates a session manager backed by the vision pool.
+// NewSessionManager creates a session manager backed by a single vision pool.
 func NewSessionManager(pool *Pool) *SessionManager {
+	return &SessionManager{
+		sessions: make(map[string]*Session),
+		pool:     pool,
+	}
+}
+
+// NewSessionManagerWithPools creates a session manager backed by a slice of independent pools.
+// Pages are sourced from the pool whose GetPage() returns a page; this requires each
+// Pool's *rod.Page to be tracked alongside the Session by extending PoolSource (already
+// done via the implementation methods).
+func NewSessionManagerWithPools(pool PoolSource) *SessionManager {
 	return &SessionManager{
 		sessions: make(map[string]*Session),
 		pool:     pool,

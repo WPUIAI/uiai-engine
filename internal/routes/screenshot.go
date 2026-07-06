@@ -55,7 +55,7 @@ func screenshotFocusaMetadata(targetURL, artifactRef, format string, bytes int, 
 	return evidence
 }
 
-func MountScreenshotReal(r chi.Router, _ *config.Config, pool *vision.Pool, usage *storage.UsageStore) {
+func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource, usage *storage.UsageStore) {
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
 			URL         string              `json:"url"`

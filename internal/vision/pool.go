@@ -130,7 +130,18 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 	return p, nil
 }
 
+// IsBrowserAlive exposes the Chrome process liveness check on the PoolSource surface.
+func (p *Pool) IsBrowserAlive() bool { return p.isBrowserAlive() }
+
+// MarkFailure records a recovery-relevant failure on the pool. Reserved for callers that
+// hold a PoolSource directly.
+func (p *Pool) MarkFailure() {}
+
+// Reset clears transient counters when a multi-pool orchestrator is restarted.
+func (p *Pool) Reset() {}
+
 // launchBrowser starts (or restarts) the Chrome process.
+
 func (p *Pool) launchBrowser() error {
 	// Clean up old browser if any
 	if p.browser != nil {

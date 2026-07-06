@@ -18,7 +18,7 @@ import (
 )
 
 // MountScreenshotCompare registers the /api/screenshot/compare endpoint.
-func MountScreenshotCompare(r chi.Router, cfg *config.Config, pool *vision.Pool, aiProv *ai.Provider, creds *credits.Service, lim *ratelimit.Limiter, usage *storage.UsageStore) {
+func MountScreenshotCompare(r chi.Router, cfg *config.Config, pool vision.PoolSource, aiProv *ai.Provider, creds *credits.Service, lim *ratelimit.Limiter, usage *storage.UsageStore) {
 	r.Post("/compare", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
 			URL1     string `json:"url1"`

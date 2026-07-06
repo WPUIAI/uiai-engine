@@ -43,7 +43,7 @@ type Engine struct {
 	credits   *credits.Service
 	limiter   *ratelimit.Limiter
 	usage     *storage.UsageStore
-	vision    *vision.Pool
+	vision    vision.PoolSource
 	sessions  *vision.SessionManager
 	mediaJobs *media.JobStore
 	captcha   *captchaPkg.Solver
@@ -67,16 +67,43 @@ func New(cfg *config.Config) *Engine {
 	limiter := ratelimit.New(cfg)
 	usage := storage.NewUsageStore(cfg.Storage.DataDir, cfg.Storage.UsageFile)
 
-	// Vision pool (Rod/Chromium) — optional, degrades gracefully
-	var visionPool *vision.Pool
+	// Vision pool (Rod/Chromium) — optional, degrades gracefully.
+	// vision.browsers > 1 starts independent Chromium processes inside this worker.
+	var visionPool vision.PoolSource
 	if !cfg.Server.DisableVision {
-		var err error
-		visionPool, err = vision.NewPoolWithConfig(vision.PoolConfig{
-			MaxPages:         cfg.Server.VisionPoolSize,
-			AllowPrivateURLs: cfg.Vision.AllowPrivateURLs,
-		})
-		if err != nil {
-			log.Printf("[vision] WARNING: Pool init failed: %v (screenshot/share will return 503)", err)
+		browsers := cfg.Vision.Browsers
+		if browsers <= 0 {
+			browsers = 1
+		}
+		pages := cfg.Vision.PoolPages
+		if pages <= 0 {
+			pages = cfg.Server.VisionPoolSize
+		}
+		if pages <= 0 {
+			pages = cfg.Vision.PoolSize
+		}
+		if browsers == 1 {
+			p, err := vision.NewPoolWithConfig(vision.PoolConfig{
+				MaxPages:         pages,
+				AllowPrivateURLs: cfg.Vision.AllowPrivateURLs,
+			})
+			if err != nil {
+				log.Printf("[vision] WARNING: Pool init failed: %v (screenshot/share will return 503)", err)
+			} else {
+				visionPool = p
+			}
+		} else {
+			cfgs := make([]vision.PoolConfig, 0, browsers)
+			for i := 0; i < browsers; i++ {
+				cfgs = append(cfgs, vision.PoolConfig{MaxPages: pages, AllowPrivateURLs: cfg.Vision.AllowPrivateURLs})
+			}
+			mp, err := vision.NewMultiPool(cfgs)
+			if err != nil {
+				log.Printf("[vision] WARNING: MultiPool init failed: %v (screenshot/share will return 503)", err)
+			} else {
+				visionPool = mp
+				log.Printf("[vision] multi-pool enabled (browsers=%d, pages_per_browser=%d)", browsers, pages)
+			}
 		}
 	}
 
@@ -99,7 +126,7 @@ func New(cfg *config.Config) *Engine {
 	// Session manager for persistent browser sessions (LLM tool API)
 	var sessionMgr *vision.SessionManager
 	if visionPool != nil {
-		sessionMgr = vision.NewSessionManager(visionPool)
+		sessionMgr = vision.NewSessionManagerWithPools(visionPool)
 	}
 
 	// Captcha solver — uses AI provider + session API

@@ -35,7 +35,7 @@ var lastCapture struct {
 }
 
 // MountVisionInteractive registers all vision interactive routes.
-func MountVisionInteractive(r chi.Router, cfg *config.Config, pool *vision.Pool) {
+func MountVisionInteractive(r chi.Router, cfg *config.Config, pool vision.PoolSource) {
 	if pool == nil {
 		return
 	}
@@ -62,7 +62,7 @@ func MountVisionInteractive(r chi.Router, cfg *config.Config, pool *vision.Pool)
 // CORE ENDPOINTS
 // ═══════════════════════════════════════════════════════════
 
-func handleState(pool *vision.Pool) http.HandlerFunc {
+func handleState(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, err := pool.GetPage()
 		if err != nil {
@@ -76,7 +76,7 @@ func handleState(pool *vision.Pool) http.HandlerFunc {
 	}
 }
 
-func handleCapture(pool *vision.Pool) http.HandlerFunc {
+func handleCapture(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, err := pool.GetPage()
 		if err != nil {
@@ -109,7 +109,7 @@ func handleCapture(pool *vision.Pool) http.HandlerFunc {
 	}
 }
 
-func handleLook(pool *vision.Pool) http.HandlerFunc {
+func handleLook(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pageParam := r.URL.Query().Get("page")
 		if pageParam == "" {
@@ -168,7 +168,7 @@ func handleLook(pool *vision.Pool) http.HandlerFunc {
 	}
 }
 
-func handleInject(pool *vision.Pool) http.HandlerFunc {
+func handleInject(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			CSS string `json:"css"`
@@ -231,7 +231,7 @@ func handleInject(pool *vision.Pool) http.HandlerFunc {
 	}
 }
 
-func handleElement(pool *vision.Pool) http.HandlerFunc {
+func handleElement(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sel := r.URL.Query().Get("sel")
 		if sel == "" {
@@ -287,7 +287,7 @@ func handleElement(pool *vision.Pool) http.HandlerFunc {
 	}
 }
 
-func handleMulti(pool *vision.Pool) http.HandlerFunc {
+func handleMulti(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, err := pool.GetPage()
 		if err != nil {
@@ -337,7 +337,7 @@ func handleMulti(pool *vision.Pool) http.HandlerFunc {
 	}
 }
 
-func handleDiff(pool *vision.Pool) http.HandlerFunc {
+func handleDiff(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, err := pool.GetPage()
 		if err != nil {
@@ -397,7 +397,7 @@ func handleDiff(pool *vision.Pool) http.HandlerFunc {
 	}
 }
 
-func handleViewport(pool *vision.Pool) http.HandlerFunc {
+func handleViewport(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		width, _ := strconv.Atoi(r.URL.Query().Get("w"))
 		height, _ := strconv.Atoi(r.URL.Query().Get("h"))
@@ -430,7 +430,7 @@ func handleViewport(pool *vision.Pool) http.HandlerFunc {
 // ═══════════════════════════════════════════════════════════
 
 // handleAnalyze returns DOM analysis without taking a screenshot.
-func handleAnalyze(pool *vision.Pool) http.HandlerFunc {
+func handleAnalyze(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, err := pool.GetPage()
 		if err != nil {
@@ -468,7 +468,7 @@ func handleAnalyze(pool *vision.Pool) http.HandlerFunc {
 
 // handleCritiqueCapture navigates, captures desktop + optional mobile + DOM analysis.
 // POST body: { "page": "url-or-slug", "mobile": true }
-func handleCritiqueCapture(pool *vision.Pool) http.HandlerFunc {
+func handleCritiqueCapture(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Page   string `json:"page"`
@@ -581,7 +581,7 @@ func handleCritiqueCapture(pool *vision.Pool) http.HandlerFunc {
 
 // handleRegression captures current state and compares to previous.
 // POST body: { "page": "url-or-slug", "threshold": 500 }
-func handleRegression(pool *vision.Pool) http.HandlerFunc {
+func handleRegression(pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Page      string `json:"page"`

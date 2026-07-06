@@ -113,6 +113,8 @@ type TwoFactorProfile struct {
 type VisionConfig struct {
 	PoolSize          int           `yaml:"pool_size"`
 	MaxPool           int           `yaml:"max_pool"`
+	Browsers          int           `yaml:"browsers"`
+	PoolPages         int           `yaml:"pool_pages"`
 	IdleTimeout       time.Duration `yaml:"idle_timeout"`
 	ScreenshotQuality int           `yaml:"screenshot_quality"`
 	ShareDir          string        `yaml:"share_dir"`
@@ -200,6 +202,15 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Vision.MaxPool == 0 {
 		c.Vision.MaxPool = 8
+	}
+	if c.Vision.Browsers == 0 {
+		c.Vision.Browsers = 1
+	}
+	if c.Vision.PoolPages == 0 {
+		c.Vision.PoolPages = c.Server.VisionPoolSize
+	}
+	if c.Vision.PoolPages == 0 {
+		c.Vision.PoolPages = c.Vision.PoolSize
 	}
 	if c.Vision.ScreenshotQuality == 0 {
 		c.Vision.ScreenshotQuality = 65

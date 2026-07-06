@@ -84,7 +84,7 @@ func shareEvidence(id, targetURL, title string, scope *vision.FocusaScope) map[s
 	return evidence
 }
 
-func MountShareReal(r chi.Router, cfg *config.Config, pool *vision.Pool) {
+func MountShareReal(r chi.Router, cfg *config.Config, pool vision.PoolSource) {
 	loadShareStore(cfg.Storage.DataDir)
 
 	// List shares

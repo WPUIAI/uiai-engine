@@ -11,7 +11,7 @@ import (
 
 // MountBrowserHealth exposes browser-specific readiness and metrics without
 // requiring agents to inspect logs or load full tool definitions.
-func MountBrowserHealth(r chi.Router, pool *vision.Pool) {
+func MountBrowserHealth(r chi.Router, pool vision.PoolSource) {
 	r.Get("/browser", func(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, browserHealthStatus(pool), browserHealthPayload(pool))
 	})
@@ -210,7 +210,7 @@ func pressureRecommendedActions(overall, browser, search, cache, errors string) 
 	return actions
 }
 
-func browserHealthStatus(pool *vision.Pool) int {
+func browserHealthStatus(pool vision.PoolSource) int {
 	if pool == nil {
 		return http.StatusServiceUnavailable
 	}
@@ -221,7 +221,7 @@ func browserHealthStatus(pool *vision.Pool) int {
 	return http.StatusOK
 }
 
-func browserHealthPayload(pool *vision.Pool) map[string]any {
+func browserHealthPayload(pool vision.PoolSource) map[string]any {
 	if pool == nil {
 		return map[string]any{
 			"status":       "unavailable",
@@ -258,6 +258,10 @@ func browserHealthPayload(pool *vision.Pool) map[string]any {
 		"screenshot_count":    stats["screenshot_count"],
 		"fail_count":          stats["fail_count"],
 		"queue":               stats["queue"],
+		"multi_pool":          stats["multi_pool"],
+		"browser_count":       stats["browser_count"],
+		"alive_browsers":      stats["alive_browsers"],
+		"pools":               stats["pools"],
 		"current_capacity":    currentCapacity,
 		"historical_pressure": historicalPressure,
 		"diagnostics_enabled": true,
