@@ -11,9 +11,9 @@ import (
 
 // MountBrowserHealth exposes browser-specific readiness and metrics without
 // requiring agents to inspect logs or load full tool definitions.
-func MountBrowserHealth(r chi.Router, pool vision.PoolSource) {
+func MountBrowserHealth(r chi.Router, pool vision.PoolSource, visionEnabled bool) {
 	r.Get("/browser", func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(w, browserHealthStatus(pool), browserHealthPayload(pool))
+		writeJSON(w, browserHealthStatus(pool, visionEnabled), browserHealthPayload(pool, visionEnabled))
 	})
 }
 
@@ -210,7 +210,10 @@ func pressureRecommendedActions(overall, browser, search, cache, errors string) 
 	return actions
 }
 
-func browserHealthStatus(pool vision.PoolSource) int {
+func browserHealthStatus(pool vision.PoolSource, visionEnabled bool) int {
+	if !visionEnabled {
+		return http.StatusOK
+	}
 	if pool == nil {
 		return http.StatusServiceUnavailable
 	}
@@ -221,7 +224,16 @@ func browserHealthStatus(pool vision.PoolSource) int {
 	return http.StatusOK
 }
 
-func browserHealthPayload(pool vision.PoolSource) map[string]any {
+func browserHealthPayload(pool vision.PoolSource, visionEnabled bool) map[string]any {
+	if !visionEnabled {
+		return map[string]any{
+			"status":         "disabled",
+			"service":        "uiai-browser",
+			"generated_at":   time.Now().UTC().Format(time.RFC3339),
+			"vision_enabled": false,
+			"reason":         "server.disable_vision=true",
+		}
+	}
 	if pool == nil {
 		return map[string]any{
 			"status":       "unavailable",

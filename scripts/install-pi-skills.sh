@@ -35,7 +35,11 @@ if [[ "$(id -u)" == "0" && "${UIAI_ALLOW_ROOT_SKILL_SYNC:-}" != "1" ]]; then
   echo "refusing root skill sync without UIAI_ALLOW_ROOT_SKILL_SYNC=1; run as the target Pi user" >&2
   exit 4
 fi
-mapfile -t skills < <(find "$SRC_DIR" -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/SKILL.md' \; -print | sort)
+# macOS ships Bash 3.2, which has arrays but not mapfile/readarray.
+skills=()
+while IFS= read -r skill; do
+  skills+=("$skill")
+done < <(find "$SRC_DIR" -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/SKILL.md' \; -print | sort)
 if [[ ${#skills[@]} -eq 0 ]]; then echo "no repo-local skills found in $SRC_DIR" >&2; exit 5; fi
 backup_root="$DEST_DIR/.uiai-backups/$(date +%Y%m%d-%H%M%S)"
 changed=0

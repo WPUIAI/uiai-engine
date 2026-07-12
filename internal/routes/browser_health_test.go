@@ -7,29 +7,42 @@ import (
 )
 
 func TestBrowserHealthPayloadUnavailableWhenPoolNil(t *testing.T) {
-	payload := browserHealthPayload(nil)
+	payload := browserHealthPayload(nil, true)
 	if got, want := payload["status"], "unavailable"; got != want {
 		t.Fatalf("status=%v want=%v", got, want)
 	}
-	if got, want := browserHealthStatus(nil), 503; got != want {
+	if got, want := browserHealthStatus(nil, true), 503; got != want {
 		t.Fatalf("status code=%d want=%d", got, want)
 	}
 }
 
 func TestBrowserHealthStandbyWhenPoolLazyIdle(t *testing.T) {
 	pool := &vision.Pool{}
-	payload := browserHealthPayload(pool)
+	payload := browserHealthPayload(pool, true)
 	if got, want := payload["status"], "standby"; got != want {
 		t.Fatalf("status=%v want=%v", got, want)
 	}
-	if got, want := browserHealthStatus(pool), 200; got != want {
+	if got, want := browserHealthStatus(pool, true), 200; got != want {
+		t.Fatalf("status code=%d want=%d", got, want)
+	}
+}
+
+func TestBrowserHealthDisabledIsTruthfulAndHealthy(t *testing.T) {
+	payload := browserHealthPayload(nil, false)
+	if got, want := payload["status"], "disabled"; got != want {
+		t.Fatalf("status=%v want=%v", got, want)
+	}
+	if got, want := payload["vision_enabled"], false; got != want {
+		t.Fatalf("vision_enabled=%v want=%v", got, want)
+	}
+	if got, want := browserHealthStatus(nil, false), 200; got != want {
 		t.Fatalf("status code=%d want=%d", got, want)
 	}
 }
 
 func TestBrowserHealthPayloadIncludesAgentPressure(t *testing.T) {
 	pool := &vision.Pool{}
-	payload := browserHealthPayload(pool)
+	payload := browserHealthPayload(pool, true)
 	pressure, ok := payload["agent_pressure"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected agent_pressure map: %#v", payload)

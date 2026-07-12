@@ -190,12 +190,13 @@ func (e *Engine) mountRoutes() {
 	r.Get("/", e.handleRoot)
 
 	// Health (no auth)
+	visionEnabled := !e.cfg.Server.DisableVision
 	r.Route("/api/health", func(r chi.Router) {
 		routes.MountHealth(r, e.cfg, e.ai)
-		routes.MountBrowserHealth(r, e.vision)
+		routes.MountBrowserHealth(r, e.vision, visionEnabled)
 	})
 	r.Route("/api/metrics", func(r chi.Router) {
-		routes.MountBrowserHealth(r, e.vision)
+		routes.MountBrowserHealth(r, e.vision, visionEnabled)
 	})
 
 	// Also respond to /health for PHP API compat + health monitor
