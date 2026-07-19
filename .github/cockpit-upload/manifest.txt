@@ -1,5 +1,0 @@
-document=UIAI-COCKPIT-000
-target=docs/UIAI_COCKPIT_000_UNIFIED_PRODUCT_IA_UX_SPEC_2026-07-16_v0.5.md
-encoding=plain-markdown-parts
-parts=16
-sha256=ac30b930f921feb6d8ebfa4314fb7c010cd6240b6931e88e2584e003af673869
