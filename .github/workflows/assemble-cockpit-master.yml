@@ -21,8 +21,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .github/cockpit-upload/part-* > /tmp/cockpit-master.xz.b64
-          base64 --decode /tmp/cockpit-master.xz.b64 | xz --decompress --stdout > docs/UIAI_COCKPIT_000_UNIFIED_PRODUCT_IA_UX_SPEC_2026-07-16_v0.5.md
+          cat .github/cockpit-upload/text-part-* > docs/UIAI_COCKPIT_000_UNIFIED_PRODUCT_IA_UX_SPEC_2026-07-16_v0.5.md
           echo "ac30b930f921feb6d8ebfa4314fb7c010cd6240b6931e88e2584e003af673869  docs/UIAI_COCKPIT_000_UNIFIED_PRODUCT_IA_UX_SPEC_2026-07-16_v0.5.md" | sha256sum --check --strict
 
       - name: Commit master and remove one-time assembly inputs
