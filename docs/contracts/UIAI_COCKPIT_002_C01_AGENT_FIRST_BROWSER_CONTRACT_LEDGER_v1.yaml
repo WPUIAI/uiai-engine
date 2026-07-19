@@ -1,0 +1,218 @@
+document_number: UIAI-COCKPIT-002-C01
+parent_document_number: UIAI-COCKPIT-002
+master_document_number: UIAI-COCKPIT-000
+document_family: UIAI Cockpit numbered specification series
+normative_document_path: docs/UIAI_COCKPIT_002_AGENT_FIRST_BROWSER_AMENDMENT_2026-07-19_v1.0.md
+schema: uiai.agent_first_browser_contract_ledger.v1
+version: '1.0'
+date: '2026-07-19'
+amends: docs/UIAI_COCKPIT_000_UNIFIED_PRODUCT_IA_UX_SPEC_2026-07-16_v0.5.md
+response_profiles:
+- agent_compact
+- agent_standard
+- evidence_grade
+- developer_full
+status_vocabulary:
+- ok
+- blocked
+- stale
+- inconclusive
+- pending
+- failed
+- requires_operator
+- resync_required
+schemas:
+- uiai.agent_result.v1
+- uiai.agent_client_capability_profile.v1
+- uiai.browser_observation.v1
+- uiai.browser_action_request.v2
+- uiai.focusa_browser_verification_request.v1
+- uiai.focusa_browser_verification_result.v1
+- uiai.browser_content_provenance.v1
+- uiai.browser_action_influence_manifest.v1
+- uiai.browser_execution_capsule.v1
+- uiai.origin_tool_candidate.v1
+capabilities:
+- id: uiai.browser.observe.versioned
+  owner: uiai_engine
+  profile: agent_compact
+- id: uiai.browser.action.observation_bound
+  owner: uiai_engine
+  profile: agent_compact
+- id: uiai.browser.verify.predicate
+  owner: uiai_engine
+  profile: agent_standard
+- id: uiai.browser.watch.settlement
+  owner: uiai_engine
+  profile: agent_compact
+- id: uiai.browser.influence.evaluate
+  owner: uiai_engine
+  profile: agent_compact
+- id: uiai.browser.execution.capsule
+  owner: uiai_engine
+  profile: agent_compact
+- id: uiai.browser.origin_tool.discover
+  owner: uiai_engine
+  profile: agent_compact
+  experimental: true
+- id: uiai.browser.origin_tool.invoke
+  owner: uiai_engine
+  profile: agent_standard
+  experimental: true
+requirements:
+- id: AFB-001
+  owner: uiai_engine
+  text: Use one shared agent exchange result envelope.
+  full_id: UIAI-COCKPIT-002/AFB-001
+- id: AFB-002
+  owner: uiai_engine
+  text: Preserve separate Focusa Operation and UIAI Capability registries.
+  full_id: UIAI-COCKPIT-002/AFB-002
+- id: AFB-003
+  owner: uiai_engine
+  text: Use lazy outcome-oriented discovery and bounded schema expansion.
+  full_id: UIAI-COCKPIT-002/AFB-003
+- id: AFB-004
+  owner: uiai_engine
+  text: Support requested/effective/minimum response profiles with policy upgrades.
+  full_id: UIAI-COCKPIT-002/AFB-004
+- id: AFB-005
+  owner: uiai_engine
+  text: Support agent client capability and token budgets.
+  full_id: UIAI-COCKPIT-002/AFB-005
+- id: AFB-006
+  owner: uiai_engine
+  text: Bind semantic actions to versioned observations.
+  full_id: UIAI-COCKPIT-002/AFB-006
+- id: AFB-007
+  owner: uiai_engine
+  text: Separate runtime identity, locator candidates and state fingerprints.
+  full_id: UIAI-COCKPIT-002/AFB-007
+- id: AFB-008
+  owner: uiai_engine
+  text: Fail stale actions closed and provide exact resync recovery.
+  full_id: UIAI-COCKPIT-002/AFB-008
+- id: AFB-009
+  owner: uiai_engine
+  text: Deltas identify baselines and support full resynchronization.
+  full_id: UIAI-COCKPIT-002/AFB-009
+- id: AFB-010
+  owner: uiai_engine
+  text: Relevant observations preserve mandatory semantic dependency closure.
+  full_id: UIAI-COCKPIT-002/AFB-010
+- id: AFB-011
+  owner: uiai_engine
+  text: Compile structured browser probes from Focusa predicates and policies.
+  full_id: UIAI-COCKPIT-002/AFB-011
+- id: AFB-012
+  owner: uiai_engine
+  text: Run settlement watchers server-side under leases and budgets.
+  full_id: UIAI-COCKPIT-002/AFB-012
+- id: AFB-013
+  owner: focusa
+  text: Retain completion and settlement authority in Focusa.
+  full_id: UIAI-COCKPIT-002/AFB-013
+- id: AFB-014
+  owner: uiai_engine
+  text: Preserve contradictory verification evidence.
+  full_id: UIAI-COCKPIT-002/AFB-014
+- id: AFB-015
+  owner: uiai_engine
+  text: Label browser content provenance and trust class.
+  full_id: UIAI-COCKPIT-002/AFB-015
+- id: AFB-016
+  owner: uiai_engine
+  text: Enforce influence and data-egress policy outside the model.
+  full_id: UIAI-COCKPIT-002/AFB-016
+- id: AFB-017
+  owner: uiai_engine
+  text: Use compact provenance dictionaries and ref-first manifests.
+  full_id: UIAI-COCKPIT-002/AFB-017
+- id: AFB-018
+  owner: uiai_engine
+  text: Produce a ref-first execution capsule for consequential actions.
+  full_id: UIAI-COCKPIT-002/AFB-018
+- id: AFB-019
+  owner: uiai_engine
+  text: Record context/profile/cleanup attestation and causality.
+  full_id: UIAI-COCKPIT-002/AFB-019
+- id: AFB-020
+  owner: uiai_engine
+  text: Treat WebMCP tools as ephemeral origin-bound untrusted actuator candidates.
+  full_id: UIAI-COCKPIT-002/AFB-020
+- id: AFB-021
+  owner: uiai_engine
+  text: Invalidate origin-tool authorization on navigation, removal or schema/hash change.
+  full_id: UIAI-COCKPIT-002/AFB-021
+- id: AFB-022
+  owner: uiai_engine
+  text: Verify origin-tool postconditions independently of returned success.
+  full_id: UIAI-COCKPIT-002/AFB-022
+- id: AFB-023
+  owner: uiai_engine
+  text: Keep artifacts, traces, diagnostics and capsules behind stable handles by default.
+  full_id: UIAI-COCKPIT-002/AFB-023
+- id: AFB-024
+  owner: uiai_engine
+  text: Return exact next actions and classified recovery.
+  full_id: UIAI-COCKPIT-002/AFB-024
+- id: AFB-025
+  owner: uiai_engine
+  text: Measure cost per verified and settled outcome.
+  full_id: UIAI-COCKPIT-002/AFB-025
+- id: AFB-026
+  owner: uiai_engine
+  text: Use UIAI Engine Eval for all browser proof.
+  full_id: UIAI-COCKPIT-002/AFB-026
+- id: AFB-027
+  owner: focusa
+  text: Consume UIAI refs without importing raw browser state into canonical Focusa state.
+  full_id: UIAI-COCKPIT-002/AFB-027
+- id: AFB-028
+  owner: cockpit
+  text: Expose freshness, actuator, verification, influence, watcher and capsule state through progressive disclosure.
+  full_id: UIAI-COCKPIT-002/AFB-028
+- id: AFB-029
+  owner: all
+  text: Do not introduce duplicate canonical stores, event histories, browser runtimes or procedure authority.
+  full_id: UIAI-COCKPIT-002/AFB-029
+- id: AFB-030
+  owner: all
+  text: No unmeasured token-savings percentage claim.
+  full_id: UIAI-COCKPIT-002/AFB-030
+implementation_phases:
+- phase: 0
+  name: Generated contracts and parity
+- phase: 1
+  name: Observation truth
+- phase: 2
+  name: Agent exchange efficiency
+- phase: 3
+  name: Security and attribution
+- phase: 4
+  name: Runtime verification
+- phase: 5
+  name: Experimental structured actuators
+metrics:
+- verified_completion_rate
+- settled_completion_rate
+- false_done_rate
+- stale_action_rejection_rate
+- duplicate_side_effect_rate
+- unauthorized_action_block_rate
+- prompt_injection_block_rate
+- cross_context_leakage_rate
+- contradiction_detection_rate
+- baseline_loss_recovery_rate
+- watcher_completion_and_expiry
+- human_rescue_rate
+- schema_tokens
+- result_tokens
+- vision_calls
+- browser_minutes
+- verification_cost
+- evidence_cost
+- cost_per_verified_outcome
+- cost_per_settled_outcome
+- time_to_verification
+- time_to_settlement
