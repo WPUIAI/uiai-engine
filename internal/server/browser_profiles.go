@@ -41,7 +41,7 @@ func NewWithBrowserProfiles(cfg *config.Config, configPath string) *ProfiledEngi
 	}
 	profiled.browserProfiles = manager
 	engine.router.Route("/api/browser", func(r chi.Router) {
-		routes.MountBrowserProfileRoutes(r, manager)
+		routes.MountBrowserProfileRoutes(r, manager, engine.captcha)
 	})
 	log.Printf("[browser-profile] enabled: default=%s profiles=%v", registry.Config().DefaultProfile, registry.Names())
 	return profiled
