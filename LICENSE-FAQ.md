@@ -1,72 +1,111 @@
 # UIAI Engine License FAQ
 
-## Can I try UIAI Engine personally?
+## Is UIAI Engine open source?
 
-Yes. Personal, educational, evaluation, and non-commercial local use is allowed
-under the source-available license terms in `LICENSE.md`. You can clone, build,
-and run UIAI Engine locally for evaluation purposes.
+No. UIAI Engine is source-available under the Business Source License terms in `LICENSE`. It becomes available under the named Change License only for a version when that version reaches its Change Date.
+
+## Can I inspect, clone, or build the source?
+
+Use of the repository source is governed by `LICENSE` and its Additional Use Grant. Source visibility, cloning, and a successful build do not themselves create an official UIAI Engine product entitlement, commercial rights, protected-worker access, support, or official updates.
+
+## Can I evaluate UIAI Engine?
+
+Yes, through an **authority-issued Evaluation license** under the mandatory entitlement architecture.
+
+The required official flow is:
+
+```text
+verified account/email and current terms
+→ explicit uiai-engine Evaluation product/features/limits
+→ node registration
+→ authority-signed lease
+→ independent engine verification
+→ bounded evaluation workflow
+```
+
+Evaluation is time-, node-, concurrency-, feature-, and usage-bounded. Missing identity or license state is recovery-only, not Evaluation.
+
+The current repository still contains legacy code that can infer Evaluation from missing/loopback state. That behavior is release-blocked and must not be used to onboard new evaluators.
+
+## Can I generate a local evaluation key?
+
+No approved production/evaluator flow uses locally generated `uiai_eval_` keys or any other self-issued key.
+
+A local API token, extension token, Pi/MCP/Cockpit token, Focusa pairing token, loopback address, tier string, source checkout, or health response authenticates or describes a surface; it does not create a product grant.
+
+Test fixtures may use a separate test trust root in isolated development tests. Production artifacts must reject those fixtures and test roots.
+
+## Do loopback browser/session/search/Markdown routes remain free without entitlement?
+
+No, not in the target production model. Loopback affects network authentication risk only. Every execution-capable route must still verify an authority-issued signed `uiai-engine` lease or a narrower child token, product/feature/time/node/sequence status, and applicable limits.
+
+Current loopback-public behavior is an implementation migration issue documented in `docs/ENDPOINT_AUTH_MATRIX.md`.
 
 ## What is the Additional Use Grant?
 
-The Additional Use Grant in `LICENSE.md` explicitly permits non-production,
-non-commercial use. You do not need a paid license for personal experimentation,
-local development, academic work, or non-commercial evaluation.
+The Additional Use Grant defines legal source-use permission under `LICENSE`. It is distinct from official product activation.
+
+It does not:
+
+- mint an Evaluation lease;
+- create protected private workers or capsules;
+- grant hosted/commercial/team/embedding rights;
+- bypass route entitlement enforcement;
+- grant support, official updates, or authority services to a modified fork.
 
 ## When do I need a commercial license?
 
-You need a commercial license if any of the following apply to your use:
+A commercial license is required when the repository license or Additional Use Grant does not authorize the intended use, including applicable production, company/team, paid service, hosted/SaaS, resale, redistribution, embedding, managed automation, or commercial proof-browser use.
 
-- You run UIAI Engine in production for a company, team, or organization.
-- You use UIAI Engine to deliver paid services or consulting work to clients.
-- You embed UIAI Engine in a product that you sell, license, or operate as a
-  hosted service.
-- You redistribute UIAI Engine or modified versions of it.
-- You use UIAI Engine to materially support commercial operations, including
-  internal automation that drives paid product delivery.
-- You run UIAI Engine as a remote/browser automation service for paying
-  customers, including agency-style or per-request commercial proof work.
+The commercial agreement must explicitly grant the intended products, features, nodes/seats, update channel, support, hosted/embedding/redistribution rights, and protected components.
 
 ## What does a commercial license include?
 
-Commercial licenses are negotiated per buyer. They typically cover one or more of:
+Depending on the agreement:
 
-- single-operator commercial use
-- team or enterprise rights
-- hosted or managed service rights
-- redistribution or resale rights
-- private deployment terms
-- support contracts
-- adapter rights for embedding
-- commercial proof or diagnostics services
+- single-operator commercial use;
+- team or enterprise use;
+- hosted or managed-service rights;
+- redistribution/resale/embedding rights;
+- private/on-prem/air-gapped deployment;
+- protected workers or feature capsules;
+- support and update terms;
+- node/seat limits;
+- offline and renewal policy.
+
+A friendly tier label is presentation only. Runtime permission comes from explicit signed product and feature grants.
 
 ## What about Founders Forge?
 
-Founders Forge participants receive UIAI Engine access under separate
-Founders Forge license terms. See the Founders Forge program agreement.
+Eligible Founders Forge participants may receive authority-issued UIAI Engine grants under the applicable program agreement. Participation labels alone do not unlock runtime features.
 
-## Can I generate an evaluation key?
+## What happens when Evaluation expires or a license is revoked?
 
-Yes. UIAI Engine accepts locally generated evaluation keys with the prefix
-`uiai_eval_` for non-production, non-commercial local use. No server check
-is required for these keys. The loopback browser/session/search/markdown
-endpoints remain available without authentication for evaluation purposes.
+UIAI Engine enters recovery-only posture. It preserves safe health/license diagnostics, operator-owned data/artifacts, applicable export, recovery, and uninstall guidance. It denies new browser, analysis, media, migration, remote-control, and other execution.
 
-## What is the change license on the Change Date?
+License failure must not delete or encrypt operator data.
 
-On the Change Date in `LICENSE.md`, the UIAI Engine source code re-licenses
-under the Change License named in `LICENSE.md`. Earlier versions retain their
-original BSL terms.
+## Can Focusa grant UIAI access?
 
-## How do I get a commercial license?
+Only when the parent Focusa/bundle license explicitly includes `uiai-engine`. Focusa may broker a short-lived, audience-bound child token no broader or longer-lived than the parent grant. UIAI independently verifies product, feature, parent lease sequence/digest, node, expiry, and limits.
 
-Email `licensing@startempirewire.com` with:
+A Focusa pairing or project-scope token is not a UIAI commercial token.
 
-- the use case (production, hosted, team, agency, embedded, redistribution, or
-  other)
-- expected volume or user count
-- the duration you need the license for
-- any specific deployment constraints (air-gapped, on-prem, regulated, etc.)
+## Can I fork UIAI Engine and remove the checks?
 
-A commercial license agreement is signed before any commercial rights are
-granted. Past operators who need proof-of-buyer artifacts can request a
-countersigned agreement PDF.
+Forking remains governed by `LICENSE`; it does not remove legal restrictions. Modified forks are unsupported and cannot obtain official protected workers, node-bound capsule keys, signed operation capabilities, authority services, or official updates merely by returning an “allowed” result.
+
+Client-side controls are cost escalation, not a claim of unbreakable DRM.
+
+## How do I get or manage a license?
+
+Use the official UIAI/Focusa license-management, purchase, or support channel published at the install/license site. Do not send raw keys, tokens, device codes, customer records, or secrets through public issues or chat.
+
+## Canonical references
+
+- `LICENSE`
+- `docs/LICENSING.md`
+- `docs/UIAI_LICENSE_ENTITLEMENT_AND_ONBOARDING_ENFORCEMENT_SPEC_2026-08-01.md`
+- `docs/UIAI_PROTECTED_WORKER_AND_FEATURE_CAPSULE_ADDENDUM_2026-08-01.md`
+- `docs/ENDPOINT_AUTH_MATRIX.md`
+- `docs/UIAI_ENTITLEMENT_SUPERSESSION_MATRIX_2026-08-01.yaml`
