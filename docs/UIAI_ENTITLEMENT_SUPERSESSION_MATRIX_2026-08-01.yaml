@@ -1,5 +1,5 @@
 schema: uiai.entitlement_supersession_matrix.v1
-generated_at: 2026-08-01T19:55:00Z
+generated_at: 2026-08-01T20:15:00Z
 normative_authorities:
   entitlement: docs/UIAI_LICENSE_ENTITLEMENT_AND_ONBOARDING_ENFORCEMENT_SPEC_2026-08-01.md
   protected_worker: docs/UIAI_PROTECTED_WORKER_AND_FEATURE_CAPSULE_ADDENDUM_2026-08-01.md
@@ -7,8 +7,9 @@ normative_authorities:
   licensing_summary: docs/LICENSING.md
 release_rule: >-
   Current auth/route behavior may remain documented as migration truth, but no guide,
-  tool descriptor, API example, release claim, or test may treat loopback, missing identity,
-  local/extension token, source access, health, or tier strings as Evaluation/product entitlement.
+  tool descriptor, API example, release claim, legal FAQ, or test may treat loopback,
+  missing identity, local/extension token, source access, health, or tier strings as
+  Evaluation/product entitlement.
 entries:
   - path: internal/license/entitlements.go
     old_behavior: nil identity becomes Evaluation; loopback eval allowlist; tierFeatures grants broad capabilities
@@ -25,6 +26,10 @@ entries:
   - path: docs/LICENSING.md
     old_behavior: legal Evaluation/non-commercial use could be read as automatic product activation
     required_behavior: source-use and authority-issued runtime entitlement separated
+    status: corrected_pending_implementation
+  - path: LICENSE-FAQ.md
+    old_behavior: explicitly allowed locally generated uiai_eval keys with no server check and anonymous loopback Evaluation
+    required_behavior: legal source-use permission separated from authority-issued official runtime Evaluation
     status: corrected_pending_implementation
   - path: docs/ENDPOINT_AUTH_MATRIX.md
     old_behavior: loopback-public remote-auth documented without a product-entitlement overlay
@@ -46,10 +51,6 @@ entries:
     old_behavior: local/remote authentication examples conflated with route permission
     required_behavior: authentication explicitly separate from product entitlement
     status: corrected_pending_implementation
-  - path: LICENSE-FAQ.md
-    old_behavior: legal source-use/evaluation statements may remain broad
-    required_behavior: interpret through LICENSE for legal use and mandatory entitlement spec for official runtime activation
-    status: historical_legal_summary_review_required
   - path: docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md
     old_behavior: Focusa scope/token integration predates explicit UIAI product child-token contract
     required_behavior: Focusa cannot grant UIAI by presence; child token must derive from explicit parent product grant
