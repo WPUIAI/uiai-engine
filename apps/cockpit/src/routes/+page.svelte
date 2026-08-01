@@ -1,5 +1,6 @@
 <script lang="ts">
   import { phase0Cards } from "$lib/cards/phase0-card-manifest";
+  import BrowserProfileSettings from "$lib/components/BrowserProfileSettings.svelte";
 </script>
 
 <h1>UIAI Engine Cockpit</h1>
@@ -26,6 +27,8 @@
     </article>
   {/each}
 </section>
+
+<BrowserProfileSettings />
 
 <style>
   h1 {
