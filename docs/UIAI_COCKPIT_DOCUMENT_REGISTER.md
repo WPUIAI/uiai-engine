@@ -47,6 +47,8 @@ Rules:
 | `UIAI-COCKPIT-004-C01` | [`contracts/UIAI_COCKPIT_004_C01_PERCEPTION_VERIFICATION_EVAL_LEDGER_v1.yaml`](contracts/UIAI_COCKPIT_004_C01_PERCEPTION_VERIFICATION_EVAL_LEDGER_v1.yaml) | Machine-readable companion v1 | Perception channels, verification levels, requirements, phases, and eval metrics |
 | `UIAI-COCKPIT-005` | [`UIAI_COCKPIT_005_BROWSER_PROFILES_CHALLENGE_RESEARCH_2026-08-01_v1.0.md`](UIAI_COCKPIT_005_BROWSER_PROFILES_CHALLENGE_RESEARCH_2026-08-01_v1.0.md) | Proposed normative amendment v1.0 | Detect/no-detect/operator/research browser profiles, engine adapters, fingerprint consistency, network identity, shared challenge subsystem, research lab, and Cockpit settings |
 | `UIAI-COCKPIT-005-C01` | [`contracts/UIAI_COCKPIT_005_C01_BROWSER_PROFILE_LEDGER_v1.yaml`](contracts/UIAI_COCKPIT_005_C01_BROWSER_PROFILE_LEDGER_v1.yaml) | Machine-readable companion v1 | Browser modes, engines, route adapters, challenge policies, contracts, requirements, phases, and metrics |
+| `UIAI-COCKPIT-006` | [`UIAI_COCKPIT_006_FOCUSA_LIVE_BINDING_AND_VISUAL_PROOF_2026-08-01_v1.0.md`](UIAI_COCKPIT_006_FOCUSA_LIVE_BINDING_AND_VISUAL_PROOF_2026-08-01_v1.0.md) | Proposed normative amendment v1.0 | Focusa contract locking, live projections, mandatory functional UI code, event-reactive states, screen capture evidence, and release-blocking visual proof |
+| `UIAI-COCKPIT-006-C01` | [`contracts/UIAI_COCKPIT_006_C01_FOCUSA_UI_VISUAL_PROOF_LEDGER_v1.yaml`](contracts/UIAI_COCKPIT_006_C01_FOCUSA_UI_VISUAL_PROOF_LEDGER_v1.yaml) | Machine-readable companion v1 | Functional UI, event binding, visual capture, evidence manifest, and release-verification requirements |
 
 ## 3. Application order
 
