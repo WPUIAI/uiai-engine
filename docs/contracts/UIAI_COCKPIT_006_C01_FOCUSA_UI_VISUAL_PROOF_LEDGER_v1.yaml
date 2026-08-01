@@ -1,0 +1,60 @@
+schema: uiai.cockpit_focusa_ui_visual_proof_ledger.v1
+version: 1
+parent: UIAI-COCKPIT-006
+truth_statuses:
+  - missing
+  - contract_only
+  - implemented_unverified
+  - functional_verified
+  - visual_verified
+  - release_verified
+requirements:
+  - id: FUI-006-001
+    requirement: Focusa Live Projection Fabric is implemented as compiled Cockpit UI code.
+    implementation:
+      - apps/cockpit/src/lib/components/FocusaLiveSurfaces.svelte
+      - apps/cockpit/src/routes/+page.svelte
+    status: implemented_unverified
+  - id: FUI-006-002
+    requirement: Cockpit connects to Focusa event health and durable SSE routes.
+    operations:
+      - GET /v1/events/health
+      - GET /v1/events/stream
+    implementation:
+      - apps/cockpit/src/lib/components/FocusaLiveSurfaces.svelte
+    status: implemented_unverified
+  - id: FUI-006-003
+    requirement: Focusa events pass through the production event application path and visibly update projections.
+    expected_events:
+      - temporal_forecast_revised
+      - prediction_authority_event_appended
+      - runtime_constitution_activated
+    expected_visible_state:
+      cursor: "103"
+      source_state_revision: "43"
+      connection_state: live
+    status: implemented_unverified
+  - id: FUI-006-004
+    requirement: Quiet state contains no synthetic activity.
+    expected_capture: cockpit-focusa-idle.png
+    status: implemented_unverified
+  - id: FUI-006-005
+    requirement: Post-event state has screen-capture proof generated from the compiled build.
+    expected_capture: cockpit-focusa-live-after-events.png
+    status: implemented_unverified
+  - id: FUI-006-006
+    requirement: Captures have SHA-256 hashes and are bound to the exact GitHub build SHA.
+    expected_manifest: visual-proof/manifest.json
+    status: implemented_unverified
+  - id: FUI-006-007
+    requirement: Visual proof artifacts are mandatory CI outputs and missing artifacts fail the job.
+    workflow: .github/workflows/cockpit.yml
+    artifact_pattern: cockpit-functional-ui-evidence-*
+    status: implemented_unverified
+  - id: FUI-006-008
+    requirement: Unit and backend smoke tests are release-blocking, not optional.
+    workflow: .github/workflows/cockpit.yml
+    status: implemented_unverified
+closure:
+  required_status: release_verified
+  rule: Every active row must be proven by a green workflow run and retained visual-proof artifact for the same commit SHA.
