@@ -54,6 +54,7 @@ jobs:
             \( -name "Chromium" -o -name "Google Chrome for Testing" -o -name "chrome-headless-shell" \) \
             2>/dev/null | grep -E '/Contents/MacOS/|chrome-headless-shell$' | head -1)
           test -n "$BROWSER"
+          echo "Visual proof browser: $BROWSER"
 
           "$BROWSER" --headless --disable-gpu --no-sandbox --virtual-time-budget=1500 \
             --dump-dom "http://127.0.0.1:4173/" > visual-proof/cockpit-focusa-idle.dom.html
@@ -73,6 +74,7 @@ jobs:
           grep -q '12 authority events' visual-proof/cockpit-focusa-live.dom.html
           grep -q 'Profile A partial verified' visual-proof/cockpit-focusa-live.dom.html
           grep -q '>active<' visual-proof/cockpit-focusa-live.dom.html
+          echo "Rendered-state assertions passed"
 
           npm exec --yes playwright@1.54.2 screenshot \
             --viewport-size="1440,1200" \
@@ -91,11 +93,20 @@ jobs:
           LIVE_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-live-after-events.png | awk '{print $1}')
           IDLE_DOM_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-idle.dom.html | awk '{print $1}')
           LIVE_DOM_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-live.dom.html | awk '{print $1}')
-          test "$IDLE_SHA" != "$LIVE_SHA"
           IDLE_SIZE=$(sips -g pixelWidth -g pixelHeight visual-proof/cockpit-focusa-idle.png | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w"x"h}')
           LIVE_SIZE=$(sips -g pixelWidth -g pixelHeight visual-proof/cockpit-focusa-live-after-events.png | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w"x"h}')
-          test "$IDLE_SIZE" = "1440x1200"
-          test "$LIVE_SIZE" = "1440x1200"
+          echo "Idle screenshot: sha256=$IDLE_SHA size=$IDLE_SIZE"
+          echo "Live screenshot: sha256=$LIVE_SHA size=$LIVE_SIZE"
+          echo "Idle DOM: sha256=$IDLE_DOM_SHA"
+          echo "Live DOM: sha256=$LIVE_DOM_SHA"
+          if [[ "$IDLE_SHA" == "$LIVE_SHA" ]]; then
+            echo "Visual proof failure: idle and live screenshots are identical" >&2
+            exit 1
+          fi
+          if [[ "$IDLE_SIZE" != "1440x1200" || "$LIVE_SIZE" != "1440x1200" ]]; then
+            echo "Visual proof failure: expected 1440x1200 captures" >&2
+            exit 1
+          fi
 
           cat > visual-proof/manifest.json <<JSON
           {
@@ -127,6 +138,7 @@ jobs:
           }
           JSON
       - name: Upload functional UI evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cockpit-functional-ui-evidence-${{ github.sha }}
