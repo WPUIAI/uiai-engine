@@ -5,14 +5,20 @@ import (
 	"net/http"
 
 	"github.com/WPUIAI/uiai-engine/internal/browserprofile"
+	"github.com/WPUIAI/uiai-engine/internal/captcha"
+	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
 
-// MountBrowserProfileRoutes exposes profile discovery, resolution, and
-// profile-scoped browser sessions.
-func MountBrowserProfileRoutes(r chi.Router, manager *browserprofile.Manager) {
+// MountBrowserProfileRoutes exposes profile discovery, resolution, profile-
+// scoped browser sessions, and the existing CAPTCHA solver over those sessions.
+func MountBrowserProfileRoutes(r chi.Router, manager *browserprofile.Manager, solvers ...*captcha.Solver) {
 	if manager == nil {
 		return
+	}
+	var solver *captcha.Solver
+	if len(solvers) > 0 {
+		solver = solvers[0]
 	}
 
 	r.Get("/profiles", func(w http.ResponseWriter, req *http.Request) {
@@ -28,8 +34,8 @@ func MountBrowserProfileRoutes(r chi.Router, manager *browserprofile.Manager) {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"default_profile": registry.Config().DefaultProfile,
-			"profiles": profiles,
-			"domain_rules": registry.Config().DomainRules,
+			"profiles":        profiles,
+			"domain_rules":    registry.Config().DomainRules,
 		})
 	})
 
@@ -65,15 +71,15 @@ func MountBrowserProfileRoutes(r chi.Router, manager *browserprofile.Manager) {
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"session": map[string]any{
-				"id": session.ID,
-				"url": session.URL,
-				"title": session.Title,
-				"created_at": session.CreatedAt,
-				"last_used": session.LastUsed,
+				"id":          session.ID,
+				"url":         session.URL,
+				"title":       session.Title,
+				"created_at":  session.CreatedAt,
+				"last_used":   session.LastUsed,
 				"runtime_pid": session.RuntimePID,
 			},
 			"selection": session.Selection,
-			"profile": session.Profile,
+			"profile":   session.Profile,
 		})
 	})
 
@@ -86,14 +92,14 @@ func MountBrowserProfileRoutes(r chi.Router, manager *browserprofile.Manager) {
 				return
 			}
 			writeJSON(w, http.StatusOK, map[string]any{
-				"id": session.ID,
-				"url": session.URL,
-				"title": session.Title,
-				"created_at": session.CreatedAt,
-				"last_used": session.LastUsed,
+				"id":          session.ID,
+				"url":         session.URL,
+				"title":       session.Title,
+				"created_at":  session.CreatedAt,
+				"last_used":   session.LastUsed,
 				"runtime_pid": session.RuntimePID,
-				"selection": session.Selection,
-				"profile": session.Profile,
+				"selection":   session.Selection,
+				"profile":     session.Profile,
 			})
 		})
 
@@ -111,6 +117,42 @@ func MountBrowserProfileRoutes(r chi.Router, manager *browserprofile.Manager) {
 				return
 			}
 			writeJSON(w, http.StatusOK, session)
+		})
+
+		r.Post("/captcha/solve", func(w http.ResponseWriter, req *http.Request) {
+			if solver == nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "captcha solver unavailable"})
+				return
+			}
+			id := chi.URLParam(req, "profileSessionID")
+			page, profile, ok := manager.SessionPage(id)
+			if !ok {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "profile session not found"})
+				return
+			}
+			session, _ := manager.Get(id)
+			var body captcha.SolveRequest
+			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
+				return
+			}
+			facade := vision.WrapExternalPage(
+				page,
+				session.URL,
+				profile.Identity.Viewport.Width,
+				profile.Identity.Viewport.Height,
+			)
+			result := solver.SolveInSession(req.Context(), facade, body)
+			writeJSON(w, http.StatusOK, map[string]any{
+				"result": result,
+				"browser_profile": map[string]any{
+					"profile_id":     profile.ID,
+					"profile_digest": profile.Digest,
+					"mode":           profile.Mode,
+					"engine":         profile.Engine,
+					"network_route":  profile.Network.Route,
+				},
+			})
 		})
 
 		r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
