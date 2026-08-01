@@ -1,0 +1,6 @@
+schema: uiai.next_entitlement_action.v1
+next_action: >-
+  Complete UIAI implementation work breakdown WP0 inventory and fixture isolation in
+  parallel with authority Phase 0. Do not enforce production yet. Prepare the route
+  ledger and cross-language lease golden-vector harness behind test/preview controls.
+after_authority_vectors: implement verifier and authentication-only identities
