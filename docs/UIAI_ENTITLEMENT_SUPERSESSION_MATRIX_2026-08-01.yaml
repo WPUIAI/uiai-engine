@@ -1,0 +1,74 @@
+schema: uiai.entitlement_supersession_matrix.v1
+generated_at: 2026-08-01T19:55:00Z
+normative_authorities:
+  entitlement: docs/UIAI_LICENSE_ENTITLEMENT_AND_ONBOARDING_ENFORCEMENT_SPEC_2026-08-01.md
+  protected_worker: docs/UIAI_PROTECTED_WORKER_AND_FEATURE_CAPSULE_ADDENDUM_2026-08-01.md
+  current_auth_and_target: docs/ENDPOINT_AUTH_MATRIX.md
+  licensing_summary: docs/LICENSING.md
+release_rule: >-
+  Current auth/route behavior may remain documented as migration truth, but no guide,
+  tool descriptor, API example, release claim, or test may treat loopback, missing identity,
+  local/extension token, source access, health, or tier strings as Evaluation/product entitlement.
+entries:
+  - path: internal/license/entitlements.go
+    old_behavior: nil identity becomes Evaluation; loopback eval allowlist; tierFeatures grants broad capabilities
+    required_behavior: canonical signed lease/child-token context with explicit product/features/limits
+    status: release_blocker
+  - path: internal/auth/auth.go
+    old_behavior: selected loopback tool paths execute without credentials; local token maps to internal tier; extension token maps to pro
+    required_behavior: authentication only; entitlement middleware follows; no hard-coded product tier
+    status: release_blocker
+  - path: internal/server/server.go
+    old_behavior: selected route families use feature middleware while many execution/mutation routes do not
+    required_behavior: generated route-feature-limit coverage before allocation/mutation
+    status: release_blocker
+  - path: docs/LICENSING.md
+    old_behavior: legal Evaluation/non-commercial use could be read as automatic product activation
+    required_behavior: source-use and authority-issued runtime entitlement separated
+    status: corrected_pending_implementation
+  - path: docs/ENDPOINT_AUTH_MATRIX.md
+    old_behavior: loopback-public remote-auth documented without a product-entitlement overlay
+    required_behavior: current auth and required entitlement shown separately
+    status: corrected_pending_implementation
+  - path: README.md
+    old_behavior: broad current feature availability and loopback-public positioning lacked release-blocking entitlement notice
+    required_behavior: current-code warning and mandatory entitlement target
+    status: corrected_pending_implementation
+  - path: docs/SESSION_API.md
+    old_behavior: direct anonymous loopback quickstart could be read as approved Evaluation
+    required_behavior: authorized-development examples with scoped token plus explicit lease/feature/limit precondition
+    status: corrected_pending_implementation
+  - path: docs/UIAI_FOR_AGENTS_QUICKSTART.md
+    old_behavior: agent workflow began with local execution without entitlement distinction
+    required_behavior: recovery-safe discovery first; signed entitlement before execution
+    status: corrected_pending_implementation
+  - path: docs/REMOTE_AUTH_EXAMPLES.md
+    old_behavior: local/remote authentication examples conflated with route permission
+    required_behavior: authentication explicitly separate from product entitlement
+    status: corrected_pending_implementation
+  - path: LICENSE-FAQ.md
+    old_behavior: legal source-use/evaluation statements may remain broad
+    required_behavior: interpret through LICENSE for legal use and mandatory entitlement spec for official runtime activation
+    status: historical_legal_summary_review_required
+  - path: docs/UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md
+    old_behavior: Focusa scope/token integration predates explicit UIAI product child-token contract
+    required_behavior: Focusa cannot grant UIAI by presence; child token must derive from explicit parent product grant
+    status: amendment_required
+  - path: docs/UIAI_OPERATOR_BROWSER_DESKTOP_SPEC_2026-06-19.md
+    old_behavior: operator/browser distribution may predate entitlement-first onboarding
+    required_behavior: signed UIAI lease before execution; recovery UI remains available
+    status: amendment_required
+  - path: docs/evidence/**
+    old_behavior: historical tests may prove loopback/public route behavior
+    required_behavior: retain as historical evidence only, not current entitlement authority
+    status: retained
+combined_release_blockers:
+  - signed lease/child-token verifier
+  - auth identity separated from entitlement context
+  - removal of loopback Evaluation and tier-derived features
+  - universal route feature/limit coverage ledger
+  - standalone and Focusa-brokered device-code onboarding
+  - transactional limit reservation
+  - production test-root/fixture exclusion
+  - protected-worker/capsule proof for selected features
+  - active documentation consistency gate
