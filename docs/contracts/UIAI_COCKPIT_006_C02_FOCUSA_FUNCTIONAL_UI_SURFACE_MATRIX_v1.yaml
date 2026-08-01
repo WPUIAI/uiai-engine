@@ -1,0 +1,180 @@
+schema: uiai.cockpit_focusa_functional_ui_surface_matrix.v1
+version: 1
+parent: UIAI-COCKPIT-006
+status_values:
+  - missing
+  - contract_only
+  - implementation_open
+  - implemented_unverified
+  - functional_verified
+  - visual_verified
+  - release_verified
+surfaces:
+  - surface_id: focusa.live_projection_fabric
+    specs: [137, 138, 140, 144]
+    purpose: Live stream state, bounded read projections, freshness, cursor, source revision, and activity.
+    implementation:
+      - apps/cockpit/src/lib/components/FocusaLiveSurfaces.svelte
+    operations:
+      - GET /v1/events/health
+      - GET /v1/events/stream
+      - GET /v1/temporal/status
+      - GET /v1/agent-runtime/doctor
+    required_captures:
+      - idle_no_synthetic_activity
+      - live_after_contract_replay
+    status: release_verified
+
+  - surface_id: focusa.temporal_authority_workbench
+    specs: [137, 137A]
+    purpose: Inspect, commit, revise, observe, forecast, and preflight project-scoped temporal claims.
+    operations:
+      - GET /v1/temporal/status
+      - POST /v1/temporal/commit
+      - POST /v1/temporal/revise
+      - POST /v1/temporal/observe
+      - POST /v1/temporal/forecast
+      - POST /v1/temporal/preflight
+    required_ui:
+      - temporal ribbon
+      - claim timeline
+      - commitment editor
+      - revision comparison
+      - observation capture
+      - forecast interval and calibration view
+      - preflight result and recovery actions
+      - absence-of-deadline truthful state
+    required_captures:
+      - temporal_empty_no_deadline
+      - temporal_forecast_live
+      - temporal_commit_preview
+      - temporal_revision_applied
+      - temporal_preflight_blocked
+      - temporal_preflight_passed
+      - temporal_stale_or_offline
+    status: implementation_open
+
+  - surface_id: focusa.epistemic_authority_workbench
+    specs: [138, 138A]
+    purpose: Operate prediction questions, information sets, commitments, outcomes, resolution, scoring, calibration, and learning profiles as runtime support becomes verified.
+    operations_currently_verified:
+      - POST /v1/prediction-authority/events
+      - POST /v1/prediction-authority/projection
+    required_ui:
+      - prediction list and detail
+      - information-set history
+      - separate confidence dimensions
+      - evidence and horizon view
+      - outcome claim and resolution workflow
+      - scorer and calibration panels
+      - conflict and supersession history
+      - Profile A-H coverage matrix
+      - explicit partial-conformance banner
+    required_captures:
+      - epistemic_empty
+      - prediction_commitment_detail
+      - outcome_awaiting_resolution
+      - authority_projection_live
+      - partial_profile_coverage
+      - contradiction_or_dispute
+      - scoring_and_calibration_when_runtime_verified
+    status: implementation_open
+
+  - surface_id: focusa.agent_runtime_studio
+    specs: [140]
+    purpose: Govern instruction discovery, conflicts, effective claims, constitutions, prompt compilation, targets, delivery, activation, rollback, and evaluation.
+    operations:
+      - POST /v1/agent-runtime/instructions/scan
+      - GET /v1/agent-runtime/instructions/sources
+      - GET /v1/agent-runtime/instructions/claims
+      - GET /v1/agent-runtime/instructions/conflicts
+      - POST /v1/agent-runtime/instructions/reconcile
+      - POST /v1/agent-runtime/instructions/simulate
+      - GET /v1/agent-runtime/instructions/effective
+      - GET /v1/agent-runtime/instructions/drift
+      - POST /v1/agent-runtime/constitutions/draft
+      - POST /v1/agent-runtime/constitutions/{id}/approve
+      - POST /v1/agent-runtime/constitutions/{id}/activate
+      - POST /v1/agent-runtime/constitutions/{id}/revoke
+      - POST /v1/agent-runtime/constitutions/{id}/rollback
+      - POST /v1/agent-runtime/compile/agents-md
+      - POST /v1/agent-runtime/compile/skills
+      - POST /v1/agent-runtime/compile/target
+      - POST /v1/agent-runtime/delivery/preview
+      - POST /v1/agent-runtime/delivery/commit
+      - POST /v1/agent-runtime/delivery/verify
+      - GET /v1/agent-runtime/studio
+      - GET /v1/agent-runtime/doctor
+    required_ui:
+      - role and grounding
+      - instruction source inventory
+      - claims and precedence
+      - conflict workbench
+      - effective instruction diff
+      - prompt composition and variants
+      - harness target preview
+      - skills and tool activation
+      - artifact delivery preview and verification
+      - lifecycle activation, revocation, and rollback
+      - evaluation history
+    required_captures:
+      - runtime_source_inventory
+      - runtime_conflict_detected
+      - runtime_conflict_resolved
+      - runtime_effective_diff
+      - runtime_constitution_draft
+      - runtime_delivery_preview
+      - runtime_delivery_verified
+      - runtime_active
+      - runtime_revoked_or_rolled_back
+      - runtime_degraded
+    status: implementation_open
+
+  - surface_id: focusa.temporal_epistemic_conformance
+    specs: [137A, 138A]
+    purpose: Expose applicability, profile coverage, parity, migration, proof, and omission status without presenting governance addenda as runtime tools.
+    required_ui:
+      - parent and addendum coverage
+      - requirement truth-status counts
+      - API/CLI/Pi/UI parity
+      - migration coverage
+      - evidence and receipt coverage
+      - unresolved omissions
+      - conformance claims permitted and prohibited
+    required_captures:
+      - conformance_summary
+      - unresolved_omissions
+      - profile_a_h_matrix
+      - parity_failure
+      - conformance_verified
+    status: implementation_open
+
+  - surface_id: focusa.semantic_verification_fabric
+    specs: [144]
+    purpose: Render semantic obligations, Builder/Verifier work, findings, coverage, evidence sufficiency, and settlement only after Focusa runtime operations are verified.
+    required_ui:
+      - contract-only capability state before activation
+      - obligation graph
+      - verifier portfolio
+      - findings and contradictions
+      - evidence coverage
+      - settlement readiness
+    required_captures:
+      - semantic_contract_only
+      - semantic_runtime_unavailable
+      - obligation_graph_when_implemented
+      - findings_and_coverage_when_implemented
+      - settlement_ready_when_implemented
+    status: contract_only
+
+closure:
+  current_verified_scope:
+    - focusa.live_projection_fabric
+  open_functional_scopes:
+    - focusa.temporal_authority_workbench
+    - focusa.epistemic_authority_workbench
+    - focusa.agent_runtime_studio
+    - focusa.temporal_epistemic_conformance
+  contract_only_scopes:
+    - focusa.semantic_verification_fabric
+  rule: No surface may move to release_verified until every activated operation has working UI code, interaction tests, real or contract-faithful state transitions, and inspected screen-capture evidence.
