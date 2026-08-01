@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
+	"github.com/go-rod/rod/lib/launcher/flags"
 	"github.com/go-rod/rod/lib/proto"
 )
 
@@ -124,10 +125,11 @@ func BuildChromiumLauncher(profile ResolvedProfile) (*launcher.Launcher, error) 
 		if key == "" {
 			continue
 		}
+		flag := flags.Flag(key)
 		if value == "" {
-			l = l.Set(key)
+			l = l.Set(flag)
 		} else {
-			l = l.Set(key, value)
+			l = l.Set(flag, value)
 		}
 	}
 
@@ -156,8 +158,8 @@ func (r *Runtime) OpenPage(ctx context.Context, targetURL string) (*rod.Page, er
 	}
 	viewport := r.Profile.Identity.Viewport
 	if err := page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
-		Width: viewport.Width,
-		Height: viewport.Height,
+		Width:             viewport.Width,
+		Height:            viewport.Height,
 		DeviceScaleFactor: viewport.DeviceScaleFactor,
 	}); err != nil {
 		page.Close()
@@ -188,9 +190,9 @@ func ApplyPageIdentity(page *rod.Page, profile ResolvedProfile) (err error) {
 	ua := selectedUserAgent(profile)
 	if ua != "" {
 		page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
-			UserAgent: ua,
+			UserAgent:      ua,
 			AcceptLanguage: strings.Join(profile.Identity.Languages, ","),
-			Platform: profile.Identity.Platform,
+			Platform:       profile.Identity.Platform,
 		})
 	}
 
@@ -207,16 +209,16 @@ func ApplyPageIdentity(page *rod.Page, profile ResolvedProfile) (err error) {
 func identityScript(profile ResolvedProfile) (string, error) {
 	id := profile.Identity
 	patch := map[string]any{
-		"webdriver": id.PatchWebDriver,
-		"chrome": id.PatchChromeObject,
-		"plugins": id.PatchPlugins,
-		"languages_patch": id.PatchLanguages,
-		"languages": id.Languages,
+		"webdriver":            id.PatchWebDriver,
+		"chrome":               id.PatchChromeObject,
+		"plugins":              id.PatchPlugins,
+		"languages_patch":      id.PatchLanguages,
+		"languages":            id.Languages,
 		"hardware_concurrency": id.HardwareConcurrency,
-		"device_memory": id.DeviceMemoryGB,
-		"webgl_vendor": id.WebGLVendor,
-		"webgl_renderer": id.WebGLRenderer,
-		"bundle_seed": profile.Digest,
+		"device_memory":        id.DeviceMemoryGB,
+		"webgl_vendor":         id.WebGLVendor,
+		"webgl_renderer":       id.WebGLRenderer,
+		"bundle_seed":          profile.Digest,
 	}
 	b, err := json.Marshal(patch)
 	if err != nil {
