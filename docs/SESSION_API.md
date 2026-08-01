@@ -1,1140 +1,204 @@
 # Browser Session API — LLM Vision Tool
 
-**Persistent browser sessions for AI agents.** Open a page once, interact with it continuously — like a human with a browser tab.
+Persistent browser sessions let agents open a page once, read/snapshot it, act through selectors and `@ref`s, capture screenshots, inspect diagnostics, and close the session without repeated navigation.
 
-### Engine/browser error tracking
+> **Mandatory entitlement warning:** Current code still allows selected unauthenticated loopback session/search/screenshot paths. The examples below describe API shape for authorized development/migration only. They do not grant Evaluation or approve customer exposure. Final production use requires caller authentication plus an authority-issued signed `uiai-engine` lease or a narrower verified child token, the required feature, node/time/sequence validation, and any limit reservation before browser allocation.
 
-- `GET /api/errors?limit=20&source=&class=` returns bounded, redacted engine/browser error events.
-- Browser/session failures and recovered panics return structured envelopes: `error_id`, `error_class`, `message`, `suggested_next_action`, `diagnostics`, and redacted `details`.
-- Captures HTTP 4xx/5xx, recovered panics, and rich browser-session action failures with session diagnostics summaries.
-- Query strings, fragments, auth headers, cookies, request bodies, and secret-like context keys are not stored.
-- Pi/MCP error text surfaces the id/class/next action and points agents to `uiai_errors`; UIAI Pi tool results render compact by default and expand with `Ctrl+O` (`app.tools.expand`).
+## Required request authority
 
-## Why This Exists
+The target request pipeline is:
 
-Traditional screenshot APIs are **transactional**: navigate → snap → forget. Every call pays the full navigation cost (~1.7s). An LLM doing visual QA must re-navigate the same page 5–10 times per iteration.
+```text
+request safety/rate limit
+→ caller authentication
+→ signed lease or child-token verification
+→ uiai-engine product grant
+→ route feature grant
+→ node/time/sequence/offline checks
+→ concurrency/usage reservation
+→ session handler or protected worker
+→ usage commit/release
+→ redacted observability
+```
 
-Session API is **persistent**: open once → snap/scroll/click/type/eval instantly. Re-screenshots take **30ms** instead of 1.7s. That's **57x faster**.
+Loopback, `UIAI_LOCAL_API_TOKEN`, extension/Pi/MCP/Cockpit tokens, Focusa pairing, source checkout, or browser health never create product permission.
 
-## Search provider behavior
+Representative feature keys:
 
-`GET/POST /api/search` is provider-neutral; Brave Search is the default provider and `provider="wikipedia"` selects Wikipedia as a keyless public fallback/second provider for encyclopedia/source URL discovery. Set `BRAVE_SEARCH_API_KEY` in the server/service environment to enable live Brave calls. `GET /api/search/providers` reports readiness without exposing secrets: Brave is `configured=true/status=ready` when the key is present or `configured=false/status=degraded/degraded_reason=missing_key` when absent; Wikipedia reports `configured=true/status=ready` with `keyless_public` capability.
+- `uiai.session.execute`
+- `uiai.screenshot.capture`
+- `uiai.search.execute`
+- `uiai.markdown.capture`
+- `uiai.browser.diagnostics`
+- `uiai.share.create`
+- `uiai.fpv.control`
 
-Provider calls are bounded by the current 12 second provider HTTP timeout in `internal/routes/search.go`. Provider quota/rate limits belong to the upstream provider account; UIAI does not expose provider keys, raw quota counters, or secret headers. UIAI adds a small in-memory successful-result cache to reduce repeated provider calls; `UIAI_SEARCH_CACHE_TTL_SECONDS` defaults to `60`, and `0` disables caching. `/api/search/providers` reports `cache_ttl_seconds`; `/api/search` responses report `cached` plus `cache_ttl_seconds`. Search results are bounded/redacted before agent exposure across both Brave and Wikipedia: title/source/age/snippet fields are length-capped, URL fragments are removed, and secret-like query keys such as tokens, API keys, signatures, credentials, and passwords are replaced with `REDACTED`. Results include `rank` and deterministic `evidence_ref` fields shaped as `uiai-search:<provider>:<query-hash>:<rank>` so agents can cite a selected result URL/title/snippet without storing raw SERP blobs. Future provider quota protection can add explicit local rate limiting while preserving stable handles and secret-safe provider metadata.
+Exact grants/limits come from the signed authority policy.
 
-## Diagnostics
+## Session lifecycle
 
-Session tools now expose lightweight DevTools-style diagnostics specified in [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md): bounded console logs, JS exceptions, network requests, failed requests, and summaries without adding Playwright/Puppeteer or taking screenshots on diagnostics reads.
+| Method | Route | Purpose | Target authority |
+| --- | --- | --- | --- |
+| `GET` | `/api/session` | list caller/lease-scoped sessions | authenticated + entitled; no cross-account enumeration |
+| `POST` | `/api/session` | open/navigate a persistent session | `uiai.session.execute` + concurrency reservation |
+| `GET` | `/api/session/{id}` | session metadata | owner/client/session scope |
+| `DELETE` | `/api/session/{id}` | close session | owner/client/session scope; idempotent |
+| `POST` | `/api/session/{id}/navigate` | navigate | session feature/scope |
+| `GET` | `/api/session/{id}/read` | bounded text/Markdown read | session feature/scope |
+| `GET` | `/api/session/{id}/snapshot` | accessibility tree and `@ref`s | session feature/scope |
+| `POST` | `/api/session/{id}/click` | click CSS selector or `@ref` | action scope, confirmation policy where required |
+| `POST` | `/api/session/{id}/fill` | fill input | action scope |
+| `POST` | `/api/session/{id}/type` | type text | action scope |
+| `POST` | `/api/session/{id}/press` | keypress | action scope |
+| `POST` | `/api/session/{id}/scroll` | scroll | action scope |
+| `POST` | `/api/session/{id}/screenshot` | capture current page | screenshot feature/limit |
+| `GET` | `/api/session/{id}/diagnostics` | console/exceptions/network/failures | diagnostics feature and redaction |
+| `POST` | `/api/session/{id}/eval` | run bounded JavaScript | sensitive feature; may be excluded from Evaluation |
+| `POST` | `/api/session/{id}/css` | inject CSS | sensitive action scope |
+| `GET/POST` | session cookie/auth routes | save/load state | explicit sensitive feature, encrypted storage, no logs |
 
-Agent discoverability rule: during browser troubleshooting, call `browser_diagnostics` after `browser_open` and after any failed/blank/broken screenshot, unexpected click/navigation, JS eval issue, failed wait, CORS/API/network suspicion, or console-error clue. Tool search terms that should find it: `diagnostics`, `console`, `network`, `error`, `exception`, `failed request`, `devtools`, `CORS`, `API failure`, `blank page`, `broken page`, `visual failure`. Agents that need a small bootstrap payload before loading tool schemas can read `GET /api/tools/agent-card`.
+The exact current route list remains in code/tool discovery and must be generated into the endpoint-feature coverage ledger before release.
 
-[Focusa](https://github.com/Startempire-Wire/focusa) ingestion for those diagnostics is specified in the [UIAI browser diagnostics Focusa integration spec](https://github.com/Startempire-Wire/focusa/blob/main/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md) (local checkout path: `/home/wirebot/focusa/docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`). When a session is opened with `focusa_scope`, diagnostics and session error envelopes echo the scope so `focusa_browser_diagnostics_intake` can link evidence without guessing Workpoint/project identity.
+## Authorized-development example
 
-Stable evidence-handle patterns:
-
-| UIAI flow | Preferred handle | Capture target | Preferred Focusa tool | Notes |
-|---|---|---|---|---|
-| Browser diagnostics | `uiai-diagnostics:session=<id>:seq=<seq>` | `/api/session/{id}/diagnostics` or `browser_diagnostics` result | `focusa_browser_diagnostics_intake` | Include `focusa_scope` when opening the session so Workpoint/project scope is echoed. |
-| Engine/browser error | `uiai-error:<error_id>` | `/api/errors?limit=20&source=&class=` or `uiai_errors` result | `focusa_evidence_capture` or diagnostics intake when paired with session diagnostics | Cite `error_id`, `error_class`, and diagnostics URL instead of raw logs. |
-| Search result | `uiai-search:<provider>:<query-hash>:<rank>` | `browser_search`/`uiai_search` selected result URL + title/snippet | `focusa_evidence_capture` | Hash or summarize the query; capture the selected result URL/title/snippet, not the full SERP blob. |
-| Source-to-Markdown | `uiai-source-markdown:sha256:<prefix>` | `/api/markdown`, `uiai_source_to_markdown`, `source_to_markdown`, or `scripts/uiai markdown <url>` / `--format jsonl` | `focusa_evidence_capture` | Capture the stable evidence ref plus bounded summary/metadata/record refs; avoid pasting full Markdown or raw JSONL into Focusa. |
-| Browser read/snapshot | `uiai-browser:session=<id>:read:<seq>` or `uiai-browser:session=<id>:snapshot:<seq>` | `/api/session/{id}/read` or snapshot/@ref output | `focusa_evidence_capture` | Store bounded text/snapshot summary and session id; avoid transcript-sized page dumps. |
-| Screenshot/share artifact | `uiai-screenshot:sha256:<prefix>` or `uiai-share:<share_id>` | screenshot/share response `focusa_evidence` | `focusa_evidence_capture` | Use the artifact handle/path; do not paste base64 image payloads into Focusa. |
-
-## Quick Start
+This example assumes a synthetic/test trust root or a valid signed entitlement and an authentication token. It is not an anonymous Evaluation flow.
 
 ```bash
-# 1. Open a session
-SID=$(curl -s -X POST http://localhost:7456/api/session \
+export UIAI_ENGINE_URL="${UIAI_ENGINE_URL:-http://127.0.0.1:7456}"
+export UIAI_BEARER_TOKEN="<short-lived-scoped-token>"
+
+SID=$(curl -fsS -X POST "$UIAI_ENGINE_URL/api/session" \
+  -H "Authorization: Bearer $UIAI_BEARER_TOKEN" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
   -d '{"url":"https://example.com","width":1280,"height":800}' \
   | jq -r '.session.id')
 
-# 2. Snapshot — get accessibility tree with @ref selectors
-curl -s http://localhost:7456/api/session/$SID/snapshot | jq '{tree, stats}'
-# Output:
-#   - link "Learn more" [ref=e1]
-#   - textbox "Search" [ref=e2]
-#   - button "Submit" [ref=e3]
+curl -fsS "$UIAI_ENGINE_URL/api/session/$SID/snapshot" \
+  -H "Authorization: Bearer $UIAI_BEARER_TOKEN" \
+  | jq '{tree,stats}'
 
-# 3. Click by @ref (from snapshot)
-curl -s -X POST http://localhost:7456/api/session/$SID/click \
-  -H "Content-Type: application/json" -d '{"selector":"@e1"}'
-
-# 4. Screenshot current state (instant — no navigation)
-curl -s -X POST http://localhost:7456/api/session/$SID/screenshot \
-  -H "Content-Type: application/json" -d '{}' \
-  | jq '{duration_ms, size, url, title}'
-
-# 5. Scroll down
-curl -s -X POST http://localhost:7456/api/session/$SID/scroll \
-  -H "Content-Type: application/json" -d '{"deltaY":600}'
-
-# 6. Click a button (CSS selector also still works)
-curl -s -X POST http://localhost:7456/api/session/$SID/click \
-  -H "Content-Type: application/json" -d '{"selector":"button.submit"}'
-
-# 6. Inject CSS to test a design change
-curl -s -X POST http://localhost:7456/api/session/$SID/css \
+curl -fsS -X POST "$UIAI_ENGINE_URL/api/session/$SID/click" \
+  -H "Authorization: Bearer $UIAI_BEARER_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"css":".header { background: red; }"}'
+  -d '{"selector":"@e1"}'
 
-# 7. Run JavaScript
-curl -s -X POST http://localhost:7456/api/session/$SID/eval \
-  -H "Content-Type: application/json" \
-  -d '{"js":"return document.querySelectorAll(\"img\").length + \" images\""}'
+curl -fsS "$UIAI_ENGINE_URL/api/session/$SID/diagnostics" \
+  -H "Authorization: Bearer $UIAI_BEARER_TOKEN"
 
-# 8. Close when done
-curl -s -X DELETE http://localhost:7456/api/session/$SID
+curl -fsS -X DELETE "$UIAI_ENGINE_URL/api/session/$SID" \
+  -H "Authorization: Bearer $UIAI_BEARER_TOKEN"
 ```
 
+Do not put raw commercial license keys in headers for normal runtime calls. Activation credentials exchange for a signed lease; Focusa/clients use scoped child/access tokens.
 
-### CLI wrapper
+## Search and Source-to-Markdown
 
-`scripts/uiai` is the lightweight unified CLI surface for operator/agent shell workflows. It wraps the HTTP API and existing smoke/install scripts before a full Go subcommand CLI is justified.
+Current provider-neutral search and Markdown capture remain useful, but final production execution requires product/feature/limit checks even from loopback.
 
-Examples:
+Provider readiness endpoints may remain public only if they expose bounded configuration status without keys, quotas, account identity, private queries, or cached customer results.
 
-```bash
-scripts/uiai status
-scripts/uiai health
-scripts/uiai errors --limit 10 --source browser_session
-scripts/uiai tools search diagnostics
-SID=$(scripts/uiai --json session open https://example.com | jq -r '.session.id')
-scripts/uiai session read "$SID" --max-chars 1000
-scripts/uiai session diagnostics "$SID"
-scripts/uiai session close "$SID"
-scripts/uiai research packet --url https://example.com --goal "CLI proof packet" --out /tmp/uiai-research-packet.json
-scripts/uiai smoke agent
-```
+Search/Markdown results must continue to:
 
-Output modes: `--compact` (default), `--json`, `--pretty`.
+- strip URL fragments;
+- redact secret-like query values;
+- bound titles/snippets/records;
+- expose stable evidence refs rather than raw transcript-sized payloads;
+- scope cache/results to safe public inputs and caller/lease where needed.
 
-`browser_eval_async` returns a structured `eval_failed` error envelope for JS/runtime errors instead of a successful text payload; its next action points agents to browser_diagnostics console/exceptions and bounded direct-action retries.
- The Pi extension also uses compact-by-default rendering with Ctrl+O expansion to full JSON for representative success/error tool results. Exit codes: `0` success, `1` API/tool failure, `2` usage error, `3` missing dependency, `4` auth/config error. Auth/env vars match Pi/MCP: `UIAI_ENGINE_URL`, `UIAI_API_KEY`, `UIAI_BEARER_TOKEN`, `UIAI_CLI_TIMEOUT_SECONDS`.
+## Diagnostics and Evidence
 
-## Agent Bootstrap + Tool Discovery
+Diagnostics include bounded:
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/tools/agent-card` | Compact local/remote agent bootstrap card: discovery endpoints, health/metrics links, recommended workflows, search hints, and reliability rules. |
-| `GET` | `/api/tools/search?q=<keyword>` | Low-context tool search; use before loading full OpenAI/MCP schemas. |
-| `GET` | `/api/tools/openai` | Full OpenAI function-calling tool definitions. |
-| `GET` | `/api/tools/mcp` | MCP tool definitions for remote bridges. |
-| `GET` | `/api/tools/docs` | Lightweight docs/examples metadata for agents. |
-| `GET` | `/api/tools/graph` | Tool relationship graph with workflow routes and [Focusa](https://github.com/Startempire-Wire/focusa) integration metadata. |
-| `GET`/`POST` | `/api/search` | Provider-neutral web search for agents; Brave is the default provider. |
-| `GET` | `/api/search/providers` | Search provider metadata and configured status. |
+- console logs;
+- JavaScript exceptions;
+- network requests and failures;
+- browser/session action failures;
+- structured engine error ids/classes/next actions.
 
-## Pi Extension
+Never store or return authorization headers, cookies, request bodies, raw keys/tokens, secret query values, unmasked customer identity, or cross-account session data.
 
-This repo now ships a project-local Pi extension at `.pi/extensions/uiai-engine.ts`. Pi auto-discovers it when launched from the UIAI Engine project root. It registers a full Pi-facing mirror of the MCP/browser tool surface for agent bootstrap, reliable browser surfing, screenshots, and frame helpers:
+Preferred stable handles:
 
-- Bootstrap/discovery: `pi_uiai_agent_card`, `pi_uiai_tool_search`, `pi_uiai_tool_graph`, `uiai_search`, `uiai_health`, `uiai_status`, `uiai_errors`, `uiai_critique_models`, `uiai_critique_dimensions`, `uiai_frame_catalog`, `uiai_frame_render`.
-- Browser lifecycle/state: `uiai_browser_open`, `uiai_browser_close`, `uiai_browser_screenshot`, `uiai_browser_read`, `uiai_browser_snapshot`, `uiai_browser_dom`, `uiai_browser_diagnostics`, `uiai_browser_diagnostics_clear`.
-- Browser navigation/actions: `uiai_browser_navigate`, `uiai_browser_scroll`, `uiai_browser_click`, `uiai_browser_hover`, `uiai_browser_type`, `uiai_browser_fill`, `uiai_browser_select`, `uiai_browser_press`, `uiai_browser_back`, `uiai_browser_forward`, `uiai_browser_wait`.
-- Browser advanced operations: `uiai_browser_eval`, `uiai_browser_eval_async`, `uiai_browser_resize`, `uiai_browser_css`, `uiai_browser_text`, `uiai_browser_cookies`.
-- Capture/media helpers: `uiai_screenshot`, `uiai_frame_catalog`, `uiai_frame_render`.
+| Flow | Handle |
+| --- | --- |
+| diagnostics | `uiai-diagnostics:session=<id>:seq=<seq>` |
+| engine error | `uiai-error:<error_id>` |
+| search result | `uiai-search:<provider>:<query-hash>:<rank>` |
+| Source-to-Markdown | `uiai-source-markdown:sha256:<prefix>` |
+| browser read/snapshot | `uiai-browser:session=<id>:read|snapshot:<seq>` |
+| screenshot/share | `uiai-screenshot:sha256:<prefix>` / `uiai-share:<id>` |
 
-Command: `/uiai` uses Pi's supported `ctx.ui.select()` menu/dialog API to prefill common UIAI workflows; it includes **Hide UIAI card**. `/uiai off` (also `hide`, `clear`, `disable`) clears the UIAI widget and persists hidden state in the Pi session with `pi.appendEntry`; `/uiai on`/`show`/`enable` restores and persists the widget. It does not use a non-existent `menu.items` API. Set `UIAI_ENGINE_URL` to target a remote tunnel or non-default port; default is `http://localhost:7456`. Set `UIAI_PI_TIMEOUT_MS` to tune Pi extension HTTP timeout; default is 30000 ms. Set `UIAI_API_KEY` or `UIAI_BEARER_TOKEN` when calling authenticated routes such as media/frame helpers or remote deployments.
+Focusa ingestion must preserve exact project/Workpoint scope and independently verify the UIAI product/child token. A Focusa Evidence link cannot retroactively authorize an unlicensed UIAI action.
 
+## FPV and shares
 
-## Interconnected Tool Graph + [Focusa](https://github.com/Startempire-Wire/focusa) Routing
+Session creation may return an FPV share in the current code. Final production behavior requires:
 
-UIAI tools are designed as a graph, not isolated calls. `GET /api/tools/graph` returns:
+- share creation as an entitled operation;
+- signed/opaque, short-lived token;
+- audience, session, action, and resource scope;
+- `controls` separately granted;
+- replay/revocation/expiry handling;
+- no escalation from `/m/{token}` into normal `/api/*` execution;
+- audit/redaction of operator actions;
+- no public session enumeration.
 
-- `workflows`: recommended sequences such as web surfing, visual debugging, single capture, and [Focusa](https://github.com/Startempire-Wire/focusa) evidence.
-- `related_tools`: adjacency lists for every primary tool, including [Focusa](https://github.com/Startempire-Wire/focusa) handoff tools where relevant.
-- `focusa_integration`: scope input/echo rules, stable evidence refs, and preferred [Focusa](https://github.com/Startempire-Wire/focusa) intake/link/prediction tools.
+A viewer may remain public by possession of a narrowly scoped token. Control is never implied by view access.
 
-OpenAI and MCP tool definitions also include `related_tools` and `workflow_hints`, so agents can chain from intent → action → diagnostics/evidence → Focusa handoff → cleanup without rediscovering routes.
+## CLI, Pi, and MCP
 
-The iterative product/engineering roadmap for making UIAI feel hand-in-glove with Focusa and Pi is [`UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md`](UIAI_FOCUSA_PI_HAND_IN_GLOVE_SPEC.md). It defines the proposed ResearchDiagnosticsPacket, authority split, scope/evidence contracts, guided Pi workflows, and rollout iterations.
+`scripts/uiai`, the Pi extension, and MCP bridge are caller surfaces. They must all:
 
-Packet parity status: UIAI composes `uiai.focusa_research_diagnostics_packet.v1` in both the Pi extension (`uiai_focusa_packet_build`) and HTTP (`POST /api/agent/research-packet`) from existing UIAI `search`, `source_markdown`, `browser_read`, `browser_snapshot`, `browser_diagnostics`, structured error, screenshot, and share responses; packets are proposal-only until a Focusa capture/intake/link tool accepts them. `/api/markdown` supports `format=jsonl` as a response hint and includes adapter record lines plus `uiai.source_markdown_chunk.v1` refs when structured records exist. `/api/tools/graph` advertises the `focusa_research_packet` workflow and schema for MCP/CLI route planning; CLI callers can use `scripts/uiai packet compose <json-file|->` or `scripts/uiai smoke packet`.
+- accept scoped authentication/child tokens;
+- project the same canonical entitlement errors;
+- expose `license_feature` and limit metadata in discovery;
+- deny before side effects;
+- avoid persisting raw activation/license keys;
+- restart/reconnect when tool schemas change;
+- keep Focusa scope separate from UIAI entitlement.
 
-`GET /api/health/browser` and `GET /api/metrics/browser` include an `agent_pressure` summary for long agent workflows: `uiai.agent_pressure.v1`, noncanonical operational telemetry classification, overall pressure, packet proposal authority, search provider/cache status, browser pool/queue/failure pressure, screenshot cache pressure, stored error pressure, bounded recommended actions, and a Focusa routing hint. Focusa/Pi should use this before long packet workflows or after browser/search/cache pressure symptoms instead of reading raw logs; pressure can narrow/block operational workflows but never becomes Focusa cognition truth.
+## Error contract
 
-[Focusa](https://github.com/Startempire-Wire/focusa)-aware default route:
-
-1. `browser_open` with `focusa_scope` when project/workpoint context is known.
-2. `browser_read` for page text or `browser_snapshot` for action refs.
-3. `browser_diagnostics` after failures or visual/API uncertainty.
-4. `focusa_browser_diagnostics_intake` or `focusa_evidence_capture` with stable `uiai-*` evidence refs.
-5. `browser_close` when done.
-
-## API Reference
-
-### Session Management
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/session` | List all active sessions |
-| `POST` | `/api/session` | Open new session (navigate + screenshot) |
-| `GET` | `/api/session/{id}` | Get session info |
-| `DELETE` | `/api/session/{id}` | Close session, release page |
-
-### Session Actions (all return screenshot except snapshot/dom/diagnostics)
-
-| Method | Path | Description | Typical Latency |
-|--------|------|-------------|-----------------|
-| `GET/POST` | `/api/session/{id}/snapshot` | **A11y tree with @ref selectors** | **~50ms** |
-| `POST` | `/api/session/{id}/screenshot` | Re-snap current state | **30ms** |
-| `POST` | `/api/session/{id}/scroll` | Scroll + screenshot | **150ms** |
-| `POST` | `/api/session/{id}/click` | Click element (CSS or @ref) + screenshot | **300ms** |
-| `POST` | `/api/session/{id}/hover` | Hover element (CSS or @ref) + screenshot | **200ms** |
-| `POST` | `/api/session/{id}/type` | Type into input (CSS or @ref) + screenshot | **150ms** |
-| `POST` | `/api/session/{id}/eval` | Run short sync JS + screenshot | **150ms** |
-| `POST` | `/api/session/{id}/eval_async` | Run bounded async JS + screenshot | timeout-bounded |
-| `POST` | `/api/session/{id}/navigate` | Go to new URL + screenshot | **1-2s** |
-| `POST` | `/api/session/{id}/resize` | Change viewport + screenshot | **300ms** |
-| `POST` | `/api/session/{id}/css` | Inject CSS + screenshot | **150ms** |
-| `POST` | `/api/session/{id}/wait` | Wait for selector + screenshot | **varies** |
-| `POST` | `/api/session/{id}/fill` | Clear + type (reliable value replace) | **150ms** |
-| `POST` | `/api/session/{id}/select` | Choose dropdown option by value/text | **150ms** |
-| `POST` | `/api/session/{id}/press` | Keyboard key (Enter, Tab, Escape…) | **200-800ms** |
-| `POST` | `/api/session/{id}/back` | Browser history back + screenshot | **1-2s** |
-| `POST` | `/api/session/{id}/forward` | Browser history forward + screenshot | **1-2s** |
-| `POST` | `/api/session/{id}/text` | Get element text content (no screenshot) | **instant** |
-| `POST` | `/api/session/{id}/read` | Compact page/region text extraction for web surfing (no screenshot) | **instant** |
-| `POST` | `/api/session/{id}/cookies` | Get/set/clear cookies (no screenshot) | **instant** |
-| `POST` | `/api/session/{id}/auth/save` | Save cookies + localStorage to JSON | **instant** |
-| `POST` | `/api/session/{id}/auth/load` | Restore auth state from saved JSON | **instant** |
-| `GET` | `/api/session/{id}/dom` | DOM structure (legacy, prefer snapshot) | **instant** |
-| `GET` | `/api/session/{id}/diagnostics` | Console/errors/exceptions/network summary (no screenshot) | **instant** |
-| `POST` | `/api/session/{id}/diagnostics/clear` | Clear diagnostic buffers | **instant** |
-
-Diagnostics endpoints are implemented per [`BROWSER_DIAGNOSTICS_SPEC.md`](BROWSER_DIAGNOSTICS_SPEC.md). `GET /api/session/{id}/diagnostics` includes `focusa_scope` when the session was opened with scope metadata.
-
----
-
-### `POST /api/session` — Open
+Representative entitlement failures:
 
 ```json
 {
-  "url": "https://example.com",    // required
-  "width": 1280,                    // default: 1280
-  "height": 800,                    // default: 800
-  "focusa_scope": {                 // optional evidence/Workpoint scope
-    "workpoint_id": "019...",
-    "continuity_id": "focusa-cont-...",
-    "project_root": "/path/to/project",
-    "evidence_ref": "uiai-diagnostics:example"
-  }
+  "error": "license_required",
+  "state": "unactivated",
+  "product": "uiai-engine",
+  "feature": "uiai.session.execute",
+  "message": "This operation requires an active UIAI Engine entitlement.",
+  "manage_url": "https://install.focusa.dev/license",
+  "retryable": false
 }
 ```
 
-**Response (201):**
-```json
-{
-  "session": {
-    "id": "abc12345",
-    "url": "https://example.com",
-    "title": "Example Domain",
-    "width": 1280,
-    "height": 800,
-    "focusa_scope": {
-      "workpoint_id": "019...",
-      "continuity_id": "focusa-cont-...",
-      "project_root": "/path/to/project",
-      "evidence_ref": "uiai-diagnostics:example"
-    }
-  },
-  "screenshot": "<base64>",
-  "size": 45230,
-  "duration_ms": 1200
-}
-```
-
-### `GET/POST /api/session/{id}/snapshot` — Accessibility Tree with @refs
-
-**The recommended way for LLMs to discover page elements.** Returns a text tree with `@ref` IDs that can be used in click/type/hover actions.
-
-```json
-// POST body (all optional)
-{
-  "interactive": true,   // only buttons, links, inputs (default: false)
-  "compact": true,       // remove empty structural nodes (default: false)
-  "max_depth": 5,        // limit tree depth (default: unlimited)
-  "selector": "#main"    // scope to CSS selector (default: "body")
-}
-```
-
-`GET` variant always returns interactive+compact snapshot.
-
-**Response:**
-```json
-{
-  "tree": "  - link \"Join Free\" [ref=e4]\n  - textbox \"Search...\" [ref=e6]\n  - button \"Search\" [ref=e7]",
-  "refs": {
-    "e4": {"selector": "a.join-btn", "role": "link", "name": "Join Free", "tag": "a"},
-    "e6": {"selector": "input[placeholder=\"Search...\"]", "role": "textbox", "name": "Search...", "tag": "input"},
-    "e7": {"selector": "button.search-btn", "role": "button", "name": "Search", "tag": "button"}
-  },
-  "stats": {
-    "lines": 78,
-    "chars": 3820,
-    "tokens": 955,
-    "ref_count": 78,
-    "interactive": 78
-  }
-}
-```
-
-**Using refs in actions:**
-```bash
-# Click by ref (resolves to stored CSS selector)
-curl -X POST /api/session/$SID/click -d '{"selector":"@e4"}'
-
-# Type by ref
-curl -X POST /api/session/$SID/type -d '{"selector":"@e6","text":"startup ideas"}'
-
-# CSS selectors still work
-curl -X POST /api/session/$SID/click -d '{"selector":"button.submit"}'
-```
-
-**Optimal LLM workflow:**
-1. `POST /snapshot {"interactive":true}` → parse tree + refs (~955 tokens)
-2. Identify target from tree (e.g., `@e7` is Search button)
-3. `POST /click {"selector":"@e7"}` → get screenshot result
-4. Re-snapshot if page changed significantly
-
----
-
-### `POST /api/session/{id}/screenshot` — Snap
-
-```json
-{
-  "format": "jpeg",     // "jpeg" (default) or "png"
-  "quality": 80,        // 1-100, default 80
-  "fullPage": false     // capture entire scrollable page
-}
-```
-
-**Response:**
-```json
-{
-  "screenshot": "<base64>",
-  "width": 1280,
-  "height": 800,
-  "format": "jpeg",
-  "size": 38445,
-  "url": "https://example.com",
-  "title": "Example Domain",
-  "duration_ms": 30
-}
-```
-
-### `POST /api/session/{id}/scroll` — Scroll
-
-```json
-// Relative scroll:
-{ "deltaY": 600 }                  // scroll down 600px
-{ "deltaX": 200, "deltaY": 0 }    // scroll right
-
-// Absolute scroll:
-{ "x": 0, "y": 2000 }             // scroll to y=2000
-```
-
-### `POST /api/session/{id}/click` — Click
-
-```json
-{ "selector": ".buy-button" }
-{ "selector": "#submit" }
-{ "selector": "nav a:nth-child(3)" }
-```
-
-### `POST /api/session/{id}/hover` — Hover
-
-```json
-{ "selector": ".dropdown-trigger" }
-```
-
-### `POST /api/session/{id}/type` — Type
-
-```json
-{
-  "selector": "input[name=email]",
-  "text": "user@example.com"
-}
-```
-
-### `POST /api/session/{id}/eval` — Short synchronous JavaScript
-
-```json
-{ "js": "return document.querySelectorAll('h1').length + ' headings'" }
-```
-
-Use this for short sync reads. Avoid long async Promises here; use `eval_async` for bounded awaits, or split UI workflows into direct click/type/wait calls.
-
-**Response:**
-```json
-{
-  "result": "3 headings",
-  "screenshot": "<base64>",
-  "size": 38445,
-  "duration_ms": 95
-}
-```
-
-### `POST /api/session/{id}/eval_async` — Bounded async JavaScript
-
-```json
-{
-  "js": "await new Promise(r => setTimeout(r, 250)); return document.title",
-  "timeout_ms": 2000
-}
-```
-
-`timeout_ms` defaults to 5000 and is capped at 15000. For long UI workflows, prefer `snapshot` + direct browser actions to avoid fragile long-lived Promise handles.
-
-**Async eval reliability rule:**
-
-- Use `/eval` for short synchronous DOM reads only.
-- Use `/eval_async` for small bounded awaits, with the shortest practical `timeout_ms`.
-- Use `snapshot` + `click`/`type`/`wait`/`diagnostics` for multi-step UI workflows; do not hide long browser flows inside one Promise.
-- If an eval flakes or returns a collected/stale Promise symptom, split the workflow into direct actions and read `diagnostics` before patching app code.
-
-### `POST /api/session/{id}/resize` — Viewport
-
-```json
-{ "width": 375, "height": 812 }    // switch to mobile
-{ "width": 1440, "height": 900 }   // switch to desktop
-```
-
-### `POST /api/session/{id}/css` — Inject CSS
-
-```json
-{ "css": ".header { background: red; } .hero { display: none; }" }
-```
-
-Replaces any previously injected CSS (identified by `#llm-injected-css`).
-
-### `POST /api/session/{id}/wait` — Wait for Selector
-
-```json
-{
-  "selector": ".lazy-loaded-content",
-  "timeout_ms": 5000                // default: 5000
-}
-```
-
-### `GET /api/session/{id}/dom` — DOM Info
-
-No screenshot. Returns structured page data for LLM reasoning:
-
-```json
-{
-  "url": "https://example.com",
-  "title": "Example Domain",
-  "scroll": { "x": 0, "y": 800, "maxY": 6788 },
-  "viewport": { "width": 1280, "height": 800, "scrollHeight": 7588 },
-  "headings": [
-    { "tag": "H1", "text": "Welcome" },
-    { "tag": "H2", "text": "Features" }
-  ],
-  "links": 72,
-  "buttons": 4,
-  "images": { "total": 12, "broken": 0 },
-  "forms": 1,
-  "inputs": 3,
-  "interactive": [
-    {
-      "tag": "a",
-      "type": "",
-      "text": "Sign In",
-      "selector": "a.sign-in-btn",
-      "visible": true
-    },
-    {
-      "tag": "button",
-      "type": "submit",
-      "text": "Subscribe",
-      "selector": "button.subscribe",
-      "visible": true
-    }
-  ]
-}
-```
-
-The `interactive` array lists up to 30 clickable/typeable elements with their CSS selectors — so the LLM knows exactly what it can interact with.
-
-> **Prefer `POST /snapshot`** for LLM agents — it returns an a11y tree with `@ref` selectors that are more reliable than DOM's CSS selectors.
-
-### `POST /api/session/{id}/fill` — Clear + Type
-
-More reliable than `type` for replacing existing input values. Select-all → delete → type.
-
-```json
-{ "selector": "@e5", "text": "new value" }
-```
-
-Accepts CSS selector or `@ref` from snapshot.
-
-### `POST /api/session/{id}/select` — Dropdown Option
-
-```json
-{ "selector": "@e8", "values": ["California"] }
-```
-
-Selects option by visible text or value. Multiple values for multi-select.
-
-### `POST /api/session/{id}/press` — Keyboard Key
-
-```json
-{ "key": "Enter" }
-```
-
-Supported keys: `Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `Space`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Home`, `End`, `PageUp`, `PageDown`.
-
-Waits for DOM stability after keypress (handles form submissions, modal dismissals).
-
-### `POST /api/session/{id}/back` — Browser History Back
-
-No body required. Returns screenshot of previous page.
-
-### `POST /api/session/{id}/forward` — Browser History Forward
-
-No body required. Returns screenshot after navigating forward.
-
-### `POST /api/session/{id}/text` — Get Element Text
-
-```json
-{ "selector": "@e12" }
-```
-
-No screenshot. Returns `{"text": "element text content", "selector": "@e12"}`.
-
-
-### `POST /api/session/{id}/read` — Read Page Text
-
-Extract compact readable text without a screenshot. Use this for agent web surfing after `browser_open` or `browser_navigate` when text content matters more than visual pixels.
-
-```json
-{
-  "selector": "main",       // optional CSS selector or @ref region
-  "max_chars": 8000,        // default 8000, capped by engine
-  "include_links": true     // include up to 40 visible links
-}
-```
-
-Response includes `url`, `title`, optional meta `description`, `text`, `chars`, `truncated`, `headings`, and optional `links`.
-
-### `POST /api/session/{id}/cookies` — Cookie Management
-
-```json
-// Get all
-{ "action": "get" }
-
-// Get by name
-{ "action": "get", "name": "wp_logged_in" }
-
-// Set
-{ "action": "set", "name": "theme", "value": "dark", "domain": "example.com" }
-
-// Clear all
-{ "action": "clear" }
-
-// Clear by name
-{ "action": "clear", "name": "tracking" }
-```
-
-Returns `{"cookies": [...], "count": N}`.
-
-### `POST /api/session/{id}/auth/save` — Save Auth State
-
-No body. Returns JSON with cookies + localStorage + sessionStorage.
-
-```json
-{
-  "url": "https://example.com",
-  "cookies": [...],
-  "localStorage": { "token": "abc123" },
-  "sessionStorage": { "cart": "{...}" },
-  "savedAt": "2026-02-09T11:08:13Z"
-}
-```
-
-Save to file: `curl -s -X POST .../auth/save -o /tmp/auth-state.json`
-
-### `POST /api/session/{id}/auth/load` — Load Auth State
-
-Body: the JSON from `auth/save`.
-
-```bash
-curl -s -X POST .../auth/load -H "Content-Type: application/json" -d @/tmp/auth-state.json
-```
-
-Returns `{"status": "loaded"}`. Navigate after loading to trigger auth.
-
----
-
-## LLM Tool Definitions
-
-Live tool definitions and lightweight docs are served by `GET /api/tools`, `GET /api/tools/mcp`, `GET /api/tools/docs`, and `GET /api/tools/search?q=diagnostics`. Those generated definitions are authoritative. The examples below show the main shape; current live tools include `browser_diagnostics` and `browser_diagnostics_clear`. Discoverability checks should pass for `q=console`, `q=network`, `q=error`, `q=exception`, and `q=devtools`.
-
-### OpenAI Function Calling Format
-
-```json
-[
-  {
-    "name": "browser_open",
-    "description": "Open a persistent browser session on a URL. Returns the session ID and an initial screenshot. Use this to start browsing a webpage.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "url": { "type": "string", "description": "URL to open" },
-        "width": { "type": "integer", "description": "Viewport width (default: 1280)" },
-        "height": { "type": "integer", "description": "Viewport height (default: 800)" }
-      },
-      "required": ["url"]
-    }
-  },
-  {
-    "name": "browser_screenshot",
-    "description": "Take an instant screenshot of the current page state. No navigation — captures whatever is visible right now. Use for re-checking after changes.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string", "description": "Session ID from browser_open" },
-        "fullPage": { "type": "boolean", "description": "Capture entire scrollable page" }
-      },
-      "required": ["session_id"]
-    }
-  },
-  {
-    "name": "browser_scroll",
-    "description": "Scroll the page and take a screenshot. Use deltaY for relative scrolling (positive=down) or x/y for absolute position.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" },
-        "deltaY": { "type": "integer", "description": "Pixels to scroll down (negative=up)" },
-        "deltaX": { "type": "integer", "description": "Pixels to scroll right" },
-        "y": { "type": "integer", "description": "Absolute scroll position" }
-      },
-      "required": ["session_id"]
-    }
-  },
-  {
-    "name": "browser_click",
-    "description": "Click an element by CSS selector. Returns a screenshot after the click completes. Use browser_dom first to find available selectors.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" },
-        "selector": { "type": "string", "description": "CSS selector of element to click" }
-      },
-      "required": ["session_id", "selector"]
-    }
-  },
-  {
-    "name": "browser_type",
-    "description": "Type text into an input field. Clears existing text first.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" },
-        "selector": { "type": "string", "description": "CSS selector of input element" },
-        "text": { "type": "string", "description": "Text to type" }
-      },
-      "required": ["session_id", "selector", "text"]
-    }
-  },
-  {
-    "name": "browser_eval",
-    "description": "Execute JavaScript on the page. Returns the result value and a screenshot. The JS runs inside an anonymous function — use 'return' for output.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" },
-        "js": { "type": "string", "description": "JavaScript to execute (use 'return' for output)" }
-      },
-      "required": ["session_id", "js"]
-    }
-  },
-  {
-    "name": "browser_dom",
-    "description": "Get the DOM structure of the current page without a screenshot. Returns headings, links, buttons, images, forms, and interactive elements with their CSS selectors. Use this to understand what you can click/type.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" }
-      },
-      "required": ["session_id"]
-    }
-  },
-  {
-    "name": "browser_diagnostics",
-    "description": "Get bounded console, exception, network, failed request, and summary diagnostics without taking a screenshot.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" },
-        "limit": { "type": "integer", "default": 100 },
-        "level": { "type": "string", "description": "all, error, warning, info" },
-        "failed_only": { "type": "boolean", "default": false }
-      },
-      "required": ["session_id"]
-    }
-  },
-  {
-    "name": "browser_diagnostics_clear",
-    "description": "Clear diagnostic buffers for a browser session.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" }
-      },
-      "required": ["session_id"]
-    }
-  },
-  {
-    "name": "browser_navigate",
-    "description": "Navigate to a new URL within the same session. Returns a screenshot of the new page.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" },
-        "url": { "type": "string", "description": "URL to navigate to" }
-      },
-      "required": ["session_id", "url"]
-    }
-  },
-  {
-    "name": "browser_resize",
-    "description": "Resize the browser viewport. Use to test responsive design (e.g., switch between mobile 375x812 and desktop 1440x900).",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" },
-        "width": { "type": "integer" },
-        "height": { "type": "integer" }
-      },
-      "required": ["session_id", "width", "height"]
-    }
-  },
-  {
-    "name": "browser_css",
-    "description": "Inject CSS into the page to test visual changes. Replaces any previously injected CSS. Returns a screenshot showing the result.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" },
-        "css": { "type": "string", "description": "CSS rules to inject" }
-      },
-      "required": ["session_id", "css"]
-    }
-  },
-  {
-    "name": "browser_close",
-    "description": "Close a browser session and release resources. Always close sessions when done.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "session_id": { "type": "string" }
-      },
-      "required": ["session_id"]
-    }
-  }
-]
-```
-
-### MCP (Model Context Protocol) Tool Format
-
-```json
-{
-  "tools": [
-    {
-      "name": "browser_open",
-      "description": "Open a persistent browser session on a URL. Returns session_id + initial screenshot.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "url": { "type": "string" },
-          "width": { "type": "integer", "default": 1280 },
-          "height": { "type": "integer", "default": 800 }
-        },
-        "required": ["url"]
-      }
-    },
-    {
-      "name": "browser_screenshot",
-      "description": "Instant re-screenshot of current page state (~30ms). No navigation.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "fullPage": { "type": "boolean", "default": false }
-        },
-        "required": ["session_id"]
-      }
-    },
-    {
-      "name": "browser_scroll",
-      "description": "Scroll the page. deltaY>0 scrolls down. Returns screenshot.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "deltaY": { "type": "integer", "default": 600 }
-        },
-        "required": ["session_id"]
-      }
-    },
-    {
-      "name": "browser_click",
-      "description": "Click element by CSS selector. Returns screenshot after click.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "selector": { "type": "string" }
-        },
-        "required": ["session_id", "selector"]
-      }
-    },
-    {
-      "name": "browser_type",
-      "description": "Type text into input. Clears existing text.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "selector": { "type": "string" },
-          "text": { "type": "string" }
-        },
-        "required": ["session_id", "selector", "text"]
-      }
-    },
-    {
-      "name": "browser_eval",
-      "description": "Execute JavaScript. Returns result + screenshot.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "js": { "type": "string" }
-        },
-        "required": ["session_id", "js"]
-      }
-    },
-    {
-      "name": "browser_dom",
-      "description": "Get page DOM structure: headings, links, interactive elements with selectors.",
-      "inputSchema": {
-        "type": "object",
-        "properties": { "session_id": { "type": "string" } },
-        "required": ["session_id"]
-      }
-    },
-    {
-      "name": "browser_navigate",
-      "description": "Navigate to new URL in same session. Returns screenshot.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "url": { "type": "string" }
-        },
-        "required": ["session_id", "url"]
-      }
-    },
-    {
-      "name": "browser_resize",
-      "description": "Resize viewport. Common: mobile 375x812, tablet 768x1024, desktop 1440x900.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "width": { "type": "integer" },
-          "height": { "type": "integer" }
-        },
-        "required": ["session_id", "width", "height"]
-      }
-    },
-    {
-      "name": "browser_css",
-      "description": "Inject CSS to test visual changes. Replaces previous injection.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "css": { "type": "string" }
-        },
-        "required": ["session_id", "css"]
-      }
-    },
-    {
-      "name": "browser_close",
-      "description": "Close browser session. Always call when done browsing.",
-      "inputSchema": {
-        "type": "object",
-        "properties": { "session_id": { "type": "string" } },
-        "required": ["session_id"]
-      }
-    }
-  ]
-}
-```
-
----
-
-## Architecture
-
-```
-LLM Agent
-  │  browser_open("https://example.com")
-  │  → POST /api/session {url}
-  ▼
-Session Manager
-  │  Holds up to 4 persistent Chrome pages
-  │  Each session: page + state + auto-expire timer (10min)
-  ▼
-Session abc12345
-  │  browser_screenshot() → 30ms (just snap, no navigate)
-  │  browser_scroll()     → 150ms
-  │  browser_click()      → 300ms
-  │  browser_dom()        → instant (no screenshot)
-  │  browser_navigate()   → 1-2s (new URL, same page)
-  ▼
-Chrome (headless, shared with screenshot pool)
-  │  System Chromium, memory-optimized flags
-  │  Pages shared with transactional /api/screenshot pool
-  ▼
-Response: screenshot (base64) + metadata + DOM info
-```
-
-## Limits
-
-| Resource | Limit | Notes |
-|----------|-------|-------|
-| Max sessions | 4 | Each holds ~50-100MB Chrome page |
-| Idle timeout | 10 minutes | Auto-closes unused sessions |
-| Session lifetime | unlimited | Active sessions never expire |
-| Actions per session | unlimited | Counter tracked in session stats |
-| Pages shared with | `/api/screenshot` pool | Same 4-page pool, sessions hold pages longer |
-
-## Typical LLM Workflow
-
-```
-1. browser_open("https://mysite.com", width=390, height=844)
-   → See the mobile homepage (screenshot + session_id)
-
-2. browser_dom(session_id)
-   → Know what's on the page (headings, links, buttons, selectors)
-
-3. browser_scroll(session_id, deltaY=600)
-   → See below the fold
-
-4. browser_click(session_id, selector="nav a:nth-child(2)")
-   → Navigate via click, see result
-
-5. browser_css(session_id, css=".hero { padding: 20px; }")
-   → Test a CSS tweak, see it instantly
-
-6. browser_resize(session_id, width=1440, height=900)
-   → Check desktop version of same page
-
-7. browser_screenshot(session_id)
-   → Quick re-check (30ms)
-
-8. browser_close(session_id)
-   → Done, release resources
-```
-
-## Performance Comparison
-
-| Operation | Transactional API | Session API | Speedup |
-|-----------|------------------|-------------|---------|
-| First view | 1.7s | 1.7s | same |
-| Re-check same page | 1.7s | **30ms** | **57x** |
-| Scroll + check | impossible | **150ms** | ∞ |
-| Click + check | impossible | **300ms** | ∞ |
-| CSS change + check | impossible | **150ms** | ∞ |
-| Resize + check | 1.7s | **300ms** | **6x** |
-| 10 checks on 1 page | 17s | **1.7s + 9×30ms = 2s** | **8.5x** |
-
-## Tool Discovery (Context-Efficient)
-
-Tools are **never auto-loaded** into LLM context. Agents discover on demand:
-
-```bash
-# Minimal: just names + one-line descriptions (~200 tokens for 14 tools)
-curl -s http://localhost:7456/api/tools/search | jq '.tools[]'
-
-# Search: only matching tools returned
-curl -s "http://localhost:7456/api/tools/search?q=click" | jq
-
-# Full definitions when needed:
-curl -s http://localhost:7456/api/tools/openai | jq   # OpenAI format
-curl -s http://localhost:7456/api/tools/mcp | jq      # MCP format
-```
-
-### Pattern: Search → Discover → Call
-
-```
-Agent: "I need to click a button on a page"
-  1. GET /api/tools/search?q=click  → finds browser_click
-  2. Reads browser_click params     → needs session_id + selector
-  3. POST /api/session/{id}/click   → clicks + returns screenshot
-```
-
-Cost: **~200 tokens** for tool discovery vs **~2000** if all 14 definitions were loaded upfront.
-
-
-
-## Portability Helpers
-
-This repo includes helper scripts for local and remote agent setup:
-
-```bash
-# Preview install actions without changing files
-DRY_RUN=1 scripts/install-agent-integrations.sh
-
-# Install project Pi extension and merge UIAI MCP server into ~/.pi/agent/mcp.json
-scripts/install-agent-integrations.sh
-
-# Smoke-check health, agent card, graph, search, MCP metadata, and bridge syntax
-scripts/smoke-agent-integrations.sh
-scripts/smoke-mcp-tool-routes.sh
-scripts/smoke-mcp-structured-failure.sh
-scripts/smoke-pi-extension-registration.sh
-scripts/smoke-pi-rendering.sh
-```
-
-Environment knobs:
-
-| Variable | Purpose | Default |
-|---|---|---|
-| `UIAI_ENGINE_URL` | Engine base URL for Pi/MCP helpers; set to tunnel/remote URL for remote agents. | `http://localhost:7456` |
-| `UIAI_PI_EXTENSION_DEST` | Pi extension install destination. | `$HOME/.pi/agent/extensions/uiai-engine.ts` |
-| `UIAI_MCP_CONFIG_DEST` | MCP config destination. | `$HOME/.pi/agent/mcp.json` |
-| `UIAI_MCP_SERVER_NAME` | MCP server key to write. | `uiai-browser` |
-| `UIAI_LOCAL_API_TOKEN` | Server-side eternal local token accepted as `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`; store only in protected env files. | unset |
-| `UIAI_LOCAL_API_TOKENS` | Optional comma-separated server-side local tokens for rotation/overlap. | unset |
-| `UIAI_API_KEY` | Client-side API key sent by the Pi extension as `X-API-Key`; for the local VPS this may match `UIAI_LOCAL_API_TOKEN`. | unset |
-| `UIAI_BEARER_TOKEN` | Client-side bearer token sent by the Pi extension and MCP bridge as `Authorization: Bearer ...`; alternative to `UIAI_API_KEY`. | unset |
-| `UIAI_PI_TIMEOUT_MS` | Pi extension request timeout. | `30000` |
-| `UIAI_MCP_TIMEOUT_MS` | MCP bridge request timeout. | `60000` |
-| `UIAI_SMOKE_TIMEOUT_SECONDS` | Smoke curl timeout. | `20` |
-| `BRAVE_SEARCH_API_KEY` | Server-side Brave Search key used by `/api/search`; never commit literal values. | unset |
-
-Remote deployment reminder: browser/session, screenshot, and `/api/agent/research-packet` endpoints require auth for non-loopback callers; media/frame helpers also require auth unless the deployment explicitly opens them. Tool discovery remains public; use authenticated tunnels/proxies for remote agents. On the local VPS, an eternal env-backed token can be configured as `UIAI_LOCAL_API_TOKEN` and then supplied by clients through either `UIAI_API_KEY` or `UIAI_BEARER_TOKEN`.
-
-## Security + Remote Exposure Boundaries
-
-- Tool discovery (`/api/tools*`) is intentionally public and low-context.
-- Browser/session APIs (`/api/session*`), screenshot APIs (`/api/screenshot*`), and provider search (`/api/search*`) are loopback-public only. Remote callers must authenticate with normal UIAI credentials/headers.
-- Persistent sessions and one-shot screenshots share URL safety rules: only `http://`/`https://`; `file://`, `data:`, `ftp://`, and similar schemes are blocked.
-- Private/internal hosts (`localhost`, `127.*`, RFC1918 ranges, link-local, etc.) are blocked unless `vision.allow_private_urls: true` is configured for local development or explicitly trusted staging.
-- For remote agents, prefer an authenticated tunnel/proxy and set `UIAI_ENGINE_URL` in the Pi extension/MCP bridge.
-
-## MCP Integration
-
-### Pi (Recommended)
-
-Add to `~/.pi/agent/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "browser": {
-      "command": "node",
-      "args": ["/home/wpuiai/uiai-engine/mcp/browser-session-mcp.mjs"],
-      "lifecycle": "lazy",
-      "idleTimeout": 60
-    }
-  }
-}
-```
-
-Then in pi:
-```
-mcp({ search: "browser" })         → see available browser tools
-mcp({ tool: "browser_open", args: '{"url": "https://example.com"}' })
-mcp({ tool: "browser_screenshot", args: '{"session_id": "abc123"}' })
-mcp({ tool: "browser_close", args: '{"session_id": "abc123"}' })
-```
-
-The bridge is **lazy** — Node process only starts when you first call a browser tool. Pi-mcp-adapter and many MCP clients cache tool metadata, so `tools/list` is usually called once per stdio process/session. MCP exposes and bridge-normalizes `uiai_agent_card`, `uiai_tool_search`, `uiai_tool_graph`, `source_to_markdown`, `browser_search`, and `browser_read` even if the running engine returns stale metadata; `browser_open` forwards optional `focusa_scope` into UIAI sessions for [Focusa](https://github.com/Startempire-Wire/focusa) evidence handoff. The project Pi extension mirrors the live MCP/browser surface with Pi-prefixed names (`browser_click` → `uiai_browser_click`, `frame_catalog` → `uiai_frame_catalog`, `uiai_agent_card` → `pi_uiai_agent_card`) plus `uiai_health`. Set `UIAI_ENGINE_URL` for remote engines and `UIAI_MCP_TIMEOUT_MS` for bridge request timeout; default is 60000 ms.
-
-Metadata refresh rule: after adding, removing, renaming, or changing MCP tool schemas, restart/reconnect the MCP server/client process and reload any Pi session using the MCP adapter before treating `tools/list` as fresh. Pure `tools/call` handler fixes in `mcp/browser-session-mcp.mjs` also require reconnect because the stdio Node process keeps the old bridge code loaded until restarted. See [MCP Cache and Reconnect Troubleshooting](MCP_CACHE_RECONNECT_TROUBLESHOOTING.md) for symptoms, causes, commands, add/remove/rename checklists, and route parity proof.
-
-### Claude Desktop
-
-Add to Claude Desktop MCP config:
-```json
-{
-  "mcpServers": {
-    "browser": {
-      "command": "node",
-      "args": ["/path/to/browser-session-mcp.mjs"],
-      "env": { "UIAI_ENGINE_URL": "http://localhost:7456" }
-    }
-  }
-}
-```
-
-### Any MCP Client
-
-The bridge speaks MCP JSON-RPC over stdio:
-- `initialize` → returns server capabilities
-- `tools/list` → fetches tool definitions from Go engine, caches/normalizes them in the bridge process, and may be cached again by the MCP client
-- `tools/call` → routes to session HTTP endpoints using the bridge code loaded when the stdio process started
-- Screenshots returned as MCP `image` content blocks
-
-## Port & Auth
-
-- **Port:** 7456 defaults to localhost. Browser/session APIs are unauthenticated only for loopback callers; non-loopback callers must provide normal UIAI auth headers.
-- **Auth:** `/api/tools*` discovery is public. `/api/session*` and `/api/screenshot*` require auth unless called from loopback.
-- **URL safety:** session navigation and screenshots allow only `http://` and `https://`. Private/internal targets are blocked unless `vision.allow_private_urls: true` is set for local/dev use.
-- **External:** Requires `X-Webhook-Secret` header through Cloudflare tunnel
-
-## Captcha Solver (Session Action)
-
-The captcha solver operates as a session action. It detects, extracts, solves, and fills captchas within an active session.
-
-### `POST /api/session/{id}/captcha/solve`
-
-Auto-detects captcha type (text vs reCAPTCHA) or specify explicitly:
-
-```json
-{"type": "auto", "profile": "prlog"}
-```
-
-For text captchas: extracts image from DOM → multi-model VLM voting → fills answer field.  
-For reCAPTCHA v2: clicks checkbox → extracts grid → VLM tile classification → clicks tiles → verifies.
-
-See [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) for full API reference, accuracy data, and proxy configuration.
-
-### Stateless Endpoints (no session needed)
-
-- `POST /api/captcha/solve-image` — solve text captcha from raw base64 image
-- `POST /api/captcha/solve-proxied` — open proxied browser on clean IP, fill form, solve captcha (auto-retries on different IP)
-- `GET /api/captcha/status` — backend availability, solve stats, IP pool info
-
-### IP Pool Management
-
-- `GET /api/captcha/pool` — per-IP health, success rates, probe status, cooldown state
-- `POST /api/captcha/pool/add` — add IP at runtime (`{"endpoint":"local:1.2.3.4"}`)
-- `POST /api/captcha/pool/remove` — remove IP at runtime
-
-The pool runs 3 clean server IPs with weighted rotation, active health probes every 5min, auto-cooldown on flag detection, and auto-retry across IPs on failure.
-
-## Related Docs
-
-- [`CAPTCHA_SOLVER_SPEC.md`](CAPTCHA_SOLVER_SPEC.md) — Complete captcha solver reference: IP pool, accuracy data, config, cost model, design decisions
-- [`WORKFLOW_API_ORCHESTRATION.md`](WORKFLOW_API_ORCHESTRATION.md) — Full endpoint map and OCR routing
-
----
-
-## Related documentation
-
-- Project overview and full feature map: [README](../README.md)
-- Diagnostics response contract and evidence handles: [Browser Diagnostics Spec](BROWSER_DIAGNOSTICS_SPEC.md)
-- Reliability gates and browser stress/soak workflow: [Browser Reliability Runbook](BROWSER_RELIABILITY_RUNBOOK.md)
-- Captcha actions available from browser sessions: [Captcha Solver Spec](CAPTCHA_SOLVER_SPEC.md)
-- Device-frame rendering used by screenshot/media flows: [Device Frame Integration](DEVICE_FRAME_INTEGRATION.md)
-- API parity and retirement caveats: [Full API Parity Evaluation](FULL_API_PARITY_EVALUATION_AND_RETIREMENT_INVENTORY_2026-03-07.md)
-- Workflow caller mapping: [Workflow API Orchestration](WORKFLOW_API_ORCHESTRATION.md)
+Other stable families include wrong product, expired, revoked, stale sequence, feature missing, node limit, concurrency limit, Evaluation limit, offline deadline, and unsupported schema.
+
+## Recovery posture
+
+Without a valid execution entitlement, allow only bounded health, license start/status/poll/activate/refresh/doctor, safe redacted diagnostics, operator-owned data location/export where applicable, and uninstall guidance. Do not allocate a browser or create a fresh local Evaluation.
+
+## Required tests
+
+- loopback without lease denied before browser allocation;
+- local API token without lease denied;
+- reverse-proxy remote cannot inherit loopback permission;
+- wrong product/feature/node/time/sequence denied;
+- child token cannot exceed/outlive parent lease;
+- concurrent session reservation is atomic;
+- session ownership prevents enumeration/control;
+- share view cannot escalate to control/API;
+- errors/logs contain no secrets;
+- expiry/revocation closes new execution but preserves recovery/data;
+- standalone and Focusa-brokered onboarding yield the same canonical posture;
+- protected worker rejects direct, replayed, wrong-audience, and downgraded calls.
+
+## Canonical references
+
+- `docs/UIAI_LICENSE_ENTITLEMENT_AND_ONBOARDING_ENFORCEMENT_SPEC_2026-08-01.md`
+- `docs/UIAI_PROTECTED_WORKER_AND_FEATURE_CAPSULE_ADDENDUM_2026-08-01.md`
+- `docs/ENDPOINT_AUTH_MATRIX.md`
+- `docs/LICENSING.md`
+- Focusa Spec 152 and Spec 150A
