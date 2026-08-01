@@ -1,0 +1,26 @@
+schema: uiai.open_entitlement_code_gaps.v1
+gaps:
+  - id: nil-identity-evaluation
+    paths: [internal/license/entitlements.go]
+    severity: p0
+  - id: loopback-execution-bypass
+    paths: [internal/auth/auth.go]
+    severity: p0
+  - id: tier-derived-features
+    paths: [internal/license/entitlements.go]
+    severity: p0
+  - id: local-internal-and-extension-pro
+    paths: [internal/auth/auth.go]
+    severity: p0
+  - id: partial-route-gates
+    paths: [internal/server/server.go]
+    severity: p0
+  - id: universal-limit-reservations-missing
+    paths: [internal/license, internal/server, internal/usage]
+    severity: p0
+  - id: standalone-and-bundle-onboarding-missing
+    paths: [internal/server, internal/auth, internal/license]
+    severity: p0
+  - id: protected-worker-missing
+    paths: [internal/server, internal/license]
+    severity: p1
