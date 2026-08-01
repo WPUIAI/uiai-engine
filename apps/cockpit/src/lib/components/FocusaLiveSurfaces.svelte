@@ -23,6 +23,7 @@
   let errorMessage = "";
   let sourceRevision = "—";
   let eventSource: EventSource | null = null;
+  let evidenceReady = false;
 
   let temporal = {
     posture: "No verified temporal projection",
@@ -116,6 +117,7 @@
 
   async function connect() {
     disconnect();
+    evidenceReady = false;
     state = "connecting";
     errorMessage = "";
     try {
@@ -156,11 +158,13 @@
   function disconnect() {
     eventSource?.close();
     eventSource = null;
+    evidenceReady = false;
     if (state !== "idle") state = "idle";
   }
 
   function runEvidenceReplay() {
     state = "replaying";
+    evidenceReady = false;
     projectRoot = "/evidence/focusa-project";
     continuityId = "continuity-evidence";
     const events: FocusaEnvelope[] = [
@@ -192,10 +196,9 @@
         payload: { status: "active", conflict_count: 1, delivery_status: "verified" }
       }
     ];
-    events.forEach((event, index) => setTimeout(() => {
-      applyFocusaEvent(event);
-      if (index === events.length - 1) state = "live";
-    }, 350 * (index + 1)));
+    for (const event of events) applyFocusaEvent(event);
+    state = "live";
+    evidenceReady = cursor === "103" && sourceRevision === "43" && activity.length === 3;
   }
 
   onMount(() => {
@@ -208,7 +211,16 @@
   });
 </script>
 
-<section class="workspace" aria-labelledby="focusa-live-title" data-testid="focusa-live-workspace" data-live-state={state}>
+<section
+  class="workspace"
+  aria-labelledby="focusa-live-title"
+  data-testid="focusa-live-workspace"
+  data-live-state={state}
+  data-cursor={cursor}
+  data-source-revision={sourceRevision}
+  data-activity-count={activity.length}
+  data-evidence-ready={evidenceReady ? "true" : "false"}
+>
   <header class="workspace-header">
     <div>
       <p class="eyebrow">Focusa Live Projection Fabric</p>
