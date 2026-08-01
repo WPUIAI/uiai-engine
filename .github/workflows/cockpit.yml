@@ -76,16 +76,14 @@ jobs:
           grep -q '>active<' visual-proof/cockpit-focusa-live.dom.html
           echo "Rendered-state assertions passed"
 
-          npm exec --yes playwright@1.54.2 screenshot \
-            --viewport-size="1440,1200" \
-            --wait-for-timeout=400 \
-            "http://127.0.0.1:4173/" \
-            visual-proof/cockpit-focusa-idle.png
-          npm exec --yes playwright@1.54.2 screenshot \
-            --viewport-size="1440,1200" \
-            --wait-for-timeout=400 \
-            "http://127.0.0.1:4173/?evidence=focusa-live" \
-            visual-proof/cockpit-focusa-live-after-events.png
+          IDLE_PATH="$(pwd)/visual-proof/cockpit-focusa-idle.png"
+          LIVE_PATH="$(pwd)/visual-proof/cockpit-focusa-live-after-events.png"
+          "$BROWSER" --headless --disable-gpu --no-sandbox --hide-scrollbars \
+            --force-device-scale-factor=1 --window-size=1440,1200 --virtual-time-budget=1500 \
+            --screenshot="$IDLE_PATH" "http://127.0.0.1:4173/"
+          "$BROWSER" --headless --disable-gpu --no-sandbox --hide-scrollbars \
+            --force-device-scale-factor=1 --window-size=1440,1200 --virtual-time-budget=1500 \
+            --screenshot="$LIVE_PATH" "http://127.0.0.1:4173/?evidence=focusa-live"
 
           test -s visual-proof/cockpit-focusa-idle.png
           test -s visual-proof/cockpit-focusa-live-after-events.png
