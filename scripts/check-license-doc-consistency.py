@@ -20,14 +20,8 @@ FILES = [
     "docs/UIAI_ENTITLEMENT_SUPERSESSION_MATRIX_2026-08-01.yaml",
 ]
 
-REQUIRED = {
-    "authority": ("authority-issued", "authority issued"),
-    "auth_separation": ("authentication", "entitlement"),
-    "recovery": ("recovery-only", "recovery only"),
-}
+ACTIVE_GUIDES = FILES[:6]
 
-# These claims are unacceptable without an explicit nearby migration warning. Active docs
-# have been rewritten to avoid them as recommendations entirely.
 FORBIDDEN = [
     "loopback remains frictionless for local agents",
     "unauthenticated on loopback",
@@ -46,11 +40,17 @@ def main() -> int:
             continue
         data[rel] = p.read_text(encoding="utf-8")
 
+    for rel in ACTIVE_GUIDES:
+        low = data.get(rel, "").lower()
+        if "authority-issued" not in low and "authority issued" not in low:
+            failures.append(f"{rel}: missing authority-issued entitlement boundary")
+        if "authentication" not in low or "entitlement" not in low:
+            failures.append(f"{rel}: must explicitly separate authentication and entitlement")
+        if "recovery-only" not in low and "recovery only" not in low:
+            failures.append(f"{rel}: missing recovery-only posture")
+
     for rel, text in data.items():
         low = text.lower()
-        for name, alternatives in REQUIRED.items():
-            if not all(any(term in low for term in alternatives) for _ in (0,)):
-                failures.append(f"{rel}: missing required concept {name}")
         for pattern in FORBIDDEN:
             if pattern.lower() in low:
                 failures.append(f"{rel}: contains forbidden active entitlement claim: {pattern}")
@@ -75,6 +75,26 @@ def main() -> int:
     ):
         if token not in endpoint:
             failures.append(f"endpoint auth/entitlement matrix missing {token}")
+
+    mandatory = data.get(
+        "docs/UIAI_LICENSE_ENTITLEMENT_AND_ONBOARDING_ENFORCEMENT_SPEC_2026-08-01.md",
+        "",
+    )
+    for token in (
+        "Identity and entitlement separation",
+        "Focusa-brokered bundle onboarding",
+        "Required tests",
+    ):
+        if token not in mandatory:
+            failures.append(f"mandatory entitlement spec missing section/token: {token}")
+
+    protected = data.get(
+        "docs/UIAI_PROTECTED_WORKER_AND_FEATURE_CAPSULE_ADDENDUM_2026-08-01.md",
+        "",
+    )
+    for token in ("Protected worker", "IPC contract", "Capsule delivery"):
+        if token not in protected:
+            failures.append(f"protected-worker addendum missing section/token: {token}")
 
     if failures:
         print("UIAI licensing documentation consistency FAILED", file=sys.stderr)
