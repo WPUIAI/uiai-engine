@@ -1,0 +1,11 @@
+schema: uiai.server_agent_handoff_pointer.v1
+private_repository: WPUIAI/wpuiai
+primary_issue: 1
+start_document: docs/LICENSE_AUTHORITY_START_HERE_2026-08-01.md
+execution_runbook: docs/LICENSE_AUTHORITY_EXECUTION_RUNBOOK_2026-08-01.md
+phase0_checklist: docs/LICENSE_AUTHORITY_PHASE0_CHECKLIST_2026-08-01.md
+operator_decisions: docs/LICENSE_AUTHORITY_OPERATOR_DECISIONS_TEMPLATE_2026-08-01.md
+agent_prompt: docs/LICENSE_AUTHORITY_AGENT_PROMPT_2026-08-01.md
+uiai_issue: WPUIAI/uiai-engine#5
+focusa_issue: Startempire-Wire/focusa#119
+boundary: no private authority details are duplicated into this public repository
