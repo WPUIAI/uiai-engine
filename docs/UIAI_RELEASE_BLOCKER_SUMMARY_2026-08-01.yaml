@@ -1,0 +1,29 @@
+schema: uiai.entitlement_release_blocker_summary.v1
+status: blocked_for_new_evaluator_and_customer_distribution
+blockers:
+  - signed uiai-engine lease and child-token verifier
+  - authentication identity separated from entitlement context
+  - removal of nil/loopback Evaluation
+  - removal of tierFeatures and hard-coded internal/pro authorization
+  - universal route feature and limit gate before allocation
+  - session/job/share/event ownership and public payload audit
+  - standalone device-code onboarding
+  - Focusa bundle child-token integration
+  - transactional limit reservations
+  - protected worker/capsule proof for selected features
+  - migration from local uiai_eval and legacy tokens
+  - wrong-product/revoke/expire/proxy/replay/concurrency E2E
+  - green documentation consistency workflow
+recovery_without_execution:
+  - health/version
+  - license onboarding/status/refresh/doctor
+  - bounded redacted diagnostics
+  - operator-owned data/export where applicable
+  - uninstall guidance
+not_entitlement:
+  - loopback
+  - local API token
+  - extension/Pi/MCP/Cockpit token without signed parent scopes
+  - Focusa pairing/project scope
+  - source checkout
+  - healthy browser pool
