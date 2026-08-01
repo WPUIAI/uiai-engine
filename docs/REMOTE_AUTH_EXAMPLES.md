@@ -1,29 +1,53 @@
-# Remote Auth Examples
+# Remote Authentication Examples
 
-These examples show safe local loopback and remote authenticated calls for UIAI Engine agent surfaces. They use placeholders only. Never paste real tokens into docs, chats, screenshots, or packet examples.
+These examples show caller authentication for UIAI Engine. They use placeholders only.
 
-## Auth modes to know
+> **Authentication is not entitlement:** A valid API/local/extension/Bearer token proves who or what is calling; it does not grant the `uiai-engine` product, Evaluation, commercial status, route features, or usage limits. Current loopback-public behavior is legacy code and is not the target production contract.
 
-See [Endpoint Auth Matrix](ENDPOINT_AUTH_MATRIX.md) for the canonical route table.
+## Required production authority
 
-- **public**: safe discovery/readiness metadata. Remote callers may call without credentials.
-- **loopback-public remote-auth**: local loopback callers may be unauthenticated; remote/tunnel callers must authenticate.
-- **authenticated**: credentials required even locally.
+Execution-capable routes require both:
 
-Public discovery is not the same as loopback-public remote-auth. `/api/tools`, `/api/tools/mcp`, `/api/health`, `/api/status`, and `/api/metrics/browser` are public metadata/readiness surfaces. Browser/session, screenshot, search, research-packet, errors, and frame helper routes are local-agent surfaces: unauthenticated on loopback, authenticated over remote/tunnel access.
+```text
+caller authentication
++ authority-issued signed lease or narrower verified child token
+```
 
-## Safe environment setup
+The entitlement check additionally validates product, feature, node, time, lease sequence/digest, status, offline window, and limits.
 
-Use one credential style. Values below are placeholders.
+See:
+
+- `docs/ENDPOINT_AUTH_MATRIX.md`
+- `docs/LICENSING.md`
+- `docs/UIAI_LICENSE_ENTITLEMENT_AND_ONBOARDING_ENFORCEMENT_SPEC_2026-08-01.md`
+
+## Public/recovery metadata
+
+Only bounded health, version, tool metadata, and future license recovery routes may be called without execution entitlement.
+
+```bash
+ENGINE_URL="${UIAI_ENGINE_URL:-http://127.0.0.1:7456}"
+curl -fsS "$ENGINE_URL/health" | jq .
+curl -fsS "$ENGINE_URL/api/tools/agent-card" | jq .
+curl -fsS "$ENGINE_URL/api/tools/search?q=diagnostics" | jq .
+```
+
+A public metadata response is never proof that browser execution is licensed.
+
+## Safe scoped-token setup
+
+Use one short-lived credential style. Values are placeholders.
 
 ```bash
 export UIAI_ENGINE_URL="https://uiai.example.invalid"
-export UIAI_API_KEY="REDACTED_API_KEY_VALUE"          # sent as X-API-Key
-# or:
-export UIAI_BEARER_TOKEN="REDACTED_BEARER_VALUE"      # sent as Authorization: Bearer ...
+export UIAI_API_KEY="REDACTED_SHORT_LIVED_API_KEY"
+# or
+export UIAI_BEARER_TOKEN="REDACTED_SHORT_LIVED_BEARER"
 ```
 
-Server-side local-token deployments may configure `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_API_TOKENS`; clients still send `X-API-Key`, `X-License-Key`, or `Authorization: Bearer ...`.
+Do not use a raw commercial license key for ordinary route calls. Activation exchanges it for a signed lease; callers use narrower access/child tokens.
+
+Server-side `UIAI_LOCAL_API_TOKEN(S)` may authenticate local callers during migration, but must not produce tier `internal`, product grants, or features by itself.
 
 ## Curl helper
 
@@ -34,154 +58,104 @@ if [ -n "${UIAI_API_KEY:-}" ]; then
   AUTH_HEADER=(-H "X-API-Key: ${UIAI_API_KEY}")
 elif [ -n "${UIAI_BEARER_TOKEN:-}" ]; then
   AUTH_HEADER=(-H "Authorization: Bearer ${UIAI_BEARER_TOKEN}")
+else
+  echo "A scoped authentication token is required for this example" >&2
+  exit 4
 fi
 ```
 
-## Public discovery examples
+## Entitled session example
 
-These are public metadata/readiness calls. Credentials are optional.
-
-```bash
-curl -s "$ENGINE_URL/api/health" | jq
-curl -s "$ENGINE_URL/api/status" | jq
-curl -s "$ENGINE_URL/api/tools" | jq '.tools | length'
-curl -s "$ENGINE_URL/api/tools/mcp" | jq '.tools | length'
-curl -s "$ENGINE_URL/api/tools/docs" | jq
-curl -s "$ENGINE_URL/api/tools/search?q=diagnostics" | jq
-curl -s "$ENGINE_URL/api/search/providers" | jq
-curl -s "$ENGINE_URL/api/metrics/browser" | jq '.agent_pressure'
-```
-
-## Browser/session examples
-
-Loopback unauthenticated:
+This assumes the token is bound to a valid signed parent lease and includes `uiai.session.execute`.
 
 ```bash
-curl -s http://127.0.0.1:7456/api/session   -H 'Content-Type: application/json'   -d '{"url":"https://example.com","focusa_scope":{"project_root":"/home/wpuiai/uiai-engine"}}' | jq
+SID=$(curl -fsS -X POST "$ENGINE_URL/api/session" \
+  "${AUTH_HEADER[@]}" \
+  -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"url":"https://example.com"}' \
+  | jq -r '.session.id')
+
+curl -fsS "$ENGINE_URL/api/session/$SID/read" "${AUTH_HEADER[@]}" | jq .
+curl -fsS "$ENGINE_URL/api/session/$SID/diagnostics" "${AUTH_HEADER[@]}" | jq .
+curl -fsS -X DELETE "$ENGINE_URL/api/session/$SID" "${AUTH_HEADER[@]}" | jq .
 ```
 
-Remote authenticated:
+If current code accepts this call without entitlement on loopback, that is a known release blocker—not a supported Evaluation path.
+
+## Pi, MCP, CLI, and Focusa child tokens
+
+Tokens issued to these callers must be:
+
+- short-lived;
+- audience bound;
+- product and feature scoped;
+- node/client scoped;
+- tied to parent lease id/sequence/digest;
+- no broader or longer-lived than the parent lease;
+- replay protected;
+- redacted from logs, docs, packets, screenshots, Workpoints, and Evidence.
+
+A Focusa pairing token or project scope cannot be reused as a UIAI commercial token.
+
+## Remote/tunnel deployment
+
+Remote exposure requires:
+
+- TLS;
+- explicit trusted proxy/client-IP configuration;
+- caller authentication;
+- canonical entitlement enforcement;
+- origin/CORS restrictions;
+- URL safety and private-target policy;
+- rate/concurrency/body limits;
+- session/share ownership;
+- secret-safe logging;
+- no proxy path that turns remote traffic into loopback permission.
+
+Do not expose the full API publicly merely because `/m/*` tokenized viewers are intended for public access.
+
+## Share/FPV token example
+
+A viewer token is not an API credential. It must be bounded to one session/share and allowed actions.
 
 ```bash
-curl -s "$ENGINE_URL/api/session"   "${AUTH_HEADER[@]}"   -H 'Content-Type: application/json'   -d '{"url":"https://example.com","focusa_scope":{"project_root":"/home/wpuiai/uiai-engine"}}' | jq
+curl -fsS "$ENGINE_URL/m/REDACTED_VIEW_TOKEN/status" | jq .
 ```
 
-Read/diagnostics/close after replacing `SESSION_ID`:
+Control must be separately granted and audited. Viewer/control tokens cannot create sessions, call unrelated routes, mint extension tokens, or access other users' work.
 
-```bash
-curl -s "$ENGINE_URL/api/session/SESSION_ID/read" "${AUTH_HEADER[@]}" | jq
-curl -s "$ENGINE_URL/api/session/SESSION_ID/diagnostics" "${AUTH_HEADER[@]}" | jq
-curl -s -X DELETE "$ENGINE_URL/api/session/SESSION_ID" "${AUTH_HEADER[@]}" | jq
+## Error expectations
+
+Authentication failure:
+
+```json
+{"error":"authentication_required"}
 ```
 
-## Screenshot examples
-
-```bash
-curl -s "$ENGINE_URL/api/screenshot"   "${AUTH_HEADER[@]}"   -H 'Content-Type: application/json'   -d '{"url":"https://example.com","width":1280,"height":800,"format":"jpeg","quality":80}' | jq '{ok,width,height,format,evidence_ref}'
-```
-
-## Search examples
-
-```bash
-curl -s "$ENGINE_URL/api/search"   "${AUTH_HEADER[@]}"   -H 'Content-Type: application/json'   -d '{"query":"UIAI browser agents","numResults":3}' | jq '{ok,provider,cached,results:[.results[] | {rank,title,url,evidence_ref}]}'
-```
-
-## Focusa research packet example
-
-```bash
-curl -s "$ENGINE_URL/api/agent/research-packet"   "${AUTH_HEADER[@]}"   -H 'Content-Type: application/json'   -d '{
-    "mode":"research",
-    "goal":"Summarize selected UIAI browser-agent result",
-    "search_response":{"results":[{"rank":1,"title":"Example","url":"https://example.com","snippet":"Bounded snippet","evidence_ref":"uiai-search:brave:example:1"}]},
-    "focusa_scope":{"project_root":"/home/wpuiai/uiai-engine","continuity_id":"focusa-cont-example"}
-  }' | jq '{schema:.packet.schema,mode:.packet.mode,preferred_tool:.packet.recommended_focusa.preferred_tool,args_preview:.packet.recommended_focusa.args_preview}'
-```
-
-## Media/frame examples
-
-Frame catalog:
-
-```bash
-curl -s "$ENGINE_URL/api/media/frame/catalog" "${AUTH_HEADER[@]}" | jq
-```
-
-Frame render uses a placeholder image payload. Replace with a bounded test image, not a secret screenshot.
-
-```bash
-curl -s "$ENGINE_URL/api/media/frame/render"   "${AUTH_HEADER[@]}"   -H 'Content-Type: application/json'   -d '{"frameId":"iphone-15-pro","imageBase64":"REDACTED_TEST_IMAGE_BASE64","fit":"cover","format":"png"}' | jq '{ok,frameId,width,height,evidence_ref}'
-```
-
-## scripts/uiai examples
-
-`scripts/uiai` reads `UIAI_ENGINE_URL`, `UIAI_API_KEY`, and `UIAI_BEARER_TOKEN` automatically.
-
-```bash
-scripts/uiai status
-scripts/uiai health
-scripts/uiai tools
-scripts/uiai --json session open https://example.com
-scripts/uiai --json session read SESSION_ID
-scripts/uiai --json session diagnostics SESSION_ID
-scripts/uiai research packet --url https://example.com --goal "Remote auth proof" --out /tmp/uiai-research-packet.json
-scripts/uiai smoke agent
-scripts/uiai smoke browser
-scripts/uiai smoke packet
-```
-
-## Pi extension examples
-
-Set env before starting Pi from the repo root:
-
-```bash
-export UIAI_ENGINE_URL="https://uiai.example.invalid"
-export UIAI_API_KEY="REDACTED_API_KEY_VALUE"
-# or export UIAI_BEARER_TOKEN="REDACTED_BEARER_VALUE"
-pi
-```
-
-Then use Pi tools such as `pi_uiai_agent_card`, `uiai_health`, `uiai_browser_open`, `uiai_browser_read`, `uiai_browser_diagnostics`, `uiai_focusa_packet_compose`, `uiai_screenshot`, `uiai_frame_catalog`, and `uiai_frame_render`.
-
-## MCP bridge examples
-
-Install/merge MCP config with placeholder credentials:
-
-```bash
-export UIAI_ENGINE_URL="https://uiai.example.invalid"
-export UIAI_API_KEY="REDACTED_API_KEY_VALUE"
-scripts/install-agent-integrations.sh
-```
-
-Manual MCP config shape:
+Authenticated but not entitled:
 
 ```json
 {
-  "mcpServers": {
-    "uiai-engine": {
-      "command": "node",
-      "args": ["/home/wpuiai/uiai-engine/mcp/browser-session-mcp.mjs"],
-      "env": {
-        "UIAI_ENGINE_URL": "https://uiai.example.invalid",
-        "UIAI_API_KEY": "REDACTED_API_KEY_VALUE"
-      }
-    }
-  }
+  "error":"license_required",
+  "product":"uiai-engine",
+  "feature":"uiai.session.execute",
+  "retryable":false
 }
 ```
 
-After credential or tool schema changes, reconnect the MCP client; see [MCP Cache and Reconnect Troubleshooting](MCP_CACHE_RECONNECT_TROUBLESHOOTING.md).
+Other stable entitlement errors include wrong product, expired, revoked, stale sequence, feature missing, node limit, concurrency/Evaluation limit, and authority unavailable outside signed offline grace.
 
-## Verification
+## Secret handling
 
-```bash
-go test ./internal/auth
-scripts/smoke-agent-integrations.sh
-scripts/check-tool-parity.sh
-scripts/smoke-pi-extension-registration.sh
-scripts/smoke-mcp-tool-routes.sh
-```
+Never place real values in:
 
-Expected proof:
+- repository files;
+- chat or issue comments;
+- command history where avoidable;
+- screenshots;
+- Focusa Evidence/Workpoints;
+- logs, traces, query strings, or error envelopes;
+- public FPV/share payloads.
 
-- Remote-auth tests cover search, errors, media frame, session, screenshot, and research packet route families.
-- Public discovery remains unauthenticated metadata/readiness.
-- Pi/MCP/CLI helpers send either `X-API-Key` or `Authorization: Bearer ...` without exposing values.
+Prefer device-code activation, OS-protected storage, short-lived tokens, and environment injection from an approved secret store.
