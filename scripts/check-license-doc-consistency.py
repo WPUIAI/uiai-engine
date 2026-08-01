@@ -8,25 +8,28 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-FILES = [
+ACTIVE_GUIDES = [
     "README.md",
     "docs/LICENSING.md",
     "docs/ENDPOINT_AUTH_MATRIX.md",
     "docs/SESSION_API.md",
     "docs/UIAI_FOR_AGENTS_QUICKSTART.md",
     "docs/REMOTE_AUTH_EXAMPLES.md",
+]
+FILES = ACTIVE_GUIDES + [
+    "LICENSE-FAQ.md",
     "docs/UIAI_LICENSE_ENTITLEMENT_AND_ONBOARDING_ENFORCEMENT_SPEC_2026-08-01.md",
     "docs/UIAI_PROTECTED_WORKER_AND_FEATURE_CAPSULE_ADDENDUM_2026-08-01.md",
     "docs/UIAI_ENTITLEMENT_SUPERSESSION_MATRIX_2026-08-01.yaml",
 ]
-
-ACTIVE_GUIDES = FILES[:6]
 
 FORBIDDEN = [
     "loopback remains frictionless for local agents",
     "unauthenticated on loopback",
     "no license / loopback eval",
     "extension tokens are always at least pro tier",
+    "uiai accepts locally generated evaluation keys",
+    "no server check is required for these keys",
 ]
 
 
@@ -49,6 +52,17 @@ def main() -> int:
         if "recovery" not in low:
             failures.append(f"{rel}: missing explicit recovery posture")
 
+    faq = data.get("LICENSE-FAQ.md", "").lower()
+    for token in (
+        "authority-issued evaluation",
+        "recovery-only",
+        "local evaluation key",
+        "loopback",
+        "source-use permission",
+    ):
+        if token not in faq:
+            failures.append(f"LICENSE-FAQ.md: missing required clarification token {token!r}")
+
     for rel, text in data.items():
         low = text.lower()
         for pattern in FORBIDDEN:
@@ -60,6 +74,7 @@ def main() -> int:
         "internal/license/entitlements.go",
         "internal/auth/auth.go",
         "internal/server/server.go",
+        "LICENSE-FAQ.md",
         "docs/SESSION_API.md",
         "docs/REMOTE_AUTH_EXAMPLES.md",
     ):
