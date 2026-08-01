@@ -1,0 +1,478 @@
+schema: uiai.cockpit_notebook_kernel_contract_ledger.v1
+version: 1
+parent: UIAI-COCKPIT-007
+status: proposed_documentation_only
+implementation_implied: false
+
+provider_model:
+  initial_provider: jupyter_server_and_jupyterlab
+  provider_neutral: true
+  required_adapters:
+    - structured_contents
+    - structured_sessions
+    - structured_kernels
+    - structured_channels
+    - browser_jupyterlab
+  selection_rule: structured_first_browser_when_required_without_authority_expansion
+
+truth_statuses:
+  - missing
+  - proposed
+  - contract_only
+  - implementation_open
+  - implemented_unverified
+  - functional_verified
+  - visual_verified
+  - release_verified
+  - blocked_external_contract
+
+core_objects:
+  - NotebookServer
+  - NotebookDocument
+  - NotebookRevision
+  - NotebookCheckpoint
+  - NotebookEnvironment
+  - KernelSpecification
+  - KernelSession
+  - NotebookSession
+  - CellDefinition
+  - CellRevision
+  - CellAttempt
+  - ExecutionDependency
+  - ParameterSet
+  - AssumptionSet
+  - DatasetSnapshot
+  - EquationDefinition
+  - MathematicalExpression
+  - SolverConfiguration
+  - SimulationRun
+  - ExperimentRun
+  - MeasurementSeries
+  - ResultArtifact
+  - VisualizationArtifact
+  - VerificationFinding
+  - ReproducibilityManifest
+  - NotebookEvidenceReceipt
+
+cell_semantic_roles:
+  - definition
+  - assumption
+  - observation
+  - measurement_import
+  - data_transform
+  - derivation
+  - transformation
+  - solver_invocation
+  - simulation
+  - visualization
+  - prediction
+  - scoring
+  - verification
+  - counterexample
+  - sensitivity_analysis
+  - control_proposal
+  - conclusion
+  - narrative
+
+execution_modes:
+  exploratory:
+    hidden_state_allowed: true
+    canonical_by_default: false
+    clean_kernel_required: false
+    reproducibility_claim_allowed: false
+  reproducible:
+    hidden_state_allowed: false
+    canonical_by_default: false
+    clean_kernel_required: true
+    frozen_notebook_revision_required: true
+    environment_manifest_required: true
+    data_lineage_required: true
+    receipt_required: true
+  verification:
+    hidden_state_allowed: false
+    canonical_by_default: false
+    independent_context_required: true
+    independence_class_required: true
+    verification_finding_required: true
+
+execution_states:
+  normal:
+    - draft
+    - ready
+    - queued
+    - dispatched
+    - running
+    - awaiting_input
+    - streaming_output
+    - succeeded
+    - failed
+    - interrupted
+    - timed_out
+    - cancelled
+    - output_captured
+    - provisional
+    - reproducible
+    - verified
+    - disputed
+    - superseded
+  blocking:
+    - blocked_authority
+    - blocked_resource
+    - blocked_dependency
+    - blocked_secret
+    - blocked_network
+    - kernel_lost
+    - server_offline
+    - output_stale
+    - environment_drift
+    - data_stale
+    - ambiguous_side_effect
+
+capabilities:
+  - id: uiai.notebook.server.discover
+    side_effect: none
+    resource_class: low
+    evidence: optional
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.server.probe
+    side_effect: network_read
+    resource_class: low
+    evidence: health_receipt
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.contents.list
+    side_effect: filesystem_read
+    resource_class: low
+    evidence: optional
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.contents.read
+    side_effect: filesystem_read
+    resource_class: low
+    evidence: optional
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.contents.write
+    side_effect: filesystem_write
+    resource_class: low
+    authority: scoped_write
+    reconciliation: revision_check
+    evidence: receipt_required
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.contents.rename
+    side_effect: filesystem_write
+    resource_class: low
+    authority: scoped_write
+    reconciliation: source_revision_and_destination_absence
+    evidence: receipt_required
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.contents.delete
+    side_effect: destructive_filesystem_write
+    resource_class: low
+    authority: explicit_confirmation
+    reconciliation: provider_delete_result
+    evidence: receipt_required
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.checkpoint.create
+    side_effect: filesystem_write
+    resource_class: low
+    authority: scoped_write
+    evidence: receipt_required
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.checkpoint.restore
+    side_effect: destructive_filesystem_write
+    resource_class: low
+    authority: explicit_confirmation
+    evidence: before_after_receipt
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.session.create
+    side_effect: process_and_session_create
+    resource_class: medium
+    authority: scoped_execute
+    evidence: receipt_required
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.session.list
+    side_effect: none
+    resource_class: low
+    evidence: optional
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.session.close
+    side_effect: session_termination
+    resource_class: medium
+    authority: session_owner_or_operator
+    evidence: receipt_required
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.kernel.specs
+    side_effect: none
+    resource_class: low
+    evidence: optional
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.kernel.start
+    side_effect: process_create
+    resource_class: medium
+    authority: scoped_execute
+    evidence: receipt_required
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.kernel.interrupt
+    side_effect: execution_interrupt
+    resource_class: medium
+    authority: kernel_owner_or_operator
+    evidence: affected_attempt_receipt
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.kernel.restart
+    side_effect: process_restart_and_state_loss
+    resource_class: medium
+    authority: kernel_owner_or_operator
+    evidence: state_loss_receipt
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.kernel.shutdown
+    side_effect: process_termination
+    resource_class: medium
+    authority: kernel_owner_or_operator
+    evidence: receipt_required
+    phase: N1
+    status: implementation_open
+  - id: uiai.notebook.cell.execute
+    side_effect: code_execution
+    resource_class: variable
+    authority: scoped_execute
+    reconciliation: attempt_id_and_message_deduplication
+    evidence: cell_attempt_required
+    phase: N2
+    status: implementation_open
+  - id: uiai.notebook.cell.cancel
+    side_effect: execution_cancellation
+    resource_class: variable
+    authority: attempt_owner_or_operator
+    evidence: terminal_state_receipt
+    phase: N2
+    status: implementation_open
+  - id: uiai.notebook.run.reproducible
+    side_effect: bounded_code_execution
+    resource_class: high
+    authority: scoped_execute
+    evidence: reproducibility_receipt_required
+    phase: N3
+    status: implementation_open
+  - id: uiai.notebook.run.verify
+    side_effect: bounded_independent_code_execution
+    resource_class: high
+    authority: scoped_verify
+    evidence: verification_finding_required
+    phase: N4
+    status: implementation_open
+  - id: uiai.notebook.environment.snapshot
+    side_effect: system_inspection
+    resource_class: medium
+    evidence: manifest_required
+    phase: N3
+    status: implementation_open
+  - id: uiai.notebook.environment.diff
+    side_effect: none
+    resource_class: low
+    evidence: drift_report_required
+    phase: N3
+    status: implementation_open
+  - id: uiai.notebook.output.capture
+    side_effect: artifact_write
+    resource_class: variable
+    authority: scoped_artifact_write
+    evidence: artifact_manifest_required
+    phase: N2
+    status: implementation_open
+  - id: uiai.notebook.evidence.prepare
+    side_effect: none
+    resource_class: low
+    evidence: preview_required
+    phase: N3
+    status: implementation_open
+  - id: uiai.notebook.evidence.commit
+    side_effect: evidence_write_and_optional_focusa_handoff
+    resource_class: medium
+    authority: explicit_commit
+    evidence: receipt_required
+    phase: N3
+    status: implementation_open
+  - id: uiai.notebook.browser.open
+    side_effect: browser_session_create
+    resource_class: medium
+    authority: scoped_browser_use
+    evidence: optional
+    phase: N5
+    status: implementation_open
+  - id: uiai.notebook.browser.inspect
+    side_effect: browser_read_and_capture
+    resource_class: medium
+    authority: scoped_browser_use
+    evidence: capture_manifest_when_saved
+    phase: N5
+    status: implementation_open
+
+proposed_routes:
+  base: /api/notebooks
+  routes:
+    - GET /servers
+    - POST /servers/probe
+    - GET /contents
+    - GET /contents/item
+    - PUT /contents/item
+    - POST /contents/rename
+    - DELETE /contents/item
+    - POST /checkpoints
+    - POST /checkpoints/restore
+    - GET /kernel-specs
+    - GET /sessions
+    - POST /sessions
+    - DELETE /sessions/{id}
+    - POST /kernels
+    - POST /kernels/{id}/interrupt
+    - POST /kernels/{id}/restart
+    - DELETE /kernels/{id}
+    - POST /cells/execute
+    - POST /cells/{attempt_id}/cancel
+    - POST /runs/reproducible
+    - POST /runs/verify
+    - POST /environments/snapshot
+    - POST /environments/diff
+    - POST /outputs/capture
+    - POST /evidence/prepare
+    - POST /evidence/commit
+    - GET /events/stream
+  registration_status: proposed
+
+requirements:
+  - id: NBK-001
+    requirement: Notebook integration uses typed objects and immutable execution attempts.
+    status: implementation_open
+  - id: NBK-002
+    requirement: Structured Jupyter operations are preferred over browser actuation when sufficient.
+    status: implementation_open
+  - id: NBK-003
+    requirement: Browser fallback cannot broaden identity, scope, authority, server, or side effects.
+    status: implementation_open
+  - id: NBK-004
+    requirement: Every consequential attempt has wall-clock, monotonic, causal, environment, data, and output lineage.
+    status: implementation_open
+  - id: NBK-005
+    requirement: Microsecond-or-better source timestamps are preserved without silent rounding.
+    status: implementation_open
+  - id: NBK-006
+    requirement: Exploratory, reproducible, and verification modes remain visibly distinct.
+    status: implementation_open
+  - id: NBK-007
+    requirement: Reproducible mode requires frozen source, clean kernel, environment manifest, data lineage, and receipt.
+    status: implementation_open
+  - id: NBK-008
+    requirement: Verification mode records independence class, alternate method, findings, and limitations.
+    status: implementation_open
+  - id: NBK-009
+    requirement: Kernel execution is serialized or explicitly proven safe for provider-supported parallelism.
+    status: implementation_open
+  - id: NBK-010
+    requirement: Lost acknowledgments, duplicate channel messages, reconnect, and unknown execution status have explicit recovery.
+    status: implementation_open
+  - id: NBK-011
+    requirement: Credentials and secrets never appear in notebook source, output, events, receipts, logs, or screenshots.
+    status: implementation_open
+  - id: NBK-012
+    requirement: Untrusted HTML, JavaScript, widgets, notebooks, and extensions are sanitized or isolated.
+    status: implementation_open
+  - id: NBK-013
+    requirement: Resource Governor accounts for kernels, sessions, attempts, outputs, storage, browser pages, and accelerators.
+    status: implementation_open
+  - id: NBK-014
+    requirement: Simulation, observation, measurement, estimate, prediction, and control proposal remain different truth classes.
+    status: implementation_open
+  - id: NBK-015
+    requirement: Notebook output cannot directly authorize physical actuation or other consequential external action.
+    status: implementation_open
+  - id: NBK-016
+    requirement: Learning candidates require reproduction, challenge, applicability, and external promotion authority.
+    status: implementation_open
+  - id: NBK-017
+    requirement: Focusa bindings display contract_only or blocked_external_contract until pinned runtime contracts exist.
+    status: implementation_open
+  - id: NBK-018
+    requirement: Actual compiled Cockpit UI code covers every claimed operational state.
+    status: implementation_open
+  - id: NBK-019
+    requirement: Functional assertions and inspected visual evidence are bound to the exact implementation SHA.
+    status: implementation_open
+  - id: NBK-020
+    requirement: At least one approved networked Jupyter run is required before release_verified integration claims.
+    status: implementation_open
+
+phases:
+  N0:
+    name: contracts_and_fixtures
+    required_outputs:
+      - operation_registry
+      - generated_types
+      - provider_test_server
+      - deterministic_channel_fixtures
+      - persistence_decisions
+      - security_policy
+      - resource_policy
+  N1:
+    name: server_contents_sessions_kernels
+    required_outputs:
+      - server_profiles
+      - contents_adapter
+      - session_manager
+      - kernel_manager
+      - cockpit_connection_files_running_kernels
+      - functional_visual_proof
+  N2:
+    name: execution_outputs
+    required_outputs:
+      - channel_client
+      - immutable_attempts
+      - output_streaming
+      - artifact_capture
+      - cancel_recovery
+      - activity_projection
+      - functional_visual_proof
+  N3:
+    name: reproducibility_evidence
+    required_outputs:
+      - environment_manifest
+      - data_manifest
+      - clean_run_executor
+      - notebook_receipts
+      - focusa_handoff_boundary
+      - drift_detection
+      - functional_visual_proof
+  N4:
+    name: verification_math_statistics_physics
+    required_outputs:
+      - independent_verification_runner
+      - alternate_solver_comparison
+      - external_focusa_bindings
+      - simulation_observation_guards
+      - learning_promotion_guards
+      - functional_visual_proof
+  N5:
+    name: rich_jupyterlab_browser
+    required_outputs:
+      - browser_adapter
+      - registered_widget_renderers
+      - extension_policy
+      - human_takeover
+      - accessibility_and_visual_regression
+
+closure:
+  current_status: proposed_documentation_only
+  release_rule: A capability may become release_verified only after registered contracts, provider integration, security and resource controls, actual functional UI code, interaction tests, machine-readable evidence, inspected screenshots, and approved networked Jupyter proof exist for the same implementation SHA.
