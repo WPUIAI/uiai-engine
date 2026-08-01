@@ -1,0 +1,138 @@
+document_number: UIAI-COCKPIT-005-C01
+parent_document_number: UIAI-COCKPIT-005
+master_document_number: UIAI-COCKPIT-000
+schema: uiai.browser_profile_contract_ledger.v1
+version: '1.0'
+date: '2026-08-01'
+modes:
+  - detect
+  - no_detect
+  - operator
+  - research
+  - auto
+engines:
+  - chromium
+  - system_chromium
+  - camoufox
+network_routes:
+  - direct
+  - named_proxy
+  - local_ip_pool
+  - tailscale_exit
+  - operator_route
+challenge_policies:
+  - disabled
+  - detect
+  - assist
+  - solve
+  - solve_and_retry
+schemas:
+  - uiai.browser_profile.v1
+  - uiai.resolved_browser_profile.v1
+  - uiai.browser_profile_selection.v1
+  - uiai.browser_fingerprint_bundle.v1
+  - uiai.browser_network_route.v1
+  - uiai.challenge_event.v1
+  - uiai.challenge_solver_attempt.v1
+  - uiai.browser_profile_eval_result.v1
+requirements:
+  - id: BPF-001
+    owner: uiai_engine
+    text: Promote browser identity, fingerprint, route, behavior, storage, challenge, and observability into one profile contract.
+  - id: BPF-002
+    owner: uiai_engine
+    text: Support detect, no_detect, operator, research, and auto modes.
+  - id: BPF-003
+    owner: uiai_engine
+    text: Support Chromium, system Chromium, and Camoufox through one engine-adapter contract.
+  - id: BPF-004
+    owner: uiai_engine
+    text: Resolve inheritance into a complete immutable profile with a stable digest.
+  - id: BPF-005
+    owner: uiai_engine
+    text: Reject inconsistent fingerprint and network identity bundles during validation.
+  - id: BPF-006
+    owner: uiai_engine
+    text: Record effective profile digest on sessions, observations, receipts, capsules, evidence, and eval results.
+  - id: BPF-007
+    owner: uiai_engine
+    text: Generalize existing CAPTCHA stealth and IP-pool implementations into shared browser-profile adapters.
+  - id: BPF-008
+    owner: uiai_engine
+    text: Pool browser runtimes only when engine, identity, storage, network, and observability contracts are compatible.
+  - id: BPF-009
+    owner: uiai_engine
+    text: Give persistent operator profiles exclusive data-directory locks and explicit account/session bindings.
+  - id: BPF-010
+    owner: uiai_engine
+    text: Support direct, named proxy, local IP pool, Tailscale exit, and operator route adapters.
+  - id: BPF-011
+    owner: uiai_engine
+    text: Measure route health, block rate, challenge rate, latency, concurrency, cooldown, and cost.
+  - id: BPF-012
+    owner: uiai_engine
+    text: Test DNS, WebRTC, geography, locale, timezone, and route consistency.
+  - id: BPF-013
+    owner: uiai_engine
+    text: Preserve and expose text, image-grid, dynamic-grid, audio, voting, retry, and route-rotation challenge capabilities.
+  - id: BPF-014
+    owner: uiai_engine
+    text: Detect and classify active challenges across DOM, accessibility, visual, iframe, script, network, navigation, and page-text channels.
+  - id: BPF-015
+    owner: uiai_engine
+    text: Record every challenge solver attempt with profile, route, solver, model, timing, result, and evidence refs.
+  - id: BPF-016
+    owner: uiai_engine
+    text: Require a new context or browser process for identity-changing profile transitions.
+  - id: BPF-017
+    owner: cockpit
+    text: Provide Browser Profiles, Network Identity, Challenge Handling, Operator Profiles, and Research Eval settings.
+  - id: BPF-018
+    owner: cockpit
+    text: Show whether a settings change applies immediately, on new context, on new process, or after restart.
+  - id: BPF-019
+    owner: cockpit
+    text: Expose effective profile, route, fingerprint consistency, challenge state, and selection rationale in Live and Inspector.
+  - id: BPF-020
+    owner: uiai_engine
+    text: Provide reproducible profile, fingerprint, route, and challenge benchmark packs.
+  - id: BPF-021
+    owner: focusa
+    text: Allow policy and autonomy calibration to select or restrict browser profiles by operation and site.
+implementation_phases:
+  - phase: 0
+    name: Canonical types registry validation and migration
+  - phase: 1
+    name: Chromium detect no_detect operator and research launch adapter
+  - phase: 2
+    name: Existing CAPTCHA IP pool and stealth adapter generalization
+  - phase: 3
+    name: Profile-scoped pools sessions receipts and inspector metadata
+  - phase: 4
+    name: Cockpit settings and Live selector
+  - phase: 5
+    name: Camoufox adapter and parity
+  - phase: 6
+    name: Fingerprint and network consistency probes
+  - phase: 7
+    name: Challenge Research Lab and Eval packs
+  - phase: 8
+    name: Auto selection and autonomy calibration
+metrics:
+  - profile_launch_success_rate
+  - profile_resolution_error_rate
+  - fingerprint_consistency_rate
+  - automation_exposure_rate
+  - dns_leak_rate
+  - webrtc_leak_rate
+  - geo_consistency_rate
+  - route_health_rate
+  - route_block_rate
+  - challenge_detection_rate
+  - challenge_solve_rate
+  - challenge_false_positive_rate
+  - challenge_retry_rate
+  - operator_escalation_rate
+  - operator_profile_lock_conflict_rate
+  - camoufox_chromium_parity_rate
+  - profile_cost_per_verified_outcome
