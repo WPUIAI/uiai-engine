@@ -1,0 +1,486 @@
+schema: uiai.cockpit_notebook_event_schema.v1
+version: 1
+parent: UIAI-COCKPIT-007
+status: proposed_documentation_only
+implementation_implied: false
+
+canonical_envelope:
+  schema: uiai.notebook_event.v1
+  required:
+    - event_id
+    - sequence
+    - timestamp
+    - timestamp_precision
+    - event_type
+    - schema_version
+    - source_state_revision
+    - correlation_id
+    - payload
+  properties:
+    event_id: stable_unique_string
+    sequence: monotonically_increasing_integer_within_stream_scope
+    cursor: opaque_or_numeric_replay_cursor
+    timestamp: rfc3339_utc_preserving_source_fractional_precision
+    timestamp_precision:
+      enum: [second, millisecond, microsecond, nanosecond, provider_declared, unknown]
+    timestamp_uncertainty_ns: nonnegative_integer_or_null
+    clock_source: string_or_null
+    clock_sync_posture:
+      enum: [synchronized, bounded_uncertainty, local_unsynchronized, provider_reported, unknown]
+    event_type: namespaced_string
+    schema_version: string
+    source_state_revision: integer_or_string
+    scope_ref: object_or_null
+    principal_ref: object_or_null
+    server_ref: string_or_null
+    notebook_id: string_or_null
+    notebook_revision_id: string_or_null
+    session_ref: string_or_null
+    kernel_ref: string_or_null
+    cell_id: string_or_null
+    cell_revision_id: string_or_null
+    attempt_id: string_or_null
+    correlation_id: string
+    causation_id: string_or_null
+    parent_event_ids: array
+    payload_ref: string_or_null
+    artifact_refs: array
+    invalidate: array
+    redaction_posture:
+      enum: [none_required, redacted, public_safe, restricted, secret_adjacent]
+    payload: object
+
+stream_invariants:
+  - sequence never decreases within the declared stream scope
+  - duplicate event_id is idempotent and does not repeat visible state transitions
+  - replay and live-tail overlap is deduplicated by event_id and source_state_revision
+  - transport keepalive is not emitted as notebook work activity
+  - malformed events move the projection to degraded or stale rather than being silently ignored
+  - event payloads do not contain credentials, raw secrets, cookies, authorization headers, or kernel connection files
+  - artifact-sized output is referenced rather than embedded without bound
+  - source timestamp precision is retained even when the UI displays an abbreviated value
+
+notebook_event_types:
+  server:
+    - notebook.server.discovered
+    - notebook.server.probe_started
+    - notebook.server.connected
+    - notebook.server.degraded
+    - notebook.server.unauthorized
+    - notebook.server.disconnected
+    - notebook.server.capabilities_changed
+  document:
+    - notebook.document.opened
+    - notebook.document.revision_loaded
+    - notebook.document.edit_proposed
+    - notebook.document.saved
+    - notebook.document.save_conflict
+    - notebook.document.renamed
+    - notebook.document.deleted
+    - notebook.document.checkpoint_created
+    - notebook.document.checkpoint_restored
+    - notebook.document.external_change_detected
+  session:
+    - notebook.session.created
+    - notebook.session.reconnected
+    - notebook.session.owner_changed
+    - notebook.session.closed
+    - notebook.session.lease_expired
+  kernel:
+    - notebook.kernel.start_requested
+    - notebook.kernel.started
+    - notebook.kernel.idle
+    - notebook.kernel.busy
+    - notebook.kernel.interrupt_requested
+    - notebook.kernel.interrupted
+    - notebook.kernel.restart_requested
+    - notebook.kernel.restarted
+    - notebook.kernel.shutdown_requested
+    - notebook.kernel.shutdown
+    - notebook.kernel.lost
+    - notebook.kernel.recovered
+    - notebook.kernel.resource_pressure
+  cell:
+    - notebook.cell.revision_created
+    - notebook.cell.ready
+    - notebook.cell.queued
+    - notebook.cell.dispatched
+    - notebook.cell.started
+    - notebook.cell.awaiting_input
+    - notebook.cell.input_supplied
+    - notebook.cell.streaming
+    - notebook.cell.succeeded
+    - notebook.cell.failed
+    - notebook.cell.interrupt_requested
+    - notebook.cell.interrupted
+    - notebook.cell.timeout_requested
+    - notebook.cell.timed_out
+    - notebook.cell.cancel_requested
+    - notebook.cell.cancelled
+    - notebook.cell.unknown_terminal_state
+    - notebook.cell.superseded
+  output:
+    - notebook.output.stream_appended
+    - notebook.output.display_created
+    - notebook.output.display_updated
+    - notebook.output.result_created
+    - notebook.output.error_created
+    - notebook.output.artifact_captured
+    - notebook.output.sanitized
+    - notebook.output.unsupported_renderer
+    - notebook.output.stale
+    - notebook.output.redacted
+  environment:
+    - notebook.environment.snapshot_started
+    - notebook.environment.snapshot_created
+    - notebook.environment.drift_detected
+    - notebook.environment.drift_resolved
+    - notebook.environment.nondeterminism_declared
+  dataset:
+    - notebook.dataset.bound
+    - notebook.dataset.snapshot_created
+    - notebook.dataset.schema_changed
+    - notebook.dataset.stale
+    - notebook.dataset.superseded
+    - notebook.measurement.ingested
+  run:
+    - notebook.run.exploratory_started
+    - notebook.run.reproducible_previewed
+    - notebook.run.reproducible_started
+    - notebook.run.reproducible_completed
+    - notebook.run.reproducible_failed
+    - notebook.run.verification_started
+    - notebook.run.verification_completed
+    - notebook.run.verification_failed
+  verification:
+    - notebook.verification.finding_created
+    - notebook.verification.supported
+    - notebook.verification.disputed
+    - notebook.verification.contradicted
+    - notebook.verification.insufficient
+    - notebook.verification.superseded
+  evidence:
+    - notebook.evidence.preview_created
+    - notebook.evidence.capture_started
+    - notebook.evidence.artifact_committed
+    - notebook.evidence.receipt_created
+    - notebook.evidence.commit_failed
+  focusa_handoff:
+    - notebook.focusa_handoff.previewed
+    - notebook.focusa_handoff.submitted
+    - notebook.focusa_handoff.accepted
+    - notebook.focusa_handoff.rejected
+    - notebook.focusa_handoff.conflicted
+    - notebook.focusa_handoff.settled
+
+cell_attempt_schema:
+  schema: uiai.notebook_cell_attempt.v1
+  required:
+    - notebook_id
+    - notebook_revision_id
+    - cell_id
+    - cell_revision_id
+    - attempt_id
+    - semantic_role
+    - language
+    - kernel_ref
+    - environment_ref
+    - execution_mode
+    - execution_requested_at
+    - source_hash
+    - terminal_status
+    - canonical_status
+  properties:
+    notebook_id: string
+    notebook_revision_id: string
+    cell_id: string
+    cell_revision_id: string
+    attempt_id: string
+    scope_ref: object
+    principal_ref: object
+    semantic_role:
+      enum:
+        - definition
+        - assumption
+        - observation
+        - measurement_import
+        - data_transform
+        - derivation
+        - transformation
+        - solver_invocation
+        - simulation
+        - visualization
+        - prediction
+        - scoring
+        - verification
+        - counterexample
+        - sensitivity_analysis
+        - control_proposal
+        - conclusion
+        - narrative
+    language: string
+    kernel_ref: string
+    environment_ref: string
+    execution_mode:
+      enum: [exploratory, reproducible, verification]
+    execution_requested_at: rfc3339_utc
+    execution_started_at: rfc3339_utc_or_null
+    execution_completed_at: rfc3339_utc_or_null
+    monotonic_started_ns: integer_or_null
+    monotonic_completed_ns: integer_or_null
+    source_hash: sha256_digest
+    input_dataset_refs: array
+    parameter_set_ref: string_or_null
+    assumption_set_ref: string_or_null
+    dependency_attempt_refs: array
+    provider_execution_count: integer_or_null
+    provider_message_ids: array
+    stdout_ref: string_or_null
+    stderr_ref: string_or_null
+    display_output_refs: array
+    result_refs: array
+    resource_usage_ref: string_or_null
+    terminal_status:
+      enum: [pending, succeeded, failed, interrupted, timed_out, cancelled, unknown]
+    error_class: string_or_null
+    error_ref: string_or_null
+    external_side_effect_posture:
+      enum: [none_declared, none_observed, possible, confirmed, unknown]
+    evidence_refs: array
+    receipt_ref: string_or_null
+    verification_status:
+      enum: [not_requested, provisional, reproducible, verification_running, supported, disputed, contradicted, insufficient, superseded]
+    canonical_status:
+      enum: [noncanonical, candidate, accepted_external_authority, rejected, superseded]
+    provider_extensions: object
+
+cell_attempt_invariants:
+  - attempt_id is immutable and unique
+  - reexecution creates a new attempt_id
+  - source_hash references the exact executed source rather than current edited source
+  - execution_started_at and execution_completed_at do not substitute for observation or effective time
+  - monotonic duration is preferred for elapsed time when present
+  - terminal_status unknown is preserved when provider acknowledgment is lost
+  - simulation semantic_role cannot produce observation or measurement truth without a separate observation event
+  - control_proposal cannot emit physical actuation authority
+  - prediction semantic_role cannot create a Focusa prediction commitment without an accepted handoff
+  - canonical_status cannot be promoted solely by the notebook runtime
+
+output_artifact_schema:
+  schema: uiai.notebook_output_artifact.v1
+  required:
+    - output_id
+    - attempt_id
+    - output_kind
+    - mime_type
+    - created_at
+    - integrity
+    - trust_posture
+  properties:
+    output_id: string
+    attempt_id: string
+    display_id: string_or_null
+    output_version: integer
+    output_kind:
+      enum: [stream, execute_result, display_data, update_display_data, error, file, table, image, plot, html, latex, audio, video, widget, model, simulation_trace, measurement_series, diagnostic]
+    mime_type: string
+    byte_size: nonnegative_integer
+    dimensions: object_or_null
+    created_at: rfc3339_utc
+    source_event_ids: array
+    artifact_ref: string
+    integrity:
+      algorithm: sha256
+      digest: string
+    trust_posture:
+      enum: [trusted_structured, sanitized, isolated, unsupported, rejected]
+    renderer_id: string_or_null
+    renderer_version: string_or_null
+    redaction_posture:
+      enum: [not_reviewed, none_required, redacted, public_safe, restricted]
+    evidence_status:
+      enum: [not_evidence, provisional, captured, verified, disputed, superseded]
+    provider_extensions: object
+
+output_invariants:
+  - captured originals are immutable
+  - display updates create versioned deltas linked by display_id
+  - unsafe HTML or JavaScript never executes in the Cockpit origin
+  - unknown widgets render a safe placeholder and preserve metadata
+  - large output bodies are bounded and use artifact_ref
+  - output trust posture is visible to the operator
+  - generated or reconstructed imagery is marked illustrative and cannot satisfy verification predicates
+
+verification_finding_schema:
+  schema: uiai.notebook_verification_finding.v1
+  required:
+    - finding_id
+    - target_refs
+    - verification_method
+    - independence_class
+    - verdict
+    - created_at
+    - evidence_refs
+    - limitations
+  properties:
+    finding_id: string
+    target_refs: array
+    verifier_principal_ref: object
+    verification_method: string
+    independence_class:
+      enum:
+        - same_kernel_repeat
+        - clean_kernel_same_environment
+        - independent_environment_same_method
+        - alternate_implementation
+        - alternate_solver
+        - analytical_cross_check
+        - dimensional_or_invariant_check
+        - property_based_or_counterexample
+        - independent_dataset_or_measurement
+        - human_expert_review
+        - composite
+    verdict:
+      enum: [supported, disputed, contradicted, insufficient, inconclusive, superseded]
+    created_at: rfc3339_utc
+    source_attempt_refs: array
+    comparison_refs: array
+    evidence_refs: array
+    uncertainty: object_or_null
+    applicability: object_or_null
+    limitations: array
+    focusa_refs: array
+
+notebook_evidence_receipt_schema:
+  schema: uiai.notebook_evidence_receipt.v1
+  required:
+    - receipt_id
+    - notebook_revision_id
+    - attempt_refs
+    - execution_mode
+    - scope_ref
+    - initiated_by
+    - started_at
+    - completed_at
+    - environment_manifest_ref
+    - result_artifact_refs
+    - integrity
+    - proof_posture
+  properties:
+    receipt_id: string
+    notebook_id: string
+    notebook_revision_id: string
+    attempt_refs: array
+    execution_mode:
+      enum: [exploratory, reproducible, verification]
+    scope_ref: object
+    initiated_by: object
+    authority_ref: object_or_null
+    server_ref: string
+    kernel_refs: array
+    started_at: rfc3339_utc
+    completed_at: rfc3339_utc
+    monotonic_duration_ns: integer_or_null
+    environment_manifest_ref: string
+    dataset_snapshot_refs: array
+    parameter_set_ref: string_or_null
+    assumption_set_ref: string_or_null
+    dependency_refs: array
+    result_artifact_refs: array
+    error_refs: array
+    resource_usage_ref: string_or_null
+    retry_count: nonnegative_integer
+    external_side_effect_posture:
+      enum: [none_declared, none_observed, possible, confirmed, unknown]
+    reproducibility_posture:
+      enum: [not_claimed, incomplete, reproducible, drifted, failed]
+    verification_posture:
+      enum: [not_requested, running, supported, disputed, contradicted, insufficient, inconclusive]
+    focusa_handoff_refs: array
+    integrity:
+      algorithm: sha256
+      manifest_digest: string
+    proof_posture:
+      enum: [execution_only, output_captured, reproducibility_supported, independently_verified, disputed]
+    limitations: array
+    what_this_proves: array
+    what_this_does_not_prove: array
+
+projection_invalidations:
+  notebook.server.connected:
+    - notebook_connection
+    - server_capabilities
+  notebook.server.disconnected:
+    - notebook_connection
+    - running_sessions
+    - kernel_health
+  notebook.document.saved:
+    - notebook_revision
+    - reproducibility_status
+  notebook.document.external_change_detected:
+    - notebook_revision
+    - edit_authority
+    - reproducibility_status
+  notebook.kernel.started:
+    - kernel_status
+    - resource_usage
+  notebook.kernel.lost:
+    - kernel_status
+    - active_attempts
+    - recovery_actions
+  notebook.cell.started:
+    - cell_status
+    - activity
+    - kernel_status
+  notebook.cell.succeeded:
+    - cell_status
+    - outputs
+    - variables
+    - evidence_readiness
+  notebook.cell.failed:
+    - cell_status
+    - diagnostics
+    - recovery_actions
+  notebook.output.display_created:
+    - outputs
+    - evidence_readiness
+  notebook.environment.drift_detected:
+    - environment
+    - reproducibility_status
+    - verification_status
+  notebook.dataset.stale:
+    - data_lineage
+    - outputs
+    - reproducibility_status
+  notebook.verification.disputed:
+    - verification
+    - conclusions
+    - focusa_handoff_readiness
+  notebook.evidence.receipt_created:
+    - evidence
+    - integrity
+  notebook.focusa_handoff.accepted:
+    - focusa_refs
+    - canonical_status
+    - activity
+
+activity_visibility:
+  visible_event_families:
+    - server_connection_state_change
+    - kernel_lifecycle_change
+    - cell_lifecycle_change
+    - output_created_or_materially_updated
+    - environment_or_data_drift
+    - verification_finding
+    - evidence_commit
+    - focusa_handoff_state_change
+  hidden_transport_events:
+    - websocket_ping
+    - websocket_pong
+    - provider_keepalive
+    - health_poll_without_change
+    - cursor_ack_without_projection_change
+
+closure:
+  status: proposed_documentation_only
+  rule: Event schemas become authoritative only after registry adoption, generated-code parity, persistence and replay tests, production reducers, Cockpit projections, evidence receipts, and release proof exist for the same implementation SHA.
