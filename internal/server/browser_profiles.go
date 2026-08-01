@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/WPUIAI/uiai-engine/internal/browserprofile"
 	captchaPkg "github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/routes"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-rod/rod"
 )
 
@@ -38,17 +40,11 @@ func NewWithBrowserProfiles(cfg *config.Config, configPath string) *ProfiledEngi
 		return profiled
 	}
 	profiled.browserProfiles = manager
-	engine.router.Route("/api/browser", func(r chiRouter) {
+	engine.router.Route("/api/browser", func(r chi.Router) {
 		routes.MountBrowserProfileRoutes(r, manager)
 	})
 	log.Printf("[browser-profile] enabled: default=%s profiles=%v", registry.Config().DefaultProfile, registry.Names())
 	return profiled
-}
-
-// chiRouter is the subset of chi.Router accepted by route mounters. The type
-// alias avoids leaking router construction out of the existing Engine.
-type chiRouter = interface {
-	Use(middlewares ...func(httpHandler) httpHandler)
 }
 
 // Run starts the wrapped engine and closes all independently launched profile
