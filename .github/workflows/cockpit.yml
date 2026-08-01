@@ -49,6 +49,31 @@ jobs:
             sleep 0.25
           done
           curl -fsS http://127.0.0.1:4173/ >/dev/null
+
+          BROWSER=$(find "$HOME/Library/Caches/ms-playwright" -type f \
+            \( -name "Chromium" -o -name "Google Chrome for Testing" -o -name "chrome-headless-shell" \) \
+            2>/dev/null | grep -E '/Contents/MacOS/|chrome-headless-shell$' | head -1)
+          test -n "$BROWSER"
+
+          "$BROWSER" --headless --disable-gpu --no-sandbox --virtual-time-budget=1500 \
+            --dump-dom "http://127.0.0.1:4173/" > visual-proof/cockpit-focusa-idle.dom.html
+          grep -q 'data-live-state="idle"' visual-proof/cockpit-focusa-idle.dom.html
+          grep -q 'data-cursor="0"' visual-proof/cockpit-focusa-idle.dom.html
+          grep -q 'data-activity-count="0"' visual-proof/cockpit-focusa-idle.dom.html
+          grep -q 'data-evidence-ready="false"' visual-proof/cockpit-focusa-idle.dom.html
+
+          "$BROWSER" --headless --disable-gpu --no-sandbox --virtual-time-budget=1500 \
+            --dump-dom "http://127.0.0.1:4173/?evidence=focusa-live" > visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-live-state="live"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-cursor="103"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-source-revision="43"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-activity-count="3"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-evidence-ready="true"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q '2.5–4.0 hours' visual-proof/cockpit-focusa-live.dom.html
+          grep -q '12 authority events' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'Profile A partial verified' visual-proof/cockpit-focusa-live.dom.html
+          grep -q '>active<' visual-proof/cockpit-focusa-live.dom.html
+
           npm exec --yes playwright@1.54.2 screenshot \
             --viewport-size="1440,1200" \
             --wait-for-timeout=400 \
@@ -56,30 +81,47 @@ jobs:
             visual-proof/cockpit-focusa-idle.png
           npm exec --yes playwright@1.54.2 screenshot \
             --viewport-size="1440,1200" \
-            --wait-for-timeout=1900 \
+            --wait-for-timeout=400 \
             "http://127.0.0.1:4173/?evidence=focusa-live" \
             visual-proof/cockpit-focusa-live-after-events.png
+
           test -s visual-proof/cockpit-focusa-idle.png
           test -s visual-proof/cockpit-focusa-live-after-events.png
           IDLE_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-idle.png | awk '{print $1}')
           LIVE_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-live-after-events.png | awk '{print $1}')
+          IDLE_DOM_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-idle.dom.html | awk '{print $1}')
+          LIVE_DOM_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-live.dom.html | awk '{print $1}')
+          test "$IDLE_SHA" != "$LIVE_SHA"
+          IDLE_SIZE=$(sips -g pixelWidth -g pixelHeight visual-proof/cockpit-focusa-idle.png | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w"x"h}')
+          LIVE_SIZE=$(sips -g pixelWidth -g pixelHeight visual-proof/cockpit-focusa-live-after-events.png | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w"x"h}')
+          test "$IDLE_SIZE" = "1440x1200"
+          test "$LIVE_SIZE" = "1440x1200"
+
           cat > visual-proof/manifest.json <<JSON
           {
             "schema": "uiai.cockpit_visual_proof.v1",
             "commit_sha": "${GITHUB_SHA}",
             "viewport": "1440x1200",
+            "production_reducer_asserted": true,
             "captures": [
               {
                 "file": "cockpit-focusa-idle.png",
+                "dom_file": "cockpit-focusa-idle.dom.html",
                 "state": "idle_no_synthetic_activity",
-                "sha256": "${IDLE_SHA}"
+                "sha256": "${IDLE_SHA}",
+                "dom_sha256": "${IDLE_DOM_SHA}",
+                "asserted_live_state": "idle",
+                "asserted_activity_count": 0
               },
               {
                 "file": "cockpit-focusa-live-after-events.png",
+                "dom_file": "cockpit-focusa-live.dom.html",
                 "state": "durable_event_replay_applied",
                 "expected_cursor": "103",
                 "expected_source_revision": "43",
-                "sha256": "${LIVE_SHA}"
+                "expected_activity_count": 3,
+                "sha256": "${LIVE_SHA}",
+                "dom_sha256": "${LIVE_DOM_SHA}"
               }
             ]
           }
