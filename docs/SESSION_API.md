@@ -160,6 +160,8 @@ A viewer may remain public by possession of a narrowly scoped token. Control is 
 
 ## Error contract
 
+`GET /api/health/browser` and `GET /api/metrics/browser` include an `agent_pressure` summary for long agent workflows: `uiai.agent_pressure.v1`, noncanonical operational telemetry classification, overall pressure, packet proposal authority, search provider/cache status, browser pool/queue/failure pressure, screenshot cache pressure, stored error pressure, bounded recommended actions, and a Focusa routing hint. Immediate browser pressure is derived only from current pool occupancy and queue depth; cumulative rejection, wait-time, and failure counters remain visible under `historical_pressure` without latching current admission readiness. Focusa/Pi should use this before long packet workflows or after browser/search/cache pressure symptoms instead of reading raw logs; pressure can narrow/block operational workflows but never becomes Focusa cognition truth.
+
 Representative entitlement failures:
 
 ```json
