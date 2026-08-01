@@ -1,10 +1,13 @@
 <script lang="ts">
   import { phase0Cards } from "$lib/cards/phase0-card-manifest";
   import BrowserProfileSettings from "$lib/components/BrowserProfileSettings.svelte";
+  import FocusaLiveSurfaces from "$lib/components/FocusaLiveSurfaces.svelte";
 </script>
 
 <h1>UIAI Engine Cockpit</h1>
-<p class="muted">Backend-first shell (Slice 0). Phase 0 card manifest loaded into the navigator.</p>
+<p class="muted">Operator workspace for live Focusa mission intelligence and UIAI Engine execution.</p>
+
+<FocusaLiveSurfaces />
 
 <section class="cards" aria-label="Phase 0 cards">
   {#each phase0Cards as card}
