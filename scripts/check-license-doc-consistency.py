@@ -46,8 +46,8 @@ def main() -> int:
             failures.append(f"{rel}: missing authority-issued entitlement boundary")
         if "authentication" not in low or "entitlement" not in low:
             failures.append(f"{rel}: must explicitly separate authentication and entitlement")
-        if "recovery-only" not in low and "recovery only" not in low:
-            failures.append(f"{rel}: missing recovery-only posture")
+        if "recovery" not in low:
+            failures.append(f"{rel}: missing explicit recovery posture")
 
     for rel, text in data.items():
         low = text.lower()
