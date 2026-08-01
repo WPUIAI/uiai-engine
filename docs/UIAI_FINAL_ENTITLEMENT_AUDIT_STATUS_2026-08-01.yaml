@@ -1,0 +1,11 @@
+schema: uiai.final_entitlement_audit_status.v1
+audited_at: 2026-08-01T20:25:00Z
+active_docs_corrected: true
+root_license_faq_corrected: true
+current_code_bypasses_classified: true
+documentation_ci_added: true
+implementation_workbreakdown_added: true
+live_authority_verified: false
+code_enforcement_implemented: false
+distribution_status: blocked
+next_action: authority Phase 0 and lease golden vectors, then UIAI WP0-WP3
