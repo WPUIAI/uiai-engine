@@ -1,0 +1,13 @@
+schema: uiai.entitlement_implementation_owners.v1
+authority:
+  repository: WPUIAI/wpuiai
+  issue: 1
+  owns: signed leases product features limits node refresh revoke refund device code capsule envelopes
+focusa:
+  repository: Startempire-Wire/focusa
+  issue: 119
+  owns: bundle parent verification child-token broker project and Workpoint authority
+uiai:
+  repository: WPUIAI/uiai-engine
+  issue: 5
+  owns: authentication entitlement route gates limits workers standalone onboarding migration
