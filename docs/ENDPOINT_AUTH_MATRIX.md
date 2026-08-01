@@ -1,64 +1,179 @@
-# UIAI Engine Endpoint Auth Matrix
+# UIAI Engine Endpoint Authentication and Entitlement Matrix
 
-Last updated: 2026-06-04
+Last reviewed against current main: 2026-08-01
 
-This matrix is the security contract for Go engine route families. Source of truth for enforcement is `internal/auth/auth.go`; route mounts are in `internal/server/server.go`. Safe copy/paste examples for curl, CLI, Pi, and MCP live in [Remote Auth Examples](REMOTE_AUTH_EXAMPLES.md).
+> **Critical status:** This document records current as-built authentication behavior and the required Spec-152 target. Current loopback-public routes and tier-derived feature behavior are legacy migration facts, not approved Evaluation entitlement. New evaluator/customer distribution is blocked until every execution/mutation route has independent authority-issued entitlement enforcement.
 
-## Auth modes
+Source of current auth truth: `internal/auth/auth.go`.  
+Source of route mounts: `internal/server/server.go`.  
+Current feature helper: `internal/license/entitlements.go`.  
+Normative target: `docs/UIAI_LICENSE_ENTITLEMENT_AND_ONBOARDING_ENFORCEMENT_SPEC_2026-08-01.md` and the protected-worker addendum.
 
-| Mode | Meaning | Accepted credentials |
-|---|---|---|
-| public | Safe read-only metadata/UI, reachable without credentials. If credentials are present, identity may be attached opportunistically. | Optional: `X-License-Key`, `X-API-Key`, `X-Extension-Token`, `Authorization: Bearer`, `X-Webhook-Secret` |
-| loopback-public remote-auth | Local agent/tool calls may be unauthenticated from loopback; non-loopback callers must authenticate. | Loopback IP or any accepted credential |
-| authenticated | Global middleware requires credentials before route handler runs. | `X-License-Key`, `X-API-Key`, `Authorization: Bearer`, `X-Extension-Token`, or `X-Webhook-Secret` |
-| service-token | Route handler has its own service-token auth in addition to middleware exception. | Handler-specific token such as `X-API-Token`/Bearer for training |
-| handler-auth | Middleware allows route family, but handler implements its own auth or token semantics. | Handler-specific |
+## Authentication versus entitlement
 
-Local-token env support: `UIAI_LOCAL_API_TOKEN` or comma-separated `UIAI_LOCAL_API_TOKENS` authenticate `X-API-Key`, `Authorization: Bearer`, and `X-License-Key` as internal local calls.
+Authentication answers **who/what is calling**. Entitlement answers **whether this product, feature, node, time, and limit permit execution**.
 
-## Matrix
+A request may be authenticated and still denied by entitlement.
 
-| Endpoint group | Mode | Evidence | Notes |
-|---|---|---|---|
-| `/`, `/dashboard` | public | `internal/auth/auth.go` public list; `internal/server/server.go` root/dashboard routes | Service info and local dashboard shell. |
-| `/health`, `/api/health`, `/api/health/*`, `/api/status`, `/api/metrics/browser` | public | `internal/auth/auth.go` public list | Operational status/readiness only. |
-| `/api/tools`, `/api/tools/*` | public | `internal/auth/auth.go` `strings.HasPrefix(p, "/api/tools")` | Agent discovery metadata, including `/api/tools/docs`; no secrets. |
-| `/api/critique/models`, `/api/critique/dimensions` | public | `internal/auth/auth.go` public list | Metadata only; `/api/critique` write path remains authenticated. |
-| `/api/ui-reverse/models`, `/api/ui-reverse/operations` | public | `internal/auth/auth.go` public list | Metadata only. |
-| `/api/copilot/health`, `/api/intelligence/health` | public | `internal/auth/auth.go` public list | Health/readiness only. |
-| `/api/screenshot`, `/api/screenshot/*` | loopback-public remote-auth | `isLoopbackToolPath`; `internal/auth/auth_test.go` pattern | Local visual tool surface; remote callers authenticate. |
-| `/api/2fa/code` | authenticated | global `/api/*` middleware; no loopback-public exception | Optional agent 2FA helper; returns short-lived OTP code from configured profile only. Keep disabled unless deployment needs it. |
-| `/api/session`, `/api/session/*` | loopback-public remote-auth | `isLoopbackToolPath` | Persistent browser automation; remote callers authenticate. |
-| `/api/search`, `/api/search/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestSearchToolPathLoopbackPublicRemoteAuth` | Provider-neutral search; remote callers authenticate. |
-| `/api/markdown`, `/api/markdown/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestMarkdownToolPathLoopbackPublicRemoteAuth` | Source-to-Markdown browser capture; remote callers authenticate. |
-| `/api/agent/research-packet` | loopback-public remote-auth | `isLoopbackToolPath`; `TestAgentPacketToolPathLoopbackPublicRemoteAuth` | Agent packet composer; accepts existing UIAI responses and returns bounded redacted Focusa packet. |
-| `/api/media/frame`, `/api/media/frame/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestMediaFrameToolPathLoopbackPublicRemoteAuth` | Frame catalog/render agent helpers. |
-| `/api/errors`, `/api/errors/*` | loopback-public remote-auth | `isLoopbackToolPath`; `TestErrorsToolPathLoopbackPublicRemoteAuth` | Bounded redacted troubleshooting events. |
-| `/api/share/*`, `/v/{token}` | public | `internal/auth/auth.go` share exception; server viewer route | Share viewing is public by design. Review mutating share routes before expanding. |
-| `/m/{token}`, `/m/{token}/status`, `/m/{token}/screenshot.jpg`, `/m/{token}/control` | public tokenized | `internal/auth/auth.go` `/m/` exception; tokenized FPV public routes | FPV PWA share links. Control endpoint works only for `controls=true` shares and is audited. Public deployment must proxy only `/m/*`; see [FPV Public Route Deployment Plan](FPV_PUBLIC_ROUTE_DEPLOY_PLAN.md). |
-| `/api/media/jobs`, `/api/media/status/*` | public read | `internal/auth/auth.go` media read exceptions | Read-only polling/listing. Media production remains authenticated. |
-| `/api/media/produce` and non-frame/non-status media writes | authenticated | falls through middleware | Potentially paid/mutating media generation. |
-| `/api/extension/verify`, `/api/extension/token` | handler-auth | `internal/auth/auth.go` exception; `internal/routes/extension.go` | Handler validates extension token behavior. Other extension routes fall through unless explicitly excepted. |
-| `/api/memory/*`, `/api/usage/*`, `/api/workflow/*` | public/legacy-compatible | `internal/auth/auth.go` Bun compatibility exceptions | Compatibility surface; audit before remote exposure. |
-| `/api/training/*` | service-token | `internal/auth/auth.go` training exception; `internal/routes/training.go requireAuth` | Requires `X-API-Token` or Bearer matching training auth env. |
-| `/api/intelligence/*` except `/health` | handler-auth | `internal/auth/auth.go` intelligence exception; `internal/routes/intelligence.go` | Per-handler auth/validation semantics. |
-| `/api/admin/*` | authenticated | falls through middleware | Admin reads/writes. |
-| `/api/reference/*` | authenticated | falls through middleware | Reference analysis can spend AI/credits. |
-| `/api/critique`, `/api/section-detect`, `/api/layout-compare`, `/api/style-enhance`, `/api/copilot/*`, `/api/intake/*` | authenticated | falls through middleware | AI/analysis operations. |
-| `/api/design-system`, `/api/content-map`, `/api/block-recipes`, `/api/comparison` | authenticated | falls through middleware | Pipeline operations. |
-| `/api/captcha/*` | authenticated | falls through middleware | Solver/pool operations are sensitive/mutating. |
-| `/api/migration/*`, `/api/events`, `/vision/*` | authenticated | falls through middleware | Migration, SSE, and interactive vision surfaces. |
+The following never create entitlement by themselves:
 
-## Update rules for new route families
+- loopback source address;
+- `UIAI_LOCAL_API_TOKEN` or `UIAI_LOCAL_API_TOKENS`;
+- API key, extension token, Pi/MCP/Cockpit token, webhook secret, or Focusa pairing token;
+- source checkout or successful build;
+- health/browser readiness;
+- a tier string reconstructed by the client;
+- an editable local file.
 
-1. Add the route family to this matrix in the same change that adds or changes route mounts.
-2. Choose the narrowest auth mode. Use `loopback-public remote-auth` only for local agent helper surfaces that are safe for unauthenticated loopback use.
-3. If a route is added to `isLoopbackToolPath`, add or update an auth test proving loopback allowed and remote unauthenticated denied.
-4. If a route is added to the middleware public exception list, document why public exposure is safe and whether credentials are still opportunistically accepted.
-5. If a route has handler-specific auth, document the token/header name and add handler-level positive/negative tests when practical.
-6. All auth failures and error logs must preserve redaction guarantees: no `Authorization`, cookies, API keys, bearer tokens, webhook secrets, request bodies, query secrets, or fragments.
+## Current authentication modes
 
-## Current verification
+| Mode | Current meaning | Target entitlement rule |
+| --- | --- | --- |
+| public | reachable without caller credentials | recovery/public metadata only; no execution side effect |
+| loopback-public remote-auth | current code permits unauthenticated loopback for selected tools | must still load/verify authority-issued lease and feature/limits before execution |
+| authenticated | caller credential required | authentication only; product/feature gate follows |
+| service-token | handler-specific service credential | token scopes must derive from verified service/product authority |
+| handler-auth | handler validates its own token | handler must also enforce product/feature/time/node/limit state |
+| public tokenized | possession of signed/opaque share token | token scope cannot escalate to general engine execution |
+| recovery | health/license/diagnostic/export/uninstall-safe surface | intentionally available without active execution entitlement |
 
-- `go test ./internal/auth` covers loopback/remote boundaries for search, markdown, agent packet, errors, media frame, session, screenshot, loopback detection, local-token auth, and remote positive auth via `X-API-Key`/Bearer.
-- `scripts/smoke-agent-integrations.sh` exercises public discovery, loopback tool surfaces, MCP/Pi parity, and browser error smoke.
+## Required middleware order
+
+```text
+request safety / body and rate limits
+→ caller authentication
+→ canonical signed-lease or child-token verification
+→ uiai-engine product grant
+→ route feature grant
+→ node/time/sequence/offline-window validation
+→ limit reservation
+→ handler or protected worker
+→ usage commit/release
+→ redacted observability
+```
+
+No expensive browser page, model call, media job, persistent session, share-control channel, or mutable storage transaction starts before the entitlement decision and required reservation.
+
+## Route matrix
+
+| Endpoint group | Current auth behavior | Required target feature/posture | Migration status |
+| --- | --- | --- | --- |
+| `/`, `/dashboard` | public | bounded product/version/onboarding shell only; no private state | review public payload |
+| `/health`, `/api/health`, `/api/health/*`, `/api/status`, `/api/metrics/browser` | public | recovery-safe operational readiness plus redacted entitlement state | retain public/recovery |
+| `/api/license/status|start|poll|activate|refresh|doctor` | not yet canonical | recovery-safe, rate-limited authority flow | must implement |
+| `/api/tools`, `/api/tools/*` | public metadata | may list locked tools with `license_feature`/limit metadata; invocation remains gated | audit metadata leakage |
+| critique/UI-reverse model or operation metadata | public | public only if no private prompts/routing/customer data; otherwise gated | route review |
+| `/api/copilot/health`, `/api/intelligence/health` | public | readiness only; no product result | retain after payload audit |
+| `/api/screenshot`, `/api/screenshot/*` | loopback-public remote-auth | `uiai.screenshot.capture`; signed Evaluation/paid feature and limits | release blocker |
+| `/api/session`, `/api/session/*` | loopback-public remote-auth | `uiai.session.execute`; concurrency/duration/idle limits | release blocker |
+| `/api/search`, `/api/search/*` | loopback-public remote-auth | `uiai.search.execute`; signed feature and usage policy | release blocker |
+| `/api/markdown`, `/api/markdown/*` | loopback-public remote-auth | `uiai.markdown.capture`; signed feature/limit | release blocker |
+| `/api/agent/research-packet` | loopback-public remote-auth | `uiai.agent.research_packet`; gate if it invokes/exposes entitled work | release blocker |
+| `/api/media/frame`, `/api/media/frame/*` | loopback-public remote-auth | public catalog may remain metadata; render/execution requires `uiai.media.frame` | split route/read-write |
+| `/api/errors`, `/api/errors/*` | loopback-public remote-auth | recovery-safe redacted diagnostics only; no private request bodies/results | payload audit |
+| `/api/2fa/code` | authenticated | sensitive helper; explicit feature and deployment policy, disabled by default | gate/review |
+| `/api/share/*`, `/v/{token}` | mixed public/auth | viewing only through scoped signed expiring token; creation/mutation requires `uiai.share.create` | split read/write |
+| `/m/{token}` status/screenshot/control | public tokenized | signed short-lived audience/resource scope; control separately granted/audited; no escalation | redesign token contract |
+| `/api/media/jobs`, `/api/media/status/*` | public read | only opaque caller-owned job status; no enumeration/customer output leakage | ownership/token audit |
+| media production routes | authenticated + some feature middleware | `uiai.media.produce`, limit reservation, protected worker where selected | extend gate |
+| `/api/extension/verify`, `/api/extension/token` | handler-auth | issuance requires verified parent lease; token scopes no broader and no hard-coded `pro` | release blocker |
+| `/api/memory/*` | public/legacy compatibility | public metadata none; reads/writes require explicit data/product feature and subject scope | release blocker |
+| `/api/usage/*` | public/legacy compatibility | caller/lease-scoped usage only; no cross-account enumeration | release blocker |
+| `/api/workflow/*` | public/legacy compatibility | mutating/triggering routes require explicit workflow feature | release blocker |
+| `/api/training/*` | service-token | service auth plus product/feature scope; test and production roots separated | gate/review |
+| `/api/intelligence/*` except health | handler-auth | explicit intelligence feature, limits, protected worker where selected | release blocker |
+| `/api/admin/*` | authenticated | admin identity and separately authorized role/product operation | harden |
+| `/api/reference/*` | authenticated + feature middleware | `uiai.reference.access`, usage reservation | verify coverage |
+| critique/section/layout/style/copilot execution | authenticated + feature middleware | explicit signed product/features/limits; remove tier-derived blanket grants | release blocker |
+| `/api/intake/*` | authenticated | read/write/execute split; mutation feature required | route review |
+| design-system/content-map/block-recipes/comparison | authenticated + feature middleware | explicit signed features and usage reservation | verify coverage |
+| `/api/captcha/*` | authenticated | sensitive execution feature, resource/session scope, limits | release blocker |
+| `/api/migration/*` | authenticated + feature middleware | `uiai.migration`, explicit target/scope and destructive confirmation | verify/harden |
+| `/api/events` | authenticated | lease/client-scoped entitled event stream; recovery stream excludes private execution | release blocker |
+| `/vision/*` | authenticated | `uiai.vision.interactive`, protected worker/session token | release blocker |
+
+## Current-code contradictions to remove
+
+1. `FromIdentity(nil)` creates Evaluation.
+2. `EvalAllowedFeatures` grants execution based on loopback.
+3. `tierFeatures()` grants a broad static feature set from a tier string.
+4. `UIAI_LOCAL_API_TOKEN` maps to tier `internal` rather than authentication-only identity.
+5. Extension token validation creates hard-coded tier `pro`.
+6. Auth middleware public/legacy exceptions allow valuable execution without a signed product grant.
+7. Route mounts apply feature middleware to selected families only.
+8. Health/status do not report one canonical entitlement state.
+
+These remain accurate observations until code migration; they are not permitted target behavior.
+
+## Required entitlement context
+
+At minimum, a verified context contains:
+
+```text
+lease_id
+license_id
+license_class
+status
+allowed_products
+features
+limits/policy_version
+node_id
+issued_at/not_before/refresh_after/offline_valid_until/expires_at
+sequence
+authority_key_id
+signature/payload digest
+subject/client/token scope
+```
+
+Friendly tier labels are presentation only. Unknown status, schema, product, feature, token type, or sequence fails closed.
+
+## Child-token rules
+
+Focusa/extension/Pi/MCP/Cockpit child tokens must be:
+
+- signed or authenticated by the approved local broker trust;
+- audience-bound to exact engine/worker;
+- product and feature scoped;
+- node and client scoped;
+- short-lived and no longer than parent lease/offline validity;
+- bound to parent lease id/sequence/digest;
+- optionally bound to request/session/job/limit reservation;
+- replay protected with token id/nonce;
+- invalidated/rejected when parent state advances to revoke/expire/replace.
+
+## Update rules for route changes
+
+1. Add/update the route in this matrix in the same change.
+2. Add it to the generated endpoint-feature coverage ledger.
+3. Classify public/recovery/authentication/entitlement/limit/protected-worker posture separately.
+4. Prove that loopback does not bypass entitlement.
+5. Prove reverse-proxy client-IP handling cannot turn remote traffic into license permission.
+6. Add positive/negative tests for missing, wrong-product, expired, revoked, stale-sequence, feature-missing, and limit-reached cases.
+7. Ensure checks occur before expensive allocation or mutation.
+8. Preserve redaction of authorization, cookies, keys, tokens, codes, customer identity, request bodies, and sensitive URLs.
+9. Public tokenized routes must prove non-escalation.
+10. Test trust roots/fixtures must be impossible in production artifacts.
+
+## Required verification
+
+Current auth tests remain useful as migration fixtures, but final release proof additionally requires:
+
+- missing identity and missing lease => recovery-only;
+- authenticated local token without lease => denied execution;
+- loopback without lease => denied execution;
+- reverse-proxy remote cannot inherit loopback permission;
+- extension token cannot synthesize `pro`;
+- wrong product/feature/status/sequence/time/node => denied;
+- concurrent limit reservation is atomic;
+- child token cannot exceed/outlive parent;
+- protected worker rejects direct/replayed/wrong-audience operations;
+- public/share/status routes cannot enumerate or expose private work;
+- standalone and Focusa-brokered onboarding produce the same canonical state;
+- expiry preserves diagnostics/data/export/uninstall behavior.
+
+## Canonical references
+
+- `docs/UIAI_LICENSE_ENTITLEMENT_AND_ONBOARDING_ENFORCEMENT_SPEC_2026-08-01.md`
+- `docs/UIAI_PROTECTED_WORKER_AND_FEATURE_CAPSULE_ADDENDUM_2026-08-01.md`
+- `docs/LICENSING.md`
+- Focusa Spec 152 and Spec 150A
