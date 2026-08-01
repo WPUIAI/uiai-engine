@@ -1,0 +1,33 @@
+name: License Documentation Consistency
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'docs/**'
+      - 'scripts/check-license-doc-consistency.py'
+      - '.github/workflows/license-documentation-consistency.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'docs/**'
+      - 'scripts/check-license-doc-consistency.py'
+      - '.github/workflows/license-documentation-consistency.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consistency:
+    name: Authentication and entitlement docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Run UIAI licensing documentation gate
+        run: python3 scripts/check-license-doc-consistency.py
