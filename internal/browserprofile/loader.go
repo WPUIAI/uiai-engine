@@ -18,11 +18,25 @@ func LoadFile(path string) (*Registry, error) {
 	var root struct {
 		Browser Config `yaml:"browser"`
 	}
-	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(data))), &root); err != nil {
+	if err := yaml.Unmarshal([]byte(expandProfileConfigEnv(string(data))), &root); err != nil {
 		return nil, fmt.Errorf("parse browser profile config %s: %w", path, err)
 	}
 	cfg := mergeConfigDefaults(root.Browser)
 	return NewRegistry(cfg)
+}
+
+func expandProfileConfigEnv(input string) string {
+	return os.Expand(input, func(key string) string {
+		if value, ok := os.LookupEnv(key); ok {
+			return value
+		}
+		if key == "UIAI_OPERATOR_PROFILE_DIR" {
+			return "~/.config/uiai/operator-profile"
+		}
+		// Preserve unrelated config references because this loader only owns
+		// the browser section and must not erase other engine placeholders.
+		return "${" + key + "}"
+	})
 }
 
 func mergeConfigDefaults(user Config) Config {
