@@ -22,33 +22,33 @@ type OpenRequest struct {
 
 // ManagedSession is an independently launched profile runtime and page.
 type ManagedSession struct {
-	ID        string          `json:"id"`
-	URL       string          `json:"url"`
-	Title     string          `json:"title"`
-	CreatedAt time.Time       `json:"created_at"`
-	LastUsed  time.Time       `json:"last_used"`
-	Selection Selection       `json:"selection"`
-	Profile   ResolvedProfile `json:"profile"`
-	RuntimePID int            `json:"runtime_pid,omitempty"`
+	ID         string          `json:"id"`
+	URL        string          `json:"url"`
+	Title      string          `json:"title"`
+	CreatedAt  time.Time       `json:"created_at"`
+	LastUsed   time.Time       `json:"last_used"`
+	Selection  Selection       `json:"selection"`
+	Profile    ResolvedProfile `json:"profile"`
+	RuntimePID int             `json:"runtime_pid,omitempty"`
 
-	runtime *Runtime
+	runtime RuntimeHandle
 	page    *rod.Page
 	lockKey string
 }
 
 // SessionSummary is the public manager view without runtime pointers.
 type SessionSummary struct {
-	ID         string    `json:"id"`
-	URL        string    `json:"url"`
-	Title      string    `json:"title"`
-	CreatedAt  time.Time `json:"created_at"`
-	LastUsed   time.Time `json:"last_used"`
-	ProfileID  string    `json:"profile_id"`
-	Mode       Mode      `json:"mode"`
-	Engine     Engine    `json:"engine"`
-	Digest     string    `json:"profile_digest"`
-	RuntimePID int       `json:"runtime_pid,omitempty"`
-	NetworkRoute string  `json:"network_route"`
+	ID              string          `json:"id"`
+	URL             string          `json:"url"`
+	Title           string          `json:"title"`
+	CreatedAt       time.Time       `json:"created_at"`
+	LastUsed        time.Time       `json:"last_used"`
+	ProfileID       string          `json:"profile_id"`
+	Mode            Mode            `json:"mode"`
+	Engine          Engine          `json:"engine"`
+	Digest          string          `json:"profile_digest"`
+	RuntimePID      int             `json:"runtime_pid,omitempty"`
+	NetworkRoute    string          `json:"network_route"`
 	ChallengePolicy ChallengePolicy `json:"challenge_policy"`
 }
 
@@ -56,18 +56,29 @@ type SessionSummary struct {
 type Manager struct {
 	mu       sync.RWMutex
 	registry *Registry
+	launcher LauncherFunc
 	sessions map[string]*ManagedSession
 	locks    map[string]string
 }
 
 func NewManager(registry *Registry) (*Manager, error) {
+	return NewManagerWithLauncher(registry, func(ctx context.Context, profile ResolvedProfile) (RuntimeHandle, error) {
+		return Launch(ctx, profile)
+	})
+}
+
+func NewManagerWithLauncher(registry *Registry, launcher LauncherFunc) (*Manager, error) {
 	if registry == nil {
 		return nil, fmt.Errorf("browser profile registry is required")
 	}
+	if launcher == nil {
+		return nil, fmt.Errorf("browser profile launcher is required")
+	}
 	return &Manager{
 		registry: registry,
+		launcher: launcher,
 		sessions: make(map[string]*ManagedSession),
-		locks: make(map[string]string),
+		locks:    make(map[string]string),
 	}, nil
 }
 
@@ -82,56 +93,45 @@ func (m *Manager) Open(ctx context.Context, request OpenRequest) (*ManagedSessio
 		return nil, err
 	}
 
-	lockKey := ""
-	if profile.Storage.ExclusiveLock {
-		lockKey = profile.Launch.UserDataDir
+	lockKey, placeholder, err := m.reserveProfileLock(profile)
+	if err != nil {
+		return nil, err
+	}
+	releaseReservation := func() {
 		if lockKey == "" {
-			lockKey = profile.Storage.IsolationKey
-		}
-		if lockKey == "" {
-			return nil, fmt.Errorf("exclusive profile %q has no lock identity", profile.ID)
+			return
 		}
 		m.mu.Lock()
-		if owner, exists := m.locks[lockKey]; exists {
-			m.mu.Unlock()
-			return nil, fmt.Errorf("profile %q is locked by session %s", profile.ID, owner)
+		if m.locks[lockKey] == placeholder {
+			delete(m.locks, lockKey)
 		}
-		placeholder := "opening-" + newSessionID()
-		m.locks[lockKey] = placeholder
 		m.mu.Unlock()
-		defer func() {
-			if err != nil {
-				m.mu.Lock()
-				if m.locks[lockKey] == placeholder {
-					delete(m.locks, lockKey)
-				}
-				m.mu.Unlock()
-			}
-		}()
 	}
 
-	runtime, err := Launch(ctx, profile)
+	runtime, err := m.launcher(ctx, profile)
 	if err != nil {
+		releaseReservation()
 		return nil, err
 	}
 	page, err := runtime.OpenPage(ctx, request.URL)
 	if err != nil {
 		runtime.Close()
+		releaseReservation()
 		return nil, err
 	}
 
 	now := time.Now().UTC()
 	session := &ManagedSession{
-		ID: newSessionID(),
-		URL: request.URL,
-		CreatedAt: now,
-		LastUsed: now,
-		Selection: selection,
-		Profile: profile,
-		RuntimePID: runtime.PID,
-		runtime: runtime,
-		page: page,
-		lockKey: lockKey,
+		ID:         newSessionID(),
+		URL:        request.URL,
+		CreatedAt:  now,
+		LastUsed:   now,
+		Selection:  selection,
+		Profile:    profile,
+		RuntimePID: runtime.RuntimePID(),
+		runtime:    runtime,
+		page:       page,
+		lockKey:    lockKey,
 	}
 	if result, titleErr := page.Eval(`() => document.title`); titleErr == nil {
 		session.Title = result.Value.Str()
@@ -144,6 +144,27 @@ func (m *Manager) Open(ctx context.Context, request OpenRequest) (*ManagedSessio
 	}
 	m.mu.Unlock()
 	return session, nil
+}
+
+func (m *Manager) reserveProfileLock(profile ResolvedProfile) (lockKey, placeholder string, err error) {
+	if !profile.Storage.ExclusiveLock {
+		return "", "", nil
+	}
+	lockKey = profile.Launch.UserDataDir
+	if lockKey == "" {
+		lockKey = profile.Storage.IsolationKey
+	}
+	if lockKey == "" {
+		return "", "", fmt.Errorf("exclusive profile %q has no lock identity", profile.ID)
+	}
+	placeholder = "opening-" + newSessionID()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if owner, exists := m.locks[lockKey]; exists {
+		return "", "", fmt.Errorf("profile %q is locked by session %s", profile.ID, owner)
+	}
+	m.locks[lockKey] = placeholder
+	return lockKey, placeholder, nil
 }
 
 func (m *Manager) Get(id string) (*ManagedSession, bool) {
@@ -226,17 +247,17 @@ func (m *Manager) CloseAll() {
 
 func sessionSummary(session *ManagedSession) SessionSummary {
 	return SessionSummary{
-		ID: session.ID,
-		URL: session.URL,
-		Title: session.Title,
-		CreatedAt: session.CreatedAt,
-		LastUsed: session.LastUsed,
-		ProfileID: session.Profile.ID,
-		Mode: session.Profile.Mode,
-		Engine: session.Profile.Engine,
-		Digest: session.Profile.Digest,
-		RuntimePID: session.RuntimePID,
-		NetworkRoute: session.Profile.Network.Route,
+		ID:              session.ID,
+		URL:             session.URL,
+		Title:           session.Title,
+		CreatedAt:       session.CreatedAt,
+		LastUsed:        session.LastUsed,
+		ProfileID:       session.Profile.ID,
+		Mode:            session.Profile.Mode,
+		Engine:          session.Profile.Engine,
+		Digest:          session.Profile.Digest,
+		RuntimePID:      session.RuntimePID,
+		NetworkRoute:    session.Profile.Network.Route,
 		ChallengePolicy: session.Profile.Challenge.Policy,
 	}
 }
