@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'README.md'
+      - 'LICENSE-FAQ.md'
       - 'docs/**'
       - 'scripts/check-license-doc-consistency.py'
       - '.github/workflows/license-documentation-consistency.yml'
@@ -12,6 +13,7 @@ on:
     branches: [main]
     paths:
       - 'README.md'
+      - 'LICENSE-FAQ.md'
       - 'docs/**'
       - 'scripts/check-license-doc-consistency.py'
       - '.github/workflows/license-documentation-consistency.yml'
