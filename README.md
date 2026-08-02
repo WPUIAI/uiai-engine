@@ -163,6 +163,15 @@ Focusa and UIAI remain separate authorities:
 - protected worker/capsule direct/replay/copy/substitution/downgrade tests;
 - redaction and data-preserving expiry/uninstall.
 
+## Clearest benefits
+
+- Public sources become usable proof through Source-to-Markdown, stable evidence handles, and bounded diagnostics.
+- Search surfaces include `/api/search`, `uiai_search`, `browser_search`, `scripts/uiai-open-result.sh`, and a Wikipedia OpenSearch fallback; `/api/markdown` and `browser sessions/actions/diagnostics` are likewise bounded and auditable.
+- Browser sessions/actions/diagnostics remain separate from Focusa authority and are inspected with `browser_diagnostics`.
+- Source-to-Markdown returns `uiai.source_markdown.v1`, `source_to_markdown`, `wpuiai.research_card`, and bounded JSONL records where requested.
+- Diagnostics errors are available at `/api/errors` and through `uiai_errors`; the Focusa packet route is `/api/agent/research-packet`; `uiai_focusa_packet_compose` and `uiai_focusa_packet_build` produce proposal-only handoff packets.
+- Available repository skills include `.pi/skills/uiai-agent/SKILL.md`, `.pi/skills/uiai-focusa-packet/SKILL.md`, `.pi/skills/uiai-mcp/SKILL.md`, `.pi/skills/uiai-release/SKILL.md`, `.pi/skills/uiai-remote-auth/SKILL.md`, `.pi/skills/uiai-docs-maintenance/SKILL.md`, `.pi/skills/uiai-ci-debug/SKILL.md`, and `.pi/skills/uiai-browser-debug/SKILL.md`.
+
 ## Documentation map
 
 ### Licensing and endpoint authority

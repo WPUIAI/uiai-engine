@@ -133,7 +133,19 @@ Focusa ingestion must preserve exact project/Workpoint scope and independently v
 
 ## Packet parity status
 
-The browser research and diagnostics handoff is represented by `uiai.focusa_research_diagnostics_packet.v1`. The `POST /api/agent/research-packet` route and the Pi/extension `uiai_focusa_packet_build`/`uiai_focusa_packet_compose` surfaces preserve bounded evidence, redacted diagnostics, Focusa scope, and an exact next action. Packet intake remains advisory: it never grants UIAI entitlement or replaces Focusa Workpoint authority.
+The browser research and diagnostics handoff is represented by `uiai.focusa_research_diagnostics_packet.v1`. The `POST /api/agent/research-packet` route and the Pi/extension `uiai_focusa_packet_build`/`uiai_focusa_packet_compose` surfaces preserve bounded evidence, redacted diagnostics, Focusa scope, and an exact next action. Packet intake remains advisory: it never grants UIAI entitlement or replaces Focusa Workpoint authority. This is proposal-only evidence handoff.
+
+## Search and source workflows
+
+Search is available at `/api/search` and returns provider-scoped results; callers may pass `provider=\` when selecting a provider. The keyless public fallback/second provider is bounded and must preserve redaction and stable result handles. A provider-qualified request may use `provider="wikipedia"` when the Wikipedia OpenSearch fallback is selected.
+
+## Browser sessions and diagnostics
+
+The browser sessions/actions/diagnostics surface includes `/api/errors`, `uiai_errors`, and `browser_diagnostics`. CLI, Pi, and MCP callers should retain a bounded session diagnostics handle after uncertain or failed actions.
+
+## CLI, Pi, and MCP research packet
+
+The shared CLI/Pi/MCP surface uses the `research packet` and `session diagnostics` flows so callers can compose the same bounded packet without creating a second authority.
 
 ## FPV and shares
 
