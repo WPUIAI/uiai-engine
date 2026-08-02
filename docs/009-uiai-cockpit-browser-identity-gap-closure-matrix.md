@@ -1,10 +1,10 @@
 # UIAI Cockpit Browser Identity Gap-Closure Matrix
 
-**Document number:** `UIAI-COCKPIT-009`  
-**Status:** proposed normative gap-closure amendment v1.0  
-**Date:** 2026-08-02  
-**Repository:** `WPUIAI/uiai-engine`  
-**Primary parent:** `UIAI-COCKPIT-005`  
+**Document number:** `UIAI-COCKPIT-009`
+**Status:** proposed normative gap-closure amendment v1.0
+**Date:** 2026-08-02
+**Repository:** `WPUIAI/uiai-engine`
+**Primary parent:** `UIAI-COCKPIT-005`
 **Also amends:** `UIAI-COCKPIT-004`, `UIAI-COCKPIT-008`, `SESSION_API.md`, `BROWSER_DIAGNOSTICS_SPEC.md`, `CAPTCHA_SOLVER_SPEC.md`, and `FPV_REMAINING_GAPS_SPEC.md`
 
 ## 0. Decision
