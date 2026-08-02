@@ -138,6 +138,7 @@ Focusa and UIAI remain separate authorities:
 - Focusa supplies canonical project/Workpoint scope and may broker a child token from a valid bundle grant.
 - UIAI independently validates the `uiai-engine` product, feature, parent lease state, node, time, sequence, and limits.
 - UIAI results become Evidence proposals; UIAI does not become Focusa cognitive truth.
+- Research and diagnostics handoff uses `uiai.focusa_research_diagnostics_packet.v1`; `uiai_focusa_packet_build` and `uiai_focusa_packet_compose` preserve bounded packet metadata and the next Focusa action.
 - UIAI pressure/health can narrow execution but cannot create or expand entitlement.
 
 ## Security and recovery
