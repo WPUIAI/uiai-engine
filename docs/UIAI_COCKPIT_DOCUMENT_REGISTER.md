@@ -63,6 +63,7 @@ Rules:
 | `UIAI-COCKPIT-008-C04` | [`contracts/UIAI_COCKPIT_008_C04_CREDENTIAL_GRANT_SECRET_PROXY_USE_RECEIPT_v1.yaml`](contracts/UIAI_COCKPIT_008_C04_CREDENTIAL_GRANT_SECRET_PROXY_USE_RECEIPT_v1.yaml) | Machine-readable companion v1 | Focusa credential authority, UIAI secret custody, opaque proxy injection, origin/operation admission, standing grants, receipts, and secret-leak testing |
 | `UIAI-COCKPIT-008-C05` | [`contracts/UIAI_COCKPIT_008_C05_WORKFLOW_CONTEXT_EXECUTION_MANIFEST_v1.yaml`](contracts/UIAI_COCKPIT_008_C05_WORKFLOW_CONTEXT_EXECUTION_MANIFEST_v1.yaml) | Machine-readable companion v1 | One Focusa recurrence authority, frozen/refreshed/carried/prohibited context, UIAI execution manifests, preflight, retry, and settlement boundary |
 | `UIAI-COCKPIT-008-C06` | [`contracts/UIAI_COCKPIT_008_C06_FUNCTIONAL_UI_CROSS_GUI_VISUAL_PROOF_MATRIX_v1.yaml`](contracts/UIAI_COCKPIT_008_C06_FUNCTIONAL_UI_CROSS_GUI_VISUAL_PROOF_MATRIX_v1.yaml) | Machine-readable companion v1 | Exact Cockpit components, complete states, interactions, cross-GUI suites, Focusa Mission Canvas captures, accessibility, secret scans, manifests, and release gates |
+| `UIAI-COCKPIT-009` | [`009-uiai-cockpit-browser-identity-gap-closure-matrix.md`](009-uiai-cockpit-browser-identity-gap-closure-matrix.md) | Proposed normative gap-closure amendment v1.0 | Cross-spec browser identity, canonical session integration, operator persona, challenge, extraction, FPV security, evidence, test, and false-completion closure matrix |
 
 ## 3. Application order
 
