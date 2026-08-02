@@ -10,6 +10,8 @@ mod bonjour;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             bridge::focusa_start_bridge_callback,
             bridge::focusa_take_bridge_completion,

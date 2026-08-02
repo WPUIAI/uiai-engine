@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "UIAI Engine Cockpit desktop capabilities",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "process:default",
+    "updater:default"
+  ]
+}

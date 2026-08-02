@@ -1,80 +1,45 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { phase0Cards } from "$lib/cards/phase0-card-manifest";
+  import "$lib/ui/screen.css";
+  import { engineClient, engineUrl, type BrowserHealth, type BrowserSession, type EngineHealth } from "$lib/engine-client";
+
+  let health: EngineHealth | null = null;
+  let browserHealth: BrowserHealth | null = null;
+  let sessions: BrowserSession[] = [];
+  let loading = true;
+  let error = "";
+  let selectedCapability = "";
+  let showCapabilities = false;
+
+  async function refresh() {
+    error = "";
+    try { [health, browserHealth, sessions] = await Promise.all([engineClient.health(), engineClient.browserHealth(), engineClient.sessions()]); }
+    catch (cause) { error = cause instanceof Error ? cause.message : "The engine could not be reached."; }
+    finally { loading = false; }
+  }
+
+  onMount(() => { void refresh(); const timer = window.setInterval(() => void refresh(), 5000); return () => window.clearInterval(timer); });
 </script>
 
-<h1>UIAI Engine Cockpit</h1>
-<p class="muted">Backend-first shell (Slice 0). Phase 0 card manifest loaded into the navigator.</p>
+<svelte:head><title>Overview · UIAI Engine Cockpit</title></svelte:head>
+<div class="screen overview-screen">
+  <div class="screen-header"><div><p class="screen-kicker">Workspace</p><h1>Overview</h1><p class="screen-lede">Orient, act, inspect, configure, and diagnose from one place.</p></div><div class="screen-actions"><span class:success={health?.status === "healthy"} class="badge">{health ? health.status : "Checking engine"}</span><button class="screen-button" type="button" onclick={refresh} disabled={loading}>↻ Refresh</button></div></div>
 
-<section class="cards" aria-label="Phase 0 cards">
-  {#each phase0Cards as card}
-    <article class="card" data-card-id={card.card_id}>
-      <header>
-        <h3>{card.label}</h3>
-        <span class="badge" data-product={card.product_surface}>
-          {card.product_surface}
-        </span>
-      </header>
-      <p class="muted">
-        <code>{card.card_id}</code>
-        {#if card.contract_ref}
-          &nbsp;·&nbsp;contract&nbsp;
-          <code>{card.contract_ref}</code>
-        {:else}
-          &nbsp;·&nbsp;<em>{card.notes ?? "adapter_only"}</em>
-        {/if}
-      </p>
-    </article>
-  {/each}
-</section>
+  {#if error}<div class="error-banner" role="alert"><strong>Engine unavailable.</strong><span>{error}</span><button class="data-row-action" type="button" onclick={refresh}>Retry</button></div>{/if}
+
+  <section class="continue-card screen-card"><div class="continue-mark" aria-hidden="true">→</div><div class="continue-copy"><p class="screen-kicker">Continue</p><h2>{sessions.length ? "Resume live browser work" : "No Workpoint is connected"}</h2><p>{sessions.length ? `${sessions.length} live session${sessions.length === 1 ? "" : "s"} returned by the engine. Open Live runs to continue.` : "A Workpoint, project, or session will appear here once Focusa scope is connected. Nothing is invented while scope is missing."}</p></div><a class="screen-button primary" href={sessions.length ? "/runs" : "/settings"}>{sessions.length ? "Open live runs" : "Connect scope"} →</a></section>
+
+  <div class="section-heading"><div><h2>Active now</h2><p>Live state returned by the browser engine.</p></div><a class="text-button" href="/runs">View live runs →</a></div>
+  {#if loading && sessions.length === 0}<section class="empty-screen compact-empty"><div class="empty-mark loading-mark">◌</div><h2>Reading live state</h2><p>Connecting to {engineUrl()}.</p></section>{:else if sessions.length === 0}<section class="empty-screen compact-empty"><div class="empty-mark">◉</div><h2>All clear</h2><p>No browser sessions or running jobs are currently returned by the engine.</p></section>{:else}<section class="screen-card"><div class="data-list">{#each sessions.slice(0, 4) as session}<a class="data-row" href="/runs"><span class="activity-icon" data-tone="green">◉</span><span class="data-row-main"><strong>{session.title || session.url}</strong><span>{session.id} · {session.url}</span></span><span class="badge success">Live</span><span class="data-row-action">Open →</span></a>{/each}</div></section>{/if}
+
+  <div class="section-heading recent-heading"><div><h2>Recent work</h2><p>Durable history is supplied by the connected Workpoint scope.</p></div></div>
+  <section class="empty-screen compact-empty"><div class="empty-mark">↺</div><h2>No recent work in scope</h2><p>The engine does not expose a durable history here, so the Cockpit leaves this surface empty instead of inventing records.</p></section>
+
+  <div class="overview-columns"><section class="screen-card posture-card"><div class="section-heading"><div><h2>System posture</h2><p>Quiet status, details stay in the relevant screen.</p></div><a class="text-button" href="/settings">Configure →</a></div><div class="posture-line"><span class="posture-dot" class:healthy={health?.status === "healthy"}></span><strong>{health?.status === "healthy" ? "UIAI healthy" : health ? "UIAI needs attention" : "UIAI status unknown"}</strong><span>·</span><span>{browserHealth?.browser_alive ? "Browser available" : "Browser not available"}</span><span>·</span><span>{browserHealth?.active_pages ?? 0}/{browserHealth?.max_pages ?? 0} browser pages</span><span>·</span><span>Local Only</span></div></section>
+    <section class="screen-card capability-card"><div class="section-heading"><div><h2>Available capabilities</h2><p>From the versioned Cockpit manifest.</p></div><button class="text-button" type="button" onclick={() => (showCapabilities = !showCapabilities)}>{showCapabilities ? "Hide" : "Inspect"} →</button></div>{#if showCapabilities}<div class="capability-list">{#each phase0Cards as card}<button class:selected={selectedCapability === card.card_id} type="button" onclick={() => (selectedCapability = card.card_id)}><strong>{card.label}</strong><span>{card.product_surface.replaceAll("_", " ")}</span></button>{/each}</div>{:else}<p class="capability-summary">{phase0Cards.length} manifest entries available. Inspect to see the current generated surface.</p>{/if}{#if selectedCapability}<div class="capability-detail" aria-live="polite">Selected capability: <strong>{selectedCapability}</strong></div>{/if}</section></div>
+</div>
 
 <style>
-  h1 {
-    font-size: 28px;
-    line-height: 32px;
-    font-weight: 700;
-    margin: 0 0 var(--space-4);
-  }
-  .muted { color: var(--color-text-muted); }
-  code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    padding: 1px 4px;
-    background: var(--color-surface);
-    border-radius: 4px;
-  }
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--space-3);
-    margin-top: var(--space-4);
-  }
-  .card {
-    padding: var(--space-4);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-  }
-  .card header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-2);
-  }
-  .card h3 {
-    margin: 0;
-    font-size: 16px;
-    line-height: 22px;
-  }
-  .badge {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: var(--radius-pill);
-    background: var(--color-surface-elevated);
-    border: 1px solid var(--color-border);
-  }
-  .badge[data-product="focusa_local"] { border-color: var(--color-success); color: var(--color-success); }
-  .badge[data-product="focusa_cloud"] { border-color: var(--color-warn); color: var(--color-warn); }
-  .badge[data-product="ai_api"] { border-color: var(--color-accent); color: var(--color-accent); }
-  .badge[data-product="uiai_engine"] { border-color: var(--color-text-muted); }
+  .overview-screen .screen-header { margin-bottom: 24px; } .recent-heading { margin-top: 30px; } .continue-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18px; padding: 22px; margin-bottom: 32px; border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border)); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-elevated)), var(--color-surface-elevated)); } .continue-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 12%, transparent); font-size: 21px; } .continue-copy h2 { margin: 0; font-size: 20px; letter-spacing: -.035em; } .continue-copy p:last-child { max-width: 600px; margin: 7px 0 0; color: var(--color-text-muted); font-size: 13px; line-height: 19px; } .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 14px; margin-bottom: 12px; } .section-heading h2 { margin: 0; font-size: 17px; } .section-heading p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 12px; } .text-button { border: 0; color: var(--color-accent); background: transparent; font: inherit; font-size: 12px; cursor: pointer; text-decoration: none; } .text-button:hover { text-decoration: underline; } .compact-empty { min-height: 150px; margin-bottom: 30px; } .overview-columns { display: grid; grid-template-columns: 1.2fr .8fr; gap: 14px; margin-top: 30px; } .posture-card, .capability-card { padding: 18px; } .posture-line { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 20px; color: var(--color-text-muted); font-size: 12px; } .posture-line strong { color: var(--color-text); } .posture-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warn); } .posture-dot.healthy { background: var(--color-success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-success) 14%, transparent); } .capability-summary { margin: 20px 0 0; } .capability-list { display: grid; gap: 1px; margin: 17px -18px -18px; border-top: 1px solid var(--color-border); background: var(--color-border); } .capability-list button { display: grid; gap: 4px; padding: 12px 18px; border: 0; color: var(--color-text); background: var(--color-surface-elevated); font: inherit; text-align: left; cursor: pointer; } .capability-list button:hover, .capability-list button.selected { background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-elevated)); } .capability-list span { color: var(--color-text-muted); font-size: 11px; text-transform: capitalize; } .capability-detail { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 11px; } .capability-detail strong { color: var(--color-text); } .error-banner { display: flex; align-items: center; gap: 10px; margin: -8px 0 18px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--color-error) 25%, var(--color-border)); border-radius: 9px; color: var(--color-error); background: color-mix(in srgb, var(--color-error) 7%, transparent); font-size: 12px; } .error-banner span { color: var(--color-text-muted); } .error-banner .data-row-action { margin-left: auto; } .loading-mark { animation: loading-breathe 1.2s ease-in-out infinite; } @keyframes loading-breathe { 50% { opacity: .35; transform: rotate(90deg); } } @media (prefers-reduced-motion: reduce) { .loading-mark { animation: none; } } @media (max-width: 760px) { .continue-card { grid-template-columns: auto 1fr; } .continue-card .screen-button { grid-column: 2; justify-self: start; } .overview-columns { grid-template-columns: 1fr; } }
 </style>

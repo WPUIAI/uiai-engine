@@ -16,6 +16,23 @@
   --motion-slow: 360ms;
   --easing-standard: cubic-bezier(0.2, 0.0, 0, 1);
 
+  /* Sidebar */
+  --sidebar-width-expanded: 240px;
+  --sidebar-width-min: 208px;
+  --sidebar-width-max: 320px;
+  --sidebar-width-compact: 64px;
+  --sidebar-row-height: 32px;
+  --sidebar-row-height-compact-density: 28px;
+  --sidebar-active-bar-width: 2px;
+  --sidebar-surface: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  --sidebar-hover-surface: color-mix(in srgb, var(--color-surface-elevated) 70%, transparent);
+  --sidebar-selected-surface: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface-elevated));
+  --sidebar-drop-target-surface: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface-elevated));
+  --sidebar-divider: var(--color-border);
+  --sidebar-resize-handle: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  --sidebar-drag-elevation: var(--shadow-popover);
+  --sidebar-transition: var(--motion-normal) var(--easing-standard);
+
   /* Spacing */
   --space-1: 4px;
   --space-2: 8px;
