@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
   "productName": "UIAI Engine Cockpit",
-  "version": "0.1.0-dev",
+  "version": "0.1.11-dev",
   "identifier": "com.wpuiai.uiaiengine.cockpit",
   "build": {
     "frontendDist": "../build",
