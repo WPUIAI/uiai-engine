@@ -4,6 +4,7 @@ build/
 src-tauri/target/
 src-tauri/gen/
 *.log
+*.timestamp-*.mjs
 .DS_Store
 smoke-report.json
 release-proof/
