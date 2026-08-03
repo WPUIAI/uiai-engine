@@ -1,7 +1,13 @@
-.PHONY: test fpv-assets fpv-visual-smoke fpv-visual-baselines browser-stress browser-soak browser-reliability release-browser-reliability
+.PHONY: test desktop-contract-parity fpv-assets fpv-visual-smoke fpv-visual-baselines browser-stress browser-soak browser-reliability release-browser-reliability
 
 test:
 	go test ./...
+
+desktop-contract-parity:
+	python3 scripts/check-desktop-contract-parity.py
+	go test ./internal/desktopcontract -count=1
+	npm --prefix apps/cockpit test -- tests/unit/desktop-presentation-contract.test.ts
+	cargo test --manifest-path tools/desktop-contract-check/Cargo.toml
 
 fpv-assets:
 	scripts/build-fpv-assets.sh

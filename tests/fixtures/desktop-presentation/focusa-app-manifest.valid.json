@@ -1,0 +1,18 @@
+{
+  "schema": "focusa.app.manifest.v2",
+  "app": "focusa-menubar",
+  "version": "0.9.112-dev",
+  "channel": "dev",
+  "protocols": {
+    "focusa_deep_link": "1",
+    "cockpit_deep_link": "1",
+    "desktop_presentation": "1",
+    "fpv": "1"
+  },
+  "capabilities": [
+    "mission.open",
+    "workpoint.open",
+    "cockpit.open",
+    "session.present"
+  ]
+}
