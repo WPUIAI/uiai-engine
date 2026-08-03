@@ -5,8 +5,7 @@ import { defineConfig } from "vite";
  *
  *  Port 1420 matches `tauri.conf.json` `devUrl`.
  */
-const allowedHostSetting = process.env.VITE_ALLOWED_HOSTS || "";
-const allowedHosts = allowedHostSetting === "*" ? true : allowedHostSetting.split(",").map((host) => host.trim()).filter(Boolean);
+const allowedHosts = (process.env.VITE_ALLOWED_HOSTS || "").split(",").map((host) => host.trim()).filter(Boolean);
 
 export default defineConfig({
   plugins: [sveltekit()],
