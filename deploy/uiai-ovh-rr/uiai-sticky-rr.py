@@ -13,6 +13,7 @@ STATE_PATH = os.environ.get("UIAI_RR_STATE", "/var/lib/uiai-ovh-rr/affinity.json
 SESSION_TARGET = {}
 SHARE_TARGET = {}
 SESSION_LOCK = threading.Lock()
+STATE_LOCK = threading.Lock()
 CREATE_COUNTER = 0
 
 
@@ -31,16 +32,18 @@ def load_affinity():
 
 
 def save_affinity():
-    state = {"sessions": SESSION_TARGET, "shares": SHARE_TARGET}
+    with SESSION_LOCK:
+        state = {"sessions": dict(SESSION_TARGET), "shares": dict(SHARE_TARGET)}
     directory = os.path.dirname(STATE_PATH)
     try:
         os.makedirs(directory, mode=0o700, exist_ok=True)
-        temporary = STATE_PATH + ".tmp"
-        with open(temporary, "w", encoding="utf-8") as stream:
-            json.dump(state, stream, sort_keys=True)
-            stream.write("\n")
-        os.chmod(temporary, 0o600)
-        os.replace(temporary, STATE_PATH)
+        temporary = f"{STATE_PATH}.{os.getpid()}.tmp"
+        with STATE_LOCK:
+            with open(temporary, "w", encoding="utf-8") as stream:
+                json.dump(state, stream, sort_keys=True)
+                stream.write("\n")
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, STATE_PATH)
     except OSError:
         # Affinity remains functional for the current process if persistence is unavailable.
         pass
