@@ -9,12 +9,13 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "npm run test && npm run cockpit:smoke -- --mode local-only --mock-external && vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri",
     "test": "vitest run",
-    "cockpit:smoke": "tsx smoke/smoke-runner.ts"
+    "cockpit:smoke": "tsx smoke/smoke-runner.ts",
+    "cockpit:gate": "npm run check && npm run build"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",
