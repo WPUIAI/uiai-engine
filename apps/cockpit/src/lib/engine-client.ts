@@ -17,6 +17,10 @@ export function engineUrl(): string {
   return window.localStorage.getItem("uiai.engine.url") || DEFAULT_ENGINE_URL;
 }
 
+export function selectEngineUrl(baseUrl: string): void {
+  if (typeof window !== "undefined") window.localStorage.setItem("uiai.engine.url", baseUrl.replace(/\/$/, ""));
+}
+
 export function savedScope(): { project_root?: string; continuity_id?: string; workpoint_id?: string } {
   if (typeof window === "undefined") return {};
   return { project_root: window.localStorage.getItem("uiai.scope.project_root") || undefined, continuity_id: window.localStorage.getItem("uiai.scope.continuity_id") || undefined, workpoint_id: window.localStorage.getItem("uiai.scope.workpoint_id") || undefined };

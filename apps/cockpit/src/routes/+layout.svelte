@@ -3,7 +3,8 @@
   import "../lib/ui/design-tokens.css";
   import "../lib/ui/sidebar-primitives.css";
   import { installCockpitDeepLinkRouting } from "$lib/desktop-deep-link";
-  import { engineClient, savedScope } from "$lib/engine-client";
+  import { discoverEngines, selectBestEngine } from "$lib/engine-discovery";
+  import { engineClient, savedScope, selectEngineUrl } from "$lib/engine-client";
   import { discoverFocusaDaemons, focusaDaemonSummary, readSavedFocusaDaemonHints, saveFocusaDaemonHints, type FocusaDaemonConnection } from "$lib/focusa-daemon-discovery";
   import { projectBindingRequiresReconciliation, readFocusaProjectBindings, rememberFocusaProjectBinding, selectFocusaProjectBinding, verifyFocusaProject, type FocusaProjectBinding } from "$lib/focusa-projects";
   import { phase0Cards } from "$lib/cards/phase0-card-manifest";
@@ -113,14 +114,16 @@
     const completionToastTimer = window.setTimeout(reportCompletedCockpitUpdate, 250);
     const stop = startAutomaticCockpitUpdate((result) => (update = result));
     const refreshEngineStatus = () => void engineClient.health().then((result) => (engineStatus = result.status)).catch(() => (engineStatus = "unavailable"));
-    refreshEngineStatus();
+    const refreshEngineDiscovery = () => void discoverEngines().then((connections) => { const selected = selectBestEngine(connections); if (selected) { selectEngineUrl(selected.baseUrl); engineStatus = "healthy"; } else engineStatus = "unavailable"; });
+    refreshEngineDiscovery();
     const engineTimer = window.setInterval(refreshEngineStatus, 5000);
+    const engineDiscoveryTimer = window.setInterval(refreshEngineDiscovery, 15_000);
     const refreshFocusaDaemons = () => void discoverFocusaDaemons().then((connections) => { focusaConnections = connections; if (!selectedDaemonBaseUrl) selectedDaemonBaseUrl = connections.find((item) => item.status === "connected" && item.location === "local")?.baseUrl || connections.find((item) => item.status === "connected")?.baseUrl || ""; });
     refreshFocusaDaemons();
     const focusaTimer = window.setInterval(refreshFocusaDaemons, 10_000);
     let stopDeepLinkRouting: () => void = () => {};
     void installCockpitDeepLinkRouting(navigateTo).then((stopRouting) => (stopDeepLinkRouting = stopRouting));
-    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("resize", updateViewport); window.removeEventListener("uiai:workpoint-resume", onResumeContract); window.removeEventListener("uiai:entitlement-state", onEntitlementContract); window.clearTimeout(completionToastTimer); window.clearInterval(engineTimer); window.clearInterval(focusaTimer); stopDeepLinkRouting(); stop(); };
+    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("resize", updateViewport); window.removeEventListener("uiai:workpoint-resume", onResumeContract); window.removeEventListener("uiai:entitlement-state", onEntitlementContract); window.clearTimeout(completionToastTimer); window.clearInterval(engineTimer); window.clearInterval(engineDiscoveryTimer); window.clearInterval(focusaTimer); stopDeepLinkRouting(); stop(); };
   });
 
   function persist(next: SidebarPreferencesV1) { preferences = next; saveSidebarPreferences(next); }
