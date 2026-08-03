@@ -9,6 +9,7 @@ mod bonjour;
 mod bridge;
 // Contract types are bound by T004-04; keep the strict release gate green while the scaffold is intentionally ahead of its presenter.
 mod deep_link;
+mod desktop_handoff;
 #[allow(dead_code)]
 mod desktop_contract;
 
@@ -29,6 +30,7 @@ fn main() {
             bridge::focusa_clear_bridge,
             bonjour::focusa_discover_via_bonjour,
             deep_link::cockpit_take_deep_link,
+            desktop_handoff::cockpit_open_focusa_handoff,
         ])
         .manage(deep_link::PendingDeepLink::default())
         .setup(|app| {

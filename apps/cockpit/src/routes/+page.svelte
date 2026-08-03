@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import "$lib/ui/screen.css";
+  import { openInFocusa } from "$lib/controllers/desktop-handoff-controller";
   import { engineClient, engineUrl, type BrowserHealth, type BrowserSession, type EngineHealth } from "$lib/engine-client";
   import { parseCockpitWorkpointResume, workpointResumeFromHost, type CockpitWorkpointResume } from "$lib/contracts/workpoint-resume";
 
@@ -10,6 +11,13 @@
   let resumeState: CockpitWorkpointResume | null = null;
   let loading = true;
   let error = "";
+  let handoffMessage = "";
+
+  async function handoffWorkpoint() {
+    if (!resumable) return;
+    const receipt = await openInFocusa("workpoint", resumable.workpoint_id);
+    handoffMessage = receipt.status === "opened" || receipt.status === "focused" ? "Opened in Focusa." : "Focusa Menubar is unavailable; Cockpit retained the read-only Workpoint context.";
+  }
 
   async function refresh() {
     error = "";
@@ -97,8 +105,9 @@
         </dl>
       {/if}
     </div>
-    <a class="screen-button primary" href={continueHref}>{continueAction} →</a>
+    <div class="continue-actions">{#if resumable}<button class="screen-button" type="button" onclick={handoffWorkpoint}>Open in Focusa</button>{/if}<a class="screen-button primary" href={continueHref}>{continueAction} →</a></div>
   </section>
+  {#if handoffMessage}<p class="handoff-message" role="status">{handoffMessage}</p>{/if}
 
   {#if blockedResume}
     <section class="screen-card recovery-card" aria-labelledby="resume-recovery-heading">
@@ -178,6 +187,7 @@
   .mission-fields div { display: grid; gap: 2px; }
   .mission-fields dt { color: var(--color-text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
   .mission-fields dd { margin: 0; font-size: 0.78rem; overflow-wrap: anywhere; }
+  .continue-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; } .handoff-message { margin: -10px 0 18px; color: var(--color-text-muted); font-size: 11px; text-align: right; }
   .recovery-card { justify-content: space-between; border-color: var(--warning-line, #f2c94c); }
   .posture-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
   .posture-card { display: grid; gap: 4px; padding: 13px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-elevated); }
