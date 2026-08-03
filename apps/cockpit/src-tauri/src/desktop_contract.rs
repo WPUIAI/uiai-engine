@@ -274,16 +274,17 @@ pub fn validate_presentation_request(value: &DesktopPresentationRequest) -> Resu
         ) {
             return Err("unsupported scope authority_state".into());
         }
-        for optional in [
+        for current in [
             &scope.project_root_key,
             &scope.workstream_key,
             &scope.continuity_id,
             &scope.thread_id,
             &scope.session_id,
-        ] {
-            if let Some(current) = optional {
-                validate_opaque_ref(current)?;
-            }
+        ]
+        .into_iter()
+        .flatten()
+        {
+            validate_opaque_ref(current)?;
         }
     }
     Ok(())
