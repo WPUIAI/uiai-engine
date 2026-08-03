@@ -4,9 +4,18 @@ on:
   push:
     tags:
       - 'cockpit-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing immutable cockpit-v* tag to release
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   rust-check:
@@ -15,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
       - name: Install system deps
         run: |
@@ -46,12 +56,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
 
       - name: Generate release notes
         id: notes
         run: |
-          TAG="${{ github.ref_name }}"
+          TAG="$RELEASE_TAG"
           PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1 || echo "")
           if [ -n "$PREV_TAG" ]; then
             COMMITS=$(git log --oneline "${PREV_TAG}..${TAG}" --no-merges | head -40)
@@ -78,8 +89,8 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: UIAI Engine Cockpit ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: UIAI Engine Cockpit ${{ env.RELEASE_TAG }}
           body_path: /tmp/release-notes.md
           draft: false
           prerelease: false
@@ -99,6 +110,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
 
       - name: Install system deps (Linux)
@@ -126,7 +138,7 @@ jobs:
       - name: Build no-bundle tauri binary
         working-directory: apps/cockpit
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
           ARTIFACT_NAME: ${{ matrix.artifact_name }}
         run: |
           set -euo pipefail
@@ -154,13 +166,13 @@ jobs:
 
           ART_DIR="/tmp/release-artifacts"
           mkdir -p "$ART_DIR"
-          cp "$BIN" "$ART_DIR/uaiengine-cockpit-${{ github.ref_name }}-${ARTIFACT_NAME}.bin"
-          shasum -a 256 "$ART_DIR/uaiengine-cockpit-${{ github.ref_name }}-${ARTIFACT_NAME}.bin" \
-            > "$ART_DIR/uaiengine-cockpit-${{ github.ref_name }}-${ARTIFACT_NAME}.bin.sha256"
+          cp "$BIN" "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${ARTIFACT_NAME}.bin"
+          shasum -a 256 "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${ARTIFACT_NAME}.bin" \
+            > "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${ARTIFACT_NAME}.bin.sha256"
 
       - name: Upload artifacts to release
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "$TAG" /tmp/release-artifacts/* --clobber
@@ -170,13 +182,14 @@ jobs:
     needs: create-release
     runs-on: macos-15-intel
     env:
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ env.RELEASE_TAG }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       UPDATER_ASSET_BASE_URL: https://github.com/${{ github.repository }}/releases/download/cockpit-latest
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
