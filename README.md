@@ -183,6 +183,12 @@ Focusa and UIAI remain separate authorities:
 - [`docs/REMOTE_AUTH_EXAMPLES.md`](docs/REMOTE_AUTH_EXAMPLES.md) — current authentication examples, not entitlement proof
 - [`docs/SESSION_API.md`](docs/SESSION_API.md) — current API plus migration warning
 
+### Cockpit and desktop architecture
+
+- [`docs/UIAI_COCKPIT_DOCUMENT_REGISTER.md`](docs/UIAI_COCKPIT_DOCUMENT_REGISTER.md) — numbered Cockpit master, decisions, amendments, and companions
+- [`docs/UIAI_COCKPIT_004_DESKTOP_SESSION_PRESENTATION_AND_MENUBAR_HANDOFF_SPEC_2026-08-03_v1.0.md`](docs/UIAI_COCKPIT_004_DESKTOP_SESSION_PRESENTATION_AND_MENUBAR_HANDOFF_SPEC_2026-08-03_v1.0.md) — packaged runtime, same-session Cockpit presentation, and Focusa Menubar handoff
+- [`docs/contracts/UIAI_COCKPIT_004_C01_DESKTOP_SESSION_PRESENTATION_HANDOFF_LEDGER_v1.yaml`](docs/contracts/UIAI_COCKPIT_004_C01_DESKTOP_SESSION_PRESENTATION_HANDOFF_LEDGER_v1.yaml) — stable requirements, task graph, metrics, and proof contract
+
 ### Agent/browser operation
 
 - [`docs/UIAI_FOR_AGENTS_QUICKSTART.md`](docs/UIAI_FOR_AGENTS_QUICKSTART.md)

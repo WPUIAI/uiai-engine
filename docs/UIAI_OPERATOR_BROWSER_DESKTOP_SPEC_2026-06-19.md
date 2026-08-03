@@ -2,6 +2,7 @@
 
 **Status:** Draft / intended to be edited in place  
 **Audience:** UIAI Engine, Focusa, Focusa Cloud, and AI API product/engineering work  
+**Normative refinement:** [`UIAI-COCKPIT-004`](UIAI_COCKPIT_004_DESKTOP_SESSION_PRESENTATION_AND_MENUBAR_HANDOFF_SPEC_2026-08-03_v1.0.md) governs packaged browser runtime, same-session Cockpit presentation, and Cockpit ↔ Focusa Menubar handoff. Section 17 remains the detailed connection-plane basis where Amendment 004 does not refine it.
 **Related docs:**
 - `docs/UIAI_AGENT_FPV_COPILOT_SPEC_2026-06-09.md`
 - `docs/UIAI_AGENT_FPV_PWA_SPEC_2026-06-09.md`

@@ -162,6 +162,14 @@ Session creation may return an FPV share in the current code. Final production b
 
 A viewer may remain public by possession of a narrowly scoped token. Control is never implied by view access.
 
+## Planned desktop presentation and app handoff
+
+[`UIAI-COCKPIT-004`](UIAI_COCKPIT_004_DESKTOP_SESSION_PRESENTATION_AND_MENUBAR_HANDOFF_SPEC_2026-08-03_v1.0.md) governs the planned desktop-presentation API. It is not implemented by the current routes yet.
+
+The planned `POST /api/session/{session_id}/present` operation requests that the single Cockpit desktop shell launch or focus and attach to the existing canonical Engine session through FPV. It does not create a second browser session or authorize takeover. `focusa://` remains owned by Focusa Menubar, `cockpit://` remains owned by Cockpit, and both schemes carry opaque handoff refs rather than tokens, raw project paths, private URLs, or page data.
+
+Implementation status and dependency order are tracked under `uiai-engine-roadmap.12` and `T004-00..T004-12` in the local Beads graph.
+
 ## CLI, Pi, and MCP
 
 `scripts/uiai`, the Pi extension, and MCP bridge are caller surfaces. They must all:
