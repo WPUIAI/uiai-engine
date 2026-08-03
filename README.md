@@ -35,6 +35,10 @@ Authentication and entitlement are separate:
 
 Selected commercially valuable implementations may move behind privately built signed workers or encrypted feature capsules. Patching a public middleware return value must not create a missing protected worker, node-bound content key, operation token, or official update.
 
+## Portable Cockpit preview
+
+For a short-lived read-only visual fallback, run `apps/cockpit/scripts/preview-share.sh` on a machine with Node/npm and `cloudflared`. It prints a disposable HTTPS preview URL and does not create an FPV share. Engine-backed actions require a reachable UIAI Engine configured in Cockpit Settings; remote users should use a protected Tailscale or named HTTPS route rather than exposing loopback directly.
+
 ## Current runtime architecture
 
 - Go server with Chi router.
