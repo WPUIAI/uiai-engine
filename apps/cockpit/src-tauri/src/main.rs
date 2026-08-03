@@ -7,6 +7,8 @@
 
 mod bonjour;
 mod bridge;
+// Contract types are bound by T004-04; keep the strict release gate green while the scaffold is intentionally ahead of its presenter.
+#[allow(dead_code)]
 mod desktop_contract;
 
 fn main() {
