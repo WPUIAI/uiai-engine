@@ -1,45 +1,193 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { phase0Cards } from "$lib/cards/phase0-card-manifest";
   import "$lib/ui/screen.css";
   import { engineClient, engineUrl, type BrowserHealth, type BrowserSession, type EngineHealth } from "$lib/engine-client";
+  import { parseCockpitWorkpointResume, workpointResumeFromHost, type CockpitWorkpointResume } from "$lib/contracts/workpoint-resume";
 
   let health: EngineHealth | null = null;
   let browserHealth: BrowserHealth | null = null;
   let sessions: BrowserSession[] = [];
+  let resumeState: CockpitWorkpointResume | null = null;
   let loading = true;
   let error = "";
-  let selectedCapability = "";
-  let showCapabilities = false;
 
   async function refresh() {
     error = "";
-    try { [health, browserHealth, sessions] = await Promise.all([engineClient.health(), engineClient.browserHealth(), engineClient.sessions()]); }
-    catch (cause) { error = cause instanceof Error ? cause.message : "The engine could not be reached."; }
-    finally { loading = false; }
+    try {
+      [health, browserHealth, sessions] = await Promise.all([
+        engineClient.health(),
+        engineClient.browserHealth(),
+        engineClient.sessions(),
+      ]);
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : "The engine could not be reached.";
+    } finally {
+      loading = false;
+    }
   }
 
-  onMount(() => { void refresh(); const timer = window.setInterval(() => void refresh(), 5000); return () => window.clearInterval(timer); });
+  onMount(() => {
+    resumeState = workpointResumeFromHost();
+    const onResumeContract = (event: Event) => {
+      try {
+        resumeState = parseCockpitWorkpointResume((event as CustomEvent<unknown>).detail);
+      } catch {
+        resumeState = null;
+      }
+    };
+    window.addEventListener("uiai:workpoint-resume", onResumeContract);
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 8000);
+    return () => {
+      window.removeEventListener("uiai:workpoint-resume", onResumeContract);
+      window.clearInterval(timer);
+    };
+  });
+
+  $: resumable = resumeState?.status === "resumable" ? resumeState : null;
+  $: blockedResume = resumeState?.status === "blocked" ? resumeState : null;
+  $: continueTitle = resumable
+    ? resumable.label
+    : sessions.length
+      ? "Continue live browser work"
+      : "No Workpoint is connected";
+  $: continueText = resumable
+    ? "Canonical Focusa resume state is available for this Workpoint."
+    : sessions.length
+      ? `${sessions.length} live session${sessions.length === 1 ? " is" : "s are"} returned by the engine.`
+      : "A canonical Workpoint or live session will appear here when its owning adapter supplies real state.";
+  $: continueHref = resumable?.target.href || (sessions.length ? "/runs" : "/settings?section=scope");
+  $: continueAction = resumable ? "Resume Workpoint" : sessions.length ? "Open Live runs" : "Connect scope";
 </script>
 
 <svelte:head><title>Overview · UIAI Engine Cockpit</title></svelte:head>
+
 <div class="screen overview-screen">
-  <div class="screen-header"><div><p class="screen-kicker">Workspace</p><h1>Overview</h1><p class="screen-lede">Orient, act, inspect, configure, and diagnose from one place.</p></div><div class="screen-actions"><span class:success={health?.status === "healthy"} class="badge">{health ? health.status : "Checking engine"}</span><button class="screen-button" type="button" onclick={refresh} disabled={loading}>↻ Refresh</button></div></div>
+  <div class="screen-header">
+    <div>
+      <p class="screen-kicker">Workspace</p>
+      <h1>Overview</h1>
+      <p class="screen-lede">Continue current work, inspect live activity, and recover from truthful system state.</p>
+    </div>
+    <div class="screen-actions">
+      <span class:success={health?.status === "healthy"} class="badge">{health ? health.status : "Checking engine"}</span>
+      <button class="screen-button" type="button" onclick={refresh} disabled={loading}>↻ Refresh</button>
+    </div>
+  </div>
 
-  {#if error}<div class="error-banner" role="alert"><strong>Engine unavailable.</strong><span>{error}</span><button class="data-row-action" type="button" onclick={refresh}>Retry</button></div>{/if}
+  {#if error}
+    <div class="error-banner" role="alert">
+      <strong>Engine unavailable.</strong>
+      <span>{error}</span>
+      <button class="data-row-action" type="button" onclick={refresh}>Retry</button>
+    </div>
+  {/if}
 
-  <section class="continue-card screen-card"><div class="continue-mark" aria-hidden="true">→</div><div class="continue-copy"><p class="screen-kicker">Continue</p><h2>{sessions.length ? "Resume live browser work" : "No Workpoint is connected"}</h2><p>{sessions.length ? `${sessions.length} live session${sessions.length === 1 ? "" : "s"} returned by the engine. Open Live runs to continue.` : "A Workpoint, project, or session will appear here once Focusa scope is connected. Nothing is invented while scope is missing."}</p></div><a class="screen-button primary" href={sessions.length ? "/runs" : "/settings"}>{sessions.length ? "Open live runs" : "Connect scope"} →</a></section>
+  <section class="continue-card screen-card" aria-labelledby="continue-heading">
+    <div class="continue-mark" aria-hidden="true">→</div>
+    <div class="continue-copy">
+      <p class="screen-kicker">Continue</p>
+      <h2 id="continue-heading">{continueTitle}</h2>
+      <p>{continueText}</p>
+      {#if resumable}
+        <dl class="mission-fields" aria-label="Mission Deck Workpoint fields">
+          <div><dt>Workpoint</dt><dd>{resumable.workpoint_id}</dd></div>
+          <div><dt>Authority</dt><dd>Canonical Focusa resume</dd></div>
+          <div><dt>Destination</dt><dd>{resumable.target.workspace_id}</dd></div>
+        </dl>
+      {/if}
+    </div>
+    <a class="screen-button primary" href={continueHref}>{continueAction} →</a>
+  </section>
 
-  <div class="section-heading"><div><h2>Active now</h2><p>Live state returned by the browser engine.</p></div><a class="text-button" href="/runs">View live runs →</a></div>
-  {#if loading && sessions.length === 0}<section class="empty-screen compact-empty"><div class="empty-mark loading-mark">◌</div><h2>Reading live state</h2><p>Connecting to {engineUrl()}.</p></section>{:else if sessions.length === 0}<section class="empty-screen compact-empty"><div class="empty-mark">◉</div><h2>All clear</h2><p>No browser sessions or running jobs are currently returned by the engine.</p></section>{:else}<section class="screen-card"><div class="data-list">{#each sessions.slice(0, 4) as session}<a class="data-row" href="/runs"><span class="activity-icon" data-tone="green">◉</span><span class="data-row-main"><strong>{session.title || session.url}</strong><span>{session.id} · {session.url}</span></span><span class="badge success">Live</span><span class="data-row-action">Open →</span></a>{/each}</div></section>{/if}
+  {#if blockedResume}
+    <section class="screen-card recovery-card" aria-labelledby="resume-recovery-heading">
+      <div>
+        <p class="screen-kicker">Resume recovery</p>
+        <h2 id="resume-recovery-heading">Workpoint cannot be resumed yet</h2>
+        <p>{blockedResume.recovery.message}</p>
+      </div>
+      <a class="screen-button" href={blockedResume.recovery.href}>{blockedResume.recovery.action_label} →</a>
+    </section>
+  {/if}
 
-  <div class="section-heading recent-heading"><div><h2>Recent work</h2><p>Durable history is supplied by the connected Workpoint scope.</p></div></div>
-  <section class="empty-screen compact-empty"><div class="empty-mark">↺</div><h2>No recent work in scope</h2><p>The engine does not expose a durable history here, so the Cockpit leaves this surface empty instead of inventing records.</p></section>
+  <section class="screen-section" aria-labelledby="active-now-heading">
+    <div class="section-heading">
+      <div><p class="screen-kicker">Active now</p><h2 id="active-now-heading">Live engine state</h2></div>
+      <a href="/runs">View live runs →</a>
+    </div>
+    <div class="data-list">
+      {#if loading}
+        <div class="empty-state compact"><span>◌</span><div><strong>Reading live state</strong><p>Connecting to {engineUrl()}.</p></div></div>
+      {:else if sessions.length === 0}
+        <div class="empty-state compact"><span>◉</span><div><strong>All clear</strong><p>No browser sessions or running jobs are currently returned by the engine.</p></div></div>
+      {:else}
+        {#each sessions.slice(0, 4) as session}
+          <div class="data-row">
+            <span class="session-orb">◉</span>
+            <div class="data-row-copy"><strong>{session.title || "Untitled browser session"}</strong><span>{session.url || "No URL"} · {session.width || "?"}×{session.height || "?"}</span></div>
+            <span class="badge">Live</span><a class="data-row-action" href="/runs">Open →</a>
+          </div>
+        {/each}
+      {/if}
+    </div>
+  </section>
 
-  <div class="overview-columns"><section class="screen-card posture-card"><div class="section-heading"><div><h2>System posture</h2><p>Quiet status, details stay in the relevant screen.</p></div><a class="text-button" href="/settings">Configure →</a></div><div class="posture-line"><span class="posture-dot" class:healthy={health?.status === "healthy"}></span><strong>{health?.status === "healthy" ? "UIAI healthy" : health ? "UIAI needs attention" : "UIAI status unknown"}</strong><span>·</span><span>{browserHealth?.browser_alive ? "Browser available" : "Browser not available"}</span><span>·</span><span>{browserHealth?.active_pages ?? 0}/{browserHealth?.max_pages ?? 0} browser pages</span><span>·</span><span>Local Only</span></div></section>
-    <section class="screen-card capability-card"><div class="section-heading"><div><h2>Available capabilities</h2><p>From the versioned Cockpit manifest.</p></div><button class="text-button" type="button" onclick={() => (showCapabilities = !showCapabilities)}>{showCapabilities ? "Hide" : "Inspect"} →</button></div>{#if showCapabilities}<div class="capability-list">{#each phase0Cards as card}<button class:selected={selectedCapability === card.card_id} type="button" onclick={() => (selectedCapability = card.card_id)}><strong>{card.label}</strong><span>{card.product_surface.replaceAll("_", " ")}</span></button>{/each}</div>{:else}<p class="capability-summary">{phase0Cards.length} manifest entries available. Inspect to see the current generated surface.</p>{/if}{#if selectedCapability}<div class="capability-detail" aria-live="polite">Selected capability: <strong>{selectedCapability}</strong></div>{/if}</section></div>
+  <section class="screen-section" aria-labelledby="recent-work-heading">
+    <div class="section-heading"><div><p class="screen-kicker">Recent work</p><h2 id="recent-work-heading">Durable history</h2></div></div>
+    <div class="empty-state compact"><span>↺</span><div><strong>No recent work in scope</strong><p>The engine does not expose durable Workpoint history here, so Overview leaves this surface empty instead of inventing records.</p></div></div>
+  </section>
+
+  <section class="screen-section" aria-labelledby="system-posture-heading">
+    <div class="section-heading">
+      <div><p class="screen-kicker">System posture</p><h2 id="system-posture-heading">Quiet status</h2></div>
+      <a href="/nodes-services">Inspect services →</a>
+    </div>
+    <div class="posture-grid">
+      <article class="posture-card"><span>Engine</span><strong>{health?.status || "unknown"}</strong><small>{health?.service || "UIAI Engine"}</small></article>
+      <article class="posture-card"><span>Browser</span><strong>{browserHealth?.browser_state || browserHealth?.status || "unknown"}</strong><small>{browserHealth?.active_pages ?? 0} / {browserHealth?.max_pages ?? "?"} pages</small></article>
+      <article class="posture-card"><span>Scope</span><strong>{resumable ? "Workpoint ready" : blockedResume ? "Recovery required" : "Not connected"}</strong><small>{resumable ? resumable.target.workspace_id : "No inferred mission data"}</small></article>
+      <article class="posture-card"><span>Contracts</span><strong>Manifest-backed</strong><small><a href="/capabilities">Inspect registered capabilities</a></small></article>
+    </div>
+  </section>
+
+  <section class="screen-section" aria-labelledby="suggested-actions-heading">
+    <div class="section-heading"><div><p class="screen-kicker">Suggested next actions</p><h2 id="suggested-actions-heading">From current state</h2></div></div>
+    <div class="suggestion-list">
+      {#if blockedResume}
+        <a href={blockedResume.recovery.href}><strong>{blockedResume.recovery.action_label}</strong><span>{blockedResume.recovery.message}</span></a>
+      {:else if resumable}
+        <a href={resumable.target.href}><strong>Resume {resumable.label}</strong><span>Continue from canonical Workpoint state.</span></a>
+      {:else}
+        <a href="/settings?section=scope"><strong>Connect project scope</strong><span>Resume actions remain hidden until canonical state is available.</span></a>
+      {/if}
+      <a href="/live"><strong>Inspect Live</strong><span>Review browser sessions and active UIAI work.</span></a>
+      <a href="/evidence"><strong>Review Evidence</strong><span>Open saved proof and Workpoint-linked artifacts.</span></a>
+    </div>
+  </section>
 </div>
 
 <style>
-  .overview-screen .screen-header { margin-bottom: 24px; } .recent-heading { margin-top: 30px; } .continue-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18px; padding: 22px; margin-bottom: 32px; border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border)); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-elevated)), var(--color-surface-elevated)); } .continue-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 12%, transparent); font-size: 21px; } .continue-copy h2 { margin: 0; font-size: 20px; letter-spacing: -.035em; } .continue-copy p:last-child { max-width: 600px; margin: 7px 0 0; color: var(--color-text-muted); font-size: 13px; line-height: 19px; } .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 14px; margin-bottom: 12px; } .section-heading h2 { margin: 0; font-size: 17px; } .section-heading p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 12px; } .text-button { border: 0; color: var(--color-accent); background: transparent; font: inherit; font-size: 12px; cursor: pointer; text-decoration: none; } .text-button:hover { text-decoration: underline; } .compact-empty { min-height: 150px; margin-bottom: 30px; } .overview-columns { display: grid; grid-template-columns: 1.2fr .8fr; gap: 14px; margin-top: 30px; } .posture-card, .capability-card { padding: 18px; } .posture-line { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 20px; color: var(--color-text-muted); font-size: 12px; } .posture-line strong { color: var(--color-text); } .posture-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warn); } .posture-dot.healthy { background: var(--color-success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-success) 14%, transparent); } .capability-summary { margin: 20px 0 0; } .capability-list { display: grid; gap: 1px; margin: 17px -18px -18px; border-top: 1px solid var(--color-border); background: var(--color-border); } .capability-list button { display: grid; gap: 4px; padding: 12px 18px; border: 0; color: var(--color-text); background: var(--color-surface-elevated); font: inherit; text-align: left; cursor: pointer; } .capability-list button:hover, .capability-list button.selected { background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-elevated)); } .capability-list span { color: var(--color-text-muted); font-size: 11px; text-transform: capitalize; } .capability-detail { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 11px; } .capability-detail strong { color: var(--color-text); } .error-banner { display: flex; align-items: center; gap: 10px; margin: -8px 0 18px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--color-error) 25%, var(--color-border)); border-radius: 9px; color: var(--color-error); background: color-mix(in srgb, var(--color-error) 7%, transparent); font-size: 12px; } .error-banner span { color: var(--color-text-muted); } .error-banner .data-row-action { margin-left: auto; } .loading-mark { animation: loading-breathe 1.2s ease-in-out infinite; } @keyframes loading-breathe { 50% { opacity: .35; transform: rotate(90deg); } } @media (prefers-reduced-motion: reduce) { .loading-mark { animation: none; } } @media (max-width: 760px) { .continue-card { grid-template-columns: auto 1fr; } .continue-card .screen-button { grid-column: 2; justify-self: start; } .overview-columns { grid-template-columns: 1fr; } }
+  .overview-screen { display: grid; gap: 24px; }
+  .continue-card, .recovery-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
+  .continue-mark { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 13px; background: var(--accent-soft, #eef2ff); color: var(--accent, #4f46e5); font-size: 1.35rem; }
+  .continue-copy { flex: 1; min-width: 0; }
+  .continue-copy h2, .recovery-card h2 { margin: 2px 0 5px; font-size: 1.08rem; }
+  .continue-copy p, .recovery-card p { margin: 0; color: var(--text-muted, #667085); }
+  .mission-fields { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 12px 0 0; }
+  .mission-fields div { display: grid; gap: 2px; }
+  .mission-fields dt { color: var(--text-muted, #667085); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .mission-fields dd { margin: 0; font-size: 0.78rem; overflow-wrap: anywhere; }
+  .recovery-card { justify-content: space-between; border-color: var(--warning-line, #f2c94c); }
+  .posture-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .posture-card { display: grid; gap: 4px; padding: 14px; border: 1px solid var(--line, #e4e7ec); border-radius: 12px; background: var(--surface-raised, #fff); }
+  .posture-card span, .posture-card small { color: var(--text-muted, #667085); }
+  .posture-card a { color: inherit; }
+  .suggestion-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .suggestion-list a { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--line, #e4e7ec); border-radius: 12px; background: var(--surface-raised, #fff); color: inherit; text-decoration: none; }
+  .suggestion-list span { color: var(--text-muted, #667085); font-size: 0.8rem; }
+  .suggestion-list a:focus-visible, .posture-card a:focus-visible { outline: 3px solid var(--focus-ring, #4f46e5); outline-offset: 2px; }
+  .session-orb { color: var(--success, #12b76a); }
+  @media (max-width: 900px) { .posture-grid { grid-template-columns: repeat(2, 1fr); } .suggestion-list { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .continue-card, .recovery-card { align-items: flex-start; flex-wrap: wrap; } .posture-grid { grid-template-columns: 1fr; } }
 </style>
