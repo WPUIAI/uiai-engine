@@ -19,6 +19,8 @@ describe("Cockpit dev OTA notifications", () => {
   it("updates one persistent toast through background download and install", () => {
     expect(updater.match(/id: 'cockpit-ota'/g)?.length).toBeGreaterThanOrEqual(4);
     expect(updater).toContain("progress: 1");
+    expect(updater).toContain("export function reportCompletedCockpitUpdate");
+    expect(updater).toContain("Background update completed and the desktop app relaunched successfully.");
     expect(host).toContain("aria-live=\"polite\"");
     expect(host).toContain("existing >= 0");
     expect(host).toContain("<progress");

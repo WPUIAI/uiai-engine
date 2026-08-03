@@ -9,7 +9,7 @@
   import { buildCommandIndex, filterCommandIndex } from "$lib/navigation/command-index";
   import ResumeWorkpointButton from "$lib/ui/sidebar/ResumeWorkpointButton.svelte";
   import { directionForLocale, message } from "$lib/ui/messages";
-  import { runCockpitUpdate, startAutomaticCockpitUpdate, type CockpitUpdateResult } from "$lib/updater";
+  import { reportCompletedCockpitUpdate, runCockpitUpdate, startAutomaticCockpitUpdate, type CockpitUpdateResult } from "$lib/updater";
   import ToastHost from "$lib/ui/ToastHost.svelte";
   import { footerDestinations, sidebarGroups, workspaceForPath, workspaceManifest, type SidebarGroup } from "$lib/navigation/sidebar-manifest";
   import { applyWorkspaceDrop, createSidebarDndAdapter } from "$lib/navigation/sidebar-dnd";
@@ -81,11 +81,12 @@
     const updateViewport = () => { constrainedViewport = window.innerWidth <= 780; if (!constrainedViewport) overlayOpen = true; };
     updateViewport();
     window.addEventListener("resize", updateViewport);
+    const completionToastTimer = window.setTimeout(reportCompletedCockpitUpdate, 250);
     const stop = startAutomaticCockpitUpdate((result) => (update = result));
     const refreshEngineStatus = () => void engineClient.health().then((result) => (engineStatus = result.status)).catch(() => (engineStatus = "unavailable"));
     refreshEngineStatus();
     const engineTimer = window.setInterval(refreshEngineStatus, 5000);
-    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("resize", updateViewport); window.removeEventListener("uiai:workpoint-resume", onResumeContract); window.removeEventListener("uiai:entitlement-state", onEntitlementContract); window.clearInterval(engineTimer); stop(); };
+    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("resize", updateViewport); window.removeEventListener("uiai:workpoint-resume", onResumeContract); window.removeEventListener("uiai:entitlement-state", onEntitlementContract); window.clearTimeout(completionToastTimer); window.clearInterval(engineTimer); stop(); };
   });
 
   function persist(next: SidebarPreferencesV1) { preferences = next; saveSidebarPreferences(next); }

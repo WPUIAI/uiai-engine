@@ -23,6 +23,14 @@ export type CockpitUpdateReporter = (result: CockpitUpdateResult) => void;
 
 export const COCKPIT_UPDATE_RECEIPT_KEY = 'uiai.cockpit.ota.activation.v1';
 
+interface CockpitUpdateActivationReceipt {
+  schema: 'uiai.cockpit_ota_activation_receipt.v1';
+  status: 'installed_relaunching';
+  version: string;
+  activated_at: string;
+  activation: 'signed_updater_install_and_relaunch';
+}
+
 function isTauriRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
@@ -131,6 +139,28 @@ export async function runCockpitUpdate(options: {
       phase: 'error',
       message: `Signed Cockpit update failed safely: ${error instanceof Error ? error.message : String(error)}`,
     });
+  }
+}
+
+/** Surface the durable activation receipt after the updater relaunch completes. */
+export function reportCompletedCockpitUpdate(): CockpitUpdateActivationReceipt | undefined {
+  try {
+    const raw = window.localStorage.getItem(COCKPIT_UPDATE_RECEIPT_KEY);
+    if (!raw) return undefined;
+    const receipt = JSON.parse(raw) as Partial<CockpitUpdateActivationReceipt>;
+    if (receipt.schema !== 'uiai.cockpit_ota_activation_receipt.v1' || receipt.status !== 'installed_relaunching' || !receipt.version) return undefined;
+    window.localStorage.removeItem(COCKPIT_UPDATE_RECEIPT_KEY);
+    pushToast({
+      id: 'cockpit-ota',
+      level: 'success',
+      title: `Cockpit ${receipt.version} updated`,
+      message: 'Background update completed and the desktop app relaunched successfully.',
+      progress: 1,
+      durationMs: 8000,
+    });
+    return receipt as CockpitUpdateActivationReceipt;
+  } catch {
+    return undefined;
   }
 }
 
