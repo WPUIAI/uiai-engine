@@ -10,6 +10,7 @@
   import ResumeWorkpointButton from "$lib/ui/sidebar/ResumeWorkpointButton.svelte";
   import { directionForLocale, message } from "$lib/ui/messages";
   import { runCockpitUpdate, startAutomaticCockpitUpdate, type CockpitUpdateResult } from "$lib/updater";
+  import ToastHost from "$lib/ui/ToastHost.svelte";
   import { footerDestinations, sidebarGroups, workspaceForPath, workspaceManifest, type SidebarGroup } from "$lib/navigation/sidebar-manifest";
   import { applyWorkspaceDrop, createSidebarDndAdapter } from "$lib/navigation/sidebar-dnd";
   import { defaultSidebarPreferences, readSidebarPreferences, resetSidebarPreferences, saveSidebarPreferences, type SidebarMode, type SidebarPreferencesV1 } from "$lib/navigation/sidebar-preferences";
@@ -185,6 +186,7 @@
     <div class:expanded={activityOpen} class="activity-bar" aria-live="polite"><button class="activity-toggle" type="button" onclick={() => (activityOpen = !activityOpen)}><span class="activity-live-dot" data-phase={update.phase}></span><strong>Activity</strong><span>{activityOpen ? "Close" : update.phase === "available" ? "Update ready" : "View signals"}</span><span class="activity-chevron">{activityOpen ? "⌃" : "⌄"}</span></button>{#if activityOpen}<div class="activity-panel"><div><strong>Update state</strong><span>{update.message}</span></div><button class="text-action" type="button" onclick={checkForUpdate}>Check again</button></div>{/if}</div>
   </main>
 </div>
+<ToastHost />
 {#if commandOpen}<div class="command-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && (commandOpen = false)}><dialog open class="command-palette" aria-label="Command palette"><div class="command-heading"><span>{message("shell.find_do")}</span><kbd>Esc</kbd></div><input bind:value={commandQuery} aria-label="Search commands" placeholder={message("shell.search_placeholder")} />{#if filteredCommands.length}<div class="command-list">{#each filteredCommands as command}<button type="button" onclick={() => navigateTo(command.href)}><span>{command.label}</span><small>{command.hint}</small></button>{/each}</div>{:else}<p class="command-empty">No commands in the current scope.</p>{/if}</dialog></div>{/if}
 
 <style>

@@ -1,5 +1,6 @@
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
+import { pushToast } from '$lib/ui/toast';
 
 export type CockpitUpdatePhase =
   | 'checking'
@@ -30,6 +31,15 @@ function report(reporter: CockpitUpdateReporter | undefined, result: CockpitUpda
   reporter?.(result);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('uiai-cockpit-update', { detail: result }));
+    if (result.phase === 'available') {
+      pushToast({ id: 'cockpit-ota', level: 'info', title: `Cockpit ${result.version ?? ''} update`, message: result.message, durationMs: 0 });
+    } else if (result.phase === 'downloading') {
+      pushToast({ id: 'cockpit-ota', level: 'info', title: `Downloading Cockpit ${result.version ?? ''}`, message: result.message, progress: result.totalBytes ? result.downloadedBytes! / result.totalBytes : undefined, durationMs: 0 });
+    } else if (result.phase === 'installing') {
+      pushToast({ id: 'cockpit-ota', level: 'success', title: `Cockpit ${result.version ?? ''} installed`, message: result.message, progress: 1, durationMs: 0 });
+    } else if (result.phase === 'error') {
+      pushToast({ id: 'cockpit-ota', level: 'error', title: 'Cockpit update failed safely', message: result.message });
+    }
   }
   return result;
 }
@@ -124,10 +134,17 @@ export async function runCockpitUpdate(options: {
   }
 }
 
-/** Check shortly after startup and install signed releases without blocking the UI. */
+/** Check shortly after startup, then poll the dev channel for near-immediate signed updates. */
 export function startAutomaticCockpitUpdate(reporter?: CockpitUpdateReporter): () => void {
-  const timer = window.setTimeout(() => {
-    void runCockpitUpdate({ install: true, reporter });
-  }, 2500);
-  return () => window.clearTimeout(timer);
+  let inFlight: Promise<CockpitUpdateResult> | undefined;
+  const run = () => {
+    if (inFlight) return;
+    inFlight = runCockpitUpdate({ install: true, reporter }).finally(() => { inFlight = undefined; });
+  };
+  const startupTimer = window.setTimeout(run, 2500);
+  const pollTimer = window.setInterval(run, 15_000);
+  return () => {
+    window.clearTimeout(startupTimer);
+    window.clearInterval(pollTimer);
+  };
 }

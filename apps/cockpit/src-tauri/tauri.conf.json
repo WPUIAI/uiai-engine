@@ -30,7 +30,7 @@
       "endpoints": [
         "https://github.com/WPUIAI/uiai-engine/releases/download/cockpit-latest/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE5MjZBQUM3OTI0MkQ3RjkKUldUNTEwS1N4Nm9tcWFycFdzbjRMcTlzdENaL0tpNkdqL2lTOWFvbzU5bUJGRDd2dUlXbEhKdDAK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUzQzdCRDQ2OEZEODU1RUIKUldUclZkaVBScjNIVSt6SFlKdnJkOFJWTmNwUXBMRjZkMWg4R1ZxbWZqSWt6L1BmN3Izb1JLQ28K"
     }
   },
   "bundle": {

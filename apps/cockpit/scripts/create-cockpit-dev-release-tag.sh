@@ -70,6 +70,5 @@ git -c user.name="$GIT_AUTHOR_NAME" \
 
 git tag "$TAG"
 git push origin "$TAG"
-git push origin HEAD:main 2>/dev/null || git push origin main
 
-echo "pushed tag: $TAG"
+echo "pushed immutable dev tag: $TAG (source branch was not rewritten)"

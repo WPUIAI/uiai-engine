@@ -50,18 +50,16 @@ if [ -z "$UPDATER_TARBALL" ] || [ ! -f "$UPDATER_SIG" ]; then
   exit 1
 fi
 
+PLATFORM="darwin-x86_64"
+[[ "$TARGET_TRIPLE" == aarch64-* ]] && PLATFORM="darwin-aarch64"
 ARTIFACTS_JSON="[]"
 if [ -n "$APP_PATH" ]; then
-  APP_SHA=$(shasum -a 256 "$APP_PATH" | awk '{print $1}')
-  PLATFORM="darwin-x86_64"
-  [[ "$TARGET_TRIPLE" == aarch64-* ]] && PLATFORM="darwin-aarch64"
+  APP_SHA=$(find "$APP_PATH" -type f -print0 | xargs -0 shasum -a 256 | sort | shasum -a 256 | awk '{print $1}')
   ARTIFACTS_JSON=$(echo "$ARTIFACTS_JSON" | jq --arg n "$(basename "$APP_PATH")" --arg s "$APP_SHA" --arg p "$PLATFORM" '. + [{name:$n, platform:$p, sha256:$s}]')
-  (cd "$(dirname "$APP_PATH")" && shasum -a 256 "$(basename "$APP_PATH")") >> "$CHECKSUMS"
+  printf '%s  %s\n' "$APP_SHA" "$(basename "$APP_PATH")" >> "$CHECKSUMS"
 fi
 if [ -n "$DMG_PATH" ]; then
   DMG_SHA=$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')
-  PLATFORM="darwin-x86_64"
-  [[ "$TARGET_TRIPLE" == aarch64-* ]] && PLATFORM="darwin-aarch64"
   ARTIFACTS_JSON=$(echo "$ARTIFACTS_JSON" | jq --arg n "$(basename "$DMG_PATH")" --arg s "$DMG_SHA" --arg p "$PLATFORM" '. + [{name:$n, platform:$p, sha256:$s}]')
   (cd "$(dirname "$DMG_PATH")" && shasum -a 256 "$(basename "$DMG_PATH")") >> "$CHECKSUMS"
 fi
@@ -87,6 +85,6 @@ cp "$UPDATER_TARBALL" "$UPDATER_DIR/"
 cp "$UPDATER_SIG" "$UPDATER_DIR/"
 SIG=$(cat "$UPDATER_SIG")
 URL="${UPDATER_ASSET_BASE_URL:-file://$(pwd)/$UPDATER_DIR/$(basename "$UPDATER_TARBALL")}"
-jq -n --arg v "$VERSION" --arg n "UIAI Engine Cockpit $VERSION" --arg s "$SIG" --arg u "$URL" '{version:$v,notes:$n,pub_date:(now|todate),platforms:{"darwin-aarch64":{signature:$s,url:$u}}}' > "${UPDATER_DIR}/latest.json"
+jq -n --arg v "$VERSION" --arg n "UIAI Engine Cockpit $VERSION" --arg s "$SIG" --arg u "$URL" --arg p "$PLATFORM" '{version:$v,notes:$n,pub_date:(now|todate),platforms:{($p):{signature:$s,url:$u}}}' > "${UPDATER_DIR}/latest.json"
 
 echo "wrote $METADATA + $CHECKSUMS + ${UPDATER_DIR}/latest.json"
