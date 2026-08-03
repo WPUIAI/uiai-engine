@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "npm run test && npm run cockpit:smoke -- --mode local-only --mock-external && vite build",
+    "build:frontend": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri",

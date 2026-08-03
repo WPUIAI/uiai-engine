@@ -16,7 +16,7 @@ permissions:
 
 env:
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-  CARGO_INCREMENTAL: 0
+  CARGO_INCREMENTAL: '0'
 
 jobs:
   checks:
@@ -61,6 +61,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       UPDATER_ASSET_BASE_URL: https://github.com/${{ github.repository }}/releases/download/cockpit-latest
+      COCKPIT_RELEASE_FAST_PATH: '1'
     steps:
       - uses: actions/checkout@v6
         with:

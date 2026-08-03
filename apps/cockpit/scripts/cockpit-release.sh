@@ -20,16 +20,27 @@ echo "== stamping ${VERSION} =="
 "$STAMP" "$VERSION"
 
 echo "== npm ci =="
-npm ci
+npm ci --prefer-offline
 
 echo "== typecheck =="
 npm run check
 
-echo "== tauri build (runs the tested frontend gate once via beforeBuildCommand) =="
 : "${TAURI_SIGNING_PRIVATE_KEY:?TAURI_SIGNING_PRIVATE_KEY must be configured for updater releases}"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
 TARGET_TRIPLE="${TARGET_TRIPLE:-$(rustc -vV | awk '/^host:/ {print $2}')}"
-npm run tauri build -- --target "$TARGET_TRIPLE"
+if [[ "$RELEASE_VERSION" == *-dev ]]; then
+  export CARGO_PROFILE_RELEASE_LTO="${CARGO_PROFILE_RELEASE_LTO:-thin}"
+  export CARGO_PROFILE_RELEASE_CODEGEN_UNITS="${CARGO_PROFILE_RELEASE_CODEGEN_UNITS:-8}"
+fi
+if [ "${COCKPIT_RELEASE_FAST_PATH:-0}" = "1" ]; then
+  echo "== fast frontend build (strict gate runs in parallel) =="
+  npm run build:frontend
+  echo "== tauri build without duplicate beforeBuildCommand =="
+  npm run tauri build -- --target "$TARGET_TRIPLE" --config '{"build":{"beforeBuildCommand":""}}'
+else
+  echo "== tauri build (runs the full frontend gate via beforeBuildCommand) =="
+  npm run tauri build -- --target "$TARGET_TRIPLE"
+fi
 
 BUNDLE_DIR="src-tauri/target/${TARGET_TRIPLE}/release/bundle"
 [ -d "$BUNDLE_DIR" ] || BUNDLE_DIR="src-tauri/target/release/bundle"
