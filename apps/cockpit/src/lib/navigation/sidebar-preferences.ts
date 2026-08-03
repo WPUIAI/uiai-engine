@@ -1,6 +1,6 @@
 import { workspaceManifest, type SidebarGroup } from "./sidebar-manifest";
 
-export type SidebarMode = "expanded" | "compact" | "hidden";
+export type SidebarMode = "expanded" | "compact";
 export type SidebarLayoutMode = "recommended" | "custom";
 export type SidebarDensity = "comfortable" | "compact";
 
@@ -51,7 +51,7 @@ export function readSidebarPreferences(): SidebarPreferencesV1 {
     });
     const normalized: SidebarPreferencesV1 = {
       ...defaultSidebarPreferences(),
-      mode: raw.mode === "compact" || raw.mode === "hidden" ? raw.mode : "expanded",
+      mode: raw.mode === "compact" || raw.mode === "hidden" ? "compact" : "expanded",
       layout_mode: raw.layout_mode === "custom" ? "custom" : "recommended",
       density: raw.density === "compact" ? "compact" : "comfortable",
       width_px: Math.min(320, Math.max(208, Number(raw.width_px) || DEFAULT_WIDTH)),
@@ -60,7 +60,7 @@ export function readSidebarPreferences(): SidebarPreferencesV1 {
       hidden_workspace_ids: hidden,
       pinned_refs: Array.isArray(raw.pinned_refs) ? raw.pinned_refs.filter((ref) => ref && typeof ref === "object") as SidebarPreferencesV1["pinned_refs"] : [],
       last_updated_at: typeof raw.last_updated_at === "string" ? raw.last_updated_at : new Date().toISOString(),
-      migration_diagnostics: [...new Set(diagnostics)],
+      migration_diagnostics: [...new Set([...(raw.mode === "hidden" ? ["sidebar_hidden_migrated_to_compact"] : []), ...diagnostics])],
     };
     if (schema !== "uaiengine.cockpit.sidebar_preferences.v1" || !currentValue) saveSidebarPreferences(normalized);
     return normalized;

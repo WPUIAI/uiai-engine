@@ -24,19 +24,19 @@
     padding: 4px;
     border: 1px solid var(--line, #e4e7ec);
     border-radius: 11px;
-    background: var(--surface, #f8fafc);
+    background: var(--color-surface);
   }
   .workspace-views a {
     flex: 0 0 auto;
     padding: 7px 10px;
     border-radius: 8px;
-    color: var(--text-muted, #667085);
+    color: var(--color-text-muted);
     font-size: 0.78rem;
     font-weight: 650;
     text-decoration: none;
   }
   .workspace-views a[aria-current="page"] {
-    background: var(--surface-raised, #fff);
+    background: var(--color-surface-elevated);
     color: var(--text, #101828);
     box-shadow: 0 1px 2px rgb(16 24 40 / 8%);
   }

@@ -22,6 +22,16 @@ describe("Cockpit accessibility and i18n contract", () => {
     ]) expect(shell).toContain(marker);
   });
 
+  it("uses desktop-native link styling, stronger contrast tokens, and visible version posture", () => {
+    const tokens = readFileSync(new URL("../../src/lib/ui/design-tokens.css", import.meta.url), "utf8");
+    const shell = readFileSync(new URL("../../src/routes/+layout.svelte", import.meta.url), "utf8");
+    expect(tokens).toContain("a { color: inherit; text-decoration: none; }");
+    expect(tokens).toContain("--color-border-strong");
+    expect(tokens).toContain("--color-text-muted: #b6b6bf");
+    expect(shell).toContain("v{APP_VERSION}");
+    expect(shell).toContain("focusaDaemonSummary(focusaConnections)");
+  });
+
   it("keeps keyboard reorder as an alternative to drag and drop", () => {
     const shell = readFileSync(new URL("../../src/routes/+layout.svelte", import.meta.url), "utf8");
     expect(shell).toContain("keyboardMoveWorkspace(item.id, -1)");

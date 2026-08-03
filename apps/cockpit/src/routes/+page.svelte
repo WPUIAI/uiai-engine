@@ -170,22 +170,23 @@
 <style>
   .overview-screen { display: grid; gap: 24px; }
   .continue-card, .recovery-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
-  .continue-mark { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 13px; background: var(--accent-soft, #eef2ff); color: var(--accent, #4f46e5); font-size: 1.35rem; }
+  .continue-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 11px; background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface-elevated)); color: var(--color-accent); font-size: 1.2rem; }
   .continue-copy { flex: 1; min-width: 0; }
   .continue-copy h2, .recovery-card h2 { margin: 2px 0 5px; font-size: 1.08rem; }
-  .continue-copy p, .recovery-card p { margin: 0; color: var(--text-muted, #667085); }
+  .continue-copy p, .recovery-card p { margin: 0; color: var(--color-text-muted); }
   .mission-fields { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 12px 0 0; }
   .mission-fields div { display: grid; gap: 2px; }
-  .mission-fields dt { color: var(--text-muted, #667085); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .mission-fields dt { color: var(--color-text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
   .mission-fields dd { margin: 0; font-size: 0.78rem; overflow-wrap: anywhere; }
   .recovery-card { justify-content: space-between; border-color: var(--warning-line, #f2c94c); }
   .posture-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-  .posture-card { display: grid; gap: 4px; padding: 14px; border: 1px solid var(--line, #e4e7ec); border-radius: 12px; background: var(--surface-raised, #fff); }
-  .posture-card span, .posture-card small { color: var(--text-muted, #667085); }
+  .posture-card { display: grid; gap: 4px; padding: 13px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-elevated); }
+  .posture-card span, .posture-card small { color: var(--color-text-muted); }
   .posture-card a { color: inherit; }
   .suggestion-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-  .suggestion-list a { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--line, #e4e7ec); border-radius: 12px; background: var(--surface-raised, #fff); color: inherit; text-decoration: none; }
-  .suggestion-list span { color: var(--text-muted, #667085); font-size: 0.8rem; }
+  .suggestion-list a { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-elevated); color: inherit; text-decoration: none; }
+  .suggestion-list a:hover { border-color: var(--color-border-strong); background: color-mix(in srgb, var(--color-surface-elevated) 88%, var(--color-accent)); }
+  .suggestion-list span { color: var(--color-text-muted); font-size: 0.8rem; }
   .suggestion-list a:focus-visible, .posture-card a:focus-visible { outline: 3px solid var(--focus-ring, #4f46e5); outline-offset: 2px; }
   .session-orb { color: var(--success, #12b76a); }
   @media (max-width: 900px) { .posture-grid { grid-template-columns: repeat(2, 1fr); } .suggestion-list { grid-template-columns: 1fr; } }

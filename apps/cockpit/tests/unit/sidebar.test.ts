@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { footerDestinations, sidebarGroups, workspaceForPath, workspaceManifest } from "../../src/lib/navigation/sidebar-manifest";
 import { defaultSidebarPreferences, readSidebarPreferences, saveSidebarPreferences } from "../../src/lib/navigation/sidebar-preferences";
@@ -31,8 +32,21 @@ describe("Cockpit sidebar manifest", () => {
     expect(preferences.workspace_placements).toEqual([]);
   });
 
+  it("never permits the desktop sidebar to disappear below the compact icon rail", () => {
+    const preferencesSource = readFileSync(new URL("../../src/lib/navigation/sidebar-preferences.ts", import.meta.url), "utf8");
+    const shellSource = readFileSync(new URL("../../src/routes/+layout.svelte", import.meta.url), "utf8");
+    expect(preferencesSource).toContain('export type SidebarMode = "expanded" | "compact"');
+    expect(preferencesSource).toContain('raw.mode === "compact" || raw.mode === "hidden" ? "compact"');
+    expect(shellSource).not.toContain('setSidebarMode("hidden")');
+    expect(shellSource).not.toContain("class:hidden=");
+    expect(shellSource).not.toContain("class:overlay=");
+    expect(shellSource).not.toContain("sidebar-scrim");
+    expect(shellSource).toContain('class:compact={preferences.mode === "compact" || constrainedViewport}');
+    expect(shellSource).toContain("v{APP_VERSION}");
+  });
+
   it("covers the required baseline shell fixtures without product data", () => {
-    expect(sidebarFixtures.map((fixture) => fixture.id)).toEqual(["expanded", "compact", "hidden", "overlay", "empty-context", "missing-scope", "blocked-entitlement"]);
+    expect(sidebarFixtures.map((fixture) => fixture.id)).toEqual(["expanded", "compact", "overlay", "empty-context", "missing-scope", "blocked-entitlement"]);
     expect(sidebarFixtures.every((fixture) => fixture.expected.length > 0)).toBe(true);
     expect(sidebarFixtures.find((fixture) => fixture.id === "blocked-entitlement")?.entitlement).toBe("blocked");
   });
