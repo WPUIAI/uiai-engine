@@ -3,6 +3,10 @@
   import "../lib/ui/design-tokens.css";
   import "../lib/ui/sidebar-primitives.css";
   import { engineClient, savedScope } from "$lib/engine-client";
+  import { phase0Cards } from "$lib/cards/phase0-card-manifest";
+  import { parseCockpitWorkpointResume, workpointResumeFromHost, type CockpitWorkpointResume } from "$lib/contracts/workpoint-resume";
+  import { buildCommandIndex, filterCommandIndex } from "$lib/navigation/command-index";
+  import ResumeWorkpointButton from "$lib/ui/sidebar/ResumeWorkpointButton.svelte";
   import { runCockpitUpdate, startAutomaticCockpitUpdate, type CockpitUpdateResult } from "$lib/updater";
   import { footerDestinations, sidebarGroups, workspaceForPath, workspaceManifest, type SidebarGroup } from "$lib/navigation/sidebar-manifest";
   import { applyWorkspaceDrop, createSidebarDndAdapter } from "$lib/navigation/sidebar-dnd";
@@ -22,21 +26,29 @@
   let engineStatus = "checking";
   let scope: ReturnType<typeof savedScope> = {};
   let update: CockpitUpdateResult = { phase: "checking", message: "Checking for signed updates…" };
+  let resumeState: CockpitWorkpointResume | null = null;
   $: scopeConnected = Boolean(scope.project_root && scope.continuity_id);
   $: scopeText = scopeConnected ? `${scope.project_root?.split("/").pop() || "Project"} · ${scope.workpoint_id ? "Workpoint connected" : "Continuity connected"}` : "Scope not connected";
 
   $: activeWorkspace = workspaceManifest.find((item) => item.id === activeWorkspaceId) || workspaceManifest[0];
   $: activeNav = activeWorkspace?.label || "Overview";
   $: groupedWorkspaces = sidebarGroups.map((group) => ({ ...group, items: workspaceManifest.filter((item) => item.group === group.id && !preferences.hidden_workspace_ids.includes(item.id)).sort((a, b) => a.order - b.order) }));
-  $: commands = [
-    ...workspaceManifest.map((item) => ({ label: `Open ${item.label}`, hint: `${item.group} · ${item.state}`, href: item.route })),
-    ...footerDestinations.map((item) => ({ label: `Open ${item.label}`, hint: "System", href: item.route })),
-  ];
-  $: filteredCommands = commands.filter((command) => `${command.label} ${command.hint}`.toLowerCase().includes(commandQuery.toLowerCase()));
+  $: commands = buildCommandIndex(workspaceManifest, phase0Cards, footerDestinations, resumeState);
+  $: resumePresentationState = resumeState?.status !== "resumable" || commands.some((command) => command.kind === "resume") ? resumeState : null;
+  $: filteredCommands = filterCommandIndex(commands, commandQuery);
 
   onMount(() => {
     preferences = readSidebarPreferences();
     scope = savedScope();
+    resumeState = workpointResumeFromHost();
+    const onResumeContract = (event: Event) => {
+      try {
+        resumeState = parseCockpitWorkpointResume((event as CustomEvent<unknown>).detail);
+      } catch {
+        resumeState = null;
+      }
+    };
+    window.addEventListener("uiai:workpoint-resume", onResumeContract);
     const setActiveFromPath = () => { activeWorkspaceId = workspaceForPath(window.location.pathname)?.id || (window.location.pathname === "/settings" ? "settings" : "overview"); };
     setActiveFromPath();
     const onKeyDown = (event: KeyboardEvent) => {
@@ -52,7 +64,7 @@
     const refreshEngineStatus = () => void engineClient.health().then((result) => (engineStatus = result.status)).catch(() => (engineStatus = "unavailable"));
     refreshEngineStatus();
     const engineTimer = window.setInterval(refreshEngineStatus, 5000);
-    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("resize", updateViewport); window.clearInterval(engineTimer); stop(); };
+    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("resize", updateViewport); window.removeEventListener("uiai:workpoint-resume", onResumeContract); window.clearInterval(engineTimer); stop(); };
   });
 
   function persist(next: SidebarPreferencesV1) { preferences = next; saveSidebarPreferences(next); }
@@ -109,6 +121,7 @@
   {#if constrainedViewport && overlayOpen}<button class="sidebar-scrim" type="button" aria-label="Close sidebar" onclick={() => (overlayOpen = false)}></button>{/if}
   <aside class:compact={preferences.mode === "compact"} class:hidden={preferences.mode === "hidden"} class:overlay={constrainedViewport} class:overlay-open={overlayOpen} class="sidebar" aria-label="Primary navigation" style={`--sidebar-width: ${preferences.width_px}px`}>
     <div class="brand"><div class="brand-mark" aria-hidden="true">✦</div><div><strong>UIAI</strong><span>Engine Cockpit</span></div></div>
+    {#if resumePresentationState}<ResumeWorkpointButton state={resumePresentationState} />{/if}
     <div class="sidebar-heading"><span>Workspaces</span><button class="workspace-menu-button sidebar-row" type="button" aria-label="Open workspace layout menu" aria-expanded={workspaceMenuOpen} onclick={() => (workspaceMenuOpen = !workspaceMenuOpen)}>•••</button></div>
     {#if workspaceMenuOpen}<div class="workspace-menu sidebar-popover" role="menu" aria-label="Workspace layout"><div class="menu-title">Layout · {preferences.layout_mode}</div><button role="menuitemradio" aria-checked={preferences.layout_mode === "recommended"} type="button" onclick={() => setLayoutMode("recommended")}>Recommended <span>Manifest order</span></button><button role="menuitemradio" aria-checked={preferences.layout_mode === "custom"} type="button" onclick={() => setLayoutMode("custom")}>Custom <span>Local preference</span></button><div class="menu-title">Sidebar</div><button role="menuitemradio" aria-checked={preferences.mode === "expanded"} type="button" onclick={() => setSidebarMode("expanded")}>Expanded <span>⌘[</span></button><button role="menuitemradio" aria-checked={preferences.mode === "compact"} type="button" onclick={() => setSidebarMode("compact")}>Compact <span>64px rail</span></button><button role="menuitemradio" aria-checked={preferences.mode === "hidden"} type="button" onclick={() => setSidebarMode("hidden")}>Hidden <span>⌘[ to restore</span></button><div class="menu-title">Visibility</div>{#if preferences.hidden_workspace_ids.length}<button role="menuitem" type="button" onclick={showHiddenWorkspaces}>Show hidden workspaces <span>{preferences.hidden_workspace_ids.length}</span></button>{/if}<button role="menuitem" type="button" disabled={activeWorkspaceId === "overview"} onclick={hideActiveWorkspace}>Hide current workspace <span>{activeWorkspaceId === "overview" ? "Overview fixed" : "Local only"}</span></button><div class="menu-title">Groups</div><button role="menuitem" type="button" onclick={() => setAllGroups(false)}>Expand all <span>⌄</span></button><button role="menuitem" type="button" onclick={() => setAllGroups(true)}>Collapse all <span>›</span></button><button class="menu-reset" role="menuitem" type="button" onclick={resetLayout}>Reset sidebar layout</button></div>{/if}
     <div class="workspace-groups">

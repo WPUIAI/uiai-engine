@@ -10,3 +10,4 @@ export * from "./desktop-presentation";
 export * from "./node-ref";
 export * from "./pairing-state";
 export * from "./scope-ref";
+export * from "./workpoint-resume";

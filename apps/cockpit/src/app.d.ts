@@ -6,5 +6,11 @@ declare global {
     // interface PageData {}
     // interface Platform {}
   }
+
+  interface Window {
+    __UIAI_COCKPIT_CONTRACTS__?: {
+      workpoint_resume?: unknown;
+    };
+  }
 }
 export {};
