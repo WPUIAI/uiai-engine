@@ -84,7 +84,11 @@ mkdir -p "$UPDATER_DIR"
 cp "$UPDATER_TARBALL" "$UPDATER_DIR/"
 cp "$UPDATER_SIG" "$UPDATER_DIR/"
 SIG=$(cat "$UPDATER_SIG")
-URL="${UPDATER_ASSET_BASE_URL:-file://$(pwd)/$UPDATER_DIR/$(basename "$UPDATER_TARBALL")}"
+if [ -n "${UPDATER_ASSET_BASE_URL:-}" ]; then
+  URL="${UPDATER_ASSET_BASE_URL%/}/$(basename "$UPDATER_TARBALL")"
+else
+  URL="file://$(pwd)/$UPDATER_DIR/$(basename "$UPDATER_TARBALL")"
+fi
 jq -n --arg v "$VERSION" --arg n "UIAI Engine Cockpit $VERSION" --arg s "$SIG" --arg u "$URL" --arg p "$PLATFORM" '{version:$v,notes:$n,pub_date:(now|todate),platforms:{($p):{signature:$s,url:$u}}}' > "${UPDATER_DIR}/latest.json"
 
 echo "wrote $METADATA + $CHECKSUMS + ${UPDATER_DIR}/latest.json"

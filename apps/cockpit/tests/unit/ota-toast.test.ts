@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const updater = readFileSync(new URL("../../src/lib/updater.ts", import.meta.url), "utf8");
 const host = readFileSync(new URL("../../src/lib/ui/ToastHost.svelte", import.meta.url), "utf8");
 const config = JSON.parse(readFileSync(new URL("../../src-tauri/tauri.conf.json", import.meta.url), "utf8"));
+const releaseScript = readFileSync(new URL("../../scripts/cockpit-release.sh", import.meta.url), "utf8");
 
 describe("Cockpit dev OTA notifications", () => {
   it("polls the signed dev channel without overlapping update operations", () => {
@@ -11,6 +12,7 @@ describe("Cockpit dev OTA notifications", () => {
     expect(updater).toContain("if (inFlight) return");
     expect(config.plugins.updater.endpoints[0]).toContain("cockpit-latest/latest.json");
     expect(config.plugins.updater.pubkey).toMatch(/^dW50cnVzdGVk/);
+    expect(releaseScript).toContain('URL="${UPDATER_ASSET_BASE_URL%/}/$(basename "$UPDATER_TARBALL")"');
   });
 
   it("updates one persistent toast through background download and install", () => {
