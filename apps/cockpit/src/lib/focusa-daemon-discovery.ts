@@ -12,6 +12,10 @@ export interface FocusaDaemonConnection {
   status: "connected" | "unavailable";
   latencyMs?: number;
   version?: string;
+  nodeId?: string;
+  machineId?: string;
+  displayName?: string;
+  paired?: boolean;
 }
 
 function normalizeBaseUrl(value: string): string | undefined {
@@ -53,7 +57,13 @@ async function probe(baseUrl: string, source: FocusaDaemonSource): Promise<Focus
     const response = await fetch(`${baseUrl}/v1/health`, { signal: controller.signal, cache: "no-store" });
     if (!response.ok) throw new Error(`health_${response.status}`);
     const body = await response.json().catch(() => ({})) as Record<string, unknown>;
-    return { baseUrl, source, location, status: "connected", latencyMs: Math.round(performance.now() - started), version: typeof body.version === "string" ? body.version : undefined };
+    const node = body.node && typeof body.node === "object" ? body.node as Record<string, unknown> : body;
+    const nodeId = typeof node.node_id === "string" ? node.node_id : typeof node.instance_id === "string" ? node.instance_id : undefined;
+    const machineId = typeof node.machine_id === "string" ? node.machine_id : undefined;
+    const displayName = typeof node.display_name === "string" ? node.display_name : typeof node.host === "string" ? node.host : location === "local" ? "Local Focusa" : "Remote Focusa";
+    const pairingStatus = body.pairing && typeof body.pairing === "object" ? (body.pairing as Record<string, unknown>).status : undefined;
+    const paired = body.paired === true || node.paired === true || pairingStatus === "paired";
+    return { baseUrl, source, location, status: "connected", latencyMs: Math.round(performance.now() - started), version: typeof body.version === "string" ? body.version : undefined, nodeId, machineId, displayName, paired };
   } catch {
     return { baseUrl, source, location, status: "unavailable" };
   } finally {

@@ -22,7 +22,7 @@ export function savedScope(): { project_root?: string; continuity_id?: string; w
   return { project_root: window.localStorage.getItem("uiai.scope.project_root") || undefined, continuity_id: window.localStorage.getItem("uiai.scope.continuity_id") || undefined, workpoint_id: window.localStorage.getItem("uiai.scope.workpoint_id") || undefined };
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function engineRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 120_000);
   let response: Response;
@@ -40,36 +40,36 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const engineClient = {
-  health: () => request<EngineHealth>("/health"),
-  browserHealth: () => request<BrowserHealth>("/api/health/browser"),
-  sessions: async () => (await request<{ sessions: BrowserSession[]; count: number; max: number }>("/api/session/")).sessions,
+  health: () => engineRequest<EngineHealth>("/health"),
+  browserHealth: () => engineRequest<BrowserHealth>("/api/health/browser"),
+  sessions: async () => (await engineRequest<{ sessions: BrowserSession[]; count: number; max: number }>("/api/session/")).sessions,
   openSession: (url: string, scope = savedScope()) => {
     requireCapabilityEntitlement("uiai.browser.session.create");
-    return request<{ session: BrowserSession; screenshot: string; size: { width: number; height: number }; fpv_share?: unknown }>("/api/session/", { method: "POST", body: JSON.stringify({ url, width: 1280, height: 800, project_root: scope.project_root, continuity_id: scope.continuity_id, workpoint_id: scope.workpoint_id }) });
+    return engineRequest<{ session: BrowserSession; screenshot: string; size: { width: number; height: number }; fpv_share?: unknown }>("/api/session/", { method: "POST", body: JSON.stringify({ url, width: 1280, height: 800, project_root: scope.project_root, continuity_id: scope.continuity_id, workpoint_id: scope.workpoint_id }) });
   },
   closeSession: (id: string) => {
     requireCapabilityEntitlement("uiai.browser.session.control");
-    return request<{ status: string; id: string }>(`/api/session/${encodeURIComponent(id)}`, { method: "DELETE" });
+    return engineRequest<{ status: string; id: string }>(`/api/session/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
-  diagnostics: (id: string) => request<Record<string, unknown>>(`/api/session/${encodeURIComponent(id)}/diagnostics`),
+  diagnostics: (id: string) => engineRequest<Record<string, unknown>>(`/api/session/${encodeURIComponent(id)}/diagnostics`),
   navigate: (id: string, url: string) => {
     requireCapabilityEntitlement("uiai.browser.session.control");
-    return request<ScreenshotResult>(`/api/session/${encodeURIComponent(id)}/navigate`, { method: "POST", body: JSON.stringify({ url }) });
+    return engineRequest<ScreenshotResult>(`/api/session/${encodeURIComponent(id)}/navigate`, { method: "POST", body: JSON.stringify({ url }) });
   },
   screenshot: (id: string) => {
     requireCapabilityEntitlement("uiai.browser.screenshot.execute");
-    return request<ScreenshotResult>(`/api/session/${encodeURIComponent(id)}/screenshot`, { method: "POST", body: JSON.stringify({ format: "jpeg", quality: 72 }) });
+    return engineRequest<ScreenshotResult>(`/api/session/${encodeURIComponent(id)}/screenshot`, { method: "POST", body: JSON.stringify({ format: "jpeg", quality: 72 }) });
   },
   sourceMarkdown: (url: string) => {
     requireCapabilityEntitlement("uiai.source.markdown.execute");
-    return request<{ markdown?: string; title?: string; source?: Record<string, unknown>; focusa?: Record<string, unknown> }>("/api/markdown/", { method: "POST", body: JSON.stringify({ url, mode: "main_content", format: "markdown", include_links: true }) });
+    return engineRequest<{ markdown?: string; title?: string; source?: Record<string, unknown>; focusa?: Record<string, unknown> }>("/api/markdown/", { method: "POST", body: JSON.stringify({ url, mode: "main_content", format: "markdown", include_links: true }) });
   },
   search: (query: string) => {
     requireCapabilityEntitlement("uiai.search.execute");
-    return request<{ results: SearchResult[]; provider?: string; focusa?: Record<string, unknown> }>(`/api/search/?q=${encodeURIComponent(query)}&limit=10`);
+    return engineRequest<{ results: SearchResult[]; provider?: string; focusa?: Record<string, unknown> }>(`/api/search/?q=${encodeURIComponent(query)}&limit=10`);
   },
   screenshotUrl: (url: string) => {
     requireCapabilityEntitlement("uiai.browser.screenshot.execute");
-    return request<ScreenshotResult & { focusa?: Record<string, unknown> }>("/api/screenshot/", { method: "POST", body: JSON.stringify({ url, width: 1440, height: 900, format: "jpeg", quality: 78 }) });
+    return engineRequest<ScreenshotResult & { focusa?: Record<string, unknown> }>("/api/screenshot/", { method: "POST", body: JSON.stringify({ url, width: 1440, height: 900, format: "jpeg", quality: 78 }) });
   },
 };

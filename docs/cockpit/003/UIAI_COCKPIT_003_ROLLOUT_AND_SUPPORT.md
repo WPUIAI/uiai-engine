@@ -13,7 +13,7 @@ The sole Cockpit shell is `apps/cockpit/src/routes/+layout.svelte`, backed by th
 ## Support diagnostics
 
 1. Run `npm --prefix apps/cockpit run cockpit:gate`.
-2. Inspect Context Control for project/continuity authority.
+2. Inspect Focusa authority in order: Project (typed ScopeRef), Trajectory Ladder, Workset, TaskGraph, then Individual Tasks/active Workpoint slice.
 3. Inspect `/nodes-services?view=uiai-engine` for entitlement, protected-worker, capsule, engine, and browser posture.
 4. Inspect `/capabilities` for manifest and signed capability metadata.
 5. Preserve `/evidence` and local artifacts during recovery-only operation.

@@ -17,7 +17,7 @@ export const phase0CardPlacements: Record<string, readonly Phase0CardPlacement[]
     { surface: "Capabilities", href: "/capabilities?object=uiai.diagnostics", role: "catalog" },
   ],
   "focusa.project_identity": [
-    { surface: "Context Control", href: "/settings?section=scope", role: "summary" },
+    { surface: "Project step in Focusa authority ladder", href: "/settings?section=scope", role: "summary" },
     { surface: "Overview", href: "/", role: "summary" },
     { surface: "Inspector", href: "/?inspector=project-identity", role: "inspector" },
   ],

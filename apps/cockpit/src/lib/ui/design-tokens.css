@@ -1,3 +1,7 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 :root {
   /* Radius */
   --radius-card: 12px;
@@ -21,7 +25,7 @@
   --sidebar-width-min: 208px;
   --sidebar-width-max: 320px;
   --sidebar-width-compact: 64px;
-  --sidebar-row-height: 36px;
+  --sidebar-row-height: 32px;
   --sidebar-row-height-compact-density: 28px;
   --sidebar-active-bar-width: 2px;
   --sidebar-surface: color-mix(in srgb, var(--color-surface) 78%, transparent);
