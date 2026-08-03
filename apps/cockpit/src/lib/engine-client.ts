@@ -1,3 +1,5 @@
+import { requireCapabilityEntitlement } from "./contracts/entitlement";
+
 export const DEFAULT_ENGINE_URL = "http://127.0.0.1:7456";
 
 export interface EngineHealth { status: string; service?: string; uptime?: number; browserless?: boolean; }
@@ -41,12 +43,33 @@ export const engineClient = {
   health: () => request<EngineHealth>("/health"),
   browserHealth: () => request<BrowserHealth>("/api/health/browser"),
   sessions: async () => (await request<{ sessions: BrowserSession[]; count: number; max: number }>("/api/session/")).sessions,
-  openSession: (url: string, scope = savedScope()) => request<{ session: BrowserSession; screenshot: string; size: { width: number; height: number }; fpv_share?: unknown }>("/api/session/", { method: "POST", body: JSON.stringify({ url, width: 1280, height: 800, project_root: scope.project_root, continuity_id: scope.continuity_id, workpoint_id: scope.workpoint_id }) }),
-  closeSession: (id: string) => request<{ status: string; id: string }>(`/api/session/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  openSession: (url: string, scope = savedScope()) => {
+    requireCapabilityEntitlement("uiai.browser.session.create");
+    return request<{ session: BrowserSession; screenshot: string; size: { width: number; height: number }; fpv_share?: unknown }>("/api/session/", { method: "POST", body: JSON.stringify({ url, width: 1280, height: 800, project_root: scope.project_root, continuity_id: scope.continuity_id, workpoint_id: scope.workpoint_id }) });
+  },
+  closeSession: (id: string) => {
+    requireCapabilityEntitlement("uiai.browser.session.control");
+    return request<{ status: string; id: string }>(`/api/session/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
   diagnostics: (id: string) => request<Record<string, unknown>>(`/api/session/${encodeURIComponent(id)}/diagnostics`),
-  navigate: (id: string, url: string) => request<ScreenshotResult>(`/api/session/${encodeURIComponent(id)}/navigate`, { method: "POST", body: JSON.stringify({ url }) }),
-  screenshot: (id: string) => request<ScreenshotResult>(`/api/session/${encodeURIComponent(id)}/screenshot`, { method: "POST", body: JSON.stringify({ format: "jpeg", quality: 72 }) }),
-  sourceMarkdown: (url: string) => request<{ markdown?: string; title?: string; source?: Record<string, unknown>; focusa?: Record<string, unknown> }>("/api/markdown/", { method: "POST", body: JSON.stringify({ url, mode: "main_content", format: "markdown", include_links: true }) }),
-  search: (query: string) => request<{ results: SearchResult[]; provider?: string; focusa?: Record<string, unknown> }>(`/api/search/?q=${encodeURIComponent(query)}&limit=10`),
-  screenshotUrl: (url: string) => request<ScreenshotResult & { focusa?: Record<string, unknown> }>("/api/screenshot/", { method: "POST", body: JSON.stringify({ url, width: 1440, height: 900, format: "jpeg", quality: 78 }) }),
+  navigate: (id: string, url: string) => {
+    requireCapabilityEntitlement("uiai.browser.session.control");
+    return request<ScreenshotResult>(`/api/session/${encodeURIComponent(id)}/navigate`, { method: "POST", body: JSON.stringify({ url }) });
+  },
+  screenshot: (id: string) => {
+    requireCapabilityEntitlement("uiai.browser.screenshot.execute");
+    return request<ScreenshotResult>(`/api/session/${encodeURIComponent(id)}/screenshot`, { method: "POST", body: JSON.stringify({ format: "jpeg", quality: 72 }) });
+  },
+  sourceMarkdown: (url: string) => {
+    requireCapabilityEntitlement("uiai.source.markdown.execute");
+    return request<{ markdown?: string; title?: string; source?: Record<string, unknown>; focusa?: Record<string, unknown> }>("/api/markdown/", { method: "POST", body: JSON.stringify({ url, mode: "main_content", format: "markdown", include_links: true }) });
+  },
+  search: (query: string) => {
+    requireCapabilityEntitlement("uiai.search.execute");
+    return request<{ results: SearchResult[]; provider?: string; focusa?: Record<string, unknown> }>(`/api/search/?q=${encodeURIComponent(query)}&limit=10`);
+  },
+  screenshotUrl: (url: string) => {
+    requireCapabilityEntitlement("uiai.browser.screenshot.execute");
+    return request<ScreenshotResult & { focusa?: Record<string, unknown> }>("/api/screenshot/", { method: "POST", body: JSON.stringify({ url, width: 1440, height: 900, format: "jpeg", quality: 78 }) });
+  },
 };

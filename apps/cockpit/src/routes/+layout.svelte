@@ -4,6 +4,7 @@
   import "../lib/ui/sidebar-primitives.css";
   import { engineClient, savedScope } from "$lib/engine-client";
   import { phase0Cards } from "$lib/cards/phase0-card-manifest";
+  import { entitlementFromHost, installEntitlementProjection, type CanonicalEntitlementProjection } from "$lib/contracts/entitlement";
   import { parseCockpitWorkpointResume, workpointResumeFromHost, type CockpitWorkpointResume } from "$lib/contracts/workpoint-resume";
   import { buildCommandIndex, filterCommandIndex } from "$lib/navigation/command-index";
   import ResumeWorkpointButton from "$lib/ui/sidebar/ResumeWorkpointButton.svelte";
@@ -27,6 +28,7 @@
   let scope: ReturnType<typeof savedScope> = {};
   let update: CockpitUpdateResult = { phase: "checking", message: "Checking for signed updates…" };
   let resumeState: CockpitWorkpointResume | null = null;
+  let entitlement: CanonicalEntitlementProjection | null = null;
   $: scopeConnected = Boolean(scope.project_root && scope.continuity_id);
   $: scopeText = scopeConnected ? `${scope.project_root?.split("/").pop() || "Project"} · ${scope.workpoint_id ? "Workpoint connected" : "Continuity connected"}` : "Scope not connected";
 
@@ -41,6 +43,7 @@
     preferences = readSidebarPreferences();
     scope = savedScope();
     resumeState = workpointResumeFromHost();
+    entitlement = entitlementFromHost();
     const onResumeContract = (event: Event) => {
       try {
         resumeState = parseCockpitWorkpointResume((event as CustomEvent<unknown>).detail);
@@ -49,6 +52,10 @@
       }
     };
     window.addEventListener("uiai:workpoint-resume", onResumeContract);
+    const onEntitlementContract = (event: Event) => {
+      entitlement = installEntitlementProjection((event as CustomEvent<unknown>).detail);
+    };
+    window.addEventListener("uiai:entitlement-state", onEntitlementContract);
     const setActiveFromPath = () => { activeWorkspaceId = workspaceForPath(window.location.pathname)?.id || (window.location.pathname === "/settings" ? "settings" : "overview"); };
     setActiveFromPath();
     const onKeyDown = (event: KeyboardEvent) => {
@@ -64,7 +71,7 @@
     const refreshEngineStatus = () => void engineClient.health().then((result) => (engineStatus = result.status)).catch(() => (engineStatus = "unavailable"));
     refreshEngineStatus();
     const engineTimer = window.setInterval(refreshEngineStatus, 5000);
-    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("resize", updateViewport); window.removeEventListener("uiai:workpoint-resume", onResumeContract); window.clearInterval(engineTimer); stop(); };
+    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("resize", updateViewport); window.removeEventListener("uiai:workpoint-resume", onResumeContract); window.removeEventListener("uiai:entitlement-state", onEntitlementContract); window.clearInterval(engineTimer); stop(); };
   });
 
   function persist(next: SidebarPreferencesV1) { preferences = next; saveSidebarPreferences(next); }
@@ -138,6 +145,7 @@
 
   <main class="main-shell">
     <header class="topbar"><div class="breadcrumbs"><span>Workspace</span><span class="slash">/</span><strong>{activeNav}</strong></div><div class="top-actions">{#if constrainedViewport}<button class="sidebar-toggle" type="button" aria-label="Toggle sidebar" aria-expanded={overlayOpen} onclick={toggleOverlay}>☰</button>{/if}<button class="command-trigger" type="button" onclick={() => (commandOpen = true)}><span>Find or do</span><kbd>⌘K</kbd></button><button class="scope-pill" class:scope-missing={!scopeConnected} type="button" aria-expanded={contextOpen} onclick={() => (contextOpen = !contextOpen)} title={scopeConnected ? "Inspect current project scope" : "Connect a project and Workpoint scope"}><span class="status-dot"></span> {scopeText}</button>{#if contextOpen}<div class="context-panel" role="dialog" aria-label="Context Control"><p class="screen-kicker">Context Control</p>{#if scopeConnected}<strong>{scope.project_root}</strong><span>{scope.continuity_id}</span><span>{scope.workpoint_id || "No Workpoint connected"}</span>{:else}<strong>Scope is not connected</strong><span>Browser actions remain local and unscoped until a project root and continuity ID are configured.</span>{/if}<a href="/settings" onclick={() => (contextOpen = false)}>Open scope settings →</a></div>{/if}<button class="update-button" type="button" onclick={checkForUpdate} title={update.message}><span class="update-dot" data-phase={update.phase}></span>{update.phase === "current" ? "Up to date" : update.phase === "available" ? "Update ready" : "Updates"}</button><button class="avatar" type="button" aria-label="Operator profile is not connected" title="Operator profile is not connected">?</button></div></header>
+    {#if !entitlement || !["active_evaluation", "active_paid", "offline_grace"].includes(entitlement.state)}<div class="entitlement-banner" role="status"><div><strong>Recovery-only mode</strong><span>{entitlement ? `Entitlement is ${entitlement.state}. Local artifacts and Evidence remain available.` : "No canonical UIAI entitlement state is connected. Execution allocation is blocked."}</span></div><a href={entitlement?.recovery_actions[0]?.href || "/nodes-services?view=uiai-engine"}>{entitlement?.recovery_actions[0]?.label || "Manage entitlement"} →</a></div>{/if}
     <section class="content"><slot /></section>
     <div class:expanded={activityOpen} class="activity-bar" aria-live="polite"><button class="activity-toggle" type="button" onclick={() => (activityOpen = !activityOpen)}><span class="activity-live-dot" data-phase={update.phase}></span><strong>Activity</strong><span>{activityOpen ? "Close" : update.phase === "available" ? "Update ready" : "View signals"}</span><span class="activity-chevron">{activityOpen ? "⌃" : "⌄"}</span></button>{#if activityOpen}<div class="activity-panel"><div><strong>Update state</strong><span>{update.message}</span></div><button class="text-action" type="button" onclick={checkForUpdate}>Check again</button></div>{/if}</div>
   </main>
@@ -163,4 +171,10 @@
   .sidebar-toggle { display: none; width: 30px; height: 30px; border: 1px solid var(--color-border); border-radius: var(--radius-button); color: var(--color-text); background: var(--color-surface); cursor: pointer; }
   .sidebar-scrim { position: fixed; inset: 0; z-index: 9; border: 0; background: rgba(0, 0, 0, .22); backdrop-filter: blur(2px); }
   @media (prefers-reduced-motion: reduce) { .sidebar { transition: none; } } @media (max-width: 780px) { .sidebar-toggle { display: grid; place-items: center; } .sidebar.overlay { position: fixed; top: 0; bottom: 0; left: 0; width: var(--sidebar-width-expanded); min-width: var(--sidebar-width-expanded); flex-basis: var(--sidebar-width-expanded); transform: translateX(-105%); box-shadow: var(--shadow-overlay); transition: transform var(--sidebar-transition); } .sidebar.overlay.overlay-open { transform: translateX(0); } .sidebar.overlay:not(.compact) .brand > div:last-child, .sidebar.overlay:not(.compact) .sidebar-heading > span, .sidebar.overlay:not(.compact) .group-heading span:first-child, .sidebar.overlay:not(.compact) .nav-label, .sidebar.overlay:not(.compact) .nav-state, .sidebar.overlay:not(.compact) .connection span:last-child, .sidebar.overlay:not(.compact) .settings-button span:last-child { display: initial; } .sidebar { width: 64px; min-width: 64px; flex-basis: 64px; padding-inline: 8px; } .sidebar:not(.hidden) .brand > div:last-child, .sidebar .sidebar-heading > span, .sidebar .group-heading span:first-child, .sidebar .nav-label, .sidebar .nav-state, .sidebar .connection span:last-child, .sidebar .settings-button span:last-child { display: none; } .sidebar .sidebar-heading, .sidebar .group-heading { justify-content: center; padding-inline: 0; } .sidebar .nav-item, .sidebar .settings-button { justify-content: center; padding-inline: 7px; } .sidebar .active-dot { position: absolute; right: 4px; } .topbar { padding: 0 16px; } .scope-pill { display: none; } .content { padding: 30px 20px 48px; } }
+  .entitlement-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 18px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-warning) 9%, var(--color-surface)); color: var(--color-text); font-size: 12px; }
+  .entitlement-banner div { display: grid; gap: 2px; }
+  .entitlement-banner span { color: var(--color-text-muted); }
+  .entitlement-banner a { flex: 0 0 auto; color: inherit; font-weight: 700; }
+  .entitlement-banner a:focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 2px; }
+  @media (max-width: 640px) { .entitlement-banner { align-items: flex-start; flex-direction: column; } }
 </style>

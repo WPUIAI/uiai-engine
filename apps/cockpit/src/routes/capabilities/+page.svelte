@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import "$lib/ui/screen.css";
   import { phase0Cards } from "$lib/cards/phase0-card-manifest";
+  import { entitlementFromHost, installEntitlementProjection, type CanonicalEntitlementProjection } from "$lib/contracts/entitlement";
   import { phase0CardPlacements } from "$lib/cards/phase0-card-placement";
   import { buildCapabilityCatalog, filterCapabilityCatalog } from "$lib/cards/capability-catalog";
 
@@ -17,11 +18,18 @@
   let query = "";
   let workspace = ""; let status = ""; let sourcePlane = ""; let sideEffect = ""; let requiredScope = "";
   let locality = ""; let license = ""; let experimental = ""; let artifactType = "";
+  let entitlement: CanonicalEntitlementProjection | null = null;
 
   onMount(() => {
     const params = new URLSearchParams(window.location.search);
     query = params.get("capability") || params.get("object") || "";
+    entitlement = entitlementFromHost();
+    const onEntitlement = (event: Event) => { entitlement = installEntitlementProjection((event as CustomEvent<unknown>).detail); };
+    window.addEventListener("uiai:entitlement-state", onEntitlement);
+    return () => window.removeEventListener("uiai:entitlement-state", onEntitlement);
   });
+
+  const entitlementFor = (capabilityId: string) => entitlement?.capabilities.find((feature) => feature.capability_id === capabilityId);
 
   $: filtered = filterCapabilityCatalog(catalog, {
     query, workspace, status, source_plane: sourcePlane, side_effect: sideEffect,
@@ -54,8 +62,8 @@
       {#each filtered as capability}
         <article class="screen-card capability-row">
           <div class="capability-main"><strong>{capability.capability_id}</strong><span>{capability.labels.join(" · ")}</span><small>Cards: {capability.card_ids.join(", ")}</small></div>
-          <div class="tag-list"><span>{capability.status}</span><span>{capability.locality}</span>{#each capability.side_effects as effect}<span>{effect}</span>{/each}{#each capability.required_scopes as scope}<span>{scope} scope</span>{/each}</div>
-          <dl><div><dt>Workspace</dt><dd>{capability.workspaces.join(", ") || "not placed"}</dd></div><div><dt>Source</dt><dd>{capability.source_planes.join(", ")}</dd></div><div><dt>License</dt><dd>{capability.license}</dd></div></dl>
+          <div class="tag-list"><span>{entitlementFor(capability.capability_id)?.status || capability.status}</span><span>{capability.locality}</span>{#each capability.side_effects as effect}<span>{effect}</span>{/each}{#each capability.required_scopes as scope}<span>{scope} scope</span>{/each}</div>
+          <dl><div><dt>Workspace</dt><dd>{capability.workspaces.join(", ") || "not placed"}</dd></div><div><dt>Source</dt><dd>{capability.source_planes.join(", ")}</dd></div><div><dt>License</dt><dd>{entitlement?.state || capability.license}</dd></div><div><dt>Remaining</dt><dd>{entitlementFor(capability.capability_id)?.remaining ?? "not returned"}</dd></div><div><dt>Protected worker</dt><dd>{entitlement?.protected_worker.worker_status || "not connected"}</dd></div><div><dt>Capsule</dt><dd>{entitlement?.protected_worker.capsule_status || "not connected"}</dd></div></dl>
         </article>
       {/each}
     </section>
