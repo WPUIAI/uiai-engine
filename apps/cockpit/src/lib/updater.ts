@@ -172,7 +172,7 @@ export function startAutomaticCockpitUpdate(reporter?: CockpitUpdateReporter): (
     inFlight = runCockpitUpdate({ install: true, reporter }).finally(() => { inFlight = undefined; });
   };
   const startupTimer = window.setTimeout(run, 2500);
-  const pollTimer = window.setInterval(run, 15_000);
+  const pollTimer = window.setInterval(run, 5_000);
   return () => {
     window.clearTimeout(startupTimer);
     window.clearInterval(pollTimer);

@@ -25,10 +25,7 @@ npm ci
 echo "== typecheck =="
 npm run check
 
-echo "== web build =="
-npm run build
-
-echo "== tauri build =="
+echo "== tauri build (runs the tested frontend gate once via beforeBuildCommand) =="
 : "${TAURI_SIGNING_PRIVATE_KEY:?TAURI_SIGNING_PRIVATE_KEY must be configured for updater releases}"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
 TARGET_TRIPLE="${TARGET_TRIPLE:-$(rustc -vV | awk '/^host:/ {print $2}')}"

@@ -16,170 +16,45 @@ permissions:
 
 env:
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  rust-check:
-    name: Rust + frontend checks
+  checks:
+    name: Strict release checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-      - name: Install system deps
+      - name: Install Linux build libraries
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf 2>&1 | tail -5
       - uses: dtolnay/rust-toolchain@stable
-      - name: Cargo checks
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/cockpit/src-tauri
+          shared-key: cockpit-checks-linux
+      - name: Rust checks
         working-directory: apps/cockpit/src-tauri
         run: |
           cargo test
           cargo clippy -- -D warnings
-
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: apps/cockpit/package-lock.json
-      - name: Frontend checks
+      - name: Frontend release gate
         working-directory: apps/cockpit
         run: |
-          npm ci
+          npm ci --prefer-offline
           npm run check
           npm run build
 
-  create-release:
-    name: Create GitHub Release
-    needs: rust-check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-          fetch-depth: 0
-
-      - name: Generate release notes
-        id: notes
-        run: |
-          TAG="$RELEASE_TAG"
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1 || echo "")
-          if [ -n "$PREV_TAG" ]; then
-            COMMITS=$(git log --oneline "${PREV_TAG}..${TAG}" --no-merges | head -40)
-          else
-            COMMITS=$(git log --oneline --no-merges | head -40)
-          fi
-          mkdir -p /tmp/release-artifacts
-          cat > /tmp/release-notes.md <<EOF
-          ## UIAI Engine Cockpit ${TAG}
-
-          Cross-platform UIAI Engine Cockpit binary release.
-
-          ### Assets
-          - Linux x86_64 binary (no-bundle)
-          - macOS x86_64 binary (no-bundle)
-          - Checksums for each asset
-
-          ### Commits since previous tag
-          ```
-          ${COMMITS}
-          ```
-          EOF
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: UIAI Engine Cockpit ${{ env.RELEASE_TAG }}
-          body_path: /tmp/release-notes.md
-          draft: false
-          prerelease: false
-
-  build-upload:
-    name: Build and upload (${{ matrix.platform }})
-    needs: create-release
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: ubuntu-latest
-            artifact_name: Linux_x86_64
-          - platform: macos-latest
-            artifact_name: macOS_x86_64
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-          fetch-depth: 0
-
-      - name: Install system deps (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf 2>&1 | tail -5
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'x86_64-apple-darwin' || '' }}
-
-      - uses: actions/setup-node@v6
-        if: matrix.platform == 'ubuntu-latest'
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: apps/cockpit/package-lock.json
-
-      - uses: actions/setup-node@v6
-        if: matrix.platform == 'macos-latest'
-        with:
-          node-version: '22'
-
-      - name: Build no-bundle tauri binary
-        working-directory: apps/cockpit
-        env:
-          TAG: ${{ env.RELEASE_TAG }}
-          ARTIFACT_NAME: ${{ matrix.artifact_name }}
-        run: |
-          set -euo pipefail
-
-          # Workaround npm bug with optional dependencies (rollup native for darwin-arm64/x64).
-          # See https://github.com/npm/cli/issues/4828 — clean node_modules + reinstall.
-          rm -rf node_modules package-lock.json
-          npm install
-
-          # Generate icons (macOS: iconutil; Linux: skip or use fallback)
-          if [ "$(uname)" = "Darwin" ]; then
-            ./scripts/generate-icons.sh
-          fi
-
-          npm run build
-
-          # Build tauri — native on each platform
-          npm run tauri build -- --no-bundle
-
-          BIN="src-tauri/target/release/uaiengine-cockpit"
-          if [ ! -x "$BIN" ]; then
-            echo "missing binary: $BIN" >&2
-            exit 1
-          fi
-
-          ART_DIR="/tmp/release-artifacts"
-          mkdir -p "$ART_DIR"
-          cp "$BIN" "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${ARTIFACT_NAME}.bin"
-          shasum -a 256 "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${ARTIFACT_NAME}.bin" \
-            > "$ART_DIR/uaiengine-cockpit-${RELEASE_TAG}-${ARTIFACT_NAME}.bin.sha256"
-
-      - name: Upload artifacts to release
-        env:
-          TAG: ${{ env.RELEASE_TAG }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "$TAG" /tmp/release-artifacts/* --clobber
-
-  macos-signed-ota:
-    name: Signed macOS dev OTA
-    needs: create-release
+  signed-macos-build:
+    name: Build signed macOS OTA
     runs-on: macos-15-intel
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
@@ -191,56 +66,141 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-apple-darwin
-
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/cockpit/src-tauri
+          shared-key: cockpit-ota-macos-x86_64
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: apps/cockpit/package-lock.json
-
       - name: Require updater signing authority
         run: |
           test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo 'missing TAURI_SIGNING_PRIVATE_KEY' >&2; exit 1; }
           test -n "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" || { echo 'missing TAURI_SIGNING_PRIVATE_KEY_PASSWORD' >&2; exit 1; }
-
-      - name: Build signed app, DMG, and updater bundle
+      - name: Build signed app, DMG, and updater bundle once
         working-directory: apps/cockpit
         env:
           TARGET_TRIPLE: x86_64-apple-darwin
         run: |
           ./scripts/generate-icons.sh
           ./scripts/cockpit-release.sh
-
       - name: Verify updater manifest
         working-directory: apps/cockpit
         run: |
           jq -e '
             (.version | length > 0) and
             (.platforms["darwin-x86_64"].signature | length > 0) and
-            (.platforms["darwin-x86_64"].url | contains("/cockpit-latest/"))
+            (.platforms["darwin-x86_64"].url | contains("/cockpit-latest/uaiengine-cockpit_"))
           ' release-proof/cockpit/updater/latest.json
           find release-proof/cockpit/updater -name '*.app.tar.gz' -type f | grep -q .
           find release-proof/cockpit/updater -name '*.app.tar.gz.sig' -type f | grep -q .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-macos-ota-${{ env.RELEASE_TAG }}
+          path: |
+            apps/cockpit/release-proof/cockpit
+            apps/cockpit/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
 
-      - name: Upload immutable release proof
-        working-directory: apps/cockpit
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  create-release:
+    name: Create immutable release
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - name: Generate release notes
         run: |
-          find release-proof/cockpit -maxdepth 1 -type f -print0 | xargs -0 gh release upload "$TAG" --clobber
-          find release-proof/cockpit/updater -type f -print0 | xargs -0 gh release upload "$TAG" --clobber
-          find src-tauri/target/x86_64-apple-darwin/release/bundle/dmg -name '*.dmg' -print0 | xargs -0 gh release upload "$TAG" --clobber
-
-      - name: Publish mutable dev OTA channel
-        working-directory: apps/cockpit
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if ! gh release view cockpit-latest >/dev/null 2>&1; then
-            gh release create cockpit-latest --target "$GITHUB_SHA" --title 'UIAI Engine Cockpit Dev OTA' --notes 'Mutable signed development channel. Install once, then Cockpit updates automatically.' --prerelease
+          TAG="$RELEASE_TAG"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1 || true)
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log --oneline "${PREV_TAG}..${TAG}" --no-merges | head -40)
+          else
+            COMMITS=$(git log --oneline --no-merges | head -40)
           fi
-          gh release upload cockpit-latest release-proof/cockpit/updater/* --clobber
+          cat > /tmp/release-notes.md <<EOF
+          ## UIAI Engine Cockpit ${TAG}
+
+          Signed development desktop release with automatic OTA activation.
+
+          ### Commits since previous tag
+          \`\`\`
+          ${COMMITS}
+          \`\`\`
+          EOF
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: UIAI Engine Cockpit ${{ env.RELEASE_TAG }}
+          body_path: /tmp/release-notes.md
+          draft: false
+          prerelease: true
+
+  publish-macos-ota:
+    name: Publish signed macOS OTA
+    needs: [checks, signed-macos-build, create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cockpit-macos-ota-${{ env.RELEASE_TAG }}
+          path: /tmp/cockpit-ota
+      - name: Publish immutable proof and mutable dev channel
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          find /tmp/cockpit-ota/release-proof/cockpit -maxdepth 1 -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
+          find /tmp/cockpit-ota/release-proof/cockpit/updater -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
+          find /tmp/cockpit-ota/src-tauri -name '*.dmg' -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
+          if ! gh release view cockpit-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create cockpit-latest --repo "$GITHUB_REPOSITORY" --target "$TAG" --title 'UIAI Engine Cockpit Dev OTA' --notes 'Mutable signed development channel.' --prerelease
+          fi
+          gh release upload cockpit-latest /tmp/cockpit-ota/release-proof/cockpit/updater/* --repo "$GITHUB_REPOSITORY" --clobber
+
+  linux-binary:
+    name: Build Linux binary
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - name: Install Linux build libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf 2>&1 | tail -5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/cockpit/src-tauri
+          shared-key: cockpit-release-linux
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/cockpit/package-lock.json
+      - name: Build once and upload
+        working-directory: apps/cockpit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          sudo apt-get update -qq >/dev/null
+          npm ci --prefer-offline
+          npm run tauri build -- --no-bundle
+          BIN=src-tauri/target/release/uaiengine-cockpit
+          test -x "$BIN"
+          cp "$BIN" "/tmp/uaiengine-cockpit-${TAG}-Linux_x86_64.bin"
+          shasum -a 256 "/tmp/uaiengine-cockpit-${TAG}-Linux_x86_64.bin" > "/tmp/uaiengine-cockpit-${TAG}-Linux_x86_64.bin.sha256"
+          gh release upload "$TAG" /tmp/uaiengine-cockpit-* --repo "$GITHUB_REPOSITORY" --clobber

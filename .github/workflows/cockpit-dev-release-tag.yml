@@ -1,14 +1,26 @@
-name: Create Dev Cockpit Release Tag
+name: Create Semantic Cockpit Release
 
 on:
   workflow_dispatch:
     inputs:
       base:
-        description: 'Major/minor release lane, e.g. 0.9'
+        description: 'Initial major/minor lane when no prior tag exists'
         required: true
-        default: '0.9'
+        default: '0.1'
+      bump:
+        description: 'Semantic version bump; auto reads conventional commits'
+        required: true
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+      channel:
+        description: 'Release channel'
+        required: true
+        type: choice
+        options: [dev, stable]
+        default: dev
       push:
-        description: 'Push the computed tag and main'
+        description: 'Create immutable tag and dispatch signed release'
         required: true
         type: boolean
         default: true
@@ -25,7 +37,7 @@ env:
 
 jobs:
   create-tag:
-    name: Compute next dev tag and start release
+    name: Compute semantic tag and start signed release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -41,9 +53,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ inputs.push }}" = "true" ]; then
-            apps/cockpit/scripts/create-cockpit-dev-release-tag.sh --base "${{ inputs.base }}" --push
+            apps/cockpit/scripts/create-cockpit-dev-release-tag.sh --base "${{ inputs.base }}" --bump "${{ inputs.bump }}" --channel "${{ inputs.channel }}" --push
           else
-            apps/cockpit/scripts/create-cockpit-dev-release-tag.sh --base "${{ inputs.base }}" --dry-run
+            apps/cockpit/scripts/create-cockpit-dev-release-tag.sh --base "${{ inputs.base }}" --bump "${{ inputs.bump }}" --channel "${{ inputs.channel }}" --dry-run
           fi
 
       - name: Dispatch signed dev OTA release

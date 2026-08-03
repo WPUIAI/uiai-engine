@@ -8,7 +8,7 @@ const releaseScript = readFileSync(new URL("../../scripts/cockpit-release.sh", i
 
 describe("Cockpit dev OTA notifications", () => {
   it("polls the signed dev channel without overlapping update operations", () => {
-    expect(updater).toContain("window.setInterval(run, 15_000)");
+    expect(updater).toContain("window.setInterval(run, 5_000)");
     expect(updater).toContain("if (inFlight) return");
     expect(config.plugins.updater.endpoints[0]).toContain("cockpit-latest/latest.json");
     expect(config.plugins.updater.pubkey).toMatch(/^dW50cnVzdGVk/);
