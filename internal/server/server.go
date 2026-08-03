@@ -18,6 +18,7 @@ import (
 	captchaPkg "github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
+	"github.com/WPUIAI/uiai-engine/internal/desktop"
 	"github.com/WPUIAI/uiai-engine/internal/intelligence"
 	"github.com/WPUIAI/uiai-engine/internal/license"
 	"github.com/WPUIAI/uiai-engine/internal/media"
@@ -45,6 +46,7 @@ type Engine struct {
 	usage     *storage.UsageStore
 	vision    vision.PoolSource
 	sessions  *vision.SessionManager
+	presenter desktop.DesktopPresenter
 	mediaJobs *media.JobStore
 	captcha   *captchaPkg.Solver
 }
@@ -164,6 +166,14 @@ func New(cfg *config.Config) *Engine {
 	}
 	captchaSolver := captchaPkg.NewSolver(aiProvider, captchaCfg)
 
+	presenter := desktop.NewPresenter(func(sessionID string) bool {
+		if sessionMgr == nil {
+			return false
+		}
+		_, ok := sessionMgr.Get(sessionID)
+		return ok
+	}, desktop.NewPlatformLauncher())
+
 	e := &Engine{
 		cfg:       cfg,
 		router:    r,
@@ -174,6 +184,7 @@ func New(cfg *config.Config) *Engine {
 		usage:     usage,
 		vision:    visionPool,
 		sessions:  sessionMgr,
+		presenter: presenter,
 		mediaJobs: mediaJobs,
 		captcha:   captchaSolver,
 	}
@@ -306,6 +317,10 @@ func (e *Engine) mountRoutes() {
 	// Open → interact → screenshot → close (page stays alive between calls)
 	r.Route("/api/session", func(r chi.Router) {
 		routes.MountSessionRoutes(r, e.cfg, e.sessions, e.captcha)
+		routes.MountSessionPresentationRoute(r, e.presenter)
+	})
+	r.Route("/api/presentation", func(r chi.Router) {
+		routes.MountPresentationRoutes(r, e.presenter)
 	})
 
 	// Captcha solver — stateless image solve + status
