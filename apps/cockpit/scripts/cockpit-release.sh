@@ -13,8 +13,8 @@ TAG="${TAG:-cockpit-v0.1.0}"
 
 cd "${APPS_COCKPIT}"
 
-VERSION="${TAG#cockpit-v}"
-VERSION="${VERSION%-dev}"
+RELEASE_VERSION="${TAG#cockpit-v}"
+VERSION="${RELEASE_VERSION%-dev}"
 
 echo "== stamping ${VERSION} =="
 "$STAMP" "$VERSION"
@@ -65,8 +65,8 @@ if [ -n "$DMG_PATH" ]; then
 fi
 
 CHANNEL="stable"
-[[ "$VERSION" == *-dev ]] && CHANNEL="dev"
-[[ "$VERSION" == *-preview ]] && CHANNEL="preview"
+[[ "$RELEASE_VERSION" == *-dev ]] && CHANNEL="dev"
+[[ "$RELEASE_VERSION" == *-preview ]] && CHANNEL="preview"
 
 echo "$ARTIFACTS_JSON" | jq --arg v "$VERSION" --arg c "$CHANNEL" --arg t "$TAG" --argjson notarized "${NOTARIZED:-false}" '{
   schema: "uaiengine.cockpit.release.v1",
@@ -81,13 +81,16 @@ echo "$ARTIFACTS_JSON" | jq --arg v "$VERSION" --arg c "$CHANNEL" --arg t "$TAG"
 
 UPDATER_DIR="release-proof/cockpit/updater"
 mkdir -p "$UPDATER_DIR"
-cp "$UPDATER_TARBALL" "$UPDATER_DIR/"
-cp "$UPDATER_SIG" "$UPDATER_DIR/"
+UPDATER_ARCH="x86_64"
+[[ "$PLATFORM" == "darwin-aarch64" ]] && UPDATER_ARCH="aarch64"
+UPDATER_NAME="uaiengine-cockpit_${VERSION}_${UPDATER_ARCH}.app.tar.gz"
+cp "$UPDATER_TARBALL" "$UPDATER_DIR/$UPDATER_NAME"
+cp "$UPDATER_SIG" "$UPDATER_DIR/$UPDATER_NAME.sig"
 SIG=$(cat "$UPDATER_SIG")
 if [ -n "${UPDATER_ASSET_BASE_URL:-}" ]; then
-  URL="${UPDATER_ASSET_BASE_URL%/}/$(basename "$UPDATER_TARBALL")"
+  URL="${UPDATER_ASSET_BASE_URL%/}/$UPDATER_NAME"
 else
-  URL="file://$(pwd)/$UPDATER_DIR/$(basename "$UPDATER_TARBALL")"
+  URL="file://$(pwd)/$UPDATER_DIR/$UPDATER_NAME"
 fi
 jq -n --arg v "$VERSION" --arg n "UIAI Engine Cockpit $VERSION" --arg s "$SIG" --arg u "$URL" --arg p "$PLATFORM" '{version:$v,notes:$n,pub_date:(now|todate),platforms:{($p):{signature:$s,url:$u}}}' > "${UPDATER_DIR}/latest.json"
 

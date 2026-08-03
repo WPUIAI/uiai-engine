@@ -12,7 +12,8 @@ describe("Cockpit dev OTA notifications", () => {
     expect(updater).toContain("if (inFlight) return");
     expect(config.plugins.updater.endpoints[0]).toContain("cockpit-latest/latest.json");
     expect(config.plugins.updater.pubkey).toMatch(/^dW50cnVzdGVk/);
-    expect(releaseScript).toContain('URL="${UPDATER_ASSET_BASE_URL%/}/$(basename "$UPDATER_TARBALL")"');
+    expect(releaseScript).toContain('UPDATER_NAME="uaiengine-cockpit_${VERSION}_${UPDATER_ARCH}.app.tar.gz"');
+    expect(releaseScript).toContain('URL="${UPDATER_ASSET_BASE_URL%/}/$UPDATER_NAME"');
   });
 
   it("updates one persistent toast through background download and install", () => {
