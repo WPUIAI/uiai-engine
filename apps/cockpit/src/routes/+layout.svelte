@@ -8,6 +8,7 @@
   import { parseCockpitWorkpointResume, workpointResumeFromHost, type CockpitWorkpointResume } from "$lib/contracts/workpoint-resume";
   import { buildCommandIndex, filterCommandIndex } from "$lib/navigation/command-index";
   import ResumeWorkpointButton from "$lib/ui/sidebar/ResumeWorkpointButton.svelte";
+  import { directionForLocale, message } from "$lib/ui/messages";
   import { runCockpitUpdate, startAutomaticCockpitUpdate, type CockpitUpdateResult } from "$lib/updater";
   import { footerDestinations, sidebarGroups, workspaceForPath, workspaceManifest, type SidebarGroup } from "$lib/navigation/sidebar-manifest";
   import { applyWorkspaceDrop, createSidebarDndAdapter } from "$lib/navigation/sidebar-dnd";
@@ -23,6 +24,7 @@
   let constrainedViewport = false;
   let overlayOpen = true;
   let draggingWorkspaceId = "";
+  let sidebarAnnouncement = "";
   let resizeStart: { x: number; width: number } | null = null;
   let engineStatus = "checking";
   let scope: ReturnType<typeof savedScope> = {};
@@ -41,6 +43,9 @@
 
   onMount(() => {
     preferences = readSidebarPreferences();
+    const locale = navigator.language || "en";
+    document.documentElement.lang = locale;
+    document.documentElement.dir = directionForLocale(locale);
     scope = savedScope();
     resumeState = workpointResumeFromHost();
     entitlement = entitlementFromHost();
@@ -59,7 +64,15 @@
     const setActiveFromPath = () => { activeWorkspaceId = workspaceForPath(window.location.pathname)?.id || (window.location.pathname === "/settings" ? "settings" : "overview"); };
     setActiveFromPath();
     const onKeyDown = (event: KeyboardEvent) => {
+      const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); commandOpen = true; }
+      if ((event.metaKey || event.ctrlKey) && event.key === ",") { event.preventDefault(); navigateTo("/settings"); }
+      if (!typing && event.key === "?") { event.preventDefault(); navigateTo("/help"); }
+      if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
+        const favoriteId = preferences.pinned_refs.filter((ref) => ref.kind === "workspace")[Number(event.key) - 1]?.workspace_id;
+        const favorite = workspaceManifest.find((workspace) => workspace.id === favoriteId);
+        if (favorite) { event.preventDefault(); navigateTo(favorite.route); }
+      }
       if (event.key === "Escape") { commandOpen = false; workspaceMenuOpen = false; contextOpen = false; activityOpen = false; if (constrainedViewport) overlayOpen = false; }
       if (event.key === "[" && !event.metaKey && !event.ctrlKey) { event.preventDefault(); setSidebarMode(preferences.mode === "expanded" ? "compact" : "expanded"); }
     };
@@ -75,12 +88,33 @@
   });
 
   function persist(next: SidebarPreferencesV1) { preferences = next; saveSidebarPreferences(next); }
-  const sidebarDnd = createSidebarDndAdapter(async (target, source) => { persist(applyWorkspaceDrop(preferences, workspaceManifest, source, target)); draggingWorkspaceId = ""; });
+  const sidebarDnd = createSidebarDndAdapter(async (target, source) => { persist(applyWorkspaceDrop(preferences, workspaceManifest, source, target)); draggingWorkspaceId = ""; sidebarAnnouncement = message("sidebar.moved", { workspace: source, group: target.display_group }); });
   function beginWorkspaceDrag(id: string) { draggingWorkspaceId = id; sidebarDnd.beginDrag(id); }
   function beginWorkspacePointerDrag(id: string, event: PointerEvent) { if (event.pointerType === "touch") { event.preventDefault(); beginWorkspaceDrag(id); } }
   function pointerDropWorkspace(item: { id: string; group: SidebarGroup; order: number }, event: PointerEvent) { if (event.pointerType === "touch" && draggingWorkspaceId) { event.preventDefault(); dropWorkspace({ workspace_id: item.id, display_group: item.group, order: item.order }); } }
   function cancelWorkspaceDrag() { draggingWorkspaceId = ""; sidebarDnd.cancelDrag(); }
   function dropWorkspace(target: { workspace_id: string; display_group: SidebarGroup; order: number }) { void sidebarDnd.commitDrop(target).catch(() => { draggingWorkspaceId = ""; sidebarDnd.cancelDrag(); }); }
+  function handleWorkspaceNavKeydown(event: KeyboardEvent) {
+    const current = (event.target as HTMLElement).closest<HTMLElement>("[data-workspace-row]");
+    if (!current) return;
+    const sidebar = current.closest<HTMLElement>(".sidebar");
+    const rows = [...(sidebar?.querySelectorAll<HTMLElement>("[data-workspace-row]") || [])];
+    const index = rows.indexOf(current);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      rows[(index + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length]?.focus();
+    }
+    const group = current.dataset.workspaceGroup as SidebarGroup | undefined;
+    if (group && event.key === "ArrowLeft" && !preferences.collapsed_groups.includes(group)) { event.preventDefault(); toggleGroup(group); }
+    if (group && event.key === "ArrowRight" && preferences.collapsed_groups.includes(group)) { event.preventDefault(); toggleGroup(group); }
+    if (event.shiftKey && event.key === "F10") {
+      event.preventDefault();
+      const id = current.dataset.workspaceId;
+      if (id) selectWorkspace(id);
+      workspaceMenuOpen = true;
+      sidebarAnnouncement = message("sidebar.commands_opened", { workspace: current.textContent?.trim() || "workspace" });
+    }
+  }
   function keyboardMoveWorkspace(id: string, direction: -1 | 1) {
     const current = workspaceManifest.find((item) => item.id === id);
     if (!current) return;
@@ -135,22 +169,23 @@
       {#each groupedWorkspaces as group}
         <section class="workspace-group" aria-label={group.label}>
           <button class="group-heading sidebar-group-header" type="button" aria-expanded={!preferences.collapsed_groups.includes(group.id)} onclick={() => toggleGroup(group.id)}><span>{group.label}</span><span aria-hidden="true">{preferences.collapsed_groups.includes(group.id) ? "›" : "⌄"}</span></button>
-          {#if !preferences.collapsed_groups.includes(group.id)}<nav aria-label={`${group.label} workspaces`}>{#each group.items as item}<a class:active={activeWorkspaceId === item.id} class:quiet={item.emphasis === "quiet"} class="nav-item sidebar-row" class:dragging={draggingWorkspaceId === item.id} data-selected={activeWorkspaceId === item.id} draggable="true" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" href={item.route} aria-current={activeWorkspaceId === item.id ? "page" : undefined} onclick={() => selectWorkspace(item.id)} onpointerdown={(event) => beginWorkspacePointerDrag(item.id, event)} onpointerup={(event) => pointerDropWorkspace(item, event)} ondragstart={() => beginWorkspaceDrag(item.id)} ondragover={(event) => event.preventDefault()} ondrop={() => dropWorkspace({ workspace_id: item.id, display_group: item.group, order: item.order })} ondragend={cancelWorkspaceDrag} onkeydown={(event) => { if (event.altKey && event.key === "ArrowUp") { event.preventDefault(); keyboardMoveWorkspace(item.id, -1); } if (event.altKey && event.key === "ArrowDown") { event.preventDefault(); keyboardMoveWorkspace(item.id, 1); } }}><span class="nav-icon sidebar-row__icon" aria-hidden="true">{item.icon}</span><span class="nav-label sidebar-row__label">{item.label}</span>{#if item.state !== "current"}<span class="nav-state sidebar-row__state">{item.state}</span>{/if}{#if activeWorkspaceId === item.id}<span class="active-dot sidebar-row__active-bar" aria-hidden="true"></span>{/if}</a>{/each}</nav>{/if}
+          {#if !preferences.collapsed_groups.includes(group.id)}<nav aria-label={`${group.label} workspaces`}> {#each group.items as item}<a class:active={activeWorkspaceId === item.id} class:quiet={item.emphasis === "quiet"} class="nav-item sidebar-row" class:dragging={draggingWorkspaceId === item.id} data-selected={activeWorkspaceId === item.id} data-workspace-row data-workspace-id={item.id} data-workspace-group={item.group} draggable="true" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" href={item.route} aria-current={activeWorkspaceId === item.id ? "page" : undefined} onclick={() => selectWorkspace(item.id)} onpointerdown={(event) => beginWorkspacePointerDrag(item.id, event)} onpointerup={(event) => pointerDropWorkspace(item, event)} ondragstart={() => beginWorkspaceDrag(item.id)} ondragover={(event) => event.preventDefault()} ondrop={() => dropWorkspace({ workspace_id: item.id, display_group: item.group, order: item.order })} ondragend={cancelWorkspaceDrag} onkeydown={(event) => { handleWorkspaceNavKeydown(event); if (event.altKey && event.key === "ArrowUp") { event.preventDefault(); keyboardMoveWorkspace(item.id, -1); } if (event.altKey && event.key === "ArrowDown") { event.preventDefault(); keyboardMoveWorkspace(item.id, 1); } }}><span class="nav-icon sidebar-row__icon" aria-hidden="true">{item.icon}</span><span class="nav-label sidebar-row__label">{item.label}</span>{#if item.state !== "current"}<span class="nav-state sidebar-row__state">{item.state}</span>{/if}{#if activeWorkspaceId === item.id}<span class="active-dot sidebar-row__active-bar" aria-hidden="true"></span>{/if}</a>{/each}</nav>{/if}
         </section>
       {/each}
     </div>
     {#if preferences.mode === "expanded"}<button class="resize-handle sidebar-resize-handle" type="button" aria-label="Resize sidebar" onpointerdown={beginResize}></button>{/if}
+    <p class="sr-only" aria-live="polite" aria-atomic="true">{sidebarAnnouncement}</p>
     <div class="sidebar-bottom"><div class="connection"><span class:healthy={engineStatus === "healthy"} class="status-dot"></span><span>Engine {engineStatus}</span></div>{#each footerDestinations as item}<a class="settings-button" class:active={activeWorkspaceId === item.id} href={item.route} aria-current={activeWorkspaceId === item.id ? "page" : undefined} onclick={() => selectWorkspace(item.id)}><span aria-hidden="true">{item.icon}</span><span>{item.label}</span></a>{/each}</div>
   </aside>
 
   <main class="main-shell">
-    <header class="topbar"><div class="breadcrumbs"><span>Workspace</span><span class="slash">/</span><strong>{activeNav}</strong></div><div class="top-actions">{#if constrainedViewport}<button class="sidebar-toggle" type="button" aria-label="Toggle sidebar" aria-expanded={overlayOpen} onclick={toggleOverlay}>☰</button>{/if}<button class="command-trigger" type="button" onclick={() => (commandOpen = true)}><span>Find or do</span><kbd>⌘K</kbd></button><button class="scope-pill" class:scope-missing={!scopeConnected} type="button" aria-expanded={contextOpen} onclick={() => (contextOpen = !contextOpen)} title={scopeConnected ? "Inspect current project scope" : "Connect a project and Workpoint scope"}><span class="status-dot"></span> {scopeText}</button>{#if contextOpen}<div class="context-panel" role="dialog" aria-label="Context Control"><p class="screen-kicker">Context Control</p>{#if scopeConnected}<strong>{scope.project_root}</strong><span>{scope.continuity_id}</span><span>{scope.workpoint_id || "No Workpoint connected"}</span>{:else}<strong>Scope is not connected</strong><span>Browser actions remain local and unscoped until a project root and continuity ID are configured.</span>{/if}<a href="/settings" onclick={() => (contextOpen = false)}>Open scope settings →</a></div>{/if}<button class="update-button" type="button" onclick={checkForUpdate} title={update.message}><span class="update-dot" data-phase={update.phase}></span>{update.phase === "current" ? "Up to date" : update.phase === "available" ? "Update ready" : "Updates"}</button><button class="avatar" type="button" aria-label="Operator profile is not connected" title="Operator profile is not connected">?</button></div></header>
-    {#if !entitlement || !["active_evaluation", "active_paid", "offline_grace"].includes(entitlement.state)}<div class="entitlement-banner" role="status"><div><strong>Recovery-only mode</strong><span>{entitlement ? `Entitlement is ${entitlement.state}. Local artifacts and Evidence remain available.` : "No canonical UIAI entitlement state is connected. Execution allocation is blocked."}</span></div><a href={entitlement?.recovery_actions[0]?.href || "/nodes-services?view=uiai-engine"}>{entitlement?.recovery_actions[0]?.label || "Manage entitlement"} →</a></div>{/if}
+    <header class="topbar"><div class="breadcrumbs"><span>{message("shell.workspace")}</span><span class="slash">/</span><strong>{activeNav}</strong></div><div class="top-actions">{#if constrainedViewport}<button class="sidebar-toggle" type="button" aria-label="Toggle sidebar" aria-expanded={overlayOpen} onclick={toggleOverlay}>☰</button>{/if}<button class="command-trigger" type="button" onclick={() => (commandOpen = true)}><span>{message("shell.find_do")}</span><kbd>⌘K</kbd></button><button class="scope-pill" class:scope-missing={!scopeConnected} type="button" aria-expanded={contextOpen} onclick={() => (contextOpen = !contextOpen)} title={scopeConnected ? "Inspect current project scope" : "Connect a project and Workpoint scope"}><span class="status-dot"></span> {scopeText}</button>{#if contextOpen}<div class="context-panel" role="dialog" aria-label="Context Control"><p class="screen-kicker">Context Control</p>{#if scopeConnected}<strong>{scope.project_root}</strong><span>{scope.continuity_id}</span><span>{scope.workpoint_id || "No Workpoint connected"}</span>{:else}<strong>Scope is not connected</strong><span>Browser actions remain local and unscoped until a project root and continuity ID are configured.</span>{/if}<a href="/settings" onclick={() => (contextOpen = false)}>Open scope settings →</a></div>{/if}<button class="update-button" type="button" onclick={checkForUpdate} title={update.message}><span class="update-dot" data-phase={update.phase}></span>{update.phase === "current" ? "Up to date" : update.phase === "available" ? "Update ready" : "Updates"}</button><button class="avatar" type="button" aria-label="Operator profile is not connected" title="Operator profile is not connected">?</button></div></header>
+    {#if !entitlement || !["active_evaluation", "active_paid", "offline_grace"].includes(entitlement.state)}<div class="entitlement-banner" role="status"><div><strong>{message("shell.recovery_only")}</strong><span>{entitlement ? `Entitlement is ${entitlement.state}. Local artifacts and Evidence remain available.` : "No canonical UIAI entitlement state is connected. Execution allocation is blocked."}</span></div><a href={entitlement?.recovery_actions[0]?.href || "/nodes-services?view=uiai-engine"}>{entitlement?.recovery_actions[0]?.label || message("shell.manage_entitlement")} →</a></div>{/if}
     <section class="content"><slot /></section>
     <div class:expanded={activityOpen} class="activity-bar" aria-live="polite"><button class="activity-toggle" type="button" onclick={() => (activityOpen = !activityOpen)}><span class="activity-live-dot" data-phase={update.phase}></span><strong>Activity</strong><span>{activityOpen ? "Close" : update.phase === "available" ? "Update ready" : "View signals"}</span><span class="activity-chevron">{activityOpen ? "⌃" : "⌄"}</span></button>{#if activityOpen}<div class="activity-panel"><div><strong>Update state</strong><span>{update.message}</span></div><button class="text-action" type="button" onclick={checkForUpdate}>Check again</button></div>{/if}</div>
   </main>
 </div>
-{#if commandOpen}<div class="command-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && (commandOpen = false)}><dialog open class="command-palette" aria-label="Command palette"><div class="command-heading"><span>Find or do</span><kbd>Esc</kbd></div><input bind:value={commandQuery} aria-label="Search commands" placeholder="Search workspace or capability…" />{#if filteredCommands.length}<div class="command-list">{#each filteredCommands as command}<button type="button" onclick={() => navigateTo(command.href)}><span>{command.label}</span><small>{command.hint}</small></button>{/each}</div>{:else}<p class="command-empty">No commands in the current scope.</p>{/if}</dialog></div>{/if}
+{#if commandOpen}<div class="command-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && (commandOpen = false)}><dialog open class="command-palette" aria-label="Command palette"><div class="command-heading"><span>{message("shell.find_do")}</span><kbd>Esc</kbd></div><input bind:value={commandQuery} aria-label="Search commands" placeholder={message("shell.search_placeholder")} />{#if filteredCommands.length}<div class="command-list">{#each filteredCommands as command}<button type="button" onclick={() => navigateTo(command.href)}><span>{command.label}</span><small>{command.hint}</small></button>{/each}</div>{:else}<p class="command-empty">No commands in the current scope.</p>{/if}</dialog></div>{/if}
 
 <style>
   .app-shell { min-height: 100vh; display: flex; background: var(--color-bg); }
@@ -177,4 +212,11 @@
   .entitlement-banner a { flex: 0 0 auto; color: inherit; font-weight: 700; }
   .entitlement-banner a:focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 2px; }
   @media (max-width: 640px) { .entitlement-banner { align-items: flex-start; flex-direction: column; } }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+  @media (prefers-reduced-motion: reduce) { .app-shell *, .app-shell *::before, .app-shell *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+  :global([dir="rtl"]) .sidebar { border-right: 0; border-left: 1px solid var(--sidebar-divider); }
+  :global([dir="rtl"]) .group-heading { text-align: right; }
+  :global([dir="rtl"]) .active-dot { right: auto; left: 3px; }
+  :global([dir="rtl"]) .context-panel { right: auto; left: 18px; }
+  @media (forced-colors: active) { .nav-item.active, .command-trigger, .scope-pill, :global(.screen-button), .entitlement-banner { border: 1px solid CanvasText; } .status-dot, .activity-live-dot { forced-color-adjust: none; } }
 </style>
