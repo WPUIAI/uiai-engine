@@ -12,6 +12,8 @@ mod deep_link;
 #[allow(dead_code)]
 mod desktop_contract;
 mod desktop_handoff;
+#[allow(dead_code)]
+mod focusa_credentials;
 mod focusa_manifest_client;
 mod focusa_manifest_server;
 #[allow(dead_code)]
