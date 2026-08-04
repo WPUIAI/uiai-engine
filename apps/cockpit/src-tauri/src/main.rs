@@ -9,14 +9,18 @@ mod bonjour;
 mod bridge;
 // Contract types are bound by T004-04; keep the strict release gate green while the scaffold is intentionally ahead of its presenter.
 mod deep_link;
-mod desktop_handoff;
 #[allow(dead_code)]
 mod desktop_contract;
+mod desktop_handoff;
+mod focusa_manifest_server;
 #[allow(dead_code)]
 mod focusa_pairing_contract;
 
 fn main() {
+    let focusa_manifest_endpoint = focusa_manifest_server::start()
+        .expect("Focusa compatibility manifest server must bind loopback");
     tauri::Builder::default()
+        .manage(focusa_manifest_endpoint)
         // Must be registered first so secondary activations are forwarded into the running app.
         .plugin(
             tauri_plugin_single_instance::Builder::new()
@@ -33,6 +37,7 @@ fn main() {
             bonjour::focusa_discover_via_bonjour,
             deep_link::cockpit_take_deep_link,
             desktop_handoff::cockpit_open_focusa_handoff,
+            focusa_manifest_server::cockpit_focusa_manifest_endpoint,
         ])
         .manage(deep_link::PendingDeepLink::default())
         .setup(|app| {
