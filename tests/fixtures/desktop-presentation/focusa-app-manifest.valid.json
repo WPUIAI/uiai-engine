@@ -7,12 +7,19 @@
     "focusa_deep_link": "1",
     "cockpit_deep_link": "1",
     "desktop_presentation": "1",
-    "fpv": "1"
+    "fpv": "1",
+    "pairing": "1",
+    "bridge": "1",
+    "scope_context": "1"
   },
   "capabilities": [
     "mission.open",
     "workpoint.open",
     "cockpit.open",
-    "session.present"
+    "session.present",
+    "pair.start",
+    "pair.status",
+    "pair.inherited",
+    "scope.enumerate"
   ]
 }

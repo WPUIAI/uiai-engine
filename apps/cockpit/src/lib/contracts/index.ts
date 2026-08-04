@@ -8,6 +8,8 @@ export * from "./cockpit-error";
 export * from "./cockpit-event";
 export * from "./desktop-presentation";
 export * from "./entitlement";
+export * from "./focusa-app-compatibility";
+export * from "./focusa-pairing";
 export * from "./node-ref";
 export * from "./pairing-state";
 export * from "./scope-ref";
