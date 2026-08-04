@@ -24,6 +24,8 @@ mod focusa_credentials_macos;
 mod focusa_manifest_client;
 mod focusa_manifest_server;
 #[allow(dead_code)]
+mod focusa_pairing_client;
+#[allow(dead_code)]
 mod focusa_pairing_contract;
 
 fn main() {
