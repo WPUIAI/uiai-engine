@@ -16,6 +16,8 @@ mod desktop_handoff;
 mod focusa_credentials;
 #[allow(dead_code)]
 mod focusa_credentials_linux;
+#[allow(dead_code)]
+mod focusa_credentials_windows;
 #[cfg(target_os = "macos")]
 #[allow(dead_code)]
 mod focusa_credentials_macos;
