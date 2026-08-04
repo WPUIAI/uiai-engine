@@ -12,6 +12,7 @@ mod deep_link;
 #[allow(dead_code)]
 mod desktop_contract;
 mod desktop_handoff;
+mod focusa_manifest_client;
 mod focusa_manifest_server;
 #[allow(dead_code)]
 mod focusa_pairing_contract;
@@ -38,6 +39,7 @@ fn main() {
             deep_link::cockpit_take_deep_link,
             desktop_handoff::cockpit_open_focusa_handoff,
             focusa_manifest_server::cockpit_focusa_manifest_endpoint,
+            focusa_manifest_client::cockpit_fetch_focusa_manifest,
         ])
         .manage(deep_link::PendingDeepLink::default())
         .setup(|app| {

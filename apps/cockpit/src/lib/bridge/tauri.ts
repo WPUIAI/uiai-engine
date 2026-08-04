@@ -19,6 +19,15 @@ export interface BonjourDiscovery {
   port: number;
 }
 
+export interface FocusaSiblingManifest {
+  schema: "focusa.app.manifest.v2";
+  app: string;
+  version: string;
+  channel: string;
+  protocols: Record<string, string>;
+  capabilities: string[];
+}
+
 export async function startBridgeCallback(nonce: string): Promise<BridgeStartResult> {
   if (!isTauri()) return {};
   try {
@@ -49,6 +58,23 @@ export async function clearBridge(nonce: string): Promise<void> {
     await invoke("focusa_clear_bridge", { nonce });
   } catch (err) {
     console.error("clearBridge failed:", err);
+  }
+}
+
+export async function cockpitManifestEndpoint(): Promise<string | null> {
+  if (!isTauri()) return null;
+  const invoke = (await import("@tauri-apps/api/core")).invoke;
+  return invoke<string>("cockpit_focusa_manifest_endpoint");
+}
+
+export async function fetchFocusaSiblingManifest(endpoint: string): Promise<FocusaSiblingManifest | null> {
+  if (!isTauri()) return null;
+  try {
+    const invoke = (await import("@tauri-apps/api/core")).invoke;
+    return await invoke<FocusaSiblingManifest>("cockpit_fetch_focusa_manifest", { endpoint });
+  } catch (err) {
+    console.error("fetchFocusaSiblingManifest failed:", err);
+    return null;
   }
 }
 
