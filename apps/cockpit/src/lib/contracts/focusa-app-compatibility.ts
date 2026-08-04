@@ -25,6 +25,8 @@ export type PairingCompatibilityReason =
 export interface PairingCompatibilityResultV1 {
   schema: "focusa.pairing_compatibility_result.v1";
   compatible: boolean;
+  path_b_available: boolean;
+  recovery_action: "continue_path_b" | "use_path_a";
   reason: PairingCompatibilityReason;
   protocol?: FocusaPairingProtocol;
   expected_version?: string;
@@ -39,6 +41,8 @@ const result = (
 ): PairingCompatibilityResultV1 => ({
   schema: "focusa.pairing_compatibility_result.v1",
   compatible,
+  path_b_available: compatible,
+  recovery_action: compatible ? "continue_path_b" : "use_path_a",
   reason,
   ...detail,
 });

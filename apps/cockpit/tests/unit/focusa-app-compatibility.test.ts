@@ -12,6 +12,8 @@ describe("Focusa sibling pairing compatibility", () => {
     expect(negotiateFocusaPairingCompatibility(valid).compatibility).toEqual({
       schema: "focusa.pairing_compatibility_result.v1",
       compatible: true,
+      path_b_available: true,
+      recovery_action: "continue_path_b",
       reason: "compatible",
     });
   });
@@ -21,6 +23,8 @@ describe("Focusa sibling pairing compatibility", () => {
     delete absent.protocols.bridge;
     expect(negotiateFocusaPairingCompatibility(absent).compatibility).toMatchObject({
       compatible: false,
+      path_b_available: false,
+      recovery_action: "use_path_a",
       reason: "missing_protocol",
       protocol: "bridge",
     });
