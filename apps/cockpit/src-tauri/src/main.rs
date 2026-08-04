@@ -12,6 +12,8 @@ mod deep_link;
 mod desktop_handoff;
 #[allow(dead_code)]
 mod desktop_contract;
+#[allow(dead_code)]
+mod focusa_pairing_contract;
 
 fn main() {
     tauri::Builder::default()
