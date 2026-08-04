@@ -14,6 +14,9 @@ mod desktop_contract;
 mod desktop_handoff;
 #[allow(dead_code)]
 mod focusa_credentials;
+#[cfg(target_os = "macos")]
+#[allow(dead_code)]
+mod focusa_credentials_macos;
 mod focusa_manifest_client;
 mod focusa_manifest_server;
 #[allow(dead_code)]
