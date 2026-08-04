@@ -4,84 +4,61 @@ use crate::focusa_credentials::{
 use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct BridgeEnvelope {
-    protocol: String,
-    role: String,
-    mac_completion_payload: String,
-}
-#[derive(Clone, Debug)]
-pub struct PairingGrant {
+pub struct FocusaRoomStatus {
+    pub status: String,
     pub room_id: String,
-    pub nonce: String,
-    pub daemon_id: String,
-    pub client_type: String,
     pub device_id: String,
+    pub mac_nonce: String,
     pub scopes: Vec<String>,
-    pub expires_unix: i64,
-    pub token: String,
+    pub expires_at: String,
+    pub expired: bool,
+    pub token: Option<String>,
 }
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct PersistedPairing {
-    pub daemon_id: String,
+    pub room_id: String,
     pub device_id: String,
     pub scopes: Vec<String>,
-    pub expires_unix: i64,
+    pub expires_at: String,
     pub token_handle: CredentialHandle,
 }
-pub trait CompletionTransport {
-    fn exchange(&self, daemon_url: &str, payload: &str) -> Result<PairingGrant, String>;
-}
-fn opaque(v: &str) -> bool {
-    !v.is_empty()
-        && v.len() <= 256
-        && v.bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'~' | b':' | b'-'))
-}
-pub fn validate_and_persist<T: CompletionTransport, S: CredentialStore>(
-    transport: &T,
+pub fn validate_and_persist<S: CredentialStore>(
     store: &S,
-    daemon_url: &str,
     expected_room: &str,
     expected_nonce: &str,
+    expected_device: &str,
     expected_scopes: &[String],
     token_handle: CredentialHandle,
-    now_unix: i64,
-    raw_bridge: &str,
+    raw_status: &[u8],
 ) -> Result<PersistedPairing, String> {
-    if raw_bridge.len() > 64 * 1024 {
-        return Err("bridge completion oversized".into());
+    if raw_status.len() > 64 * 1024 {
+        return Err("room status oversized".into());
     }
-    let envelope: BridgeEnvelope =
-        serde_json::from_str(raw_bridge).map_err(|_| "bridge completion invalid")?;
-    if envelope.protocol != "focusa-connect-v1"
-        || envelope.role != "mac_completion_payload"
-        || envelope.mac_completion_payload.is_empty()
-        || envelope.mac_completion_payload.len() > 48 * 1024
+    let mut status: FocusaRoomStatus =
+        serde_json::from_slice(raw_status).map_err(|_| "room status invalid")?;
+    if status.status != "completed"
+        || status.expired
+        || status.room_id != expected_room
+        || status.mac_nonce != expected_nonce
+        || status.device_id != expected_device
+        || status.scopes != expected_scopes
     {
-        return Err("bridge completion protocol invalid".into());
+        return Err("room status authority mismatch".into());
     }
-    let mut grant = transport.exchange(daemon_url, &envelope.mac_completion_payload)?;
-    if grant.room_id != expected_room
-        || grant.nonce != expected_nonce
-        || grant.client_type != "cockpit"
-        || !opaque(&grant.daemon_id)
-        || !opaque(&grant.device_id)
-        || grant.expires_unix <= now_unix
-        || grant.scopes != expected_scopes
-        || grant.token.is_empty()
-    {
-        return Err("pairing grant mismatch".into());
-    }
-    let secret =
-        CredentialSecret::new(std::mem::take(&mut grant.token)).map_err(|e| e.to_string())?;
+    let token = status
+        .token
+        .take()
+        .filter(|v| !v.is_empty())
+        .ok_or("one-shot token unavailable")?;
+    let secret = CredentialSecret::new(token).map_err(|e| e.to_string())?;
     store
         .write(&token_handle, secret)
         .map_err(|e: CredentialError| e.to_string())?;
     Ok(PersistedPairing {
-        daemon_id: grant.daemon_id,
-        device_id: grant.device_id,
-        scopes: grant.scopes,
-        expires_unix: grant.expires_unix,
+        room_id: status.room_id,
+        device_id: status.device_id,
+        scopes: status.scopes,
+        expires_at: status.expires_at,
         token_handle,
     })
 }
@@ -90,14 +67,6 @@ mod tests {
     use super::*;
     use crate::focusa_credentials::CredentialStatus;
     use std::sync::Mutex;
-    struct Transport {
-        grant: Mutex<Option<PairingGrant>>,
-    }
-    impl CompletionTransport for Transport {
-        fn exchange(&self, _: &str, _: &str) -> Result<PairingGrant, String> {
-            self.grant.lock().unwrap().take().ok_or("consumed".into())
-        }
-    }
     #[derive(Default)]
     struct Store {
         value: Mutex<Option<String>>,
@@ -117,71 +86,59 @@ mod tests {
             CredentialStatus::Missing
         }
     }
-    fn grant() -> PairingGrant {
-        PairingGrant {
-            room_id: "room_1234567890".into(),
-            nonce: "nonce_1234567890".into(),
-            daemon_id: "daemon_1".into(),
-            client_type: "cockpit".into(),
-            device_id: "device_1".into(),
-            scopes: vec!["read".into()],
-            expires_unix: 200,
-            token: "native-token".into(),
-        }
-    }
-    fn envelope() -> String {
-        "{\"protocol\":\"focusa-connect-v1\",\"role\":\"mac_completion_payload\",\"mac_completion_payload\":\"opaque-exchange\"}".into()
+    fn status(token: Option<&str>) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({"status":"completed","room_id":"room_1234567890abcdef","device_id":"device_1234567890abcd","mac_nonce":"nonce_1234567890abcdef","scopes":["read"],"expires_at":"2026-08-03T00:05:00Z","expired":false,"token":token})).unwrap()
     }
     #[test]
-    fn validates_then_persists_without_returning_token() {
-        let t = Transport {
-            grant: Mutex::new(Some(grant())),
-        };
+    fn consumes_one_shot_status_directly_into_native_store() {
         let s = Store::default();
         let result = validate_and_persist(
-            &t,
             &s,
-            "https://focusa.example",
-            "room_1234567890",
-            "nonce_1234567890",
+            "room_1234567890abcdef",
+            "nonce_1234567890abcdef",
+            "device_1234567890abcd",
             &["read".into()],
             CredentialHandle::parse("profile:1").unwrap(),
-            100,
-            &envelope(),
+            &status(Some("native-token")),
         )
         .unwrap();
-        assert_eq!(result.device_id, "device_1");
         assert_eq!(s.value.lock().unwrap().as_deref(), Some("native-token"));
         assert!(!serde_json::to_string(&result)
             .unwrap()
             .contains("native-token"));
     }
-    #[test]
-    fn mismatch_expiry_and_client_type_never_persist() {
-        for mutation in 0..3 {
-            let mut g = grant();
-            match mutation {
-                0 => g.nonce = "wrong".into(),
-                1 => g.expires_unix = 50,
-                _ => g.client_type = "menubar".into(),
-            };
-            let t = Transport {
-                grant: Mutex::new(Some(g)),
-            };
-            let s = Store::default();
-            assert!(validate_and_persist(
-                &t,
-                &s,
-                "https://focusa.example",
-                "room_1234567890",
-                "nonce_1234567890",
-                &["read".into()],
-                CredentialHandle::parse("profile:1").unwrap(),
-                100,
-                &envelope()
-            )
-            .is_err());
-            assert!(s.value.lock().unwrap().is_none());
+    struct DeniedStore;
+    impl CredentialStore for DeniedStore {
+        fn write(&self, _: &CredentialHandle, _: CredentialSecret) -> Result<(), CredentialError> {
+            Err(CredentialError::Denied)
         }
+        fn read(&self, _: &CredentialHandle) -> Result<CredentialSecret, CredentialError> {
+            Err(CredentialError::Denied)
+        }
+        fn delete(&self, _: &CredentialHandle) -> Result<(), CredentialError> {
+            Err(CredentialError::Denied)
+        }
+        fn status(&self, _: &CredentialHandle) -> CredentialStatus {
+            CredentialStatus::Denied
+        }
+    }
+
+    #[test]
+    fn storage_denial_returns_no_profile_or_token() {
+        assert!(validate_and_persist(
+            &DeniedStore,
+            "room_1234567890abcdef",
+            "nonce_1234567890abcdef",
+            "device_1234567890abcd",
+            &["read".into()],
+            CredentialHandle::parse("profile:1").unwrap(),
+            &status(Some("native-token"))
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn consumed_or_mismatched_status_never_persists() {
+        for raw in [status(None),status(Some("")),serde_json::to_vec(&serde_json::json!({"status":"consumed","room_id":"room_1234567890abcdef","device_id":"device_1234567890abcd","mac_nonce":"nonce_1234567890abcdef","scopes":["read"],"expires_at":"x","expired":false,"token":null})).unwrap()]{let s=Store::default();assert!(validate_and_persist(&s,"room_1234567890abcdef","nonce_1234567890abcdef","device_1234567890abcd",&["read".into()],CredentialHandle::parse("profile:1").unwrap(),&raw).is_err());assert!(s.value.lock().unwrap().is_none());}
     }
 }

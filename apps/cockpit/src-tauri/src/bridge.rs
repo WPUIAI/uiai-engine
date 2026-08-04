@@ -33,7 +33,6 @@ pub struct PairingBridgeDescriptor {
 
 #[derive(Default)]
 struct BridgeState {
-    completions: Mutex<HashMap<String, String>>,
     listeners: Mutex<HashMap<String, BridgeLease>>,
 }
 
@@ -119,9 +118,9 @@ fn handle_bridge_callback(mut stream: TcpStream, nonce: String) {
         );
         return;
     }
-    if let Ok(mut map) = state().completions.lock() {
-        map.insert(nonce.clone(), body);
-    }
+    // The callback is only a bounded wake-up optimization. Canonical token
+    // delivery is polled and persisted natively from the daemon status route.
+    let _ = nonce;
     let _ = stream.write_all(
         b"HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\nconnection: close\r\n\r\nFocusa Phone Bridge completion received. You can return to the Mac app.",
     );
@@ -220,20 +219,8 @@ pub fn focusa_start_bridge_callback(nonce: String) -> Result<String, String> {
     Ok(start_bridge(legacy_room, nonce, 30)?.callback_url)
 }
 
-pub(crate) fn take_bridge_completion_native(nonce: String) -> Result<Option<String>, String> {
-    if let Ok(mut map) = state().completions.lock() {
-        if let Some(v) = map.remove(&nonce) {
-            return Ok(Some(v));
-        }
-    }
-    Ok(None)
-}
-
 #[tauri::command]
 pub fn focusa_clear_bridge(nonce: String) -> Result<(), String> {
-    if let Ok(mut map) = state().completions.lock() {
-        map.remove(&nonce);
-    }
     if let Ok(mut listeners) = state().listeners.lock() {
         if let Some(lease) = listeners.remove(&nonce) {
             let _ = lease.room_id;
