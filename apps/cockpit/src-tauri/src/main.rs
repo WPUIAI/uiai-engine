@@ -28,6 +28,8 @@ mod focusa_pairing_client;
 #[allow(dead_code)]
 mod focusa_pairing_completion;
 #[allow(dead_code)]
+mod focusa_pairing_verify;
+#[allow(dead_code)]
 mod focusa_pairing_contract;
 
 fn main() {
