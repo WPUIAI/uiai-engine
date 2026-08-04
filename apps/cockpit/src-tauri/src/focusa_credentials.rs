@@ -111,6 +111,58 @@ pub trait CredentialStore: Send + Sync {
     fn status(&self, handle: &CredentialHandle) -> CredentialStatus;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeRequest {
+    pub method: String,
+    pub url: String,
+    pub body: Option<Vec<u8>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct NativeResponse {
+    pub status: u16,
+    pub body: Vec<u8>,
+}
+
+pub trait NativeRequestExecutor: Send + Sync {
+    fn execute(
+        &self,
+        request: NativeRequest,
+        authorization: &str,
+    ) -> Result<NativeResponse, CredentialError>;
+}
+
+/// Resolves credentials only while executing native requests. Neither the raw
+/// credential nor the Authorization value can be returned through this API.
+pub struct NativeCredentialResolver<S, E> {
+    store: S,
+    executor: E,
+}
+
+impl<S: CredentialStore, E: NativeRequestExecutor> NativeCredentialResolver<S, E> {
+    pub fn new(store: S, executor: E) -> Self {
+        Self { store, executor }
+    }
+
+    pub fn execute(
+        &self,
+        handle: &CredentialHandle,
+        request: NativeRequest,
+    ) -> Result<NativeResponse, CredentialError> {
+        let secret = self.store.read(handle)?;
+        let authorization = Zeroizing::new(format!("Bearer {}", secret.expose_native()));
+        let response = self.executor.execute(request, authorization.as_str())?;
+        if response
+            .body
+            .windows(secret.expose_native().len())
+            .any(|window| window == secret.expose_native().as_bytes())
+        {
+            return Err(CredentialError::BackendFailure);
+        }
+        Ok(response)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,5 +211,78 @@ mod tests {
             assert!(!rendered.contains("token"));
             assert!(!rendered.contains("secret"));
         }
+    }
+
+    struct ReadOnlyStore;
+    impl CredentialStore for ReadOnlyStore {
+        fn write(&self, _: &CredentialHandle, _: CredentialSecret) -> Result<(), CredentialError> {
+            unreachable!()
+        }
+        fn read(&self, _: &CredentialHandle) -> Result<CredentialSecret, CredentialError> {
+            CredentialSecret::new("native-token-value".into())
+        }
+        fn delete(&self, _: &CredentialHandle) -> Result<(), CredentialError> {
+            unreachable!()
+        }
+        fn status(&self, _: &CredentialHandle) -> CredentialStatus {
+            CredentialStatus::Available
+        }
+    }
+    struct Executor {
+        echo_secret: bool,
+    }
+    impl NativeRequestExecutor for Executor {
+        fn execute(
+            &self,
+            _: NativeRequest,
+            authorization: &str,
+        ) -> Result<NativeResponse, CredentialError> {
+            assert_eq!(authorization, "Bearer native-token-value");
+            Ok(NativeResponse {
+                status: 200,
+                body: if self.echo_secret {
+                    b"native-token-value".to_vec()
+                } else {
+                    b"{\"ok\":true}".to_vec()
+                },
+            })
+        }
+    }
+
+    #[test]
+    fn native_resolver_injects_authority_without_returning_it() {
+        let resolver =
+            NativeCredentialResolver::new(ReadOnlyStore, Executor { echo_secret: false });
+        let response = resolver
+            .execute(
+                &CredentialHandle::parse("profile:native-01").unwrap(),
+                NativeRequest {
+                    method: "GET".into(),
+                    url: "https://focusa.example/v1/projects".into(),
+                    body: None,
+                },
+            )
+            .unwrap();
+        assert_eq!(response.status, 200);
+        assert!(!response
+            .body
+            .windows(18)
+            .any(|window| window == b"native-token-value"));
+    }
+
+    #[test]
+    fn native_resolver_blocks_reflected_credentials() {
+        let resolver = NativeCredentialResolver::new(ReadOnlyStore, Executor { echo_secret: true });
+        assert_eq!(
+            resolver.execute(
+                &CredentialHandle::parse("profile:native-01").unwrap(),
+                NativeRequest {
+                    method: "GET".into(),
+                    url: "https://focusa.example/v1/projects".into(),
+                    body: None
+                }
+            ),
+            Err(CredentialError::BackendFailure)
+        );
     }
 }
