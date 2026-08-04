@@ -13,10 +13,10 @@ export interface FocusaHealthProbeResult {
 }
 export type FocusaHealthProbe = (baseUrl: string, signal: AbortSignal) => Promise<FocusaHealthProbeResult>;
 
-function normalizeBaseUrl(input: string): { baseUrl: string; location: "local" | "remote" } {
+export function normalizeFocusaDaemonBaseUrl(input: string, requireExplicitPort = true): { baseUrl: string; location: "local" | "remote" } {
   if (input.length > 2048) throw new Error("daemon URL is oversized");
   const authority = input.match(/^[a-z]+:\/\/([^/?#]+)/i)?.[1] ?? "";
-  if (!/:\d+$/.test(authority)) throw new Error("daemon URL requires an explicit port");
+  if (requireExplicitPort && !/:\d+$/.test(authority)) throw new Error("daemon URL requires an explicit port");
   const url = new URL(input);
   if (url.username || url.password || url.search || url.hash || !["", "/"].includes(url.pathname)) throw new Error("daemon URL contains forbidden components");
   const local = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
@@ -24,7 +24,7 @@ function normalizeBaseUrl(input: string): { baseUrl: string; location: "local" |
   return { baseUrl: url.origin, location: local ? "local" : "remote" };
 }
 
-function candidateId(source: string, baseUrl: string): string {
+export function focusaCandidateId(source: string, baseUrl: string): string {
   let hash = 5381;
   for (const char of `${source}:${baseUrl}`) hash = ((hash << 5) + hash) ^ char.charCodeAt(0);
   return `candidate_${source}_${(hash >>> 0).toString(16)}`;
@@ -60,8 +60,8 @@ abstract class DirectSource implements FocusaDiscoverySourceAdapter {
     const candidates: FocusaDaemonCandidateV1[] = [];
     for (const value of this.values) {
       if (context.signal?.aborted) break;
-      let endpoint: ReturnType<typeof normalizeBaseUrl>;
-      try { endpoint = normalizeBaseUrl(value); } catch { continue; }
+      let endpoint: ReturnType<typeof normalizeFocusaDaemonBaseUrl>;
+      try { endpoint = normalizeFocusaDaemonBaseUrl(value); } catch { continue; }
       if (context.localOnly && endpoint.location !== "local") continue;
       const controller = new AbortController();
       const abort = () => controller.abort();
@@ -70,7 +70,7 @@ abstract class DirectSource implements FocusaDiscoverySourceAdapter {
       context.signal?.removeEventListener("abort", abort);
       candidates.push({
         schema: "focusa.daemon_candidate.v1",
-        candidate_id: candidateId(this.source, endpoint.baseUrl),
+        candidate_id: focusaCandidateId(this.source, endpoint.baseUrl),
         base_url: endpoint.baseUrl,
         source: this.source,
         location: endpoint.location,
