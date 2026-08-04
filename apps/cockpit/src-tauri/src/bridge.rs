@@ -220,8 +220,7 @@ pub fn focusa_start_bridge_callback(nonce: String) -> Result<String, String> {
     Ok(start_bridge(legacy_room, nonce, 30)?.callback_url)
 }
 
-#[tauri::command]
-pub fn focusa_take_bridge_completion(nonce: String) -> Result<Option<String>, String> {
+pub(crate) fn take_bridge_completion_native(nonce: String) -> Result<Option<String>, String> {
     if let Ok(mut map) = state().completions.lock() {
         if let Some(v) = map.remove(&nonce) {
             return Ok(Some(v));

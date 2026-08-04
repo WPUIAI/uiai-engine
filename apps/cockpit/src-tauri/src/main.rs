@@ -26,6 +26,8 @@ mod focusa_manifest_server;
 #[allow(dead_code)]
 mod focusa_pairing_client;
 #[allow(dead_code)]
+mod focusa_pairing_completion;
+#[allow(dead_code)]
 mod focusa_pairing_contract;
 
 fn main() {
@@ -45,7 +47,6 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             bridge::focusa_start_bridge_callback,
             bridge::focusa_start_pairing_bridge,
-            bridge::focusa_take_bridge_completion,
             bridge::focusa_clear_bridge,
             bonjour::focusa_discover_via_bonjour,
             deep_link::cockpit_take_deep_link,

@@ -14,12 +14,6 @@ export interface PairingBridgeDescriptor {
   bridge_owner: "cockpit";
 }
 
-export interface BridgeCompletionPayload {
-  protocol: "focusa-connect-v1";
-  role: "mac_completion_payload";
-  mac_completion_payload: string;
-}
-
 export interface BonjourDiscovery {
   url: string;
   host: string;
@@ -54,17 +48,6 @@ export async function startPairingBridge(roomId: string, nonce: string, ttlSecs:
     return await invoke<PairingBridgeDescriptor>("focusa_start_pairing_bridge", { roomId, nonce, ttlSecs });
   } catch (err) {
     console.error("startPairingBridge failed:", err);
-    return null;
-  }
-}
-
-export async function takeBridgeCompletion(nonce: string): Promise<string | null> {
-  if (!isTauri()) return null;
-  try {
-    const invoke = (await import("@tauri-apps/api/core")).invoke;
-    return await invoke<string | null>("focusa_take_bridge_completion", { nonce });
-  } catch (err) {
-    console.error("takeBridgeCompletion failed:", err);
     return null;
   }
 }
