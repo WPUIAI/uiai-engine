@@ -3,10 +3,14 @@
 //! (`focusa-connect-v1`), same ScopeContext preservation (Spec 104 MBN-01).
 //! Spec 53 §2.0, Spec 54 §B.5, §17.3.1 Path A replicated pairing.
 
-use std::collections::{HashMap, HashSet};
+use serde::Serialize;
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream, UdpSocket};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex, OnceLock,
+};
 use std::time::Duration;
 
 const BRIDGE_CALLBACK_MAX_BODY: usize = 64 * 1024;
@@ -14,9 +18,23 @@ const REQUIRED_PROTOCOL: &str = "focusa-connect-v1";
 const REQUIRED_ROLE: &str = "mac_completion_payload";
 
 #[derive(Default)]
+struct BridgeLease {
+    room_id: String,
+    cancel: Arc<AtomicBool>,
+}
+
+#[derive(Serialize)]
+pub struct PairingBridgeDescriptor {
+    pub room_id: String,
+    pub callback_url: String,
+    pub ttl_secs: u64,
+    pub bridge_owner: &'static str,
+}
+
+#[derive(Default)]
 struct BridgeState {
     completions: Mutex<HashMap<String, String>>,
-    listeners: Mutex<HashSet<String>>,
+    listeners: Mutex<HashMap<String, BridgeLease>>,
 }
 
 static BRIDGE_STATE: OnceLock<BridgeState> = OnceLock::new();
@@ -113,19 +131,37 @@ fn body_bytes_are_valid_json(body: &str) -> bool {
     serde_json::from_str::<serde_json::Value>(body).is_ok()
 }
 
-#[tauri::command]
-pub fn focusa_start_bridge_callback(nonce: String) -> Result<String, String> {
-    if nonce.trim().is_empty() {
-        return Err("nonce is required".to_string());
+fn opaque(value: &str) -> bool {
+    (16..=256).contains(&value.len())
+        && value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'~' | b':' | b'-')
+        })
+}
+
+fn start_bridge(
+    room_id: String,
+    nonce: String,
+    ttl_secs: u64,
+) -> Result<PairingBridgeDescriptor, String> {
+    if !opaque(&room_id) || !opaque(&nonce) {
+        return Err("room and nonce must be opaque bounded references".to_string());
     }
+    let ttl_secs = ttl_secs.clamp(5, 300);
+    let cancel = Arc::new(AtomicBool::new(false));
     if let Ok(mut listeners) = state().listeners.lock() {
-        if listeners.contains(&nonce) {
+        if listeners.contains_key(&nonce) {
             return Err("callback listener already active for nonce".to_string());
         }
-        listeners.insert(nonce.clone());
+        listeners.insert(
+            nonce.clone(),
+            BridgeLease {
+                room_id: room_id.clone(),
+                cancel: Arc::clone(&cancel),
+            },
+        );
     }
-    let listener = TcpListener::bind("0.0.0.0:0")
-        .map_err(|e| format!("callback bind failed: {e}"))?;
+    let listener =
+        TcpListener::bind("0.0.0.0:0").map_err(|e| format!("callback bind failed: {e}"))?;
     let port = listener
         .local_addr()
         .map_err(|e| format!("callback local addr failed: {e}"))?
@@ -140,9 +176,9 @@ pub fn focusa_start_bridge_callback(nonce: String) -> Result<String, String> {
         let nonce = nonce.clone();
         move || {
             let _ = listener.set_nonblocking(true);
-            let deadline = std::time::Instant::now() + Duration::from_secs(30);
+            let deadline = std::time::Instant::now() + Duration::from_secs(ttl_secs);
             loop {
-                if std::time::Instant::now() >= deadline {
+                if cancel.load(Ordering::Relaxed) || std::time::Instant::now() >= deadline {
                     break;
                 }
                 match listener.accept() {
@@ -161,7 +197,27 @@ pub fn focusa_start_bridge_callback(nonce: String) -> Result<String, String> {
             }
         }
     });
-    Ok(callback_url)
+    Ok(PairingBridgeDescriptor {
+        room_id,
+        callback_url,
+        ttl_secs,
+        bridge_owner: "cockpit",
+    })
+}
+
+#[tauri::command]
+pub fn focusa_start_pairing_bridge(
+    room_id: String,
+    nonce: String,
+    ttl_secs: u64,
+) -> Result<PairingBridgeDescriptor, String> {
+    start_bridge(room_id, nonce, ttl_secs)
+}
+
+#[tauri::command]
+pub fn focusa_start_bridge_callback(nonce: String) -> Result<String, String> {
+    let legacy_room = format!("legacy-room-{nonce}");
+    Ok(start_bridge(legacy_room, nonce, 30)?.callback_url)
 }
 
 #[tauri::command]
@@ -179,5 +235,38 @@ pub fn focusa_clear_bridge(nonce: String) -> Result<(), String> {
     if let Ok(mut map) = state().completions.lock() {
         map.remove(&nonce);
     }
+    if let Ok(mut listeners) = state().listeners.lock() {
+        if let Some(lease) = listeners.remove(&nonce) {
+            let _ = lease.room_id;
+            lease.cancel.store(true, Ordering::Relaxed);
+        }
+    }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pairing_bridge_owns_a_bounded_room_nonce_lease() {
+        let nonce = "nonce_1234567890abcdef".to_string();
+        let room = "room_1234567890abcdef".to_string();
+        let descriptor = start_bridge(room.clone(), nonce.clone(), 999).unwrap();
+        assert_eq!(descriptor.room_id, room);
+        assert_eq!(descriptor.bridge_owner, "cockpit");
+        assert_eq!(descriptor.ttl_secs, 300);
+        assert!(descriptor.callback_url.ends_with(&nonce));
+        assert!(start_bridge("room_abcdefghijklmnop".into(), nonce.clone(), 30).is_err());
+        focusa_clear_bridge(nonce.clone()).unwrap();
+        assert!(start_bridge("room_abcdefghijklmnop".into(), nonce.clone(), 5).is_ok());
+        focusa_clear_bridge(nonce).unwrap();
+    }
+
+    #[test]
+    fn pairing_bridge_rejects_unbounded_or_nonopaque_authority() {
+        for value in ["short", "contains space!!!!!", "contains/path!!!!!"] {
+            assert!(start_bridge(value.into(), "nonce_1234567890abcdef".into(), 30).is_err());
+        }
+    }
 }

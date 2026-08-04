@@ -7,6 +7,13 @@ export interface BridgeStartResult {
   callbackUrl?: string;
 }
 
+export interface PairingBridgeDescriptor {
+  room_id: string;
+  callback_url: string;
+  ttl_secs: number;
+  bridge_owner: "cockpit";
+}
+
 export interface BridgeCompletionPayload {
   protocol: "focusa-connect-v1";
   role: "mac_completion_payload";
@@ -37,6 +44,17 @@ export async function startBridgeCallback(nonce: string): Promise<BridgeStartRes
   } catch (err) {
     console.error("startBridgeCallback failed:", err);
     return {};
+  }
+}
+
+export async function startPairingBridge(roomId: string, nonce: string, ttlSecs: number): Promise<PairingBridgeDescriptor | null> {
+  if (!isTauri()) return null;
+  try {
+    const invoke = (await import("@tauri-apps/api/core")).invoke;
+    return await invoke<PairingBridgeDescriptor>("focusa_start_pairing_bridge", { roomId, nonce, ttlSecs });
+  } catch (err) {
+    console.error("startPairingBridge failed:", err);
+    return null;
   }
 }
 

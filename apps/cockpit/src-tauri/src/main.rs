@@ -44,6 +44,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             bridge::focusa_start_bridge_callback,
+            bridge::focusa_start_pairing_bridge,
             bridge::focusa_take_bridge_completion,
             bridge::focusa_clear_bridge,
             bonjour::focusa_discover_via_bonjour,
