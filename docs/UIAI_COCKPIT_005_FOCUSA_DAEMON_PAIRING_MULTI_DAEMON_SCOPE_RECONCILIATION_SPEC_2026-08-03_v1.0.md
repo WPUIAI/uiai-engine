@@ -6,7 +6,7 @@
 **Status:** Proposed normative implementation amendment  
 **Version:** 1.0  
 **Date:** 2026-08-03  
-**Machine-readable companion:** [`UIAI-COCKPIT-005-C01`](contracts/UIAI_COCKPIT_005_C01_FOCUSA_PAIRING_RECONCILIATION_LEDGER_v1.yaml)  
+**Machine-readable companions:** [`UIAI-COCKPIT-005-C01`](contracts/UIAI_COCKPIT_005_C01_FOCUSA_PAIRING_RECONCILIATION_LEDGER_v1.yaml), [`UIAI-COCKPIT-005-C02`](contracts/UIAI_COCKPIT_005_C02_ATOMIC_TASKGRAPH_v1.yaml)
 **Call-stack design:** `019fca49-b618-7502-9346-8facffeb7778`
 
 ---
@@ -19,7 +19,7 @@ UIAI-COCKPIT-000
 → UIAI-COCKPIT-002 + UIAI-COCKPIT-002-C01
 → UIAI-COCKPIT-003
 → UIAI-COCKPIT-004 + UIAI-COCKPIT-004-C01
-→ UIAI-COCKPIT-005 + UIAI-COCKPIT-005-C01
+→ UIAI-COCKPIT-005 + UIAI-COCKPIT-005-C01 + UIAI-COCKPIT-005-C02
 ```
 
 This amendment is the canonical Cockpit integration specification for Focusa daemon discovery, pairing, secure authentication, multi-daemon selection, and project/scope reconciliation. It incorporates, but does not replace, the daemon and Menubar authority defined by Focusa Specs 53–57.
