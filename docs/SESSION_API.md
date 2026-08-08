@@ -131,6 +131,22 @@ Preferred stable handles:
 
 Focusa ingestion must preserve exact project/Workpoint scope and independently verify the UIAI product/child token. A Focusa Evidence link cannot retroactively authorize an unlicensed UIAI action.
 
+## Packet parity status
+
+The browser research and diagnostics handoff is represented by `uiai.focusa_research_diagnostics_packet.v1`. The `POST /api/agent/research-packet` route and the Pi/extension `uiai_focusa_packet_build`/`uiai_focusa_packet_compose` surfaces preserve bounded evidence, redacted diagnostics, Focusa scope, and an exact next action. Packet intake remains advisory: it never grants UIAI entitlement or replaces Focusa Workpoint authority. This is proposal-only evidence handoff.
+
+## Search and source workflows
+
+Search is available at `/api/search` and returns provider-scoped results; callers may pass `provider=\` when selecting a provider. The keyless public fallback/second provider is bounded and must preserve redaction and stable result handles. A provider-qualified request may use `provider="wikipedia"` when the Wikipedia OpenSearch fallback is selected.
+
+## Browser sessions and diagnostics
+
+The browser sessions/actions/diagnostics surface includes `/api/errors`, `uiai_errors`, and `browser_diagnostics`. CLI, Pi, and MCP callers should retain a bounded session diagnostics handle after uncertain or failed actions.
+
+## CLI, Pi, and MCP research packet
+
+The shared CLI/Pi/MCP surface uses the `research packet` and `session diagnostics` flows so callers can compose the same bounded packet without creating a second authority.
+
 ## FPV and shares
 
 Session creation may return an FPV share in the current code. Final production behavior requires:
@@ -146,6 +162,14 @@ Session creation may return an FPV share in the current code. Final production b
 
 A viewer may remain public by possession of a narrowly scoped token. Control is never implied by view access.
 
+## Planned desktop presentation and app handoff
+
+[`UIAI-COCKPIT-004`](UIAI_COCKPIT_004_DESKTOP_SESSION_PRESENTATION_AND_MENUBAR_HANDOFF_SPEC_2026-08-03_v1.0.md) governs the planned desktop-presentation API. It is not implemented by the current routes yet.
+
+The planned `POST /api/session/{session_id}/present` operation requests that the single Cockpit desktop shell launch or focus and attach to the existing canonical Engine session through FPV. It does not create a second browser session or authorize takeover. `focusa://` remains owned by Focusa Menubar, `cockpit://` remains owned by Cockpit, and both schemes carry opaque handoff refs rather than tokens, raw project paths, private URLs, or page data.
+
+Implementation status and dependency order are tracked under `uiai-engine-roadmap.12` and `T004-00..T004-12` in the local Beads graph.
+
 ## CLI, Pi, and MCP
 
 `scripts/uiai`, the Pi extension, and MCP bridge are caller surfaces. They must all:
@@ -159,6 +183,8 @@ A viewer may remain public by possession of a narrowly scoped token. Control is 
 - keep Focusa scope separate from UIAI entitlement.
 
 ## Error contract
+
+`GET /api/health/browser` and `GET /api/metrics/browser` include an `agent_pressure` summary for long agent workflows: `uiai.agent_pressure.v1`, noncanonical operational telemetry classification, overall pressure, packet proposal authority, search provider/cache status, browser pool/queue/failure pressure, screenshot cache pressure, stored error pressure, bounded recommended actions, and a Focusa routing hint. Immediate browser pressure is derived only from current pool occupancy and queue depth; cumulative rejection, wait-time, and failure counters remain visible under `historical_pressure` without latching current admission readiness. Focusa/Pi should use this before long packet workflows or after browser/search/cache pressure symptoms instead of reading raw logs; pressure can narrow/block operational workflows but never becomes Focusa cognition truth.
 
 Representative entitlement failures:
 

@@ -97,6 +97,51 @@ func TestAgentPressureSummaryDoesNotLookSaturatedWhenCapacityAvailable(t *testin
 	}
 }
 
+func TestAgentPressureSummaryIgnoresHistoricalOverloadWhenCapacityReturns(t *testing.T) {
+	pressure := agentPressureSummary(map[string]any{
+		"active_pages":    0,
+		"available_pages": 0,
+		"max_pages":       1,
+		"fail_count":      int64(7),
+		"queue": map[string]any{
+			"depth":       0,
+			"served":      9,
+			"rejected":    14,
+			"p95_wait_ms": 24590,
+		},
+	})
+
+	browser := pressure["browser"].(map[string]any)
+	capacity := pressure["current_capacity"].(map[string]any)
+	history := pressure["historical_pressure"].(map[string]any)
+	if got, want := browser["pressure"], "normal"; got != want {
+		t.Fatalf("browser pressure=%v want=%v: %#v", got, want, pressure)
+	}
+	if got := pressure["overall_pressure"]; got == "saturated" {
+		t.Fatalf("historical browser overload must not saturate overall pressure: %#v", pressure)
+	}
+	if capacity["capacity_available"] != true || capacity["remaining_page_slots"] != 1 {
+		t.Fatalf("expected recovered current capacity: %#v", capacity)
+	}
+	if history["queue_rejected"] != 14 || history["queue_p95_wait_ms"] != 24590 || history["fail_count"] != int64(7) {
+		t.Fatalf("historical overload must remain visible: %#v", history)
+	}
+}
+
+func TestAgentPressureSummaryCurrentQueueIsConstrained(t *testing.T) {
+	pressure := agentPressureSummary(map[string]any{
+		"active_pages":    0,
+		"available_pages": 0,
+		"max_pages":       2,
+		"fail_count":      int64(0),
+		"queue":           map[string]any{"depth": 1, "rejected": 0, "p95_wait_ms": 0},
+	})
+	browser := pressure["browser"].(map[string]any)
+	if got, want := browser["pressure"], "constrained"; got != want {
+		t.Fatalf("browser pressure=%v want=%v: %#v", got, want, pressure)
+	}
+}
+
 func TestAgentPressureSummaryClassifiesSaturatedBrowser(t *testing.T) {
 	pressure := agentPressureSummary(map[string]any{
 		"active_pages":    2,

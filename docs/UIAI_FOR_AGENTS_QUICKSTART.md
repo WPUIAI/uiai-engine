@@ -2,6 +2,16 @@
 
 UIAI Engine is the proof browser for Focusa-powered agents: browser sessions, research, diagnostics, screenshots, and stable evidence handles. Focusa owns project identity, Workpoints, Trajectory, evidence linkage, prediction, metacognition, and recovery.
 
+## Highest-value agent benefits
+
+### Turn sources into proof
+
+Use provider-neutral search and Source-to-Markdown to turn public sources into bounded Markdown, `wpuiai.research_card` metadata, JSONL records, and stable evidence refs rather than copying unbounded pages into a prompt.
+
+### Hand off to Focusa/Pi cleanly
+
+Use `uiai_focusa_packet_compose` or `scripts/uiai research packet` for a redacted `uiai.focusa_research_diagnostics_packet.v1`; packet intake proposes evidence and the next action without replacing Focusa Workpoint authority.
+
 > **Release boundary:** Current UIAI code still exposes selected loopback-public execution. That is legacy development behavior, not authority-issued Evaluation. New evaluator/customer use is blocked until signed product/feature/limit enforcement is universal. Agents must not treat a successful local call, local token, extension token, or health result as a license.
 
 ## 1. Read the authority contracts
@@ -109,6 +119,10 @@ curl -fsS "$UIAI_ENGINE_URL/api/search/providers" "${AUTH[@]}" | jq .
 curl -fsS -X POST "$UIAI_ENGINE_URL/api/search" \
   "${AUTH[@]}" -H 'Content-Type: application/json' \
   -d '{"query":"official public source"}' | jq .
+
+uiai_source_to_markdown <public-url>
+source_to_markdown <public-url>
+scripts/uiai markdown <public-url>
 ```
 
 ## 7. Focusa handoff
@@ -127,6 +141,16 @@ UIAI stable evidence handle
 Focusa bundle onboarding may issue a child token only from a valid parent UIAI grant. UIAI independently verifies its audience, parent lease id/sequence/digest, node, feature, expiry, and limits.
 
 ## 8. Pi and MCP
+
+CLI parity examples:
+
+```text
+/uiai research <query>
+/uiai proof <url>
+/uiai diagnose <session_id>
+```
+
+Install the repository Pi skills with `scripts/install-pi-skills.sh --apply` before using the skill-specific workflows.
 
 Project-local Pi tools and MCP schemas are discovery/caller surfaces. They must:
 

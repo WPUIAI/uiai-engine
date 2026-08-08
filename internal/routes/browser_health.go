@@ -38,7 +38,7 @@ func agentPressureSummary(browserStats map[string]any) map[string]any {
 	searchPressure := stringFromAny(searchSummary["pressure"], "unknown")
 	currentCapacity := currentBrowserCapacity(activePages, availablePages, maxPages, queueDepth)
 	historicalPressure := historicalBrowserPressure(queue, failCount)
-	browserPressure := browserPressureLevel(activePages, maxPages, failCount, queueDepth, queueRejected, queueP95WaitMs)
+	browserPressure := browserPressureLevel(activePages, maxPages, queueDepth)
 	errorPressure := errorPressureLevel(observability.Count())
 	overallPressure := maxPressureLevel(browserPressure, searchPressure, cachePressure, errorPressure)
 	actions := pressureRecommendedActions(overallPressure, browserPressure, searchPressure, cachePressure, errorPressure)
@@ -147,11 +147,11 @@ func historicalBrowserPressure(queue map[string]any, failCount int64) map[string
 	}
 }
 
-func browserPressureLevel(activePages, maxPages int, failCount int64, queueDepth, queueRejected, queueP95WaitMs int) string {
-	if maxPages > 0 && activePages >= maxPages || queueRejected > 0 || queueP95WaitMs >= 5000 {
+func browserPressureLevel(activePages, maxPages, queueDepth int) string {
+	if maxPages > 0 && activePages >= maxPages {
 		return "saturated"
 	}
-	if queueDepth > 0 || failCount >= 3 {
+	if queueDepth > 0 {
 		return "constrained"
 	}
 	return "normal"
