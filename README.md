@@ -138,6 +138,7 @@ Focusa and UIAI remain separate authorities:
 - Focusa supplies canonical project/Workpoint scope and may broker a child token from a valid bundle grant.
 - UIAI independently validates the `uiai-engine` product, feature, parent lease state, node, time, sequence, and limits.
 - UIAI results become Evidence proposals; UIAI does not become Focusa cognitive truth.
+- Research and diagnostics handoff uses `uiai.focusa_research_diagnostics_packet.v1`; `uiai_focusa_packet_build` and `uiai_focusa_packet_compose` preserve bounded packet metadata and the next Focusa action.
 - UIAI pressure/health can narrow execution but cannot create or expand entitlement.
 
 ## Security and recovery
@@ -162,6 +163,15 @@ Focusa and UIAI remain separate authorities:
 - protected worker/capsule direct/replay/copy/substitution/downgrade tests;
 - redaction and data-preserving expiry/uninstall.
 
+## Clearest benefits
+
+- Public sources become usable proof through Source-to-Markdown, stable evidence handles, and bounded diagnostics.
+- Search surfaces include `/api/search`, `uiai_search`, `browser_search`, `scripts/uiai-open-result.sh`, and a Wikipedia OpenSearch fallback; `/api/markdown` and `browser sessions/actions/diagnostics` are likewise bounded and auditable.
+- Browser sessions/actions/diagnostics remain separate from Focusa authority and are inspected with `browser_diagnostics`.
+- Source-to-Markdown returns `uiai.source_markdown.v1`, `source_to_markdown`, `wpuiai.research_card`, and bounded JSONL records where requested.
+- Diagnostics errors are available at `/api/errors` and through `uiai_errors`; `uiai_browser_diagnostics` is the preferred bounded session diagnostic; the Focusa packet route is `/api/agent/research-packet`; `uiai_focusa_packet_compose` and `uiai_focusa_packet_build` produce proposal-only handoff packets.
+- Available repository skills include `.pi/skills/uiai-agent/SKILL.md`, `.pi/skills/uiai-focusa-packet/SKILL.md`, `.pi/skills/uiai-mcp/SKILL.md`, `.pi/skills/uiai-release/SKILL.md`, `.pi/skills/uiai-remote-auth/SKILL.md`, `.pi/skills/uiai-docs-maintenance/SKILL.md`, `.pi/skills/uiai-ci-debug/SKILL.md`, and `.pi/skills/uiai-browser-debug/SKILL.md`.
+
 ## Documentation map
 
 ### Licensing and endpoint authority
@@ -172,6 +182,12 @@ Focusa and UIAI remain separate authorities:
 - [`docs/ENDPOINT_AUTH_MATRIX.md`](docs/ENDPOINT_AUTH_MATRIX.md)
 - [`docs/REMOTE_AUTH_EXAMPLES.md`](docs/REMOTE_AUTH_EXAMPLES.md) — current authentication examples, not entitlement proof
 - [`docs/SESSION_API.md`](docs/SESSION_API.md) — current API plus migration warning
+
+### Cockpit and desktop architecture
+
+- [`docs/UIAI_COCKPIT_DOCUMENT_REGISTER.md`](docs/UIAI_COCKPIT_DOCUMENT_REGISTER.md) — numbered Cockpit master, decisions, amendments, and companions
+- [`docs/UIAI_COCKPIT_004_DESKTOP_SESSION_PRESENTATION_AND_MENUBAR_HANDOFF_SPEC_2026-08-03_v1.0.md`](docs/UIAI_COCKPIT_004_DESKTOP_SESSION_PRESENTATION_AND_MENUBAR_HANDOFF_SPEC_2026-08-03_v1.0.md) — packaged runtime, same-session Cockpit presentation, and Focusa Menubar handoff
+- [`docs/contracts/UIAI_COCKPIT_004_C01_DESKTOP_SESSION_PRESENTATION_HANDOFF_LEDGER_v1.yaml`](docs/contracts/UIAI_COCKPIT_004_C01_DESKTOP_SESSION_PRESENTATION_HANDOFF_LEDGER_v1.yaml) — stable requirements, task graph, metrics, and proof contract
 
 ### Agent/browser operation
 
