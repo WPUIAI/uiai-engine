@@ -38,6 +38,8 @@
     "@tauri-apps/plugin-updater": "^2.9.0",
     "@theatre/core": "^0.7.1",
     "gsap": "^3.12.5",
+    "remotion": "^4.0.512",
+    "remotion-bits": "^0.2.0",
     "three": "^0.160.0"
   }
 }

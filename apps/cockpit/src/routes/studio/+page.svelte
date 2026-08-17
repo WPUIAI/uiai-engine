@@ -36,6 +36,12 @@
   let homepageEmbedded = false;
   let otaStatus: "idle"|"checking"|"ready"|"applied" = "idle";
   let lambdaBusy = false;
+  // v0.10 Combine-All — motion-design + remotion + openness philosophy
+  let motionPersonality: "Premium"|"Playful"|"Corporate"|"Energetic" = "Premium";
+  let staggerMs = 60;
+  let iterationCount = 0;
+  let remotionComp: { id:string, fps:number, durationInFrames:number, title:string } | null = null;
+  try { const ic = localStorage.getItem("studio:iteration"); if(ic) iterationCount = JSON.parse(ic); const mp = localStorage.getItem("studio:motion"); if(mp) motionPersonality = JSON.parse(mp) as any; } catch {}
   let evidence: {id:string, kind:string, at:string, receipt:string}[] = [];
   let critiques: {id:string, sev:"info"|"warn"|"error", msg:string}[] = [
     {id:"a11y-1", sev:"warn", msg:"Low contrast in hero CTA — 2.9:1 (needs 4.5:1)"},
@@ -50,6 +56,8 @@
     const v = localStorage.getItem("studio:diff"); if (v) diffThreshold = JSON.parse(v);
   } catch {}
   $: try { localStorage.setItem("studio:diff", JSON.stringify(diffThreshold)); } catch {}
+  $: try { localStorage.setItem("studio:motion", JSON.stringify(motionPersonality)); } catch {}
+  $: try { localStorage.setItem("studio:iteration", JSON.stringify(iterationCount)); } catch {}
 
   function initTheatre(){
     try { theatreProject = getProject("StudioWorkRouter", { state: { sheetsById: { "WorkRouter": { staticOverrides: { byObject: {} } } }, definitionVersion: "0.5.0" } }); } catch {}
@@ -149,6 +157,49 @@
     try { localStorage.setItem("studio:evidence", JSON.stringify(evidence)); } catch {}
   }
 
+  function getMotionConfig(){
+    const map: Record<string,{dur:number,ease:string,overshoot:string}> = {
+      Premium: { dur: 500, ease: "cubic-bezier(0.4,0,0.2,1)", overshoot: "0%" },
+      Playful: { dur: 250, ease: "ease-out-back", overshoot: "12%" },
+      Corporate: { dur: 300, ease: "cubic-bezier(0.2,0,0,1)", overshoot: "2%" },
+      Energetic: { dur: 180, ease: "ease-out-expo", overshoot: "22%" },
+    };
+    return map[motionPersonality];
+  }
+  function buildRemotionComposition(){
+    // Philosophy: every render = hypothesis → evidence → iteration. Cutting-edge mixer: 3D + motion + real video
+    const fps = 30, durationInFrames = 180; // 6s
+    const id = Math.random().toString(36).slice(2,8);
+    const cfg = getMotionConfig();
+    const comp = {
+      id, fps, durationInFrames,
+      title: `WorkRouter ${motionPersonality} — Premium tilt+bloom+bits`,
+      philosophy: "Continual openness: beautiful = next iteration beats last evidence",
+      stack: ["three@0.160","@theatre/core 0.7","gsap 3.12","remotion@4","remotion-bits","motion-design Disney12","EffectComposer UnrealBloom+Bokeh","HyperFrames 0.7"],
+      timeline: [
+        { at: 0, kind: "capture:real", src: url || "workrouter.app", props: "CanvasImage staticFile" },
+        { at: 1.2, kind: "hunt:3D", value: `tilt ${theatreTime.toFixed(1)} + Scene3D Stagger ${staggerMs}ms`, scene: "PlaneGeometry 1.6×0.92 + ParticlesFountain" },
+        { at: 2.8, kind: "motion:graphics", value: `AnimatedText y:[40,0] blur:[10,0] split:word ${cfg.ease}`, lib: "remotion-bits AnimatedText + Particles" },
+        { at: 4.5, kind: "reveal:caption+voice", value: `karaoke-captions + Aura-${auraVoice} + Bokeh focus ${dofFocus}` }
+      ],
+      motion: cfg
+    };
+    remotionComp = { id, fps, durationInFrames, title: comp.title };
+    try { localStorage.setItem("studio:remotion", JSON.stringify(comp)); localStorage.setItem("studio:motion", JSON.stringify(motionPersonality)); } catch {}
+    iterationCount += 1; try { localStorage.setItem("studio:iteration", JSON.stringify(iterationCount)); } catch {}
+    addEvidence(`remotion:composition:${id}:${motionPersonality}`);
+    try { new BroadcastChannel("studio:wb").postMessage({ kind:"remotion-composition", comp }); } catch {}
+    return comp;
+  }
+  async function renderRemotion(){
+    const comp = buildRemotionComposition();
+    addEvidence(`remotion:render:${comp.id}`);
+    // In cockpit preview we drive Three composer; real render = npx remotion render src/remotion/index.ts WorkRouter out.mp4
+    tickProduce();
+    // also trigger HyperFrames for equivalence
+    try { await renderHyperFrames(); } catch {}
+  }
+
   async function capture() {
     if (!url.trim()) return;
     capturing = true; error = "";
@@ -205,7 +256,7 @@
 
 <svelte:head><title>Studio · UIAI Engine Cockpit</title></svelte:head>
 <div class="screen">
-  <div class="screen-header"><div><p class="screen-kicker">Create — Workstream-scoped</p><h1>Studio</h1><p class="screen-lede">006 Creative Workbench — Capture / Compare / Analyze / Design / Produce + whiteboard (tldraw-offline LWW) + generative GUIs + Report Canvas collab.</p></div><span class="badge">Scope: workstream</span></div>
+  <div class="screen-header"><div><p class="screen-kicker">Create — Workstream-scoped</p><h1>Studio</h1><p class="screen-lede">006 Creative Workbench — Capture / Compare / Analyze / Design / Produce + whiteboard (tldraw-offline LWW) + generative GUIs + Report Canvas collab.</p><p style="font-size:11px;color:var(--color-text-muted);margin-top:6px"><em>Philosophy: Continual openness — every render is a hypothesis → evidence → revision. Beautiful = next iteration beats last evidence. Cutting-edge mixer: 3D + motion graphics + real video.</em></p></div><span class="badge">Scope: workstream</span><span class="badge" style="margin-left:8px;background:var(--color-accent);color:#fff">Iter #{iterationCount} · {motionPersonality} · {getMotionConfig().dur}ms {getMotionConfig().ease}</span></div>
 
   <nav class="studio-tabs" aria-label="Studio sections">
     {#each [["capture","Capture"],["compare","Compare"],["analyze","Analyze"],["design","Design"],["produce","Produce"]] as [id,label]}
@@ -251,6 +302,7 @@
       <canvas bind:this={produceCanvas} width="840" height="260" style="width:100%;border:1px solid var(--color-border);border-radius:8px;background:#0a0a0f;display:block;margin:8px 0"></canvas>
       <div style="display:flex;gap:8px;margin-bottom:10px"><button class="screen-button primary" on:click={()=>tickProduce()}>Play preview</button><button class="screen-button" on:click={()=>stopProduce()}>Stop</button><button class="screen-button" on:click={()=>addEvidence("media:produce")}>Render WorkRouter.mp4 (mock)</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">HyperFrames timeline 0–6s · 3D tilt + UnrealBloom + DoF</span></div>
       <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><label>Theatre <input type="range" min="0" max="6" step="0.1" bind:value={theatreTime} /></label><span>{theatreTime.toFixed(1)}s</span><label>Bloom <input type="range" min="0" max="1.5" step="0.05" bind:value={bloomStrength} /></label><span>{bloomStrength.toFixed(2)}</span><label>DOF aperture <input type="range" min="0.00005" max="0.0005" step="0.00001" bind:value={dofAperture} /></label><span>{dofAperture.toFixed(5)}</span><label>focus <input type="range" min="0.5" max="1.2" step="0.01" bind:value={dofFocus} /></label><span>{dofFocus.toFixed(2)}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><span style="font-size:11px;background:var(--color-surface-elevated);padding:4px 8px;border-radius:6px;border:1px solid var(--color-border)">Openness: iter {iterationCount} → next beats last evidence</span><label>Motion <select bind:value={motionPersonality} style="font-size:11px"><option>Premium</option><option>Playful</option><option>Corporate</option><option>Energetic</option></select></label><span style="font-size:10px;color:var(--color-text-muted)">{getMotionConfig().dur}ms · {getMotionConfig().overshoot} overshoot · {getMotionConfig().ease}</span><label>Stagger <input type="range" min="20" max="120" step="5" bind:value={staggerMs} /></label><span style="font-size:10px">{staggerMs}ms</span><button class="screen-button" on:click={buildRemotionComposition}>Build Remotion comp</button><button class="screen-button primary" on:click={renderRemotion}>▶︎ Remotion + 3D + Bloom + DOF</button>{#if remotionComp}<span style="font-size:10px;color:var(--color-text-muted)">{remotionComp.title} · {remotionComp.durationInFrames}f</span>{/if}</div>
       <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><button class="screen-button" on:click={initTheatre}>Init Theatre</button><button class="screen-button" on:click={addEvidenceBlockRecipe}>Gen block-recipe</button><button class="screen-button primary" on:click={renderHyperFrames} disabled={hyperframesBusy}>{hyperframesBusy ? "Rendering…" : "Build HyperFrames → /api/media/produce"}</button><button class="screen-button" on:click={generateReportCanvas}>Generate Report Canvas → Evidence</button><button class="screen-button" on:click={initSSE}>{sseConnected ? "H44 ✓" : "Connect SSE"}</button><span style="font-size:10px;color:var(--color-text-muted)">Bokeh DOF · EffectComposer+UnrealBloom</span></div>
       <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><label>Aura voice <select bind:value={auraVoice} style="font-size:11px"><option>Aura-Asteria-en</option><option>Aura-Luna-en</option><option>Aura-Orion-en</option><option>Web Speech</option></select></label><button class="screen-button" on:click={()=>speakAura()}>▶︎ Aura preview</button><label style="display:flex;gap:4px;align-items:center"><input type="checkbox" bind:checked={captionsEnabled} on:change={toggleCaptions} /> Captions VTT</label><span style="font-size:10px;color:var(--color-text-muted)">{captionsEnabled ? "burned-in" : "off"}</span><button class="screen-button" on:click={buildClaimManifest}>Build claim manifest</button><button class="screen-button primary" on:click={publishToDemos} disabled={hyperframesBusy}>{hyperframesBusy ? "Publishing…" : "Publish → /demos"}</button><button class="screen-button" on:click={approveInCommandCenter}>Approve in Command Center</button></div>
       <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><button class="screen-button" on:click={publishLambda} disabled={lambdaBusy}>{lambdaBusy ? "Lambda…" : "Lambda publish → cloud"}</button><button class="screen-button" on:click={embedHomepage} disabled={!claimManifest && !demosGallery.length}>{homepageEmbedded ? "Homepage ✓ embedded" : "Embed → homepage"}</button><button class="screen-button" on:click={checkOTA} disabled={otaStatus==="checking"}>{otaStatus==="checking" ? "Checking OTA…" : otaStatus==="ready" ? "OTA ready → Apply" : otaStatus==="applied" ? "OTA ✓ applied" : "Check OTA"}</button>{#if otaStatus==="ready"}<button class="screen-button primary" on:click={applyOTA}>Apply OTA</button>{/if}<span style="font-size:10px;color:var(--color-text-muted)">lambda render · homepage /demos · OTA lifecycle</span></div>
