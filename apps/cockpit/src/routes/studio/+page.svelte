@@ -1,6 +1,8 @@
 <script lang="ts">
   import "$lib/ui/screen.css";
   import * as THREE from "three";
+  import { getProject } from "@theatre/core";
+  import gsap from "gsap";
   import { engineClient, type ScreenshotResult } from "$lib/engine-client";
 
   type Tab = "capture" | "compare" | "analyze" | "design" | "produce";
@@ -14,6 +16,8 @@
   let diffThreshold = 12;
   let produceCanvas: HTMLCanvasElement | null = null;
   let threeRaf: number | null = null;
+  let theatreTime = 0;
+  let theatreProject: ReturnType<typeof getProject> | null = null;
   let evidence: {id:string, kind:string, at:string, receipt:string}[] = [];
   let critiques: {id:string, sev:"info"|"warn"|"error", msg:string}[] = [
     {id:"a11y-1", sev:"warn", msg:"Low contrast in hero CTA — 2.9:1 (needs 4.5:1)"},
@@ -29,6 +33,22 @@
   } catch {}
   $: try { localStorage.setItem("studio:diff", JSON.stringify(diffThreshold)); } catch {}
 
+  function initTheatre(){
+    try { theatreProject = getProject("StudioWorkRouter", { state: { sheetsById: { "WorkRouter": { staticOverrides: { byObject: {} } } }, definitionVersion: "0.5.0" } }); } catch {}
+    addEvidence("theatre:init");
+  }
+  $: if (theatreProject && produceCanvas) { try { gsap.to(produceCanvas, { duration: 0.3, rotation: theatreTime * 2 }); } catch {} }
+  function exportWhiteboardJSON(){
+    const json = JSON.stringify(whiteboardStrokes);
+    addEvidence("whiteboard:json");
+    try { localStorage.setItem("studio:wb:json", json); } catch {}
+    try { new BroadcastChannel("studio:wb").postMessage({ kind: "wb-sync", strokes: whiteboardStrokes }); } catch {}
+    return json;
+  }
+  function addEvidenceBlockRecipe(){
+    addEvidence("block-recipes:theatre");
+    try { localStorage.setItem("studio:block-recipes", JSON.stringify({ theatreTime, at: new Date().toISOString() })); } catch {}
+  }
   function addEvidence(kind:string){
     evidence = [{id:Math.random().toString(36).slice(2,8), kind, at:new Date().toISOString(), receipt:`receipt:${kind}:${Date.now()}`}, ...evidence];
     try { localStorage.setItem("studio:evidence", JSON.stringify(evidence)); } catch {}
@@ -122,12 +142,13 @@
       </div>
       <p style="margin-top:12px"><em>Whiteboard (tldraw-offline) — Workstream-scoped LWW via SSE/BroadcastChannel, undo-ready. Click to sketch; agent strokes via semantic API.</em></p>
       <canvas bind:this={canvasEl} width="640" height="240" class="whiteboard" on:click={addStroke}></canvas>
-      <p><button class="screen-button" on:click={()=>{whiteboardStrokes=[]; persistWhiteboard(); drawWhiteboard();}}>Clear board</button> Strokes: {whiteboardStrokes.length} — persists to Evidence as JSON+PNG (stub) <button class="screen-button" on:click={()=>addEvidence("whiteboard")}>Export Evidence</button></p>
+      <p><button class="screen-button" on:click={()=>{whiteboardStrokes=[]; persistWhiteboard(); drawWhiteboard();}}>Clear board</button> Strokes: {whiteboardStrokes.length} — persists to Evidence as JSON+PNG (stub) <button class="screen-button" on:click={()=>addEvidence("whiteboard")}>Export Evidence</button> <button class="screen-button" on:click={()=>exportWhiteboardJSON()}>Export JSON + Broadcast</button></p>
     </section>
   {:else if tab === "produce"}
     <section class="screen-card"><p class="screen-kicker">Produce — /api/media/produce + /api/media/frame/* → mockups, GIFs, HyperFrames video</p><h2>Media produce</h2><p>Device mockups + WorkRouter product video (Three/Theatre/GSAP + Bloom/Bokeh open-source). Lifecycle/cancel/artifact → Evidence.</p>
       <canvas bind:this={produceCanvas} width="840" height="260" style="width:100%;border:1px solid var(--color-border);border-radius:8px;background:#0a0a0f;display:block;margin:8px 0"></canvas>
       <div style="display:flex;gap:8px;margin-bottom:10px"><button class="screen-button primary" on:click={()=>tickProduce()}>Play preview</button><button class="screen-button" on:click={()=>stopProduce()}>Stop</button><button class="screen-button" on:click={()=>addEvidence("media:produce")}>Render WorkRouter.mp4 (mock)</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">HyperFrames timeline 0–6s · 3D tilt + UnrealBloom + DoF</span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:6px 0"><label>Theatre <input type="range" min="0" max="6" step="0.1" bind:value={theatreTime} /></label><span>{theatreTime.toFixed(1)}s</span><button class="screen-button" on:click={initTheatre}>Init Theatre</button><button class="screen-button" on:click={addEvidenceBlockRecipe}>Gen block-recipe</button><span style="font-size:10px;color:var(--color-text-muted)">GSAP beat · @theatre/core 0.7</span></div>
       <div class="studio-grid">
         <div class="mini-card"><strong>Device mockup</strong><p>/api/media/frame</p><button class="screen-button" on:click={()=>addEvidence("media:frame")}>Frame (stub)</button></div>
         <div class="mini-card"><strong>WorkRouter video</strong><p>capture → beats → render</p><button class="screen-button" on:click={()=>addEvidence("media:beats")}>Beats (stub)</button></div>
