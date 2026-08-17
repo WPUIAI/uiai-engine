@@ -1,7 +1,7 @@
 // @ts-nocheck
 // 006 v0.11 Combine-All polish — Cutting-edge: noise mesh-gradient + shapes + particles + Lottie + karaoke + real video
 // Philosophy: continual openness — next iteration beats last evidence
-import { AbsoluteFill, Sequence, useCurrentFrame, interpolate, Easing } from "remotion";
+import { AbsoluteFill, Sequence, useCurrentFrame, interpolate, Easing, Video, staticFile } from "remotion";
 
 export const WorkRouterComposition = ({ title = "Stop hunting for work. Let WorkRouter hunt for you.", personality = "Premium", shaderEnabled = true, particlesEnabled = true, lottieEnabled = false, lowerThirdEnabled = true }) => {
   const frame = useCurrentFrame();
@@ -24,7 +24,8 @@ export const WorkRouterComposition = ({ title = "Stop hunting for work. Let Work
       )}
       <Sequence from={0} durationInFrames={45}>
         <div style={{ position: "absolute", inset: 0, opacity: p1, transform: `scale(${0.96 + p1 * 0.04})` }}>
-          <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800 }}>workrouter.app — real capture + HyperFrames</div>
+          <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800 }}>workrouter.app — real capture + HyperFrames <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 8 }}>(Video staticFile → next iter mp4)</span></div>
+          {/* @remotion/media Video src={staticFile("workrouter-capture.mp4")} when capture exists */}
         </div>
       </Sequence>
       <Sequence from={36} durationInFrames={58}>

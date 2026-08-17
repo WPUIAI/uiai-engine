@@ -19,6 +19,8 @@
     "cockpit:gate": "npm run check && npm run build"
   },
   "devDependencies": {
+    "@remotion/cli": "^4.0.512",
+    "@remotion/media": "^4.0.512",
     "@sveltejs/adapter-static": "^3.0.0",
     "@sveltejs/kit": "^2.0.0",
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
