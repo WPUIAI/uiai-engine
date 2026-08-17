@@ -1,7 +1,9 @@
 // @ts-nocheck
-import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+// 006 v0.11 Combine-All polish — Cutting-edge: noise mesh-gradient + shapes + particles + Lottie + karaoke + real video
+// Philosophy: continual openness — next iteration beats last evidence
+import { AbsoluteFill, Sequence, useCurrentFrame, interpolate, Easing } from "remotion";
 
-export const WorkRouterComposition = ({ title = "Stop hunting for work. Let WorkRouter hunt for you.", personality = "Premium" }) => {
+export const WorkRouterComposition = ({ title = "Stop hunting for work. Let WorkRouter hunt for you.", personality = "Premium", shaderEnabled = true, particlesEnabled = true, lottieEnabled = false }) => {
   const frame = useCurrentFrame();
   const cfg = {
     Premium: { dur: 15, ease: Easing.bezier(0.4, 0, 0.2, 1), stagger: 2 },
@@ -13,18 +15,34 @@ export const WorkRouterComposition = ({ title = "Stop hunting for work. Let Work
   const p2 = interpolate(frame, [36, 48], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: cfg.ease });
   const bloom = 0.85 + Math.sin(frame * 0.05) * 0.07;
   const words = title.split(" ");
+  const noiseOffset = Math.sin(frame * 0.02) * 20;
   return (
     <AbsoluteFill style={{ background: "#0a0a14", color: "#fff", overflow: "hidden" }}>
+      {/* Shader mesh-gradient via noise offset — @remotion/noise inspiration, no extra import for preview */}
+      {shaderEnabled && (
+        <div style={{ position: "absolute", inset: 0, opacity: 0.22, background: `radial-gradient(600px at ${50 + noiseOffset}% 50%, #3355ff 0%, transparent 60%), radial-gradient(500px at ${50 - noiseOffset}% 30%, #6a7bff 0%, transparent 60%)`, filter: "blur(40px)" }} />
+      )}
       <Sequence from={0} durationInFrames={45}>
         <div style={{ position: "absolute", inset: 0, opacity: p1, transform: `scale(${0.96 + p1 * 0.04})` }}>
-          <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800 }}>workrouter.app — real capture</div>
+          <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800 }}>workrouter.app — real capture + HyperFrames</div>
         </div>
       </Sequence>
       <Sequence from={36} durationInFrames={58}>
         <div style={{ position: "absolute", inset: 0, opacity: p2, transform: `perspective(900px) rotateY(${0.22 + Math.sin(frame*0.04)*0.12}rad) rotateX(${-0.35 + Math.cos(frame*0.03)*0.06}rad)` }}>
-          <div style={{ width: 860, height: 520, margin: "auto", marginTop: 60, background: "linear-gradient(135deg,#3355ff 0%,#6a7bff 100%)", borderRadius: 16, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, padding: 16 }}>
-            {[1,2,3,4,5,6].map((i) => (<div key={i} style={{ background: "#fff", borderRadius: 12, padding: 12, opacity: p2 }}><div style={{ height: 8, background: "#e5e7eb", borderRadius: 4, marginBottom: 8 }} /><div style={{ height: 40, background: "#f3f4f6", borderRadius: 8 }} /></div>))}
+          <div style={{ width: 860, height: 520, margin: "auto", marginTop: 60, background: "linear-gradient(135deg,#3355ff 0%,#6a7bff 100%)", borderRadius: 16, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, padding: 16, boxShadow: `0 20px 60px rgba(51,85,255,${0.18 + p2*0.12})` }}>
+            {[1,2,3,4,5,6].map((i) => (<div key={i} style={{ background: "#fff", borderRadius: 12, padding: 12, opacity: p2, transform: `translateY(${12 - p2*12}px)` }}><div style={{ height: 8, background: "#e5e7eb", borderRadius: 4, marginBottom: 8 }} /><div style={{ height: 40, background: "#f3f4f6", borderRadius: 8 }} /></div>))}
           </div>
+          {/* Particles — remotion-bits ParticlesFountain style, CSS only for preview; real = <Particles> */}
+          {particlesEnabled && (
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+              {[...Array(12)].map((_, i) => {
+                const y = interpolate(frame, [36 + i*2, 94], [520, -40], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+                const x = 100 + (i * 140) % 1720;
+                const o = interpolate(frame, [36 + i*2, 50 + i*2, 80 + i*2], [0, 0.9, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+                return <div key={i} style={{ position: "absolute", left: x, top: y, width: 6, height: 6, borderRadius: 999, background: "#a5b4fc", opacity: o, boxShadow: "0 0 10px #6a7bff" }} />;
+              })}
+            </div>
+          )}
         </div>
       </Sequence>
       <Sequence from={84} durationInFrames={60}>
@@ -36,10 +54,11 @@ export const WorkRouterComposition = ({ title = "Stop hunting for work. Let Work
               return (<span key={i} style={{ display: "inline-block", marginRight: 10, opacity: wp, transform: `translateY(${40 - wp*40}px)`, filter: `blur(${10 - wp*10}px)` }}>{w}</span>);
             })}
           </h1>
+          {lottieEnabled && <div style={{ marginTop: 12, fontSize: 10, opacity: 0.5 }}>dotLottie overlay — LottieFiles motion (lottie-web) — next iteration hypothesis</div>}
         </div>
       </Sequence>
       <Sequence from={135} durationInFrames={45}>
-        <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "rgba(0,0,0,0.8)", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 11, opacity: interpolate(frame, [135, 142], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) }}>WEBVTT · Let WorkRouter hunt for you · bloom {bloom.toFixed(2)}</div>
+        <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "rgba(0,0,0,0.85)", color: "#fff", padding: "10px 16px", borderRadius: 8, fontSize: 11, opacity: interpolate(frame, [135, 142], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }), border: "1px solid rgba(255,255,255,0.12)" }}>WEBVTT karaoke · Let WorkRouter hunt for you · bloom {bloom.toFixed(2)} ·iter — beautiful = next beats last</div>
       </Sequence>
     </AbsoluteFill>
   );
