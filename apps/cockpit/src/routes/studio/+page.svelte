@@ -28,6 +28,11 @@
   let dofFocus = 0.92;
   let reportCanvas: { id:string, title:string, at:string } | null = null;
   let hyperframesBusy = false;
+  let auraVoice = "Aura-Asteria-en";
+  let captionsEnabled = true;
+  let captionsVtt = "WEBVTT\n\n00:00:00.000 --> 00:00:02.500\nStop hunting for work.\n\n00:00:02.500 --> 00:00:06.000\nLet WorkRouter hunt for you.\n";
+  let claimManifest: { id:string, claims:string[], at:string, receipt:string } | null = null;
+  let demosGallery: { id:string, title:string, src:string }[] = [];
   let evidence: {id:string, kind:string, at:string, receipt:string}[] = [];
   let critiques: {id:string, sev:"info"|"warn"|"error", msg:string}[] = [
     {id:"a11y-1", sev:"warn", msg:"Low contrast in hero CTA — 2.9:1 (needs 4.5:1)"},
@@ -93,6 +98,28 @@
     const payload = { title: "Studio Report Canvas — WorkRouter", strokes: whiteboardStrokes.length, theatreTime, bloomStrength, dofAperture, at: new Date().toISOString() };
     try { const r=await fetch("/api/report/canvas", {method:"POST", headers:{ "content-type":"application/json"}, body: JSON.stringify(payload)}); const j=await r.json().catch(()=>null); addEvidence(j?.receipt ? `report:canvas:${j.receipt.slice(0,6)}` : "report:canvas:mock"); reportCanvas={ id: j?.id?.slice(0,8) || Math.random().toString(36).slice(2,8), title:"Studio Report Canvas", at:payload.at}; } catch { addEvidence("report:canvas:mock"); reportCanvas={ id:Math.random().toString(36).slice(2,8), title:"Studio Report Canvas (mock)", at:payload.at};}
     try { new BroadcastChannel("studio:wb").postMessage({kind:"report-canvas", reportCanvas}); } catch {}
+  }
+  function speakAura(text = "Stop hunting for work. Let WorkRouter hunt for you."){
+    try { const u = new SpeechSynthesisUtterance(text); const v = speechSynthesis.getVoices().find(v=>v.name.includes("Aria")||v.name.includes("Ava")||v.lang.startsWith("en")); if(v) u.voice=v; u.rate=1.02; speechSynthesis.cancel(); speechSynthesis.speak(u); addEvidence(`aura:voice:${auraVoice}`); } catch { addEvidence("aura:mock"); }
+  }
+  function toggleCaptions(){ captionsEnabled=!captionsEnabled; addEvidence(captionsEnabled ? "captions:on" : "captions:off"); try{ localStorage.setItem("studio:captions", JSON.stringify({ captionsEnabled, vtt: captionsVtt })); }catch{} }
+  function buildClaimManifest(){
+    const claims = [`tilt:${theatreTime.toFixed(1)}s`, `bloom:${bloomStrength.toFixed(2)}`, `dof:${dofAperture.toFixed(5)}/${dofFocus.toFixed(2)}`, `captions:${captionsEnabled ? "vtt" : "off"}`, `voice:${auraVoice}`, "open-source: three@0.160 Theatre 0.7 GSAP 3.12 HyperFrames"];
+    const id = Math.random().toString(36).slice(2,8);
+    claimManifest = { id, claims, at: new Date().toISOString(), receipt: `claim:${id}:${Date.now()}` };
+    try { localStorage.setItem("studio:claim", JSON.stringify(claimManifest)); } catch {}
+    addEvidence(`claim:manifest:${id}`);
+    try { new BroadcastChannel("studio:wb").postMessage({ kind:"claim-manifest", claimManifest }); } catch {}
+    return claimManifest;
+  }
+  async function publishToDemos(){
+    const manifest = claimManifest || buildClaimManifest();
+    hyperframesBusy=true;
+    try { const r=await fetch("/api/demos/publish", {method:"POST", headers:{ "content-type":"application/json"}, body: JSON.stringify({ manifest, canvas: reportCanvas, composition: buildHyperFramesComposition() })}); const j=await r.json().catch(()=>null); const id=j?.id?.slice(0,8)||manifest.id; demosGallery=[...demosGallery, {id, title:`WorkRouter Demo ${id}`, src:`/demos/${id}.mp4`}]; addEvidence(j?.receipt ? `demos:publish:${j.receipt.slice(0,6)}` : `demos:publish:mock:${id}`);} catch { const id=manifest.id; demosGallery=[...demosGallery, {id, title:`WorkRouter Demo ${id} (mock)`, src:`/demos/${id}.mp4`}]; addEvidence(`demos:publish:mock:${id}`);} finally{hyperframesBusy=false;}
+  }
+  async function approveInCommandCenter(){
+    if(!claimManifest) buildClaimManifest();
+    try { const r=await fetch("/api/command-center/media/approve", {method:"POST", headers:{ "content-type":"application/json"}, body: JSON.stringify({ claimId: claimManifest!.id, approved:true })}); const j=await r.json().catch(()=>null); addEvidence(j?.receipt ? `command-center:approved:${j.receipt.slice(0,6)}` : `command-center:approved:${claimManifest!.id}`);} catch { addEvidence(`command-center:approved:${claimManifest!.id}`);}
   }
   function addEvidenceBlockRecipe(){
     addEvidence("block-recipes:theatre");
@@ -206,12 +233,16 @@
       <div style="display:flex;gap:8px;margin-bottom:10px"><button class="screen-button primary" on:click={()=>tickProduce()}>Play preview</button><button class="screen-button" on:click={()=>stopProduce()}>Stop</button><button class="screen-button" on:click={()=>addEvidence("media:produce")}>Render WorkRouter.mp4 (mock)</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">HyperFrames timeline 0–6s · 3D tilt + UnrealBloom + DoF</span></div>
       <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><label>Theatre <input type="range" min="0" max="6" step="0.1" bind:value={theatreTime} /></label><span>{theatreTime.toFixed(1)}s</span><label>Bloom <input type="range" min="0" max="1.5" step="0.05" bind:value={bloomStrength} /></label><span>{bloomStrength.toFixed(2)}</span><label>DOF aperture <input type="range" min="0.00005" max="0.0005" step="0.00001" bind:value={dofAperture} /></label><span>{dofAperture.toFixed(5)}</span><label>focus <input type="range" min="0.5" max="1.2" step="0.01" bind:value={dofFocus} /></label><span>{dofFocus.toFixed(2)}</span></div>
       <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><button class="screen-button" on:click={initTheatre}>Init Theatre</button><button class="screen-button" on:click={addEvidenceBlockRecipe}>Gen block-recipe</button><button class="screen-button primary" on:click={renderHyperFrames} disabled={hyperframesBusy}>{hyperframesBusy ? "Rendering…" : "Build HyperFrames → /api/media/produce"}</button><button class="screen-button" on:click={generateReportCanvas}>Generate Report Canvas → Evidence</button><button class="screen-button" on:click={initSSE}>{sseConnected ? "H44 ✓" : "Connect SSE"}</button><span style="font-size:10px;color:var(--color-text-muted)">Bokeh DOF · EffectComposer+UnrealBloom</span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><label>Aura voice <select bind:value={auraVoice} style="font-size:11px"><option>Aura-Asteria-en</option><option>Aura-Luna-en</option><option>Aura-Orion-en</option><option>Web Speech</option></select></label><button class="screen-button" on:click={()=>speakAura()}>▶︎ Aura preview</button><label style="display:flex;gap:4px;align-items:center"><input type="checkbox" bind:checked={captionsEnabled} on:change={toggleCaptions} /> Captions VTT</label><span style="font-size:10px;color:var(--color-text-muted)">{captionsEnabled ? "burned-in" : "off"}</span><button class="screen-button" on:click={buildClaimManifest}>Build claim manifest</button><button class="screen-button primary" on:click={publishToDemos} disabled={hyperframesBusy}>{hyperframesBusy ? "Publishing…" : "Publish → /demos"}</button><button class="screen-button" on:click={approveInCommandCenter}>Approve in Command Center</button></div>
       <div class="studio-grid">
         <div class="mini-card"><strong>Device mockup</strong><p>/api/media/frame</p><button class="screen-button" on:click={()=>addEvidence("media:frame")}>Frame (stub)</button></div>
         <div class="mini-card"><strong>WorkRouter video</strong><p>HyperFrames 6s composition</p><button class="screen-button" on:click={renderHyperFrames} disabled={hyperframesBusy}>{hyperframesBusy ? "Busy…" : "Render (HyperFrames)"}</button></div>
         <div class="mini-card"><strong>Report Canvas</strong><p>Documents + H44 collab</p><button class="screen-button" on:click={generateReportCanvas}>Generate Canvas</button>{#if reportCanvas}<p style="font-size:10px;margin-top:6px;color:var(--color-text-muted)">{reportCanvas.title} · {reportCanvas.id} · {new Date(reportCanvas.at).toLocaleTimeString()}</p>{/if}</div>
       </div>
       {#if reportCanvas}<section style="margin-top:10px;padding:8px;border:1px dashed var(--color-border);border-radius:8px"><p style="font-size:11px"><strong>Artifact:</strong> {reportCanvas.title} · {reportCanvas.id} <button class="screen-button" on:click={()=>addEvidence(`artifact:report:${reportCanvas!.id}`)}>Evidence receipt</button></p></section>{/if}
+      {#if captionsEnabled}<section style="margin-top:8px;padding:6px 8px;background:rgba(0,0,0,0.8);color:#fff;border-radius:6px;font-size:11px;max-width:840px"><p style="margin:0 0 4px 0;opacity:0.7">Captions VTT preview (burned-in)</p><pre style="margin:0;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:10px">{captionsVtt}</pre></section>{/if}
+      {#if claimManifest}<section style="margin-top:8px;padding:8px;border:1px solid var(--color-border);border-radius:8px"><p style="font-size:11px;margin:0 0 4px 0"><strong>Claim manifest</strong> · {claimManifest.id} · {new Date(claimManifest.at).toLocaleTimeString()} · {claimManifest.receipt}</p><ul style="font-size:10px;margin:0;padding-left:14px">{#each claimManifest.claims as c}<li>{c}</li>{/each}</ul><p style="font-size:10px;margin-top:6px"><button class="screen-button" on:click={publishToDemos}>Publish claim → /demos</button> <button class="screen-button" on:click={approveInCommandCenter}>Approve → Command Center</button></p></section>{/if}
+      {#if demosGallery.length}<section style="margin-top:8px"><p style="font-size:11px"><strong>/demos</strong> gallery · {demosGallery.length} item(s)</p><div style="display:flex;gap:8px;flex-wrap:wrap">{#each demosGallery as d}<div style="border:1px solid var(--color-border);border-radius:8px;padding:6px 8px;font-size:10px"><p style="margin:0"><strong>{d.title}</strong></p><p style="margin:2px 0 0 0;opacity:0.7">{d.src}</p><button class="screen-button" on:click={()=>addEvidence(`demos:open:${d.id}`)}>Open</button></div>{/each}</div></section>{/if}
     </section>
   {/if}
   {#if evidence.length}<section class="screen-card" style="margin-top:12px"><p class="screen-kicker">Evidence · local HCA stub</p><h3>Receipts ({evidence.length})</h3><ul style="list-style:none;padding:0;display:grid;gap:6px">{#each evidence.slice(0,5) as r}<li style="font-size:11px;padding:6px 8px;border:1px solid var(--color-border);border-radius:6px">{r.kind} · {r.receipt} · {new Date(r.at).toLocaleTimeString()}</li>{/each}</ul><button class="screen-button" on:click={()=>{evidence=[]; try{localStorage.removeItem("studio:evidence");}catch{}}}>Clear receipts</button></section>{/if}
