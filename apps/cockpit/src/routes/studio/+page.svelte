@@ -12,18 +12,26 @@
   let whiteboardStrokes: {x:number,y:number}[] = [];
   let canvasEl: HTMLCanvasElement | null = null;
   // v0.2 deep
-  let diffThreshold = 12;
+  let diffThreshold = 12; try{ const v=localStorage.getItem("studio:diff"); if(v) diffThreshold=JSON.parse(v);}catch{}; $: try{ localStorage.setItem("studio:diff", JSON.stringify(diffThreshold)); }catch{}
   let produceCanvas: HTMLCanvasElement | null = null;
   let produceTick = 0;
+  let evidence: {id:string, kind:string, at:string, receipt:string}[] = [];
+  function addEvidence(kind:string){ evidence=[{id:Math.random().toString(36).slice(2,8), kind, at:new Date().toISOString(), receipt:`receipt:${kind}:${Date.now()}`}, ...evidence]; localStorage.setItem("studio:evidence", JSON.stringify(evidence)); }
+  // hydrate
+  try{ const e=localStorage.getItem("studio:evidence"); if(e) evidence=JSON.parse(e); const s=localStorage.getItem("studio:wb"); if(s) whiteboardStrokes=JSON.parse(s); }catch{}
   let critiques: {id:string, sev:"info"|"warn"|"error", msg:string}[] = [
     {id:"a11y-1", sev:"warn", msg:"Low contrast in hero CTA — 2.9:1 (needs 4.5:1)"},
     {id:"layout-1", sev:"info", msg:"Section gap 2/7 — hero→features jump 96px"},
     {id:"perf-1", sev:"info", msg:"Capture 1280×800 · filter: tilt 8° + bloom 0.6"}
   ];
   // v0.2 deep
-  let diffThreshold = 12;
+  let diffThreshold = 12; try{ const v=localStorage.getItem("studio:diff"); if(v) diffThreshold=JSON.parse(v);}catch{}; $: try{ localStorage.setItem("studio:diff", JSON.stringify(diffThreshold)); }catch{}
   let produceCanvas: HTMLCanvasElement | null = null;
   let produceTick = 0;
+  let evidence: {id:string, kind:string, at:string, receipt:string}[] = [];
+  function addEvidence(kind:string){ evidence=[{id:Math.random().toString(36).slice(2,8), kind, at:new Date().toISOString(), receipt:`receipt:${kind}:${Date.now()}`}, ...evidence]; localStorage.setItem("studio:evidence", JSON.stringify(evidence)); }
+  // hydrate
+  try{ const e=localStorage.getItem("studio:evidence"); if(e) evidence=JSON.parse(e); const s=localStorage.getItem("studio:wb"); if(s) whiteboardStrokes=JSON.parse(s); }catch{}
   let critiques: {id:string, sev:"info"|"warn"|"error", msg:string}[] = [
     {id:"a11y-1", sev:"warn", msg:"Low contrast in hero CTA — 2.9:1 (needs 4.5:1)"},
     {id:"layout-1", sev:"info", msg:"Section gap 2/7 — hero→features jump 96px"},
@@ -41,10 +49,12 @@
     if (!canvasEl) return;
     const r = canvasEl.getBoundingClientRect();
     whiteboardStrokes = [...whiteboardStrokes, {x: e.clientX - r.left, y: e.clientY - r.top}];
+    persistWhiteboard();
     drawWhiteboard();
   }
   function tickProduce(){ if(!produceCanvas) return; const c=produceCanvas.getContext('2d'); if(!c) return; const w=produceCanvas.width, h=produceCanvas.height; produceTick=(produceTick+1)%360; c.clearRect(0,0,w,h); const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0, `hsl(${220+Math.sin(produceTick*0.02)*10} 90% 55%)`); g.addColorStop(1, `hsl(${280+Math.cos(produceTick*0.02)*10} 75% 60%)`); c.fillStyle=g; c.fillRect(0,0,w,h); c.fillStyle="rgba(255,255,255,0.92)"; c.font="14px system-ui"; c.fillText("WorkRouter · tilt " + (4+Math.sin(produceTick*0.03)*2).toFixed(1) + "° · bloom 0.6", 12, 22); c.fillStyle="rgba(0,0,0,0.25)"; c.fillRect(w*0.08,h*0.18,w*0.84,h*0.62); c.fillStyle="#fff"; c.font="11px system-ui"; c.fillText("HyperFrames — Three/Theatre/GSAP stub (open-source)", w*0.1+8, h*0.22+8); requestAnimationFrame(tickProduce); }
   function tickProduce(){ if(!produceCanvas) return; const c=produceCanvas.getContext('2d'); if(!c) return; const w=produceCanvas.width, h=produceCanvas.height; produceTick=(produceTick+1)%360; c.clearRect(0,0,w,h); const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0, `hsl(${220+Math.sin(produceTick*0.02)*10} 90% 55%)`); g.addColorStop(1, `hsl(${280+Math.cos(produceTick*0.02)*10} 75% 60%)`); c.fillStyle=g; c.fillRect(0,0,w,h); c.fillStyle="rgba(255,255,255,0.92)"; c.font="14px system-ui"; c.fillText("WorkRouter · tilt " + (4+Math.sin(produceTick*0.03)*2).toFixed(1) + "° · bloom 0.6", 12, 22); c.fillStyle="rgba(0,0,0,0.25)"; c.fillRect(w*0.08,h*0.18,w*0.84,h*0.62); c.fillStyle="#fff"; c.font="11px system-ui"; c.fillText("HyperFrames — Three/Theatre/GSAP stub (open-source)", w*0.1+8, h*0.22+8); requestAnimationFrame(tickProduce); }
+  function persistWhiteboard(){ try{ localStorage.setItem("studio:wb", JSON.stringify(whiteboardStrokes)); }catch{} }
   function drawWhiteboard() {
     if (!canvasEl) return;
     const ctx = canvasEl.getContext("2d"); if (!ctx) return;
@@ -72,7 +82,7 @@
     {#if result?.screenshot}<section class="screen-card studio-result"><div class="screen-toolbar"><div><p class="screen-kicker">Captured surface</p><h2>{result.title || result.url}</h2><p>{result.url} · {result.width}×{result.height} · {result.duration_ms} ms</p></div><button class="screen-button" on:click={() => (result = null)}>Clear</button></div><img class="studio-image" src={`data:image/${result.format || "jpeg"};base64,${result.screenshot}`} alt="capture" /></section>{:else}<section class="empty-screen"><div class="empty-mark">▧</div><h2>No capture yet</h2><p>Engine returns image + bounded Focusa metadata. Stub for Compare/Analyze consumes this artifact.</p></section>{/if}
   {:else if tab === "compare"}
     <section class="screen-card"><p class="screen-kicker">Compare — /api/comparison + /api/layout-compare + /api/media/frame/*</p><h2>Visual diff</h2><p>Threshold + changed-region overlay. Artifact-backed, Evidence-receipted.</p>
-      <div style="display:flex;gap:12px;align-items:center;margin:10px 0"><label>Threshold <input type="range" min="0" max="30" bind:value={diffThreshold} /></label><span>{diffThreshold}px</span><button class="screen-button" on:click={()=>{}}>Run diff (mock)</button></div>
+      <div style="display:flex;gap:12px;align-items:center;margin:10px 0"><label>Threshold <input type="range" min="0" max="30" bind:value={diffThreshold} /></label><span>{diffThreshold}px</span><button class="screen-button" on:click={()=>addEvidence("comparison")}>Run diff (mock)</button></div>
       <div style="position:relative;border:1px solid var(--color-border);border-radius:8px;overflow:hidden;background:#0f1115;min-height:220px">
         {#if result?.screenshot}<img src={`data:image/${result.format||"jpeg"};base64,${result.screenshot}`} style="width:100%;display:block;opacity:0.85" alt="baseline" />{:else}<div style="padding:40px;text-align:center;color:var(--color-text-muted)">Capture first to use as baseline. Mock overlay shown on grey.</div>{/if}
         <!-- mock changed regions -->
@@ -83,7 +93,7 @@
     </section>
   {:else if tab === "analyze"}
     <section class="screen-card"><p class="screen-kicker">Analyze — /api/critique + /api/ui-reverse + /api/section-detect + /api/reference/analyze</p><h2>Critique & reverse</h2>
-      <div style="display:flex;gap:8px;margin:8px 0"><button class="screen-button primary" on:click={()=>{}}>Run critique (mock)</button><button class="screen-button" on:click={()=>{}}>Reverse UI map</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">Sections: hero(1), features(2-5), pricing(6), footer(7) · a11y 94</span></div>
+      <div style="display:flex;gap:8px;margin:8px 0"><button class="screen-button primary" on:click={()=>addEvidence("critique")}>Run critique (mock)</button><button class="screen-button" on:click={()=>addEvidence("ui-reverse")}>Reverse UI map</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">Sections: hero(1), features(2-5), pricing(6), footer(7) · a11y 94</span></div>
       <ul style="list-style:none;padding:0;margin:0;display:grid;gap:8px">
         {#each critiques as c}<li style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface-elevated)"><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:{c.sev==='error'?'#ff3b30':c.sev==='warn'?'#ffcc02':'#0a84ff'};color:{c.sev==='warn'?'#000':'#fff'}">{c.sev}</span><span style="font-size:12px">{c.msg}</span><button class="screen-button" style="margin-left:auto" on:click={()=>{}}>Jump</button></li>{/each}
       </ul>
@@ -103,13 +113,14 @@
   {:else if tab === "produce"}
     <section class="screen-card"><p class="screen-kicker">Produce — /api/media/produce + /api/media/frame/* → mockups, GIFs, HyperFrames video</p><h2>Media produce</h2><p>Device mockups + WorkRouter product video (Three/Theatre/GSAP + Bloom/Bokeh open-source). Lifecycle/cancel/artifact → Evidence.</p>
       <canvas bind:this={produceCanvas} width="840" height="260" style="width:100%;border:1px solid var(--color-border);border-radius:8px;background:#0a0a0f;display:block;margin:8px 0"></canvas>
-      <div style="display:flex;gap:8px;margin-bottom:10px"><button class="screen-button primary" on:click={()=>{tickProduce();}}>Play preview</button><button class="screen-button" on:click={()=>{}}>Render WorkRouter.mp4 (mock)</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">HyperFrames timeline 0–6s · 3D tilt + UnrealBloom + DoF</span></div>
+      <div style="display:flex;gap:8px;margin-bottom:10px"><button class="screen-button primary" on:click={()=>{tickProduce();}}>Play preview</button><button class="screen-button" on:click={()=>addEvidence("media:produce")}>Render WorkRouter.mp4 (mock)</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">HyperFrames timeline 0–6s · 3D tilt + UnrealBloom + DoF</span></div>
       <div class="studio-grid">
         <div class="mini-card"><strong>Device mockup</strong><p>/api/media/frame</p><button class="screen-button">Frame (stub)</button></div>
-        <div class="mini-card"><strong>WorkRouter video</strong><p>capture → beats → render</p><button class="screen-button">Beats (stub)</button></div>
+        <div class="mini-card"><strong>WorkRouter video</strong><p>capture → beats → render</p><button class="screen-button" on:click={()=>addEvidence("media:beats")}>Beats (stub)</button></div>
         <div class="mini-card"><strong>Report Canvas</strong><p>Documents + H44</p><button class="screen-button">Generate Report (stub)</button></div>
       </div>
     </section>
+    {#if evidence.length}<section class="screen-card" style="margin-top:12px"><p class="screen-kicker">Evidence · local HCA stub</p><h3>Receipts ({evidence.length})</h3><ul style="list-style:none;padding:0;display:grid;gap:6px">{#each evidence.slice(0,5) as r}<li style="font-size:11px;padding:6px 8px;border:1px solid var(--color-border);border-radius:6px">{r.kind} · {r.receipt} · {new Date(r.at).toLocaleTimeString()}</li>{/each}</ul><button class="screen-button" on:click={()=>{evidence=[]; localStorage.removeItem("studio:evidence");}}>Clear receipts</button></section>{/if}
   {/if}
 </div>
 <style>
