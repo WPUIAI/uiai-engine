@@ -4,6 +4,7 @@
   import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
   import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
   import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+  import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
   import { getProject } from "@theatre/core";
   import gsap from "gsap";
   import { engineClient, type ScreenshotResult } from "$lib/engine-client";
@@ -23,6 +24,10 @@
   let theatreProject: ReturnType<typeof getProject> | null = null;
   let sseConnected = false;
   let bloomStrength = 0.85;
+  let dofAperture = 0.00015;
+  let dofFocus = 0.92;
+  let reportCanvas: { id:string, title:string, at:string } | null = null;
+  let hyperframesBusy = false;
   let evidence: {id:string, kind:string, at:string, receipt:string}[] = [];
   let critiques: {id:string, sev:"info"|"warn"|"error", msg:string}[] = [
     {id:"a11y-1", sev:"warn", msg:"Low contrast in hero CTA — 2.9:1 (needs 4.5:1)"},
@@ -62,6 +67,32 @@
   async function runCritique(){
     addEvidence("critique:cost-gated");
     try { const r = await fetch("/api/critique", { method: "POST", body: JSON.stringify({ url }) }); const j=await r.json().catch(()=>null); if(j?.provenance) addEvidence(`critique:prov:${j.provenance.slice(0,6)}`);} catch { addEvidence("critique:mock-receipt"); }
+  }
+  function buildHyperFramesComposition(){
+    const comp = {
+      version: "0.7",
+      title: "WorkRouter — HyperFrames 6s",
+      duration: 6,
+      fps: 30,
+      timeline: [{ at: 0, kind: "capture", url }, { at: 1.2, kind: "tilt", value: theatreTime }, { at: 3, kind: "bloom", value: bloomStrength }, { at: 4.5, kind: "dof", aperture: dofAperture, focus: dofFocus }],
+      tracks: { video: { clip: "data-clip: workrouter hero" }, audio: { voice: "aura neural" } },
+      evidence: { provenance: "studio:hyperframes:open-source", at: new Date().toISOString() }
+    };
+    try { localStorage.setItem("studio:hyperframes", JSON.stringify(comp)); } catch {}
+    addEvidence("hyperframes:composition");
+    return comp;
+  }
+  async function renderHyperFrames(){
+    hyperframesBusy = true;
+    const comp = buildHyperFramesComposition();
+    addEvidence("media:produce:hyperframes");
+    try { const r = await fetch("/api/media/produce", { method: "POST", headers:{ "content-type":"application/json"}, body: JSON.stringify(comp)}); const j=await r.json().catch(()=>null); if(j?.artifact) { reportCanvas={ id:j.artifact.slice(0,8), title:"WorkRouter.mp4", at:new Date().toISOString()}; addEvidence(`media:produce:artifact:${j.artifact.slice(0,6)}`);} else { reportCanvas={ id:Math.random().toString(36).slice(2,8), title:"WorkRouter.mp4 (mock)", at:new Date().toISOString()}; addEvidence("media:produce:artifact-mock"); } } catch { reportCanvas={ id:Math.random().toString(36).slice(2,8), title:"WorkRouter.mp4 (mock)", at:new Date().toISOString()}; addEvidence("media:produce:artifact-mock"); }
+    finally { hyperframesBusy=false; }
+  }
+  async function generateReportCanvas(){
+    const payload = { title: "Studio Report Canvas — WorkRouter", strokes: whiteboardStrokes.length, theatreTime, bloomStrength, dofAperture, at: new Date().toISOString() };
+    try { const r=await fetch("/api/report/canvas", {method:"POST", headers:{ "content-type":"application/json"}, body: JSON.stringify(payload)}); const j=await r.json().catch(()=>null); addEvidence(j?.receipt ? `report:canvas:${j.receipt.slice(0,6)}` : "report:canvas:mock"); reportCanvas={ id: j?.id?.slice(0,8) || Math.random().toString(36).slice(2,8), title:"Studio Report Canvas", at:payload.at}; } catch { addEvidence("report:canvas:mock"); reportCanvas={ id:Math.random().toString(36).slice(2,8), title:"Studio Report Canvas (mock)", at:payload.at};}
+    try { new BroadcastChannel("studio:wb").postMessage({kind:"report-canvas", reportCanvas}); } catch {}
   }
   function addEvidenceBlockRecipe(){
     addEvidence("block-recipes:theatre");
@@ -116,8 +147,10 @@
     composer.addPass(new RenderPass(scene, cam));
     const bloom = new UnrealBloomPass(new THREE.Vector2(w,h), bloomStrength, 0.4, 0.85);
     composer.addPass(bloom);
+    const bokeh = new BokehPass(scene, cam, { focus: dofFocus, aperture: dofAperture * 10000, maxblur: 0.012 });
+    composer.addPass(bokeh);
     let t=0;
-    const animate = ()=>{ t+=0.016; plane.rotation.y = 0.22 + Math.sin(t*0.4)*0.12; plane.rotation.x = -0.35 + Math.cos(t*0.3)*0.06; glow.material.opacity = 0.16 + Math.sin(t*0.7)*0.04; bloom.strength = bloomStrength + Math.sin(t*0.5)*0.07; composer.render(); threeRaf=requestAnimationFrame(animate); };
+    const animate = ()=>{ t+=0.016; plane.rotation.y = 0.22 + Math.sin(t*0.4)*0.12; plane.rotation.x = -0.35 + Math.cos(t*0.3)*0.06; glow.material.opacity = 0.16 + Math.sin(t*0.7)*0.04; bloom.strength = bloomStrength + Math.sin(t*0.5)*0.07; try{ (bokeh as any).uniforms["focus"].value = dofFocus + Math.sin(t*0.33)*0.02; (bokeh as any).uniforms["aperture"].value = dofAperture * 10000 + Math.sin(t*0.4)*0.8; }catch{} composer.render(); threeRaf=requestAnimationFrame(animate); };
     if(threeRaf) cancelAnimationFrame(threeRaf);
     animate();
   }
@@ -171,12 +204,14 @@
     <section class="screen-card"><p class="screen-kicker">Produce — /api/media/produce + /api/media/frame/* → mockups, GIFs, HyperFrames video</p><h2>Media produce</h2><p>Device mockups + WorkRouter product video (Three/Theatre/GSAP + Bloom/Bokeh open-source). Lifecycle/cancel/artifact → Evidence.</p>
       <canvas bind:this={produceCanvas} width="840" height="260" style="width:100%;border:1px solid var(--color-border);border-radius:8px;background:#0a0a0f;display:block;margin:8px 0"></canvas>
       <div style="display:flex;gap:8px;margin-bottom:10px"><button class="screen-button primary" on:click={()=>tickProduce()}>Play preview</button><button class="screen-button" on:click={()=>stopProduce()}>Stop</button><button class="screen-button" on:click={()=>addEvidence("media:produce")}>Render WorkRouter.mp4 (mock)</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">HyperFrames timeline 0–6s · 3D tilt + UnrealBloom + DoF</span></div>
-      <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><label>Theatre <input type="range" min="0" max="6" step="0.1" bind:value={theatreTime} /></label><span>{theatreTime.toFixed(1)}s</span><label>Bloom <input type="range" min="0" max="1.5" step="0.05" bind:value={bloomStrength} /></label><span>{bloomStrength.toFixed(2)}</span><button class="screen-button" on:click={initTheatre}>Init Theatre</button><button class="screen-button" on:click={addEvidenceBlockRecipe}>Gen block-recipe</button><button class="screen-button" on:click={initSSE}>{sseConnected ? "H44 ✓" : "Connect SSE"}</button><span style="font-size:10px;color:var(--color-text-muted)">GSAP beat · EffectComposer+UnrealBloom</span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><label>Theatre <input type="range" min="0" max="6" step="0.1" bind:value={theatreTime} /></label><span>{theatreTime.toFixed(1)}s</span><label>Bloom <input type="range" min="0" max="1.5" step="0.05" bind:value={bloomStrength} /></label><span>{bloomStrength.toFixed(2)}</span><label>DOF aperture <input type="range" min="0.00005" max="0.0005" step="0.00001" bind:value={dofAperture} /></label><span>{dofAperture.toFixed(5)}</span><label>focus <input type="range" min="0.5" max="1.2" step="0.01" bind:value={dofFocus} /></label><span>{dofFocus.toFixed(2)}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><button class="screen-button" on:click={initTheatre}>Init Theatre</button><button class="screen-button" on:click={addEvidenceBlockRecipe}>Gen block-recipe</button><button class="screen-button primary" on:click={renderHyperFrames} disabled={hyperframesBusy}>{hyperframesBusy ? "Rendering…" : "Build HyperFrames → /api/media/produce"}</button><button class="screen-button" on:click={generateReportCanvas}>Generate Report Canvas → Evidence</button><button class="screen-button" on:click={initSSE}>{sseConnected ? "H44 ✓" : "Connect SSE"}</button><span style="font-size:10px;color:var(--color-text-muted)">Bokeh DOF · EffectComposer+UnrealBloom</span></div>
       <div class="studio-grid">
         <div class="mini-card"><strong>Device mockup</strong><p>/api/media/frame</p><button class="screen-button" on:click={()=>addEvidence("media:frame")}>Frame (stub)</button></div>
-        <div class="mini-card"><strong>WorkRouter video</strong><p>capture → beats → render</p><button class="screen-button" on:click={()=>addEvidence("media:beats")}>Beats (stub)</button></div>
-        <div class="mini-card"><strong>Report Canvas</strong><p>Documents + H44</p><button class="screen-button" on:click={()=>addEvidence("report")}>Generate Report (stub)</button></div>
+        <div class="mini-card"><strong>WorkRouter video</strong><p>HyperFrames 6s composition</p><button class="screen-button" on:click={renderHyperFrames} disabled={hyperframesBusy}>{hyperframesBusy ? "Busy…" : "Render (HyperFrames)"}</button></div>
+        <div class="mini-card"><strong>Report Canvas</strong><p>Documents + H44 collab</p><button class="screen-button" on:click={generateReportCanvas}>Generate Canvas</button>{#if reportCanvas}<p style="font-size:10px;margin-top:6px;color:var(--color-text-muted)">{reportCanvas.title} · {reportCanvas.id} · {new Date(reportCanvas.at).toLocaleTimeString()}</p>{/if}</div>
       </div>
+      {#if reportCanvas}<section style="margin-top:10px;padding:8px;border:1px dashed var(--color-border);border-radius:8px"><p style="font-size:11px"><strong>Artifact:</strong> {reportCanvas.title} · {reportCanvas.id} <button class="screen-button" on:click={()=>addEvidence(`artifact:report:${reportCanvas!.id}`)}>Evidence receipt</button></p></section>{/if}
     </section>
   {/if}
   {#if evidence.length}<section class="screen-card" style="margin-top:12px"><p class="screen-kicker">Evidence · local HCA stub</p><h3>Receipts ({evidence.length})</h3><ul style="list-style:none;padding:0;display:grid;gap:6px">{#each evidence.slice(0,5) as r}<li style="font-size:11px;padding:6px 8px;border:1px solid var(--color-border);border-radius:6px">{r.kind} · {r.receipt} · {new Date(r.at).toLocaleTimeString()}</li>{/each}</ul><button class="screen-button" on:click={()=>{evidence=[]; try{localStorage.removeItem("studio:evidence");}catch{}}}>Clear receipts</button></section>{/if}
