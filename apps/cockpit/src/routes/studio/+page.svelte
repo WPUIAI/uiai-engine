@@ -1,5 +1,6 @@
 <script lang="ts">
   import "$lib/ui/screen.css";
+  import * as THREE from "three";
   import { engineClient, type ScreenshotResult } from "$lib/engine-client";
 
   type Tab = "capture" | "compare" | "analyze" | "design" | "produce";
@@ -8,35 +9,30 @@
   let capturing = false;
   let result: ScreenshotResult & { focusa?: Record<string, unknown> } | null = null;
   let error = "";
-  // 006 stubs: whiteboard LWW, generative pipeline state
   let whiteboardStrokes: {x:number,y:number}[] = [];
   let canvasEl: HTMLCanvasElement | null = null;
-  // v0.2 deep
-  let diffThreshold = 12; try{ const v=localStorage.getItem("studio:diff"); if(v) diffThreshold=JSON.parse(v);}catch{}; $: try{ localStorage.setItem("studio:diff", JSON.stringify(diffThreshold)); }catch{}
+  let diffThreshold = 12;
   let produceCanvas: HTMLCanvasElement | null = null;
-  let produceTick = 0;
+  let threeRaf: number | null = null;
   let evidence: {id:string, kind:string, at:string, receipt:string}[] = [];
-  function addEvidence(kind:string){ evidence=[{id:Math.random().toString(36).slice(2,8), kind, at:new Date().toISOString(), receipt:`receipt:${kind}:${Date.now()}`}, ...evidence]; localStorage.setItem("studio:evidence", JSON.stringify(evidence)); }
-  // hydrate
-  try{ const e=localStorage.getItem("studio:evidence"); if(e) evidence=JSON.parse(e); const s=localStorage.getItem("studio:wb"); if(s) whiteboardStrokes=JSON.parse(s); }catch{}
   let critiques: {id:string, sev:"info"|"warn"|"error", msg:string}[] = [
     {id:"a11y-1", sev:"warn", msg:"Low contrast in hero CTA — 2.9:1 (needs 4.5:1)"},
     {id:"layout-1", sev:"info", msg:"Section gap 2/7 — hero→features jump 96px"},
     {id:"perf-1", sev:"info", msg:"Capture 1280×800 · filter: tilt 8° + bloom 0.6"}
   ];
-  // v0.2 deep
-  let diffThreshold = 12; try{ const v=localStorage.getItem("studio:diff"); if(v) diffThreshold=JSON.parse(v);}catch{}; $: try{ localStorage.setItem("studio:diff", JSON.stringify(diffThreshold)); }catch{}
-  let produceCanvas: HTMLCanvasElement | null = null;
-  let produceTick = 0;
-  let evidence: {id:string, kind:string, at:string, receipt:string}[] = [];
-  function addEvidence(kind:string){ evidence=[{id:Math.random().toString(36).slice(2,8), kind, at:new Date().toISOString(), receipt:`receipt:${kind}:${Date.now()}`}, ...evidence]; localStorage.setItem("studio:evidence", JSON.stringify(evidence)); }
-  // hydrate
-  try{ const e=localStorage.getItem("studio:evidence"); if(e) evidence=JSON.parse(e); const s=localStorage.getItem("studio:wb"); if(s) whiteboardStrokes=JSON.parse(s); }catch{}
-  let critiques: {id:string, sev:"info"|"warn"|"error", msg:string}[] = [
-    {id:"a11y-1", sev:"warn", msg:"Low contrast in hero CTA — 2.9:1 (needs 4.5:1)"},
-    {id:"layout-1", sev:"info", msg:"Section gap 2/7 — hero→features jump 96px"},
-    {id:"perf-1", sev:"info", msg:"Capture 1280×800 · filter: tilt 8° + bloom 0.6"}
-  ];
+
+  // hydrate evidence + whiteboard + diffThreshold
+  try {
+    const e = localStorage.getItem("studio:evidence"); if (e) evidence = JSON.parse(e);
+    const s = localStorage.getItem("studio:wb"); if (s) whiteboardStrokes = JSON.parse(s);
+    const v = localStorage.getItem("studio:diff"); if (v) diffThreshold = JSON.parse(v);
+  } catch {}
+  $: try { localStorage.setItem("studio:diff", JSON.stringify(diffThreshold)); } catch {}
+
+  function addEvidence(kind:string){
+    evidence = [{id:Math.random().toString(36).slice(2,8), kind, at:new Date().toISOString(), receipt:`receipt:${kind}:${Date.now()}`}, ...evidence];
+    try { localStorage.setItem("studio:evidence", JSON.stringify(evidence)); } catch {}
+  }
 
   async function capture() {
     if (!url.trim()) return;
@@ -45,15 +41,6 @@
     catch (cause) { result = null; error = cause instanceof Error ? cause.message : "Screenshot capture failed."; }
     finally { capturing = false; }
   }
-  function addStroke(e: MouseEvent) {
-    if (!canvasEl) return;
-    const r = canvasEl.getBoundingClientRect();
-    whiteboardStrokes = [...whiteboardStrokes, {x: e.clientX - r.left, y: e.clientY - r.top}];
-    persistWhiteboard();
-    drawWhiteboard();
-  }
-  function tickProduce(){ if(!produceCanvas) return; const c=produceCanvas.getContext('2d'); if(!c) return; const w=produceCanvas.width, h=produceCanvas.height; produceTick=(produceTick+1)%360; c.clearRect(0,0,w,h); const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0, `hsl(${220+Math.sin(produceTick*0.02)*10} 90% 55%)`); g.addColorStop(1, `hsl(${280+Math.cos(produceTick*0.02)*10} 75% 60%)`); c.fillStyle=g; c.fillRect(0,0,w,h); c.fillStyle="rgba(255,255,255,0.92)"; c.font="14px system-ui"; c.fillText("WorkRouter · tilt " + (4+Math.sin(produceTick*0.03)*2).toFixed(1) + "° · bloom 0.6", 12, 22); c.fillStyle="rgba(0,0,0,0.25)"; c.fillRect(w*0.08,h*0.18,w*0.84,h*0.62); c.fillStyle="#fff"; c.font="11px system-ui"; c.fillText("HyperFrames — Three/Theatre/GSAP stub (open-source)", w*0.1+8, h*0.22+8); requestAnimationFrame(tickProduce); }
-  function tickProduce(){ if(!produceCanvas) return; const c=produceCanvas.getContext('2d'); if(!c) return; const w=produceCanvas.width, h=produceCanvas.height; produceTick=(produceTick+1)%360; c.clearRect(0,0,w,h); const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0, `hsl(${220+Math.sin(produceTick*0.02)*10} 90% 55%)`); g.addColorStop(1, `hsl(${280+Math.cos(produceTick*0.02)*10} 75% 60%)`); c.fillStyle=g; c.fillRect(0,0,w,h); c.fillStyle="rgba(255,255,255,0.92)"; c.font="14px system-ui"; c.fillText("WorkRouter · tilt " + (4+Math.sin(produceTick*0.03)*2).toFixed(1) + "° · bloom 0.6", 12, 22); c.fillStyle="rgba(0,0,0,0.25)"; c.fillRect(w*0.08,h*0.18,w*0.84,h*0.62); c.fillStyle="#fff"; c.font="11px system-ui"; c.fillText("HyperFrames — Three/Theatre/GSAP stub (open-source)", w*0.1+8, h*0.22+8); requestAnimationFrame(tickProduce); }
   function persistWhiteboard(){ try{ localStorage.setItem("studio:wb", JSON.stringify(whiteboardStrokes)); }catch{} }
   function drawWhiteboard() {
     if (!canvasEl) return;
@@ -64,6 +51,34 @@
     whiteboardStrokes.forEach((p,i)=> i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
     ctx.stroke();
   }
+  function addStroke(e: MouseEvent) {
+    if (!canvasEl) return;
+    const r = canvasEl.getBoundingClientRect();
+    whiteboardStrokes = [...whiteboardStrokes, {x: e.clientX - r.left, y: e.clientY - r.top}];
+    persistWhiteboard();
+    drawWhiteboard();
+  }
+  function tickProduce(){
+    if(!produceCanvas) return;
+    const w=produceCanvas.width, h=produceCanvas.height;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a14);
+    const cam = new THREE.PerspectiveCamera(42, w/h, 0.1, 100);
+    cam.position.set(0, 0.9, 2.2); cam.lookAt(0,0,0);
+    const renderer = new THREE.WebGLRenderer({canvas: produceCanvas, antialias:true, alpha:false});
+    renderer.setSize(w, h, false);
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.92), new THREE.MeshStandardMaterial({color:0xffffff, emissive:0x3355ff, emissiveIntensity:0.18, side: THREE.DoubleSide}));
+    plane.rotation.x = -0.35; plane.rotation.y = 0.22; scene.add(plane);
+    const light = new THREE.DirectionalLight(0xffffff, 1.1); light.position.set(1,2,2); scene.add(light);
+    scene.add(new THREE.AmbientLight(0x8899ff, 0.45));
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.75, 1.05), new THREE.MeshBasicMaterial({color:0x6a7bff, transparent:true, opacity:0.18}));
+    glow.position.z = -0.02; scene.add(glow);
+    let t=0;
+    const animate = ()=>{ t+=0.016; plane.rotation.y = 0.22 + Math.sin(t*0.4)*0.12; plane.rotation.x = -0.35 + Math.cos(t*0.3)*0.06; glow.material.opacity = 0.16 + Math.sin(t*0.7)*0.04; renderer.render(scene, cam); threeRaf=requestAnimationFrame(animate); };
+    if(threeRaf) cancelAnimationFrame(threeRaf);
+    animate();
+  }
+  function stopProduce(){ if(threeRaf) cancelAnimationFrame(threeRaf); threeRaf=null; }
 </script>
 
 <svelte:head><title>Studio · UIAI Engine Cockpit</title></svelte:head>
@@ -85,7 +100,6 @@
       <div style="display:flex;gap:12px;align-items:center;margin:10px 0"><label>Threshold <input type="range" min="0" max="30" bind:value={diffThreshold} /></label><span>{diffThreshold}px</span><button class="screen-button" on:click={()=>addEvidence("comparison")}>Run diff (mock)</button></div>
       <div style="position:relative;border:1px solid var(--color-border);border-radius:8px;overflow:hidden;background:#0f1115;min-height:220px">
         {#if result?.screenshot}<img src={`data:image/${result.format||"jpeg"};base64,${result.screenshot}`} style="width:100%;display:block;opacity:0.85" alt="baseline" />{:else}<div style="padding:40px;text-align:center;color:var(--color-text-muted)">Capture first to use as baseline. Mock overlay shown on grey.</div>{/if}
-        <!-- mock changed regions -->
         <div style="position:absolute;left:8%;top:18%;width:34%;height:18%;border:2px solid #ff3b30;background:rgba(255,59,48,0.18)"></div>
         <div style="position:absolute;right:12%;top:52%;width:26%;height:22%;border:2px solid #ffcc02;background:rgba(255,204,2,0.18)"></div>
         <span style="position:absolute;left:8%;top:14%;font-size:10px;background:#ff3b30;color:#fff;padding:2px 4px;border-radius:4px">changed · {diffThreshold}px</span>
@@ -102,26 +116,26 @@
   {:else if tab === "design"}
     <section class="screen-card"><p class="screen-kicker">Design — /api/design-system + /api/content-map + /api/block-recipes → generated GUIs</p><h2>Design system & block recipes</h2><p>Extract tokens, map content, emit WPUIAI block recipes. Generative GUIs manifest-declared, cost-visible, provenance-tagged → Evidence.</p>
       <div class="studio-grid">
-        <div class="mini-card"><strong>design-system.json</strong><p>Tokens + components from capture</p><button class="screen-button">Extract (stub)</button></div>
-        <div class="mini-card"><strong>content-map.json</strong><p>Sections + copy map</p><button class="screen-button">Map (stub)</button></div>
-        <div class="mini-card"><strong>block-recipes/</strong><p>Generated workspaces / dashboards</p><button class="screen-button">Generate (stub)</button></div>
+        <div class="mini-card"><strong>design-system.json</strong><p>Tokens + components from capture</p><button class="screen-button" on:click={()=>addEvidence("design-system")}>Extract (stub)</button></div>
+        <div class="mini-card"><strong>content-map.json</strong><p>Sections + copy map</p><button class="screen-button" on:click={()=>addEvidence("content-map")}>Map (stub)</button></div>
+        <div class="mini-card"><strong>block-recipes/</strong><p>Generated workspaces / dashboards</p><button class="screen-button" on:click={()=>addEvidence("block-recipes")}>Generate (stub)</button></div>
       </div>
       <p style="margin-top:12px"><em>Whiteboard (tldraw-offline) — Workstream-scoped LWW via SSE/BroadcastChannel, undo-ready. Click to sketch; agent strokes via semantic API.</em></p>
       <canvas bind:this={canvasEl} width="640" height="240" class="whiteboard" on:click={addStroke}></canvas>
-      <p><button class="screen-button" on:click={()=>{whiteboardStrokes=[]; drawWhiteboard();}}>Clear board</button> Strokes: {whiteboardStrokes.length} — persists to Evidence as JSON+PNG (stub)</p>
+      <p><button class="screen-button" on:click={()=>{whiteboardStrokes=[]; persistWhiteboard(); drawWhiteboard();}}>Clear board</button> Strokes: {whiteboardStrokes.length} — persists to Evidence as JSON+PNG (stub) <button class="screen-button" on:click={()=>addEvidence("whiteboard")}>Export Evidence</button></p>
     </section>
   {:else if tab === "produce"}
     <section class="screen-card"><p class="screen-kicker">Produce — /api/media/produce + /api/media/frame/* → mockups, GIFs, HyperFrames video</p><h2>Media produce</h2><p>Device mockups + WorkRouter product video (Three/Theatre/GSAP + Bloom/Bokeh open-source). Lifecycle/cancel/artifact → Evidence.</p>
       <canvas bind:this={produceCanvas} width="840" height="260" style="width:100%;border:1px solid var(--color-border);border-radius:8px;background:#0a0a0f;display:block;margin:8px 0"></canvas>
-      <div style="display:flex;gap:8px;margin-bottom:10px"><button class="screen-button primary" on:click={()=>{tickProduce();}}>Play preview</button><button class="screen-button" on:click={()=>addEvidence("media:produce")}>Render WorkRouter.mp4 (mock)</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">HyperFrames timeline 0–6s · 3D tilt + UnrealBloom + DoF</span></div>
+      <div style="display:flex;gap:8px;margin-bottom:10px"><button class="screen-button primary" on:click={()=>tickProduce()}>Play preview</button><button class="screen-button" on:click={()=>stopProduce()}>Stop</button><button class="screen-button" on:click={()=>addEvidence("media:produce")}>Render WorkRouter.mp4 (mock)</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">HyperFrames timeline 0–6s · 3D tilt + UnrealBloom + DoF</span></div>
       <div class="studio-grid">
-        <div class="mini-card"><strong>Device mockup</strong><p>/api/media/frame</p><button class="screen-button">Frame (stub)</button></div>
+        <div class="mini-card"><strong>Device mockup</strong><p>/api/media/frame</p><button class="screen-button" on:click={()=>addEvidence("media:frame")}>Frame (stub)</button></div>
         <div class="mini-card"><strong>WorkRouter video</strong><p>capture → beats → render</p><button class="screen-button" on:click={()=>addEvidence("media:beats")}>Beats (stub)</button></div>
-        <div class="mini-card"><strong>Report Canvas</strong><p>Documents + H44</p><button class="screen-button">Generate Report (stub)</button></div>
+        <div class="mini-card"><strong>Report Canvas</strong><p>Documents + H44</p><button class="screen-button" on:click={()=>addEvidence("report")}>Generate Report (stub)</button></div>
       </div>
     </section>
-    {#if evidence.length}<section class="screen-card" style="margin-top:12px"><p class="screen-kicker">Evidence · local HCA stub</p><h3>Receipts ({evidence.length})</h3><ul style="list-style:none;padding:0;display:grid;gap:6px">{#each evidence.slice(0,5) as r}<li style="font-size:11px;padding:6px 8px;border:1px solid var(--color-border);border-radius:6px">{r.kind} · {r.receipt} · {new Date(r.at).toLocaleTimeString()}</li>{/each}</ul><button class="screen-button" on:click={()=>{evidence=[]; localStorage.removeItem("studio:evidence");}}>Clear receipts</button></section>{/if}
   {/if}
+  {#if evidence.length}<section class="screen-card" style="margin-top:12px"><p class="screen-kicker">Evidence · local HCA stub</p><h3>Receipts ({evidence.length})</h3><ul style="list-style:none;padding:0;display:grid;gap:6px">{#each evidence.slice(0,5) as r}<li style="font-size:11px;padding:6px 8px;border:1px solid var(--color-border);border-radius:6px">{r.kind} · {r.receipt} · {new Date(r.at).toLocaleTimeString()}</li>{/each}</ul><button class="screen-button" on:click={()=>{evidence=[]; try{localStorage.removeItem("studio:evidence");}catch{}}}>Clear receipts</button></section>{/if}
 </div>
 <style>
   .studio-tabs{display:flex;gap:8px;margin:12px 0 16px;flex-wrap:wrap}
