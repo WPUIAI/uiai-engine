@@ -1,6 +1,9 @@
 <script lang="ts">
   import "$lib/ui/screen.css";
   import * as THREE from "three";
+  import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+  import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+  import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
   import { getProject } from "@theatre/core";
   import gsap from "gsap";
   import { engineClient, type ScreenshotResult } from "$lib/engine-client";
@@ -18,6 +21,8 @@
   let threeRaf: number | null = null;
   let theatreTime = 0;
   let theatreProject: ReturnType<typeof getProject> | null = null;
+  let sseConnected = false;
+  let bloomStrength = 0.85;
   let evidence: {id:string, kind:string, at:string, receipt:string}[] = [];
   let critiques: {id:string, sev:"info"|"warn"|"error", msg:string}[] = [
     {id:"a11y-1", sev:"warn", msg:"Low contrast in hero CTA — 2.9:1 (needs 4.5:1)"},
@@ -44,6 +49,19 @@
     try { localStorage.setItem("studio:wb:json", json); } catch {}
     try { new BroadcastChannel("studio:wb").postMessage({ kind: "wb-sync", strokes: whiteboardStrokes }); } catch {}
     return json;
+  }
+  let sseChannel: BroadcastChannel | null = null;
+  function initSSE(){
+    try { sseChannel = new BroadcastChannel("studio:wb"); sseChannel.onmessage = (e)=>{ if(e.data?.kind==="wb-sync" && Array.isArray(e.data.strokes)) { whiteboardStrokes = e.data.strokes; drawWhiteboard(); } }; sseConnected = true; addEvidence("sse:h44-connected"); } catch {}
+    try { const es = new EventSource("/api/events?scope=workstream"); es.onmessage = (e)=>{ try{ const d=JSON.parse(e.data); if(d.kind) addEvidence(`sse:${d.kind}`);}catch{} }; es.onerror = ()=>{ sseConnected=false; }; } catch {}
+  }
+  async function runComparison(){
+    addEvidence("comparison:bloom");
+    try { const r = await fetch("/api/comparison", { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify({ threshold: diffThreshold, bloomStrength }) }); const j = await r.json().catch(()=>null); if(j?.receipt) addEvidence(`comparison:receipt:${j.receipt.slice(0,6)}`); } catch { addEvidence("comparison:mock-receipt"); }
+  }
+  async function runCritique(){
+    addEvidence("critique:cost-gated");
+    try { const r = await fetch("/api/critique", { method: "POST", body: JSON.stringify({ url }) }); const j=await r.json().catch(()=>null); if(j?.provenance) addEvidence(`critique:prov:${j.provenance.slice(0,6)}`);} catch { addEvidence("critique:mock-receipt"); }
   }
   function addEvidenceBlockRecipe(){
     addEvidence("block-recipes:theatre");
@@ -93,8 +111,13 @@
     scene.add(new THREE.AmbientLight(0x8899ff, 0.45));
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.75, 1.05), new THREE.MeshBasicMaterial({color:0x6a7bff, transparent:true, opacity:0.18}));
     glow.position.z = -0.02; scene.add(glow);
+    // EffectComposer + UnrealBloomPass (open-source post)
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, cam));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(w,h), bloomStrength, 0.4, 0.85);
+    composer.addPass(bloom);
     let t=0;
-    const animate = ()=>{ t+=0.016; plane.rotation.y = 0.22 + Math.sin(t*0.4)*0.12; plane.rotation.x = -0.35 + Math.cos(t*0.3)*0.06; glow.material.opacity = 0.16 + Math.sin(t*0.7)*0.04; renderer.render(scene, cam); threeRaf=requestAnimationFrame(animate); };
+    const animate = ()=>{ t+=0.016; plane.rotation.y = 0.22 + Math.sin(t*0.4)*0.12; plane.rotation.x = -0.35 + Math.cos(t*0.3)*0.06; glow.material.opacity = 0.16 + Math.sin(t*0.7)*0.04; bloom.strength = bloomStrength + Math.sin(t*0.5)*0.07; composer.render(); threeRaf=requestAnimationFrame(animate); };
     if(threeRaf) cancelAnimationFrame(threeRaf);
     animate();
   }
@@ -117,7 +140,7 @@
     {#if result?.screenshot}<section class="screen-card studio-result"><div class="screen-toolbar"><div><p class="screen-kicker">Captured surface</p><h2>{result.title || result.url}</h2><p>{result.url} · {result.width}×{result.height} · {result.duration_ms} ms</p></div><button class="screen-button" on:click={() => (result = null)}>Clear</button></div><img class="studio-image" src={`data:image/${result.format || "jpeg"};base64,${result.screenshot}`} alt="capture" /></section>{:else}<section class="empty-screen"><div class="empty-mark">▧</div><h2>No capture yet</h2><p>Engine returns image + bounded Focusa metadata. Stub for Compare/Analyze consumes this artifact.</p></section>{/if}
   {:else if tab === "compare"}
     <section class="screen-card"><p class="screen-kicker">Compare — /api/comparison + /api/layout-compare + /api/media/frame/*</p><h2>Visual diff</h2><p>Threshold + changed-region overlay. Artifact-backed, Evidence-receipted.</p>
-      <div style="display:flex;gap:12px;align-items:center;margin:10px 0"><label>Threshold <input type="range" min="0" max="30" bind:value={diffThreshold} /></label><span>{diffThreshold}px</span><button class="screen-button" on:click={()=>addEvidence("comparison")}>Run diff (mock)</button></div>
+      <div style="display:flex;gap:12px;align-items:center;margin:10px 0;flex-wrap:wrap"><label>Threshold <input type="range" min="0" max="30" bind:value={diffThreshold} /></label><span>{diffThreshold}px</span><label>Bloom <input type="range" min="0" max="1.5" step="0.05" bind:value={bloomStrength} /></label><span>{bloomStrength.toFixed(2)}</span><button class="screen-button primary" on:click={runComparison}>Run diff → /api/comparison</button><button class="screen-button" on:click={initSSE}>{sseConnected ? "SSE ✓" : "Connect H44 SSE"}</button></div>
       <div style="position:relative;border:1px solid var(--color-border);border-radius:8px;overflow:hidden;background:#0f1115;min-height:220px">
         {#if result?.screenshot}<img src={`data:image/${result.format||"jpeg"};base64,${result.screenshot}`} style="width:100%;display:block;opacity:0.85" alt="baseline" />{:else}<div style="padding:40px;text-align:center;color:var(--color-text-muted)">Capture first to use as baseline. Mock overlay shown on grey.</div>{/if}
         <div style="position:absolute;left:8%;top:18%;width:34%;height:18%;border:2px solid #ff3b30;background:rgba(255,59,48,0.18)"></div>
@@ -127,7 +150,7 @@
     </section>
   {:else if tab === "analyze"}
     <section class="screen-card"><p class="screen-kicker">Analyze — /api/critique + /api/ui-reverse + /api/section-detect + /api/reference/analyze</p><h2>Critique & reverse</h2>
-      <div style="display:flex;gap:8px;margin:8px 0"><button class="screen-button primary" on:click={()=>addEvidence("critique")}>Run critique (mock)</button><button class="screen-button" on:click={()=>addEvidence("ui-reverse")}>Reverse UI map</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">Sections: hero(1), features(2-5), pricing(6), footer(7) · a11y 94</span></div>
+      <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap"><button class="screen-button primary" on:click={runCritique}>Run critique → /api/critique</button><button class="screen-button" on:click={()=>addEvidence("ui-reverse")}>Reverse UI map</button><button class="screen-button" on:click={initSSE}>{sseConnected ? "H44 live ✓" : "Connect H44"}</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">Sections: hero(1), features(2-5), pricing(6), footer(7) · a11y 94 · Evidence cost-gated</span></div>
       <ul style="list-style:none;padding:0;margin:0;display:grid;gap:8px">
         {#each critiques as c}<li style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface-elevated)"><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:{c.sev==='error'?'#ff3b30':c.sev==='warn'?'#ffcc02':'#0a84ff'};color:{c.sev==='warn'?'#000':'#fff'}">{c.sev}</span><span style="font-size:12px">{c.msg}</span><button class="screen-button" style="margin-left:auto" on:click={()=>{}}>Jump</button></li>{/each}
       </ul>
@@ -148,7 +171,7 @@
     <section class="screen-card"><p class="screen-kicker">Produce — /api/media/produce + /api/media/frame/* → mockups, GIFs, HyperFrames video</p><h2>Media produce</h2><p>Device mockups + WorkRouter product video (Three/Theatre/GSAP + Bloom/Bokeh open-source). Lifecycle/cancel/artifact → Evidence.</p>
       <canvas bind:this={produceCanvas} width="840" height="260" style="width:100%;border:1px solid var(--color-border);border-radius:8px;background:#0a0a0f;display:block;margin:8px 0"></canvas>
       <div style="display:flex;gap:8px;margin-bottom:10px"><button class="screen-button primary" on:click={()=>tickProduce()}>Play preview</button><button class="screen-button" on:click={()=>stopProduce()}>Stop</button><button class="screen-button" on:click={()=>addEvidence("media:produce")}>Render WorkRouter.mp4 (mock)</button><span style="font-size:11px;color:var(--color-text-muted);align-self:center">HyperFrames timeline 0–6s · 3D tilt + UnrealBloom + DoF</span></div>
-      <div style="display:flex;gap:8px;align-items:center;margin:6px 0"><label>Theatre <input type="range" min="0" max="6" step="0.1" bind:value={theatreTime} /></label><span>{theatreTime.toFixed(1)}s</span><button class="screen-button" on:click={initTheatre}>Init Theatre</button><button class="screen-button" on:click={addEvidenceBlockRecipe}>Gen block-recipe</button><span style="font-size:10px;color:var(--color-text-muted)">GSAP beat · @theatre/core 0.7</span></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"><label>Theatre <input type="range" min="0" max="6" step="0.1" bind:value={theatreTime} /></label><span>{theatreTime.toFixed(1)}s</span><label>Bloom <input type="range" min="0" max="1.5" step="0.05" bind:value={bloomStrength} /></label><span>{bloomStrength.toFixed(2)}</span><button class="screen-button" on:click={initTheatre}>Init Theatre</button><button class="screen-button" on:click={addEvidenceBlockRecipe}>Gen block-recipe</button><button class="screen-button" on:click={initSSE}>{sseConnected ? "H44 ✓" : "Connect SSE"}</button><span style="font-size:10px;color:var(--color-text-muted)">GSAP beat · EffectComposer+UnrealBloom</span></div>
       <div class="studio-grid">
         <div class="mini-card"><strong>Device mockup</strong><p>/api/media/frame</p><button class="screen-button" on:click={()=>addEvidence("media:frame")}>Frame (stub)</button></div>
         <div class="mini-card"><strong>WorkRouter video</strong><p>capture → beats → render</p><button class="screen-button" on:click={()=>addEvidence("media:beats")}>Beats (stub)</button></div>
