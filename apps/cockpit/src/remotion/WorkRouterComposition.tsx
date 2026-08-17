@@ -3,7 +3,7 @@
 // Philosophy: continual openness — next iteration beats last evidence
 import { AbsoluteFill, Sequence, useCurrentFrame, interpolate, Easing } from "remotion";
 
-export const WorkRouterComposition = ({ title = "Stop hunting for work. Let WorkRouter hunt for you.", personality = "Premium", shaderEnabled = true, particlesEnabled = true, lottieEnabled = false }) => {
+export const WorkRouterComposition = ({ title = "Stop hunting for work. Let WorkRouter hunt for you.", personality = "Premium", shaderEnabled = true, particlesEnabled = true, lottieEnabled = false, lowerThirdEnabled = true }) => {
   const frame = useCurrentFrame();
   const cfg = {
     Premium: { dur: 15, ease: Easing.bezier(0.4, 0, 0.2, 1), stagger: 2 },
@@ -56,6 +56,18 @@ export const WorkRouterComposition = ({ title = "Stop hunting for work. Let Work
           </h1>
           {lottieEnabled && <div style={{ marginTop: 12, fontSize: 10, opacity: 0.5 }}>dotLottie overlay — LottieFiles motion (lottie-web) — next iteration hypothesis</div>}
         </div>
+      </Sequence>
+      {lowerThirdEnabled && (
+        <Sequence from={120} durationInFrames={60}>
+          <div style={{ position: "absolute", left: 24, bottom: 80, background: "#3355ff", color: "#fff", padding: "10px 16px", borderRadius: 10, display: "flex", gap: 10, alignItems: "center", transform: `translateY(${interpolate(frame,[120,132],[20,0],{extrapolateLeft:"clamp",extrapolateRight:"clamp",easing:cfg.ease})}px)`, opacity: interpolate(frame,[120,128],[0,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"}) }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#3355ff", fontWeight: 900, fontSize: 12 }}>WR</div>
+            <div><div style={{ fontSize: 12, fontWeight: 800 }}>WorkRouter</div><div style={{ fontSize: 10, opacity: 0.8 }}>workrouter.app — Let it hunt</div></div>
+            <div style={{ fontSize: 10, opacity: 0.7, marginLeft: 10 }}>remotion-ui social-clip</div>
+          </div>
+        </Sequence>
+      )}
+      <Sequence from={36} durationInFrames={58}>
+        <div style={{ position: "absolute", right: 20, top: 20, fontSize: 8, background: "rgba(51,85,255,0.9)", color: "#fff", padding: "4px 6px", borderRadius: 6, opacity: p2 }}>device-mockup-zoom 840-260 to 1920x1080</div>
       </Sequence>
       <Sequence from={135} durationInFrames={45}>
         <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "rgba(0,0,0,0.85)", color: "#fff", padding: "10px 16px", borderRadius: 8, fontSize: 11, opacity: interpolate(frame, [135, 142], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }), border: "1px solid rgba(255,255,255,0.12)" }}>WEBVTT karaoke · Let WorkRouter hunt for you · bloom {bloom.toFixed(2)} ·iter — beautiful = next beats last</div>
