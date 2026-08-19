@@ -9,7 +9,7 @@ name: Cockpit Auto Retry Deploy
 # suffix. Cap of 1 retry per upstream run is enforced via `attempt` to
 # prevent infinite re-dispatch loops.
 #
-# Triggered, never manual.
+# Triggered, never manual. Cap 1 retry.
 
 on:
   workflow_run:
@@ -70,7 +70,7 @@ jobs:
           # should refuse attempt >=3 via a workflow-level guard, but
           # we additionally gate via attempts var.
           echo "dispatching retry for release_tag=$RELEASE_TAG asset_suffix=$ASSET_SUFFIX"
-          gh workflow run 'Deploy Live Daemon' \
+          gh workflow run 'Deploy Cockpit' \
             --ref main \
             -f release_tag="$RELEASE_TAG" \
             -f asset_suffix="$ASSET_SUFFIX"
