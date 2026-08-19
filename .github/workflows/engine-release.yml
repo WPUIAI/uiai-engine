@@ -87,6 +87,27 @@ jobs:
           sha256sum "dist/${ENGINE_ASSET_NAME}" | tee "dist/${ENGINE_ASSET_NAME}.sha256"
           echo "sha256=$(awk '{print $1}' dist/${ENGINE_ASSET_NAME}.sha256)" >> "$GITHUB_OUTPUT"
 
+      - name: Generate release notes (deterministic, script-owned)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+        shell: bash
+        run: |
+          notes="dist/release-notes.md"
+          # DETERMINISTIC — script-owned, never agent. Detailed: type/area/files/features.
+          python3 scripts/generate-release-notes.py --tag "$RELEASE_TAG" --output "$notes"
+          # Append artifact provenance (supplements script output)
+          {
+            echo ""
+            echo "---"
+            echo "### Artifact provenance"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Artifact: \`${ENGINE_ASSET_NAME}\`"
+            echo "- SHA256: \`${{ steps.hash.outputs.sha256 }}\`"
+            echo "- Deploy target: OVH worker (via deploy job; public domains unchanged)"
+          } >> "$notes"
+          echo "release_notes_generated $(wc -l < "$notes") lines for $RELEASE_TAG"
+
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -94,16 +115,6 @@ jobs:
         shell: bash
         run: |
           notes="dist/release-notes.md"
-          cat > "$notes" <<NOTES
-          # UIAI Engine ${RELEASE_TAG}
-
-          Parent UIAI Engine worker release.
-
-          - Commit: ${GITHUB_SHA}
-          - Artifact: ${ENGINE_ASSET_NAME}
-          - SHA256: ${{ steps.hash.outputs.sha256 }}
-          - Deploy target: OVH worker (via deploy job; public domains unchanged)
-          NOTES
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" --clobber
           else

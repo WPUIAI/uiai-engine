@@ -119,25 +119,14 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-      - name: Generate release notes
+      - name: Generate release notes (deterministic, script-owned)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="$RELEASE_TAG"
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1 || true)
-          if [ -n "$PREV_TAG" ]; then
-            COMMITS=$(git log --oneline "${PREV_TAG}..${TAG}" --no-merges | head -40)
-          else
-            COMMITS=$(git log --oneline --no-merges | head -40)
-          fi
-          cat > /tmp/release-notes.md <<EOF
-          ## UIAI Engine Cockpit ${TAG}
-
-          Signed development desktop release with automatic OTA activation.
-
-          ### Commits since previous tag
-          \`\`\`
-          ${COMMITS}
-          \`\`\`
-          EOF
+          # DETERMINISTIC — script-owned, never agent. Detailed: type/area/files/features.
+          python3 scripts/generate-release-notes.py --tag "$TAG" --output /tmp/release-notes.md
+          echo "release_notes_generated $(wc -l < /tmp/release-notes.md) lines for $TAG"
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
