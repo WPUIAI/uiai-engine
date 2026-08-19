@@ -40,6 +40,23 @@ type FocusaScope struct {
 	EvidenceRef  string `json:"evidence_ref,omitempty"`
 }
 
+// Spec104ScopeRef is the typed scope key for UIAI Engine (Spec 104 §6.1, §7.2).
+// Kind "project" => ID is project_root; Kind "host" => ID is host identifier.
+type ScopeKind string
+
+const (
+	ScopeKindProject ScopeKind = "project"
+	ScopeKindHost    ScopeKind = "host"
+)
+
+type ScopeRef struct {
+	Kind ScopeKind `json:"kind"`
+	ID   string    `json:"id"`
+}
+
+func (s ScopeRef) String() string { return string(s.Kind) + ":" + s.ID }
+func DefaultHostScope() ScopeRef  { return ScopeRef{Kind: ScopeKindHost, ID: "loopback"} }
+
 type Session struct {
 	ID            string       `json:"id"`
 	URL           string       `json:"url"`
@@ -52,6 +69,7 @@ type Session struct {
 	SnapCount     int          `json:"snap_count"`
 	ReadCount     int          `json:"read_count"`
 	SnapshotCount int          `json:"snapshot_count"`
+	Scope         ScopeRef     `json:"scope"`
 	FocusaScope   *FocusaScope `json:"focusa_scope,omitempty"`
 
 	page              *rod.Page
@@ -64,10 +82,23 @@ type Session struct {
 }
 
 // SessionManager manages persistent browser sessions.
+// Spec 104: authority-bearing singleton eliminated — sessions are indexed by (scope, id) and MaxSessions is enforced per-scope with a global cap.
 type SessionManager struct {
 	mu       sync.RWMutex
-	sessions map[string]*Session
+	sessions map[string]*Session // id → Session (Scope inside)
 	pool     PoolSource
+}
+
+const globalMaxSessions = 16 // hard global cap across all scopes
+
+func (sm *SessionManager) countForScopeLocked(scope ScopeRef) int {
+	n := 0
+	for _, s := range sm.sessions {
+		if s.Scope == scope {
+			n++
+		}
+	}
+	return n
 }
 
 // NewSessionManager creates a session manager backed by a single vision pool.
@@ -134,18 +165,28 @@ func (s *Session) SetFocusaScope(scope *FocusaScope) {
 	s.FocusaScope = scope
 }
 
-// Open creates a new session, navigates to the URL, and returns the session
-// with an initial screenshot. It retries one cold-page acquisition because
-// Rod/Chrome page creation can transiently race pool pressure or target startup.
+// Open creates a new session with the default host scope (backwards compat).
+// New code should use OpenScoped with an explicit ScopeRef per Spec 104 §6.1.
 func (sm *SessionManager) Open(url string, width, height int) (*Session, *SnapResult, error) {
+	return sm.OpenScoped(url, width, height, DefaultHostScope())
+}
+
+// OpenScoped creates a session under an explicit typed scope (Spec 104 §7.2).
+// MaxSessions is enforced per-scope (4) plus a global cap (16); pool-full errors include scope.
+func (sm *SessionManager) OpenScoped(url string, width, height int, scope ScopeRef) (*Session, *SnapResult, error) {
 	if err := sm.pool.ValidateNavigationURL(url); err != nil {
 		return nil, nil, err
 	}
 
 	sm.mu.Lock()
-	if len(sm.sessions) >= MaxSessions {
+	perScope := sm.countForScopeLocked(scope)
+	if perScope >= MaxSessions {
 		sm.mu.Unlock()
-		return nil, nil, fmt.Errorf("max sessions reached (%d) — close one first", MaxSessions)
+		return nil, nil, fmt.Errorf("max sessions for scope %s reached (%d) — close one in that scope first (global %d/%d)", scope.String(), MaxSessions, len(sm.sessions), globalMaxSessions)
+	}
+	if len(sm.sessions) >= globalMaxSessions {
+		sm.mu.Unlock()
+		return nil, nil, fmt.Errorf("global max sessions reached (%d) — close one first", globalMaxSessions)
 	}
 	sm.mu.Unlock()
 
@@ -158,7 +199,7 @@ func (sm *SessionManager) Open(url string, width, height int) (*Session, *SnapRe
 
 	var lastErr error
 	for attempt := 1; attempt <= sessionOpenAttempts; attempt++ {
-		sess, snap, err := sm.openOnce(url, width, height)
+		sess, snap, err := sm.openOnceScoped(url, width, height, scope)
 		if err == nil {
 			if attempt > 1 {
 				log.Printf("[session] open recovered on attempt %d → %s", attempt, url)
@@ -174,6 +215,10 @@ func (sm *SessionManager) Open(url string, width, height int) (*Session, *SnapRe
 }
 
 func (sm *SessionManager) openOnce(url string, width, height int) (*Session, *SnapResult, error) {
+	return sm.openOnceScoped(url, width, height, DefaultHostScope())
+}
+
+func (sm *SessionManager) openOnceScoped(url string, width, height int, scope ScopeRef) (*Session, *SnapResult, error) {
 	page, err := sm.pool.GetPage()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get page: %w", err)
@@ -185,7 +230,7 @@ func (sm *SessionManager) openOnce(url string, width, height int) (*Session, *Sn
 	}
 
 	now := time.Now()
-	sess := &Session{ID: generateID(), URL: url, Width: width, Height: height, CreatedAt: now, LastUsed: now, page: page, pool: sm.pool, refs: make(map[string]SnapshotRef), diagnostics: newDiagnosticsRecorder()}
+	sess := &Session{ID: generateID(), URL: url, Width: width, Height: height, CreatedAt: now, LastUsed: now, Scope: scope, page: page, pool: sm.pool, refs: make(map[string]SnapshotRef), diagnostics: newDiagnosticsRecorder()}
 	sess.initDiagnostics()
 
 	if err := page.Timeout(18 * time.Second).Navigate(url); err != nil {
@@ -253,12 +298,30 @@ func retryNavigate(page *rod.Page, url string) error {
 	return fmt.Errorf("navigation failed after 2 attempts: %w", lastErr)
 }
 
-// Get returns a session by ID.
+// Get returns a session by ID (scope-agnostic, backwards compat).
 func (sm *SessionManager) Get(id string) (*Session, bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	s, ok := sm.sessions[id]
 	return s, ok
+}
+
+// GetScoped returns a session only if scope matches (Spec 104 §7.2).
+func (sm *SessionManager) GetScoped(id string, scope ScopeRef) (*Session, bool) {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	s, ok := sm.sessions[id]
+	if !ok || s.Scope != scope {
+		return nil, false
+	}
+	return s, true
+}
+
+// CountForScope returns live session count for a given scope.
+func (sm *SessionManager) CountForScope(scope ScopeRef) int {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	return sm.countForScopeLocked(scope)
 }
 
 // Close destroys a session and returns its page to the pool.
@@ -289,13 +352,26 @@ func (sm *SessionManager) Close(id string) error {
 	return nil
 }
 
-// List returns all active sessions.
+// List returns all active sessions (includes Scope per-spec).
 func (sm *SessionManager) List() []*Session {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	out := make([]*Session, 0, len(sm.sessions))
 	for _, s := range sm.sessions {
 		out = append(out, s)
+	}
+	return out
+}
+
+// ListScoped returns sessions for a single typed scope.
+func (sm *SessionManager) ListScoped(scope ScopeRef) []*Session {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	out := []*Session{}
+	for _, s := range sm.sessions {
+		if s.Scope == scope {
+			out = append(out, s)
+		}
 	}
 	return out
 }
