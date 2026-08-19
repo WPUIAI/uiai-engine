@@ -123,6 +123,18 @@ func FromIdentity(id *auth.Identity) Entitlements {
 }
 
 func tierFeatures(tier string) map[string]bool {
+	// Spec 152 / ENDPOINT_AUTH_MATRIX §3: tier-derived grants are legacy.
+	// All known licensed tiers currently receive the same broad set; explicit
+	// authority-issued claims (product/features/limits) will replace this.
+	// Unknown tiers fail closed (no features) per spec 152e.
+	known := map[string]bool{"operator": true, "founders-forge": true, "team": true, "commercial": true, "enterprise": true, "internal": false, "pro": false}
+	if _, ok := known[tier]; !ok {
+		return map[string]bool{}
+	}
+	// internal/pro are legacy token-derived tiers — must not grant product features by themselves.
+	if tier == "internal" || tier == "pro" {
+		return map[string]bool{}
+	}
 	all := []string{
 		FeatureRemoteAPIAccess, FeatureCritique, FeatureUIReverse, FeatureStyleEnhance,
 		FeatureLayoutCompare, FeatureSectionDetect, FeatureCopilot, FeatureMediaAccess,
