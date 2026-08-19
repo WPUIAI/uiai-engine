@@ -54,7 +54,7 @@ jobs:
           npm run build
 
   signed-macos-build:
-    name: Build signed macOS OTA
+    name: Build signed macOS OTA (x86_64)
     runs-on: macos-15-intel
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
@@ -110,6 +110,63 @@ jobs:
           retention-days: 1
           compression-level: 0
 
+  signed-macos-build-arm64:
+    name: Build signed macOS OTA (aarch64)
+    runs-on: macos-14
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      UPDATER_ASSET_BASE_URL: https://github.com/${{ github.repository }}/releases/download/cockpit-latest
+      COCKPIT_RELEASE_FAST_PATH: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/cockpit/src-tauri
+          shared-key: cockpit-ota-macos-aarch64
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/cockpit/package-lock.json
+      - name: Require updater signing authority
+        run: |
+          test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo 'missing TAURI_SIGNING_PRIVATE_KEY' >&2; exit 1; }
+          test -n "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" || { echo 'missing TAURI_SIGNING_PRIVATE_KEY_PASSWORD' >&2; exit 1; }
+      - name: Build signed app, DMG, and updater bundle once
+        working-directory: apps/cockpit
+        env:
+          TARGET_TRIPLE: aarch64-apple-darwin
+        run: |
+          ./scripts/generate-icons.sh
+          ./scripts/cockpit-release.sh
+      - name: Verify updater manifest
+        working-directory: apps/cockpit
+        run: |
+          jq -e '
+            (.version | length > 0) and
+            (.platforms["darwin-aarch64"].signature | length > 0) and
+            (.platforms["darwin-aarch64"].url | contains("/cockpit-latest/uaiengine-cockpit_"))
+          ' release-proof/cockpit/updater/latest.json
+          find release-proof/cockpit/updater -name '*.app.tar.gz' -type f | grep -q .
+          find release-proof/cockpit/updater -name '*.app.tar.gz.sig' -type f | grep -q .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-macos-ota-arm64-${{ env.RELEASE_TAG }}
+          path: |
+            apps/cockpit/release-proof/cockpit
+            apps/cockpit/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
   create-release:
     name: Create immutable release
     needs: checks
@@ -137,21 +194,34 @@ jobs:
 
   publish-macos-ota:
     name: Publish signed macOS OTA
-    needs: [checks, signed-macos-build, create-release]
+    needs: [checks, signed-macos-build, signed-macos-build-arm64, create-release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: cockpit-macos-ota-${{ env.RELEASE_TAG }}
-          path: /tmp/cockpit-ota
+          path: /tmp/cockpit-ota-x86
+      - uses: actions/download-artifact@v4
+        with:
+          name: cockpit-macos-ota-arm64-${{ env.RELEASE_TAG }}
+          path: /tmp/cockpit-ota-arm64
+      - name: Merge updater latest.json (x86_64 + aarch64)
+        run: |
+          jq -s '.[0] * {platforms: (.[0].platforms + .[1].platforms)}' /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json /tmp/cockpit-ota-arm64/release-proof/cockpit/updater/latest.json > /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json.merged
+          mv /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json.merged /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json
+          cp /tmp/cockpit-ota-arm64/release-proof/cockpit/updater/*.app.tar.gz /tmp/cockpit-ota-x86/release-proof/cockpit/updater/ 2>/dev/null || true
+          cp /tmp/cockpit-ota-arm64/release-proof/cockpit/updater/*.app.tar.gz.sig /tmp/cockpit-ota-x86/release-proof/cockpit/updater/ 2>/dev/null || true
+          jq -e '(.platforms["darwin-x86_64"].signature | length > 0) and (.platforms["darwin-aarch64"].signature | length > 0)' /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json
+          echo "merged latest.json platforms: $(jq -c .platforms /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json)"
       - name: Publish immutable proof and mutable dev channel
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ env.RELEASE_TAG }}
         run: |
-          find /tmp/cockpit-ota/release-proof/cockpit -maxdepth 1 -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
-          find /tmp/cockpit-ota/release-proof/cockpit/updater -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
-          find /tmp/cockpit-ota/src-tauri -name '*.dmg' -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
+          find /tmp/cockpit-ota-x86/release-proof/cockpit -maxdepth 1 -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
+          find /tmp/cockpit-ota-x86/release-proof/cockpit/updater -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
+          find /tmp/cockpit-ota-x86/src-tauri -name '*.dmg' -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
+          find /tmp/cockpit-ota-arm64/src-tauri -name '*.dmg' -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber 2>/dev/null || true
           if ! gh release view cockpit-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create cockpit-latest --repo "$GITHUB_REPOSITORY" --target "$TAG" --title 'UIAI Engine Cockpit Dev OTA' --notes 'Mutable signed development channel.' --prerelease
           fi
