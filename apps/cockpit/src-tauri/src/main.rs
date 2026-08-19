@@ -31,6 +31,8 @@ mod focusa_pairing_completion;
 mod focusa_pairing_verify;
 #[allow(dead_code)]
 mod focusa_pairing_contract;
+#[allow(dead_code)]
+mod focusa_menubar_mint;
 
 fn main() {
     let focusa_manifest_endpoint = focusa_manifest_server::start()

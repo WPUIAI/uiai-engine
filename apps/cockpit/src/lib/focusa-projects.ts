@@ -89,6 +89,9 @@ export function selectFocusaProjectBinding(binding: FocusaProjectBinding): void 
   window.localStorage.setItem("uiai.scope.project_root", binding.projectRoot);
   if (binding.continuityId) window.localStorage.setItem("uiai.scope.continuity_id", binding.continuityId);
   else window.localStorage.removeItem("uiai.scope.continuity_id");
+  // Workstream-rooted: persist derived WorkstreamKey = ProjectRoot::ContinuityId (one partition per workstream).
+  if (binding.projectRoot && binding.continuityId) window.localStorage.setItem("uiai.scope.workstream_key", `${binding.projectRoot.replace(/\/+$/, "")}::${binding.continuityId}`);
+  else window.localStorage.removeItem("uiai.scope.workstream_key");
   window.localStorage.removeItem("uiai.scope.workpoint_id");
   window.localStorage.setItem("uiai.scope.focusa_daemon_key", binding.daemonKey);
 }

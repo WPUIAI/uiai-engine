@@ -188,9 +188,23 @@ function parseScopeRef(value: unknown): ScopeRef {
   exactKeys(item, ["project_root_key", "project_label", "workstream_key", "continuity_id", "thread_id", "session_id", "cloud_node_id", "machine_id", "daemon_endpoint", "role", "authority_state"], "scope_ref");
   const authorityState = requiredString(item, "authority_state", "scope_ref");
   if (!authorityStates.has(authorityState)) throw new Error(`unsupported authority_state: ${authorityState}`);
-  for (const key of ["project_root_key", "workstream_key", "continuity_id", "thread_id", "session_id"] as const) {
+  for (const key of ["project_root_key", "continuity_id", "thread_id", "session_id"] as const) {
     const current = item[key];
     if (current !== undefined) assertOpaqueRef(String(current), `scope_ref.${key}`);
+  }
+  // Workstream invariant — mirrors focusa-core workstream_root.rs: WorkstreamKey = ProjectRootKey::ContinuityId.
+  // workstream_key is path-aware (contains / and ::), so validate shape directly instead of opaque ref.
+  const pr = item.project_root_key as string | undefined;
+  const wk = item.workstream_key as string | undefined;
+  const ci = item.continuity_id as string | undefined;
+  if (wk !== undefined) {
+    const idx = String(wk).indexOf("::");
+    if (idx < 1) throw new Error("workstream_key must be project_root_key::continuity_id");
+    if (wk.includes("://") || wk.includes("?") || wk.includes("#")) throw new Error("workstream_key must not contain URL delimiters");
+  }
+  if (pr && ci && wk) {
+    const derived = `${String(pr).replace(/\/+$/, "")}::${String(ci)}`;
+    if (wk !== derived) throw new Error(`workstream_key mismatch: expected ${derived}`);
   }
   return item as unknown as ScopeRef;
 }

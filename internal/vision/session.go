@@ -34,10 +34,42 @@ const (
 // the page alive between calls — enabling instant re-screenshots, scrolling,
 // clicking, CSS injection, and JS evaluation without re-navigating.
 type FocusaScope struct {
-	WorkpointID  string `json:"workpoint_id,omitempty"`
-	ContinuityID string `json:"continuity_id,omitempty"`
-	ProjectRoot  string `json:"project_root,omitempty"`
-	EvidenceRef  string `json:"evidence_ref,omitempty"`
+	WorkpointID   string `json:"workpoint_id,omitempty"`
+	ContinuityID  string `json:"continuity_id,omitempty"`
+	ProjectRoot   string `json:"project_root,omitempty"`
+	WorkstreamKey string `json:"workstream_key,omitempty"`
+	EvidenceRef   string `json:"evidence_ref,omitempty"`
+}
+
+func (s *FocusaScope) DerivedWorkstreamKey() string {
+	if s == nil {
+		return ""
+	}
+	if s.WorkstreamKey != "" {
+		return s.WorkstreamKey
+	}
+	if s.ProjectRoot != "" && s.ContinuityID != "" {
+		root := s.ProjectRoot
+		for len(root) > 1 && root[len(root)-1] == '/' {
+			root = root[:len(root)-1]
+		}
+		return root + "::" + s.ContinuityID
+	}
+	return ""
+}
+
+func (s *FocusaScope) ValidWorkstreamKey() bool {
+	if s == nil {
+		return true
+	}
+	derived := s.DerivedWorkstreamKey()
+	if s.WorkstreamKey != "" && derived != s.WorkstreamKey {
+		return false
+	}
+	if s.WorkstreamKey != "" && s.WorkstreamKey != derived {
+		return false
+	}
+	return true
 }
 
 // Spec104ScopeRef is the typed scope key for UIAI Engine (Spec 104 §6.1, §7.2).
@@ -158,11 +190,21 @@ func generateID() string {
 }
 
 func (s *Session) SetFocusaScope(scope *FocusaScope) {
-	if scope == nil || (scope.WorkpointID == "" && scope.ContinuityID == "" && scope.ProjectRoot == "" && scope.EvidenceRef == "") {
+	if scope == nil || (scope.WorkpointID == "" && scope.ContinuityID == "" && scope.ProjectRoot == "" && scope.WorkstreamKey == "" && scope.EvidenceRef == "") {
 		s.FocusaScope = nil
 		return
 	}
+	if scope.WorkstreamKey == "" && scope.ProjectRoot != "" && scope.ContinuityID != "" {
+		scope.WorkstreamKey = scope.DerivedWorkstreamKey()
+	}
 	s.FocusaScope = scope
+}
+
+func (s *Session) WorkstreamKey() string {
+	if s.FocusaScope == nil {
+		return ""
+	}
+	return s.FocusaScope.DerivedWorkstreamKey()
 }
 
 // Open creates a new session with the default host scope (backwards compat).

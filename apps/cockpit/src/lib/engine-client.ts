@@ -21,9 +21,14 @@ export function selectEngineUrl(baseUrl: string): void {
   if (typeof window !== "undefined") window.localStorage.setItem("uiai.engine.url", baseUrl.replace(/\/$/, ""));
 }
 
-export function savedScope(): { project_root?: string; continuity_id?: string; workpoint_id?: string } {
+export function savedScope(): { project_root?: string; continuity_id?: string; workpoint_id?: string; workstream_key?: string } {
   if (typeof window === "undefined") return {};
-  return { project_root: window.localStorage.getItem("uiai.scope.project_root") || undefined, continuity_id: window.localStorage.getItem("uiai.scope.continuity_id") || undefined, workpoint_id: window.localStorage.getItem("uiai.scope.workpoint_id") || undefined };
+  const project_root = window.localStorage.getItem("uiai.scope.project_root") || undefined;
+  const continuity_id = window.localStorage.getItem("uiai.scope.continuity_id") || undefined;
+  const workpoint_id = window.localStorage.getItem("uiai.scope.workpoint_id") || undefined;
+  const stored = window.localStorage.getItem("uiai.scope.workstream_key") || undefined;
+  const workstream_key = stored ?? (project_root && continuity_id ? `${project_root.replace(/\/+$/, "")}::${continuity_id}` : undefined);
+  return { project_root, continuity_id, workpoint_id, workstream_key };
 }
 
 export async function engineRequest<T>(path: string, init?: RequestInit): Promise<T> {
@@ -49,7 +54,7 @@ export const engineClient = {
   sessions: async () => (await engineRequest<{ sessions: BrowserSession[]; count: number; max: number }>("/api/session/")).sessions,
   openSession: (url: string, scope = savedScope()) => {
     requireCapabilityEntitlement("uiai.browser.session.create");
-    return engineRequest<{ session: BrowserSession; screenshot: string; size: { width: number; height: number }; fpv_share?: unknown }>("/api/session/", { method: "POST", body: JSON.stringify({ url, width: 1280, height: 800, project_root: scope.project_root, continuity_id: scope.continuity_id, workpoint_id: scope.workpoint_id }) });
+    return engineRequest<{ session: BrowserSession; screenshot: string; size: { width: number; height: number }; fpv_share?: unknown }>("/api/session/", { method: "POST", body: JSON.stringify({ url, width: 1280, height: 800, project_root: scope.project_root, continuity_id: scope.continuity_id, workpoint_id: scope.workpoint_id, workstream_key: (scope as Record<string,string|undefined>).workstream_key ?? (scope.project_root && scope.continuity_id ? `${scope.project_root.replace(/\/+$/, "")}::${scope.continuity_id}` : undefined) }) });
   },
   closeSession: (id: string) => {
     requireCapabilityEntitlement("uiai.browser.session.control");
