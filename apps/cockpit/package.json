@@ -42,6 +42,7 @@
     "@remotion/shapes": "^4.0.512",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-process": "^2.3.0",
+    "@tauri-apps/plugin-store": "^2.4.4",
     "@tauri-apps/plugin-updater": "^2.9.0",
     "@theatre/core": "^0.7.1",
     "bits-ui": "^2.18.2",
