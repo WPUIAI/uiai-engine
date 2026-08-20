@@ -29,10 +29,8 @@ describe("T005-07.01 profile metadata repository", () => {
   });
 
   it("fail-closes on token material", async () => {
-    // @ts-expect-error intentional
-    expect(() => validateProfileMetadata({ ...valid, token: "secret123456789012345" })).toThrow(/token material/i);
-    // @ts-expect-error
-    expect(() => validateProfileMetadata({ ...valid, secret: "abc" })).toThrow(/token material/i);
+    expect(() => validateProfileMetadata({ ...valid, token: "secret123456789012345" } as unknown as typeof valid)).toThrow(/token material/i);
+    expect(() => validateProfileMetadata({ ...valid, secret: "abc" } as unknown as typeof valid)).toThrow(/token material/i);
     await expect(saveProfileMetadata({ ...valid, profileId: "profile:bad", token: "x" } as unknown as typeof valid)).rejects.toThrow(
       /token material/i,
     );
