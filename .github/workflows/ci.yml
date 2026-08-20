@@ -36,6 +36,10 @@ jobs:
         run: npm run check
       - working-directory: apps/cockpit
         run: npm run build
+      - name: Disable updater signing for PR CI (no private key)
+        run: |
+          jq 'del(.plugins.updater.pubkey)' apps/cockpit/src-tauri/tauri.conf.json > /tmp/tauri.ci.json && mv /tmp/tauri.ci.json apps/cockpit/src-tauri/tauri.conf.json
+          echo "CI tauri.conf.json pubkey removed for unsigned PR build"
       - working-directory: apps/cockpit
         run: npm run tauri build -- --bundles app
       - run: |
