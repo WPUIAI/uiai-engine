@@ -4,8 +4,12 @@
 let memory = new Map<string, string>();
 let tauriStore: any = null;
 
+let tauriStoreTried = false;
 async function getTauriStore(): Promise<any | null> {
+  if (typeof window === "undefined") return null;
   if (tauriStore) return tauriStore;
+  if (tauriStoreTried) return null;
+  tauriStoreTried = true;
   try {
     const mod: any = await import("@tauri-apps/plugin-store").catch(() => null);
     if (!mod?.LazyStore) return null;
