@@ -36,10 +36,10 @@ jobs:
         run: npm run check
       - working-directory: apps/cockpit
         run: npm run build
-      - name: Set dummy signing key for PR CI (keep ota-toast pubkey valid)
+      - name: Disable updater signing for PR CI (unsigned build — canonical release signs via GH)
         run: |
-          echo "TAURI_SIGNING_PRIVATE_KEY=RWQ3ZeYjL66+DvRXLe+KcVrTGv7PiK9AgvuxA/Jh7XIvgXvp3PSGusouRZHQugeTaMtw4K00SWneL0ivuj9TRO6/" >> $GITHUB_ENV
-          echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=" >> $GITHUB_ENV
+          jq 'del(.plugins.updater.pubkey) | .bundle.createUpdaterArtifacts = false' apps/cockpit/src-tauri/tauri.conf.json > /tmp/tauri.ci.json && mv /tmp/tauri.ci.json apps/cockpit/src-tauri/tauri.conf.json
+          cat apps/cockpit/src-tauri/tauri.conf.json | grep -q updater && echo "tauri.conf patched for unsigned PR CI"
       - working-directory: apps/cockpit
         run: npm run tauri build -- --bundles app
       - run: |
