@@ -36,11 +36,18 @@ jobs:
         run: npm run check
       - working-directory: apps/cockpit
         run: npm run build
+      - name: Set dummy signing key for PR CI (keep ota-toast pubkey valid)
+        run: |
+          cat > /tmp/tauri-key <<'KEY'
+          untrusted comment: minisign secret key
+          RWQ3ZeYjL66+DvRXLe+KcVrTGv7PiK9AgvuxA/Jh7XIvgXvp3PSGusouRZHQugeTaMtw4K00SWneL0ivuj9TRO6/
+          KEY
+          echo "TAURI_SIGNING_PRIVATE_KEY<<EOF" >> $GITHUB_ENV
+          cat /tmp/tauri-key >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=" >> $GITHUB_ENV
       - working-directory: apps/cockpit
         run: npm run tauri build -- --bundles app
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: "untrusted comment: minisign secret key\nRWQ3ZeYjL66+DvRXLe+KcVrTGv7PiK9AgvuxA/Jh7XIvgXvp3PSGusouRZHQugeTaMtw4K00SWneL0ivuj9TRO6/"
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
       - run: |
           APP=$(find apps/cockpit/src-tauri/target/release/bundle/macos -name "*.app" | head -1)
           test -n "$APP" && /usr/bin/plutil -lint "$APP/Contents/Info.plist" && echo "plutil PASS $APP"
