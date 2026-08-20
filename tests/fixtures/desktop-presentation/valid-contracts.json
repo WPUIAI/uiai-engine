@@ -19,7 +19,7 @@
     "reason": "operator_request",
     "scope_ref": {
       "project_root_key": "project:uiai-engine",
-      "workstream_key": "continuity:extension-bootstrap",
+      "workstream_key": "project:uiai-engine::extension-bootstrap",
       "continuity_id": "extension-bootstrap",
       "session_id": "session:browser-01",
       "authority_state": "verified"
