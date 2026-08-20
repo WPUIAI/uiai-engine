@@ -422,10 +422,11 @@ func (e *Engine) handleRoot(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleStatus returns service status — same shape as Bun.
+// handleStatus returns service status — same shape as Bun, now with machine schema id.
 func (e *Engine) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
-		"type": "status",
+		"schema": "uiai.status.v1",
+		"type":   "status",
 		"services": map[string]any{
 			"uiai-engine": map[string]any{
 				"id":      "uiai-engine",
