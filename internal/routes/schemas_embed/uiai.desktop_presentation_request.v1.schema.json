@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "uiai.desktop_presentation_request.v1",
+  "title": "Desktop Presentation Request",
+  "type": "object",
+  "required": ["schema", "mode", "reason", "requested_by", "focus", "expires_in_ms", "idempotency_key"],
+  "properties": {
+    "schema": { "const": "uiai.desktop_presentation_request.v1" },
+    "mode": { "type": "string", "enum": ["full", "pip", "focus_existing"] },
+    "reason": { "type": "string", "enum": ["operator_request", "takeover_required", "policy_confirmation", "failure_recovery", "workflow"] },
+    "scope_ref": { "$ref": "uiai.scope_ref.v1.schema.json" },
+    "requested_by": { "$ref": "uiai.client_ref.v1.schema.json" },
+    "focus": { "type": "boolean" },
+    "expires_in_ms": { "type": "integer", "minimum": 1000, "maximum": 300000 },
+    "idempotency_key": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$" }
+  },
+  "additionalProperties": false
+}

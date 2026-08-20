@@ -224,6 +224,10 @@ func (e *Engine) mountRoutes() {
 	// API status
 	r.Get("/api/status", e.handleStatus)
 
+	// Machine-readable contracts — MR-P0-03/MR-P0-04: OpenAPI 3.1 + per-schema serve
+	r.Get("/api/openapi.json", routes.HandleOpenAPI)
+	r.Get("/api/schema/{id}", routes.HandleSchema)
+
 	// -- All /api/* routes below get auth middleware in Phase A2 --
 
 	// AI endpoints — critique is real, rest are stubs until implemented

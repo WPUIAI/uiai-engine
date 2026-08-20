@@ -57,7 +57,7 @@ pub fn validate_and_mint<S: CredentialStore>(
     if cockpit_device_id == cross_device_id { return Err("cockpit device must be distinct from menubar device".into()); }
     if !opaque(cockpit_device_id) { return Err("cockpit device invalid".into()); }
     // Validate handle shape already via CredentialHandle parse before call; forbid handle containing secret word
-    if forbidden(&token_handle.to_string()) { return Err("token_handle contains forbidden shape".into()); }
+    if forbidden(token_handle.as_str()) { return Err("token_handle contains forbidden shape".into()); }
     let secret = CredentialSecret::new(one_shot_token.to_string()).map_err(|e| e.to_string())?;
     store.write(&token_handle, secret).map_err(|e: CredentialError| e.to_string())?;
     Ok(DistinctCockpitMint {
