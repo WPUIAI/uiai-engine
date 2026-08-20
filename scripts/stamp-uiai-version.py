@@ -69,16 +69,15 @@ def regen_manifest(version: str):
     else:
         data = json.loads(mp.read_text(encoding="utf-8"))
         data["release_version"] = version
-        # recompute sha256 for listed artifacts that exist on disk; keep others as-is (CI will fill)
+        # Recompute sha256 for every listed artifact — fail closed if missing (mirror Core strictness).
+        # No stale preservation: every artifact must exist at stamp time; CI will verify.
         new_artifacts = {}
         for rel, old_hash in list(data.get("artifacts", {}).items()):
             ap = ROOT / rel
-            if ap.exists() and ap.is_file():
-                digest = "sha256:" + hashlib.sha256(ap.read_bytes()).hexdigest()
-                new_artifacts[rel] = digest
-            else:
-                # keep stale marker but warn — CI build will recompute
-                new_artifacts[rel] = old_hash
+            if not ap.exists() or not ap.is_file():
+                raise SystemExit(f"Missing artifact for manifest (fail-closed): {rel}")
+            digest = "sha256:" + hashlib.sha256(ap.read_bytes()).hexdigest()
+            new_artifacts[rel] = digest
         data["artifacts"] = new_artifacts
         data.setdefault("schema", "uiai.distribution_manifest.v1")
         data.setdefault("compatibility_status", "compatible")

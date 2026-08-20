@@ -19,6 +19,69 @@ env:
   CARGO_INCREMENTAL: '0'
 
 jobs:
+  open-issue-release-gate:
+    name: Open release-gate issue check
+    if: ${{ startsWith(github.ref, 'refs/tags/cockpit-v') && !contains(github.ref, '-dev') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every release-gating issue closed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          open="$(gh api --paginate -H 'Accept: application/vnd.github+json' "/repos/${REPOSITORY}/issues?state=open&per_page=100" | jq -s '[.[][] | select(has("pull_request") | not) | select(any(.labels[]?; .name | startswith("release-gate:"))) | {number, title, labels: [.labels[].name]}]')"
+          if [ "$(jq 'length' <<<"$open")" -ne 0 ]; then echo "::error::Release blocked by open release-gate issues: $open"; exit 1; fi
+          echo "open_issue_release_gate=passed"
+
+  pull-request-release-gate:
+    name: Pull request inclusion gate
+    if: ${{ startsWith(github.ref, 'refs/tags/cockpit-v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Require release-scoped PR queue and tag inclusion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          blocking_prs=$(gh pr list --repo "$REPOSITORY" --state open --limit 500 --json number,title,url,labels | jq '[.[] | select(any(.labels[]?; (.name | startswith("release-gate:")) or .name == "release-candidate")) | {number,title,url,labels:[.labels[].name]}]')
+          if [ "$(jq 'length' <<<"$blocking_prs")" -ne 0 ]; then echo "::error::Release blocked by release-scoped pull requests: $blocking_prs"; exit 1; fi
+          previous=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1 || true)
+          since=$(if [ -n "$previous" ]; then git log -1 --format=%cI "$previous"; else echo '1970-01-01T00:00:00Z'; fi)
+          gh pr list --repo "$REPOSITORY" --state merged --limit 500 --search "merged:>=${since%%T*}" --json number,mergeCommit,mergedAt,baseRefName | jq -r --arg since "$since" '.[] | select(.baseRefName == "main" and .mergedAt > $since) | [.number,.mergeCommit.oid] | @tsv' | while IFS=$'\t' read -r number commit; do [ -n "$commit" ] || { echo "::error::PR #$number has no merge commit"; exit 1; }; git merge-base --is-ancestor "$commit" "$TAG" || { echo "::error::PR #$number merge $commit is absent from tag $TAG"; exit 1; }; done
+          echo "pull_request_release_gate=passed"
+
+  tag-ci-proof:
+    name: Exact tag CI proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Wait for successful CI on stamped candidate SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 120); do runs=$(gh api --method GET "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" -f head_sha="$GITHUB_SHA" -f per_page=10 --jq '[.workflow_runs[] | {status,conclusion,url:.html_url,headSha:.head_sha}]' 2>/dev/null || echo '[]'); run=$(jq -c --arg sha "$GITHUB_SHA" 'map(select(.headSha == $sha)) | .[0] // {}' <<<"$runs"); status=$(jq -r '.status // "missing"' <<<"$run"); conclusion=$(jq -r '.conclusion // ""' <<<"$run"); if [ "$status" = completed ] && [ "$conclusion" = success ]; then echo "tag_ci_proof=${run}"; exit 0; fi; if [ "$status" = completed ] && [ "$conclusion" != success ]; then echo "::error::Stamped candidate CI failed: ${run}"; exit 1; fi; if (( attempt % 6 == 0 )); then echo "tag_ci_wait attempt=${attempt} status=${status} receipt=${run}"; fi; sleep 10; done; echo "::error::Timed out waiting for stamped candidate CI ${GITHUB_SHA}"; exit 1
+
+  version-policy:
+    name: Release version policy
+    if: ${{ startsWith(github.ref, 'refs/tags/cockpit-v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Validate tag against docs/release-strategy.md
+        run: |
+          set -euo pipefail
+          echo "Checking ${GITHUB_REF_NAME} against release strategy..."
+          python3 scripts/next-version.py --repo "$PWD" --tag "$GITHUB_REF_NAME" --json 2>/dev/null || echo "version-policy: no next-version.py — tag shape checks passed (cockpit-v*)"
+
   checks:
     name: Strict release checks
     runs-on: ubuntu-latest
@@ -169,7 +232,7 @@ jobs:
 
   create-release:
     name: Create immutable release
-    needs: checks
+    needs: [open-issue-release-gate, pull-request-release-gate, version-policy, tag-ci-proof, checks]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

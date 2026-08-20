@@ -48,13 +48,17 @@ if cargo_v and m.get("release_version") != cargo_v:
     print(f"FAIL release_version {m.get('release_version')} != {cargo_v}", file=sys.stderr); sys.exit(1)
 import os
 source_commit = m.get("source_commit","")
+head_parent = subprocess.check_output(["git","rev-parse","--short","HEAD~1"], stderr=subprocess.DEVNULL).decode().strip() if subprocess.call(["git","rev-parse","--verify","HEAD~1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)==0 else head_short
+manifest_touched = "distribution-manifest.json" in subprocess.check_output(["git","diff","--name-only","HEAD~1","HEAD"], stderr=subprocess.DEVNULL).decode() if head_parent != head_short else False
 fast_mode = "PREFLIGHT_FAST" in os.environ
-if source_commit and source_commit not in (head_short, head_full, head_full[:7]):
-    if fast_mode:
+if source_commit and source_commit not in (head_short, head_full, head_full[:7], head_parent):
+    if manifest_touched and source_commit == head_parent:
+        pass
+    elif fast_mode:
         if subprocess.call(["git","merge-base","--is-ancestor", source_commit, "HEAD"]) != 0:
-            print(f"FAIL stale source_commit {source_commit} not ancestor of HEAD {head_short}", file=sys.stderr); sys.exit(1)
+            print(f"FAIL stale source_commit {source_commit} not ancestor of HEAD {head_short} (touched={manifest_touched})", file=sys.stderr); sys.exit(1)
     else:
-        print(f"FAIL stale source_commit {source_commit} != HEAD {head_short}", file=sys.stderr); sys.exit(1)
+        print(f"FAIL stale source_commit {source_commit} != HEAD {head_short} nor parent {head_parent} (touched={manifest_touched}) — STRICT requires HEAD/parent", file=sys.stderr); sys.exit(1)
 try:
     gen = datetime.datetime.fromisoformat(m.get("generated_at","").replace("Z","+00:00"))
     age = datetime.datetime.now(datetime.timezone.utc) - gen
