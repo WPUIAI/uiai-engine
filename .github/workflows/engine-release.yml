@@ -31,7 +31,7 @@ env:
 jobs:
   build-release:
     name: Build parent UIAI Engine release
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       asset_name: ${{ env.ENGINE_ASSET_NAME }}
@@ -123,7 +123,7 @@ jobs:
   deploy-ovh:
     name: Deploy parent UIAI Engine to OVH worker
     needs: build-release
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     if: ${{ github.event_name == 'push' || inputs.deploy_to_ovh }}
     environment: production
     concurrency:

@@ -11,7 +11,7 @@ permissions:
 jobs:
   rust-check:
     name: Rust + frontend checks
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
         with:
@@ -42,7 +42,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     needs: rust-check
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
         with:

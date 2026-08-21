@@ -22,7 +22,7 @@ jobs:
   record-and-heal:
     name: Record failure + self-heal
     if: ${{ github.event_name == 'schedule' || github.event.workflow_run.conclusion == 'failure' }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
         with:
