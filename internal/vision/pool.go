@@ -36,7 +36,11 @@ const (
 const WarmPageCount = 1
 
 type Pool struct {
-	mu       sync.Mutex
+	mu sync.Mutex
+	// launchMu serializes browser launches and keeps them OFF p.mu so a
+	// wedged launch can never hold the pool mutex hostage (Spec: engine must
+	// never deadlock the session API — fixed 2026-08-23).
+	launchMu sync.Mutex
 	browser  *rod.Browser
 	launcher *launcher.Launcher
 	pages    chan *rod.Page
@@ -130,18 +134,7 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 	return p, nil
 }
 
-// IsBrowserAlive exposes the Chrome process liveness check on the PoolSource surface.
-func (p *Pool) IsBrowserAlive() bool { return p.isBrowserAlive() }
-
-// MarkFailure records a recovery-relevant failure on the pool. Reserved for callers that
-// hold a PoolSource directly.
-func (p *Pool) MarkFailure() {}
-
-// Reset clears transient counters when a multi-pool orchestrator is restarted.
-func (p *Pool) Reset() {}
-
 // launchBrowser starts (or restarts) the Chrome process.
-
 func (p *Pool) launchBrowser() error {
 	// Clean up old browser if any
 	if p.browser != nil {
@@ -240,15 +233,36 @@ drained:
 		log.Printf("[vision] Using system browser: %s", chromePath)
 	}
 
-	u, err := l.Launch()
-	if err != nil {
-		return fmt.Errorf("failed to launch browser: %w", err)
-	}
+	launchErr := make(chan error, 1)
+	var browser *rod.Browser
+	var pid int
+	go func() {
+		u, err := l.Launch()
+		if err != nil {
+			launchErr <- fmt.Errorf("failed to launch browser: %w", err)
+			return
+		}
+		browser = rod.New().ControlURL(u)
+		if err := browser.Connect(); err != nil {
+			launchErr <- fmt.Errorf("failed to connect browser: %w", err)
+			return
+		}
+		launchErr <- nil
+	}()
 
-	browser := rod.New().ControlURL(u)
-	if err := browser.Connect(); err != nil {
+	select {
+	case err := <-launchErr:
+		if err != nil {
+			l.Cleanup()
+			return err
+		}
+	case <-time.After(LaunchTimeout):
+		// Kill the half-launched browser so nothing leaks (2026-08-23 fix).
+		if pid = l.PID(); pid > 0 {
+			exec.Command("kill", "-9", fmt.Sprintf("%d", pid)).Run() // #nosec G204 -- managed launcher PID
+		}
 		l.Cleanup()
-		return fmt.Errorf("failed to connect browser: %w", err)
+		return ErrLaunchTimeout
 	}
 
 	browser.IgnoreCertErrors(true)
@@ -258,19 +272,37 @@ drained:
 	p.browserPID = l.PID()
 	p.failCount = 0
 
-	// Pre-warm pages so first requests don't pay page-creation cost
+	// Pre-warm pages so first requests don't pay page-creation cost.
+	// Bounded per-page: a hung CDP must not stall the launch path again.
 	warmCount := WarmPageCount
 	if warmCount > p.maxPages {
 		warmCount = p.maxPages
 	}
 	for i := 0; i < warmCount; i++ {
-		page, err := p.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
-		if err != nil {
-			log.Printf("[vision] Pre-warm page %d failed: %v", i, err)
+		warmDone := make(chan *rod.Page, 1)
+		go func() {
+			page, err := browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+			if err != nil {
+				warmDone <- nil
+				return
+			}
+			warmDone <- page
+		}()
+		var page *rod.Page
+		select {
+		case page = <-warmDone:
+		case <-time.After(10 * time.Second):
+			log.Printf("[vision] Pre-warm page %d timed out; skipping remaining warm pages", i)
+			page = nil
+		}
+		if page == nil {
+			log.Printf("[vision] Pre-warm page %d failed", i)
 			break
 		}
+		p.mu.Lock()
 		p.pages <- page
 		p.created++
+		p.mu.Unlock()
 	}
 
 	log.Printf("[vision] Browser launched: PID=%d, max=%d pages, pre-warmed=%d", p.browserPID, p.maxPages, warmCount)
@@ -306,6 +338,13 @@ func (p *Pool) restartBrowser() error {
 	return p.launchBrowser()
 }
 
+// LaunchTimeout bounds browser launch + CDP connect + pre-warm. Without it a
+// wedged chromium startup holds the pool forever (2026-08-23 outage).
+const LaunchTimeout = 45 * time.Second
+
+// ErrLaunchTimeout is returned when the browser did not become ready in time.
+var ErrLaunchTimeout = fmt.Errorf("browser launch timed out after %s", LaunchTimeout)
+
 // ErrQueueFull is returned when the request queue is at capacity.
 var ErrQueueFull = fmt.Errorf("queue full")
 
@@ -320,17 +359,26 @@ func (p *Pool) getPage() (*rod.Page, error) {
 		p.idleTimer.Stop()
 		p.idleTimer = nil
 	}
-
-	// Lazy launch: start Chrome on first request
-	if p.browser == nil {
-		log.Printf("[vision] Launching Chrome on-demand")
-		if err := p.launchBrowser(); err != nil {
-			p.mu.Unlock()
-			return nil, fmt.Errorf("on-demand launch failed: %w", err)
-		}
-	}
-
+	needLaunch := p.browser == nil || !p.isBrowserAlive()
 	p.mu.Unlock()
+
+	// Lazy launch: start Chrome on first request. Runs WITHOUT p.mu so a
+	// wedged launch can never block other callers (2026-08-23 fix).
+	if needLaunch {
+		log.Printf("[vision] Launching Chrome on-demand")
+		p.launchMu.Lock()
+		// Double-check: another goroutine may have launched while we waited.
+		p.mu.Lock()
+		still := p.browser == nil || !p.isBrowserAlive()
+		p.mu.Unlock()
+		if still {
+			if err := p.launchBrowser(); err != nil {
+				p.launchMu.Unlock()
+				return nil, fmt.Errorf("on-demand launch failed: %w", err)
+			}
+		}
+		p.launchMu.Unlock()
+	}
 
 	// Try to get from pool (non-blocking)
 	select {
