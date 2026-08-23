@@ -59,7 +59,14 @@ type ErrorStore struct {
 
 var defaultStore = &ErrorStore{}
 
+// DefaultFreshWindow is how far back "fresh" errors count for pressure
+// signals (#75): stale noise must never read as current saturation.
+const DefaultFreshWindow = 15 * time.Minute
+
 func Record(event ErrorEvent) ErrorEvent { return defaultStore.Record(event) }
+
+// FreshCount counts errors recorded within DefaultFreshWindow.
+func FreshCount() int { return defaultStore.FreshCount(DefaultFreshWindow) }
 func Recent(limit int, source, class string) []ErrorEvent {
 	return defaultStore.Recent(limit, source, class)
 }
@@ -173,6 +180,28 @@ func (s *ErrorStore) Record(event ErrorEvent) ErrorEvent {
 		s.events = s.events[len(s.events)-maxErrorEvents:]
 	}
 	return event
+}
+
+// FreshCount counts events whose TS parses within maxAge of now.
+// Unparseable timestamps are treated as stale (never inflate pressure).
+func (s *ErrorStore) FreshCount(maxAge time.Duration) int {
+	if maxAge <= 0 {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cutoff := time.Now().Add(-maxAge)
+	n := 0
+	for i := len(s.events) - 1; i >= 0; i-- {
+		ts, err := time.Parse(time.RFC3339Nano, s.events[i].TS)
+		if err != nil {
+			continue // unparseable: skip, never inflate
+		}
+		if !ts.Before(cutoff) {
+			n++
+		}
+	}
+	return n
 }
 
 func (s *ErrorStore) Recent(limit int, source, class string) []ErrorEvent {

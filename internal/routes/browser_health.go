@@ -39,7 +39,9 @@ func agentPressureSummary(browserStats map[string]any) map[string]any {
 	currentCapacity := currentBrowserCapacity(activePages, availablePages, maxPages, queueDepth)
 	historicalPressure := historicalBrowserPressure(queue, failCount)
 	browserPressure := browserPressureLevel(activePages, maxPages, queueDepth)
-	errorPressure := errorPressureLevel(observability.Count())
+	// #75 — pressure reflects the FRESH window, not lifetime accumulation.
+	freshErrors := observability.FreshCount()
+	errorPressure := errorPressureLevel(freshErrors)
 	overallPressure := maxPressureLevel(browserPressure, searchPressure, cachePressure, errorPressure)
 	actions := pressureRecommendedActions(overallPressure, browserPressure, searchPressure, cachePressure, errorPressure)
 
@@ -72,7 +74,12 @@ func agentPressureSummary(browserStats map[string]any) map[string]any {
 			"queue_p95_ms":        queueP95WaitMs,
 		},
 		"cache":               cacheSummary,
-		"errors":              map[string]any{"pressure": errorPressure, "stored_count": observability.Count()},
+		"errors": map[string]any{
+			"pressure":             errorPressure,
+			"stored_count":         observability.Count(),
+			"fresh_count":          freshErrors,
+			"fresh_window_minutes": int(observability.DefaultFreshWindow.Minutes()),
+		},
 		"recommended_action":  actions[0],
 		"focusa_routing_hint": "Use as operational telemetry only; capture/link evidence through Focusa tools before treating results as durable cognition.",
 	}
