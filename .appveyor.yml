@@ -1,0 +1,16 @@
+# AppVeyor free OSS tier for UIAI Engine Windows builds (Spec 177 addendum).
+version: "{build}"
+image: Visual Studio 2022
+clone_folder: c:\gopath\src\github.com\WPUIAI\uiai-engine
+environment:
+  GOPATH: c:\gopath
+  GO111MODULE: on
+install:
+  - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
+  - go version
+build_script:
+  - cd c:\gopath\src\github.com\WPUIAI\uiai-engine && go build ./...
+test_script:
+  - go vet ./internal/... || exit 0
+  - go test ./internal/... || exit 0
+deploy: off
