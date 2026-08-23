@@ -6,7 +6,9 @@ environment:
   GOPATH: c:\gopath
   GO111MODULE: on
 install:
-  - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
+  - choco upgrade golang -y --no-progress || exit 0
+  - refreshenv
+  - set PATH=%GOPATH%\bin;c:\Program Files\Go\bin;%PATH%
   - go version
 build_script:
   - cd c:\gopath\src\github.com\WPUIAI\uiai-engine && go build ./...
