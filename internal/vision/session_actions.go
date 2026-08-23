@@ -424,12 +424,9 @@ func (s *Session) LoadAuth(state json.RawMessage) error {
 		return nil
 	}
 
-	if data.URL != "" {
-		_ = s.page.Navigate(data.URL)
-		s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
-	}
-
-	// Restore cookies with the same metadata we captured.
+	// Bug fix: restore cookies BEFORE navigation — setting them after the
+	// document loaded often left the page unauthenticated until a manual
+	// reload (restore fidelity).
 	if len(data.Cookies) > 0 {
 		params := make([]*proto.NetworkCookieParam, 0, len(data.Cookies))
 		for _, c := range data.Cookies {
@@ -453,6 +450,11 @@ func (s *Session) LoadAuth(state json.RawMessage) error {
 		if err := s.page.SetCookies(params); err != nil {
 			return fmt.Errorf("cookie restore failed: %w", err)
 		}
+	}
+
+	if data.URL != "" {
+		_ = s.page.Navigate(data.URL)
+		s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
 	}
 
 	// Restore localStorage

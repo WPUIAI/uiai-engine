@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -94,11 +95,16 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			writeJSON(w, 200, sessionInfoPayload(sess))
 		})
 
-		// Close session
+		// Close session — idempotent: closing an already-reaped/closed session
+		// is a success (#45/#73 contract; operators must not need to distinguish).
 		r.Delete("/", func(w http.ResponseWriter, req *http.Request) {
 			id := chi.URLParam(req, "sessionID")
 			if err := sm.Close(id); err != nil {
-				writeJSON(w, 404, map[string]string{"error": err.Error()})
+				if errors.Is(err, vision.ErrSessionNotFound) {
+					writeJSON(w, 200, map[string]string{"status": "already_closed", "id": id})
+					return
+				}
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
 				return
 			}
 			writeJSON(w, 200, map[string]string{"status": "closed", "id": id})

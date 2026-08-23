@@ -262,12 +262,15 @@ func (sm *SessionManager) Get(id string) (*Session, bool) {
 }
 
 // Close destroys a session and returns its page to the pool.
+// ErrSessionNotFound is returned when no live session matches the id.
+var ErrSessionNotFound = fmt.Errorf("session not found")
+
 func (sm *SessionManager) Close(id string) error {
 	sm.mu.Lock()
 	sess, ok := sm.sessions[id]
 	if !ok {
 		sm.mu.Unlock()
-		return fmt.Errorf("session %s not found", id)
+		return ErrSessionNotFound
 	}
 	delete(sm.sessions, id)
 	sm.mu.Unlock()
@@ -784,7 +787,11 @@ func (s *Session) EvalAsync(js string, timeoutMs int) (string, *SnapResult, erro
 		const __work = (async () => { %s })();
 		return await Promise.race([__work, __timeout]);
 	}`, timeoutMs, timeoutMs, js)
+	// Bug fix (#45 family): long async evals let the TTL reaper fire mid-work —
+	// session vanished from the registry while in use.
+	s.touch()
 	result, err := s.page.Timeout(time.Duration(timeoutMs+1000) * time.Millisecond).Eval(wrapper)
+	s.touch()
 	jsResult := ""
 	if err != nil {
 		jsResult = "error: " + err.Error()

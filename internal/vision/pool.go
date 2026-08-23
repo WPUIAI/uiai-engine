@@ -366,6 +366,26 @@ func (p *Pool) restartBrowser() error {
 		time.Sleep(500 * time.Millisecond)
 	}
 
+	// Drain pooled pages — they belonged to the killed process and are dead.
+	// Serving them post-restart caused instant aborts (leak class #45).
+	p.mu.Lock()
+	drained := 0
+	for {
+		select {
+		case dead := <-p.pages:
+			_ = dead.Close()
+			p.created--
+			drained++
+			continue
+		default:
+		}
+		break
+	}
+	if drained > 0 {
+		log.Printf("[vision] restart drained %d dead pooled page(s)", drained)
+	}
+	p.mu.Unlock()
+
 	return p.launchBrowser()
 }
 
