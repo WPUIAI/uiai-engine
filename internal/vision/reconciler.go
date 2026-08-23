@@ -91,6 +91,20 @@ func (r *Reconciler) loop() {
 // Stop terminates the loop.
 func (r *Reconciler) Stop() { r.stopOnce.Do(func() { close(r.stopCh) }) }
 
+// ReconcileSnapshot returns the reconciler counters (nil-safe manager method).
+func (sm *SessionManager) ReconcileSnapshot() map[string]any {
+	if sm == nil {
+		return map[string]any{"running": false}
+	}
+	sm.mu.RLock()
+	r := sm.reconciler
+	sm.mu.RUnlock()
+	if r == nil {
+		return map[string]any{"running": false}
+	}
+	return r.Snapshot()
+}
+
 // Snapshot returns counters for health/observability surfaces.
 func (r *Reconciler) Snapshot() map[string]any {
 	last, _ := r.lastRun.Load().(time.Time)

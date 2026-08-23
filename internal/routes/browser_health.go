@@ -11,13 +11,13 @@ import (
 
 // MountBrowserHealth exposes browser-specific readiness and metrics without
 // requiring agents to inspect logs or load full tool definitions.
-func MountBrowserHealth(r chi.Router, pool vision.PoolSource, visionEnabled bool) {
+func MountBrowserHealth(r chi.Router, pool vision.PoolSource, visionEnabled bool, sessions *vision.SessionManager) {
 	r.Get("/browser", func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(w, browserHealthStatus(pool, visionEnabled), browserHealthPayload(pool, visionEnabled))
+		writeJSON(w, browserHealthStatus(pool, visionEnabled, sessions), browserHealthPayload(pool, visionEnabled, sessions))
 	})
 }
 
-func agentPressureSummary(browserStats map[string]any) map[string]any {
+func agentPressureSummary(browserStats map[string]any, reconciler map[string]any) map[string]any {
 	activePages := intFromAny(browserStats["active_pages"])
 	availablePages := intFromAny(browserStats["available_pages"])
 	maxPages := intFromAny(browserStats["max_pages"])
@@ -73,13 +73,14 @@ func agentPressureSummary(browserStats map[string]any) map[string]any {
 			"queue_rejected":      queueRejected,
 			"queue_p95_ms":        queueP95WaitMs,
 		},
-		"cache":               cacheSummary,
+		"cache": cacheSummary,
 		"errors": map[string]any{
 			"pressure":             errorPressure,
 			"stored_count":         observability.Count(),
 			"fresh_count":          freshErrors,
 			"fresh_window_minutes": int(observability.DefaultFreshWindow.Minutes()),
 		},
+		"reconciler":          reconciler,
 		"recommended_action":  actions[0],
 		"focusa_routing_hint": "Use as operational telemetry only; capture/link evidence through Focusa tools before treating results as durable cognition.",
 	}
@@ -176,6 +177,14 @@ func cachePressureLevel(cache map[string]any) string {
 	return "normal"
 }
 
+// reconcilerSnapshot returns lifecycle self-healing counters (nil-safe).
+func reconcilerSnapshot(sessions *vision.SessionManager) map[string]any {
+	if sessions == nil {
+		return map[string]any{"running": false}
+	}
+	return sessions.ReconcileSnapshot()
+}
+
 func errorPressureLevel(storedCount int) string {
 	if storedCount >= 100 {
 		return "saturated"
@@ -217,7 +226,7 @@ func pressureRecommendedActions(overall, browser, search, cache, errors string) 
 	return actions
 }
 
-func browserHealthStatus(pool vision.PoolSource, visionEnabled bool) int {
+func browserHealthStatus(pool vision.PoolSource, visionEnabled bool, sessions *vision.SessionManager) int {
 	if !visionEnabled {
 		return http.StatusOK
 	}
@@ -231,7 +240,7 @@ func browserHealthStatus(pool vision.PoolSource, visionEnabled bool) int {
 	return http.StatusOK
 }
 
-func browserHealthPayload(pool vision.PoolSource, visionEnabled bool) map[string]any {
+func browserHealthPayload(pool vision.PoolSource, visionEnabled bool, sessions *vision.SessionManager) map[string]any {
 	if !visionEnabled {
 		return map[string]any{
 			"status":         "disabled",
@@ -285,7 +294,7 @@ func browserHealthPayload(pool vision.PoolSource, visionEnabled bool) map[string
 		"historical_pressure": historicalPressure,
 		"diagnostics_enabled": true,
 		"eval_async_enabled":  true,
-		"agent_pressure":      agentPressureSummary(stats),
+		"agent_pressure":      agentPressureSummary(stats, reconcilerSnapshot(sessions)),
 		"actions": map[string]string{
 			"open_session": "/api/session",
 			"diagnostics":  "/api/session/{id}/diagnostics",
