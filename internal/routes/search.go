@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -180,6 +181,24 @@ func runSearch(w http.ResponseWriter, req searchRequest) {
 		results, err = searchWikipedia(query, limit)
 	default:
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": []string{"brave", "wikipedia"}})
+		return
+	}
+	var use *upstreamSearchError
+	if errors.As(err, &use) {
+		w.Header().Set("Cache-Control", "no-store")
+		if use.retryAfter != "" {
+			w.Header().Set("Retry-After", use.retryAfter)
+		}
+		code := http.StatusBadGateway
+		errCode := "search_provider_error"
+		if use.status == http.StatusTooManyRequests {
+			code = http.StatusTooManyRequests
+			errCode = "search_provider_limited"
+		}
+		writeJSON(w, code, map[string]any{
+			"error": errCode, "provider": provider, "message": use.message,
+			"upstream_status": use.status, "retryable": true,
+		})
 		return
 	}
 	if err != nil {
@@ -406,7 +425,7 @@ func searchWikipedia(query string, limit int) ([]searchResult, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("wikipedia API returned HTTP %d", resp.StatusCode)
+		return nil, upstreamErr(resp)
 	}
 
 	var decoded []any
@@ -488,6 +507,25 @@ func stringsFromJSONArray(value any) []string {
 	return out
 }
 
+// upstreamSearchError preserves the provider's HTTP status so the handler
+// can return honest semantics (#64): 429 stays 429 (retryable, with
+// Retry-After), never a blanket unrecoverable 503.
+type upstreamSearchError struct {
+	status     int
+	retryAfter string
+	message    string
+}
+
+func (e *upstreamSearchError) Error() string { return e.message }
+
+func upstreamErr(resp *http.Response) *upstreamSearchError {
+	e := &upstreamSearchError{status: resp.StatusCode, message: fmt.Sprintf("search provider returned HTTP %d", resp.StatusCode)}
+	if ra := resp.Header.Get("Retry-After"); ra != "" {
+		e.retryAfter = ra
+	}
+	return e
+}
+
 func searchBrave(query string, limit int) ([]searchResult, error) {
 	key := strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY"))
 	if key == "" {
@@ -520,7 +558,7 @@ func searchBrave(query string, limit int) ([]searchResult, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("brave API returned HTTP %d", resp.StatusCode)
+		return nil, upstreamErr(resp)
 	}
 
 	var decoded braveWebResponse
