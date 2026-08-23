@@ -127,6 +127,9 @@ func New(cfg *config.Config) *Engine {
 	var sessionMgr *vision.SessionManager
 	if visionPool != nil {
 		sessionMgr = vision.NewSessionManagerWithPools(visionPool)
+		// Spec 76 pillar 3 — self-healing lifecycle: periodic registry↔CDP
+		// diff closes orphan targets and reaps dead sessions (#45).
+		sessionMgr.StartReconciler(30 * time.Second)
 	}
 
 	// Captcha solver — uses AI provider + session API

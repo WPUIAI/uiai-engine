@@ -65,9 +65,10 @@ type Session struct {
 
 // SessionManager manages persistent browser sessions.
 type SessionManager struct {
-	mu       sync.RWMutex
-	sessions map[string]*Session
-	pool     PoolSource
+	mu         sync.RWMutex
+	sessions   map[string]*Session
+	pool       PoolSource
+	reconciler *Reconciler
 }
 
 // NewSessionManager creates a session manager backed by a single vision pool.
@@ -331,6 +332,17 @@ type SnapResult struct {
 	Title      string         `json:"title"`
 	Duration   int64          `json:"duration_ms"`
 	DOM        map[string]any `json:"dom,omitempty"`
+}
+
+// PageTargetID returns the CDP target id of the session's page, or "" when
+// unknown this pass. Used by the Reconciler; never false-positives on busy.
+func (s *Session) PageTargetID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.page == nil {
+		return ""
+	}
+	return string(s.page.TargetID)
 }
 
 func (s *Session) touch() {

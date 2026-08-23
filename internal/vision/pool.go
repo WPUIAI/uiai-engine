@@ -356,6 +356,40 @@ func (p *Pool) Reset() {
 	p.mu.Unlock()
 }
 
+// PageTargets enumerates live page-type targets straight from Chrome.
+func (p *Pool) PageTargets() []PageTargetInfo {
+	p.launchMu.Lock()
+	b := p.browser
+	p.launchMu.Unlock()
+	if b == nil {
+		return nil
+	}
+	res, err := proto.TargetGetTargets{}.Call(b)
+	if err != nil {
+		return nil
+	}
+	out := make([]PageTargetInfo, 0, len(res.TargetInfos))
+	for _, t := range res.TargetInfos {
+		if t.Type != "page" {
+			continue
+		}
+		out = append(out, PageTargetInfo{ID: string(t.TargetID), URL: t.URL})
+	}
+	return out
+}
+
+// CloseTarget force-closes a target by ID (reconciler orphan cleanup).
+func (p *Pool) CloseTarget(targetID string) error {
+	p.launchMu.Lock()
+	b := p.browser
+	p.launchMu.Unlock()
+	if b == nil {
+		return fmt.Errorf("browser not running")
+	}
+	_, err := proto.TargetCloseTarget{TargetID: proto.TargetTargetID(targetID)}.Call(b)
+	return err
+}
+
 // restartBrowser kills the old browser and launches a fresh one.
 func (p *Pool) restartBrowser() error {
 	log.Printf("[vision] Restarting browser (old PID=%d, fails=%d)", p.browserPID, p.failCount)
