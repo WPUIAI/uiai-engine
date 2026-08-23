@@ -37,6 +37,8 @@ type ErrorEnvelope struct {
 	ErrorClass          string               `json:"error_class,omitempty"`
 	Status              int                  `json:"status,omitempty"`
 	SuggestedNextAction string               `json:"suggested_next_action,omitempty"`
+	Retryable           bool                 `json:"retryable,omitempty"`
+	Recover             []string             `json:"recover,omitempty"`
 	Diagnostics         string               `json:"diagnostics,omitempty"`
 	Details             map[string]any       `json:"details,omitempty"`
 	Focusa              *ErrorFocusaMetadata `json:"focusa,omitempty"`
@@ -73,6 +75,22 @@ func Recent(limit int, source, class string) []ErrorEvent {
 func Count() int { return defaultStore.Count() }
 func Clear()     { defaultStore.Clear() }
 
+// classRecovery maps error classes to agent-actionable recovery semantics (#73).
+func classRecovery(class string) (bool, []string) {
+	switch class {
+	case "selector_not_found":
+		return false, []string{"snapshot", "resync_refs"}
+	case "url_not_allowed":
+		return false, []string{"adjust_target"}
+	case "page_unavailable":
+		return true, []string{"reopen_session"}
+	case "timeout", "navigation_failed", "screenshot_failed", "click_failed", "eval_failed":
+		return true, []string{"retry", "diagnostics"}
+	default:
+		return true, []string{"retry", "diagnostics"}
+	}
+}
+
 func NewErrorEnvelope(event ErrorEvent, fallbackMessage string, details map[string]any) ErrorEnvelope {
 	message := strings.TrimSpace(event.Message)
 	if message == "" {
@@ -81,11 +99,14 @@ func NewErrorEnvelope(event ErrorEvent, fallbackMessage string, details map[stri
 	if message == "" {
 		message = "UIAI request failed"
 	}
+	retryable, recover := classRecovery(event.Class)
 	return ErrorEnvelope{
 		Error:               message,
 		Message:             message,
 		ErrorID:             event.ID,
 		ErrorClass:          event.Class,
+		Retryable:           retryable,
+		Recover:             recover,
 		Status:              event.Status,
 		SuggestedNextAction: event.SuggestedNextAction,
 		Diagnostics:         "/api/errors?limit=20" + diagnosticsFilter(event),
