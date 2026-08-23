@@ -325,6 +325,37 @@ func (p *Pool) isBrowserAlive() bool {
 	return true
 }
 
+// IsBrowserAlive reports whether this pool's browser process is running.
+// Exported for MultiPool fan-out health checks (AFB-style capacity reporting).
+func (p *Pool) IsBrowserAlive() bool {
+	return p.isBrowserAlive()
+}
+
+// MarkFailure records one browser-level failure in this pool's restart
+// heuristics. Queue-full/queue-timeout are NOT failures and must not be
+// reported here (see screenshot error handling).
+func (p *Pool) MarkFailure() {
+	p.mu.Lock()
+	p.failCount++
+	fc := p.failCount
+	p.mu.Unlock()
+	if fc >= 3 {
+		go func() {
+			if err := p.restartBrowser(); err != nil {
+				log.Printf("[vision] MarkFailure auto-restart failed: %v", err)
+			}
+		}()
+	}
+}
+
+// Reset clears this pool's failure counters (e.g. after a verified-healthy
+// launch or an operator-forced recovery).
+func (p *Pool) Reset() {
+	p.mu.Lock()
+	p.failCount = 0
+	p.mu.Unlock()
+}
+
 // restartBrowser kills the old browser and launches a fresh one.
 func (p *Pool) restartBrowser() error {
 	log.Printf("[vision] Restarting browser (old PID=%d, fails=%d)", p.browserPID, p.failCount)
