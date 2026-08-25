@@ -11,6 +11,8 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/auth"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"github.com/WPUIAI/uiai-engine/internal/events"
 )
 
 var (
@@ -77,15 +79,19 @@ func Charge(id string, ms int64, pages int, bytes int64) error {
 		return ErrBudgetUnknown
 	}
 	if b.Paused {
+		events.Emit("budget.denied_paused", map[string]any{"budget_id": id}, []string{"workforce"}, nil)
 		return ErrBudgetPaused
 	}
+	exceeded := ""
 	if b.Limits.TotalMS > 0 && b.Used.MS+ms > b.Limits.TotalMS {
-		return ErrBudgetExceeded
+		exceeded = "total_ms"
+	} else if b.Limits.MaxPages > 0 && b.Used.Pages+pages > b.Limits.MaxPages {
+		exceeded = "max_pages"
+	} else if b.Limits.MaxBytes > 0 && b.Used.Bytes+bytes > b.Limits.MaxBytes {
+		exceeded = "max_bytes"
 	}
-	if b.Limits.MaxPages > 0 && b.Used.Pages+pages > b.Limits.MaxPages {
-		return ErrBudgetExceeded
-	}
-	if b.Limits.MaxBytes > 0 && b.Used.Bytes+bytes > b.Limits.MaxBytes {
+	if exceeded != "" {
+		events.Emit("budget.exceeded", map[string]any{"budget_id": id}, []string{"workforce"}, map[string]any{"cap": exceeded})
 		return ErrBudgetExceeded
 	}
 	b.Used.MS += ms
@@ -103,6 +109,11 @@ func SetPaused(id, token string, paused bool) (*Budget, bool) {
 		return nil, false
 	}
 	b.Paused = paused
+	ev := "budget.resumed"
+	if paused {
+		ev = "budget.paused"
+	}
+	events.Emit(ev, map[string]any{"budget_id": id}, []string{"workforce"}, nil)
 	return b, true
 }
 

@@ -332,6 +332,7 @@ func (e *Engine) mountRoutes() {
 	r.Route("/api/budget", func(r chi.Router) {
 		routes.MountBudgetRoutes(r)
 	})
+	routes.MountFocusaEvents(r) // C-010-02
 
 	r.Route("/api/session", func(r chi.Router) {
 		r.Use(routes.CostMiddleware)                 // C-010-05 innermost-instrumented

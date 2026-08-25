@@ -1,6 +1,7 @@
 package captcha
 
 import (
+	"github.com/WPUIAI/uiai-engine/internal/events"
 	"context"
 	"encoding/json"
 	"errors"
@@ -820,9 +821,11 @@ func (p *IPPool) evaluateBreaker() {
 	case healthy == 0 && !p.breakerOpen:
 		p.breakerOpen = true
 		p.breakerOpenedAt = time.Now()
+		events.Emit("egress.degraded", map[string]any{"healthy_ips": 0}, []string{"browser_fleet"}, map[string]any{"total_ips": len(p.nodes)})
 		log.Printf("[ip-pool] Circuit OPEN: 0/%d IPs healthy", len(p.nodes))
 	case healthy > 0 && p.breakerOpen:
 		p.breakerOpen = false
+		events.Emit("egress.recovered", map[string]any{"healthy_ips": healthy}, []string{"browser_fleet"}, nil)
 		log.Printf("[ip-pool] Circuit CLOSED: %d/%d IPs healthy", healthy, len(p.nodes))
 	}
 }
