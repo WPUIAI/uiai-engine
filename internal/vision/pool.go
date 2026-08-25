@@ -52,6 +52,7 @@ type Pool struct {
 	browserPID  int
 	// Lazy launch: Chrome starts on first request, auto-kills after IdleTimeout
 	idleTimer *time.Timer
+	keepAlive bool
 	active    int // number of pages currently checked out
 	// Screenshot cache: avoids redundant Chrome renders
 	cache *screenshotCache
@@ -104,6 +105,7 @@ type ScreenshotResult struct {
 type PoolConfig struct {
 	MaxPages         int
 	AllowPrivateURLs bool // when true, disables SSRF private-IP blocking (for local dev/staging)
+	KeepAlive        bool // C-010-06: never idle-shutdown; prelaunch for warm first-action
 }
 
 func NewPool(maxPages int) (*Pool, error) {
@@ -114,8 +116,13 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 	if cfg.MaxPages <= 0 {
 		cfg.MaxPages = 2
 	}
+	// C-010-06: env default so ops can enable fleet warmth without code changes.
+	if os.Getenv("UIAI_VISION_KEEPALIVE") == "1" {
+		cfg.KeepAlive = true
+	}
 
 	p := &Pool{
+		keepAlive:        cfg.KeepAlive,
 		pages:            make(chan *rod.Page, cfg.MaxPages),
 		maxPages:         cfg.MaxPages,
 		lastSuccess:      time.Now(),
@@ -133,6 +140,14 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 	log.Printf("[vision] Pool initialized: max=%d pages, cache=50MB/5min, SSRF protection=%s (Chrome starts on first request)", p.maxPages, ssrfStatus)
 	p.StartPressureRecycler(45 * time.Second) // C-010-11
 
+	// C-010-06 warm fleet: launch immediately so first action is warm.
+	if cfg.KeepAlive {
+		go func() {
+			if err := p.launchBrowser(); err != nil {
+				log.Printf("[vision] keepalive prelaunch failed: %v", err)
+			}
+		}()
+	}
 	return p, nil
 }
 
@@ -677,6 +692,9 @@ func (p *Pool) releasePage(page *rod.Page) {
 // scheduleIdleShutdown starts or resets the idle timer.
 // Must be called with p.mu held.
 func (p *Pool) scheduleIdleShutdown() {
+	if p.keepAlive { // C-010-06: warm fleet keeps browsers alive
+		return
+	}
 	if p.active > 0 || p.browser == nil {
 		return
 	}

@@ -302,7 +302,7 @@ func (e *Engine) mountRoutes() {
 
 	// Screenshot & Share (Rod vision pool — Phase A8)
 	r.Route("/api/screenshot", func(r chi.Router) {
-		r.Use(routes.WithDeadline(25 * time.Second)) // C-010-04
+		r.Use(routes.WithDeadline(45 * time.Second)) // C-010-04
 		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage)
 		routes.MountScreenshotCompare(r, e.cfg, e.vision, e.ai, e.credits, e.limiter, e.usage)
 	})
@@ -335,7 +335,7 @@ func (e *Engine) mountRoutes() {
 
 	r.Route("/api/session", func(r chi.Router) {
 		r.Use(routes.CostMiddleware)                 // C-010-05 innermost-instrumented
-		r.Use(routes.WithDeadline(25 * time.Second)) // C-010-04
+		r.Use(routes.WithDeadline(45 * time.Second)) // C-010-04
 		routes.MountSessionRoutes(r, e.cfg, e.sessions, e.captcha)
 		routes.MountSessionPresentationRoute(r, e.presenter)
 	})
