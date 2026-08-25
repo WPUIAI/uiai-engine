@@ -58,8 +58,9 @@ func TestCostStamping(t *testing.T) {
 		!strings.Contains(body, `"pages_touched":2`) {
 		t.Fatalf("cost object missing/wrong: %s", body)
 	}
-	if w.Header().Get("X-UIAI-Cost-Ms") == "" || w.Header().Get("X-UIAI-Cost-Pages") != "2" {
-		t.Fatalf("cost headers missing: %v", w.Header())
+	tr := w.Result().Trailer
+	if tr == nil || tr.Get("X-UIAI-Cost-Pages") != "2" || tr.Get("X-UIAI-Cost-Ms") == "" {
+		t.Fatalf("cost trailers missing: %v", tr)
 	}
 }
 

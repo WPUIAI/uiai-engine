@@ -43,11 +43,12 @@ func CostMiddleware(next http.Handler) http.Handler {
 		cw := &costWriter{ResponseWriter: w, holder: holder}
 		r = r.WithContext(context.WithValue(r.Context(), costKeyType{}, holder))
 		next.ServeHTTP(cw, r)
-		ms := time.Since(holder.start).Milliseconds()
+		// C-010-05: emit as HTTP trailers (valid after body) so handlers are
+		// never blocked from flushing early.
 		h := cw.Header()
-		h.Set("X-UIAI-Cost-Ms", itoa64(ms))
-		h.Set("X-UIAI-Cost-Bytes", itoa64(int64(cw.bytes)))
-		h.Set("X-UIAI-Cost-Pages", itoa64(int64(holder.pages)))
+		h.Set(http.TrailerPrefix+"X-UIAI-Cost-Ms", itoa64(time.Since(holder.start).Milliseconds()))
+		h.Set(http.TrailerPrefix+"X-UIAI-Cost-Bytes", itoa64(int64(cw.bytes)))
+		h.Set(http.TrailerPrefix+"X-UIAI-Cost-Pages", itoa64(int64(holder.pages)))
 	})
 }
 
