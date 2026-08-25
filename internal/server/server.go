@@ -324,6 +324,15 @@ func (e *Engine) mountRoutes() {
 
 	// Browser Sessions — persistent pages for LLM tool use
 	// Open → interact → screenshot → close (page stays alive between calls)
+	// C-010-01/C-010-03 — intent verbs + budget governors
+	r.Route("/api/intent", func(r chi.Router) {
+		r.Use(routes.CostMiddleware)
+		routes.MountIntentRoutes(r, e.sessions)
+	})
+	r.Route("/api/budget", func(r chi.Router) {
+		routes.MountBudgetRoutes(r)
+	})
+
 	r.Route("/api/session", func(r chi.Router) {
 		r.Use(routes.CostMiddleware)                 // C-010-05 innermost-instrumented
 		r.Use(routes.WithDeadline(25 * time.Second)) // C-010-04

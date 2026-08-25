@@ -7,7 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
@@ -70,6 +73,7 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource,
 			Timeout     int                 `json:"timeout"` // overall timeout in seconds (default: 30)
 			NoCache     bool                `json:"nocache"` // skip cache, always take fresh screenshot
 			FocusaScope *vision.FocusaScope `json:"focusa_scope"`
+			Inline      *bool               `json:"inline"` // C-010-09: default false → artifact_ref only
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
@@ -127,8 +131,11 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource,
 		if body.FocusaScope != nil {
 			focusaEvidence["focusa_scope"] = body.FocusaScope
 		}
+		inline := true
+		if body.Inline != nil {
+			inline = *body.Inline
+		}
 		resp := map[string]any{
-			"screenshot":      base64.StdEncoding.EncodeToString(result.Data),
 			"width":           result.Width,
 			"height":          result.Height,
 			"format":          result.Format,
@@ -137,11 +144,25 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource,
 			"focusa_evidence": focusaEvidence,
 			"focusa":          focusaEvidence,
 		}
+		// C-010-09: default to artifact-ref responses; pixels inline only on demand.
+		fullHash := sha256.Sum256(result.Data)
+		resp["artifact_sha256"] = hex.EncodeToString(fullHash[:])
+		if path, err := persistScreenshotArtifact(result.Data, result.Format); err == nil && path != "" {
+			resp["artifact_path"] = path
+		} else if err != nil {
+			resp["artifact_store_error"] = err.Error()
+		}
+		resp["artifact_retrieval"] = "GET /api/screenshot/artifact/{sha256}"
+		if inline {
+			resp["screenshot"] = base64.StdEncoding.EncodeToString(result.Data)
+		}
 		if result.DOMReport != "" {
 			resp["dom_report"] = result.DOMReport
 		}
 		writeJSON(w, 200, resp)
 	})
+
+	mountScreenshotArtifact(r) // C-010-09 retrieval surface
 
 	r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
 		if pool == nil {
@@ -152,5 +173,68 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource,
 			"status": "healthy",
 			"pool":   pool.Stats(),
 		})
+	})
+}
+
+// screenshotArtifactDir resolves the durable store for C-010-09 artifacts.
+func screenshotStoreDir() string {
+	dir := os.Getenv("UIAI_SCREENSHOT_DIR")
+	if dir == "" {
+		dir = "/home/wpuiai/uiai-engine/data/screenshots"
+	}
+	return dir
+}
+
+// persistScreenshotArtifact stores bytes under sha256 name; idempotent.
+func persistScreenshotArtifact(data []byte, format string) (string, error) {
+	dir := screenshotStoreDir()
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	name := hex.EncodeToString(sum[:])
+	if format != "" && format != "png" {
+		name += "." + format
+	} else {
+		name += ".png"
+	}
+	path := filepath.Join(dir, name)
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
+	}
+	if err := os.WriteFile(path, data, 0o640); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// mountScreenshotArtifact serves stored artifacts by hash (bounded, read-only).
+func mountScreenshotArtifact(r chi.Router) {
+	r.Get("/artifact/{sha}", func(w http.ResponseWriter, req *http.Request) {
+		sum := chi.URLParam(req, "sha")
+		if len(sum) < 16 || strings.ContainsAny(sum, "/\\.") {
+			http.Error(w, "invalid sha", http.StatusBadRequest)
+			return
+		}
+		dir := screenshotStoreDir()
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		for _, e := range entries {
+			if strings.HasPrefix(e.Name(), sum) {
+				data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+				if err != nil {
+					http.Error(w, "unreadable", http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "image/"+strings.TrimPrefix(filepath.Ext(e.Name()), "."))
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				_, _ = w.Write(data)
+				return
+			}
+		}
+		http.Error(w, "not found", http.StatusNotFound)
 	})
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
 )
 
@@ -1403,3 +1404,60 @@ func safeEvalStr(page *rod.Page, js string) string {
 	}
 	return s
 }
+
+// ── Intent-layer page ops (C-010-01) ────────────────────────────────────────
+
+// TextIntent returns visible text for a selector (intent verb support).
+func (s *Session) TextIntent(selector string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.page == nil {
+		return "", fmt.Errorf("session closed")
+	}
+	el, err := retryElement(s.page, selector)
+	if err != nil {
+		return "", fmt.Errorf("element not found: %s", selector)
+	}
+	val, err := el.Text()
+	if err != nil {
+		return "", err
+	}
+	return val, nil
+}
+
+// InputIntent types a value into a selector (values are never logged).
+func (s *Session) InputIntent(selector, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.page == nil {
+		return fmt.Errorf("session closed")
+	}
+	el, err := retryElement(s.page, selector)
+	if err != nil {
+		return fmt.Errorf("element not found: %s", selector)
+	}
+	if err := el.Input(value); err != nil {
+		return fmt.Errorf("input failed: %w", err)
+	}
+	s.touch()
+	return nil
+}
+
+// PressKeyIntent presses a keyboard key (intent verb support).
+func (s *Session) PressKeyIntent(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.page == nil {
+		return fmt.Errorf("session closed")
+	}
+	if err := rod.Try(func() {
+		s.page.MustElement("body").MustFocus()
+		s.page.Keyboard.MustType(input.Enter)
+	}); err != nil {
+		return fmt.Errorf("press failed: %w", err)
+	}
+	s.touch()
+	return nil
+}
+
+func selectorOrBody(key string) string { return "body" }

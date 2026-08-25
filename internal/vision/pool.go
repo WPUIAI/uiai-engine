@@ -62,6 +62,7 @@ type Pool struct {
 	queueDrop        int64   // total requests rejected (queue full or timeout)
 	queueWaitTotalMs int64   // cumulative time spent waiting for pooled pages
 	queueWaitMaxMs   int64   // max observed queue wait in milliseconds
+	interQueued      int64   // C-010-12 interactive waiters
 	queueWaitSamples []int64 // bounded tail for p95/p99 metrics, protected by mu
 	// SSRF: when true, block private/internal IPs in screenshot URLs.
 	// Commercial deployments may set false to allow localhost screenshots.
@@ -130,6 +131,7 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 		ssrfStatus = "OFF (private URLs allowed)"
 	}
 	log.Printf("[vision] Pool initialized: max=%d pages, cache=50MB/5min, SSRF protection=%s (Chrome starts on first request)", p.maxPages, ssrfStatus)
+	p.StartPressureRecycler(45 * time.Second) // C-010-11
 
 	return p, nil
 }
@@ -451,7 +453,9 @@ var ErrQueueFull = fmt.Errorf("queue full")
 // ErrQueueTimeout is returned when a request waited too long in the queue.
 var ErrQueueTimeout = fmt.Errorf("queue timeout")
 
-func (p *Pool) getPage() (*rod.Page, error) {
+func (p *Pool) getPage() (*rod.Page, error) { return p.getPagePrio(true) }
+
+func (p *Pool) getPagePrio(interactive bool) (*rod.Page, error) {
 	p.mu.Lock()
 
 	// Cancel idle timer — browser is being used
@@ -547,38 +551,71 @@ func (p *Pool) getPage() (*rod.Page, error) {
 	}
 	p.mu.Unlock()
 
-	// Enter queue — wait for a page to be released
+	if interactive {
+		atomic.AddInt64(&p.interQueued, 1)
+		defer atomic.AddInt64(&p.interQueued, -1)
+	}
+
+	// Enter queue — priority-aware wait (C-010-12)
 	queueStarted := time.Now()
 	atomic.AddInt64(&p.queued, 1)
-	log.Printf("[vision] queued request (depth=%d, active=%d, max=%d)", depth+1, p.active, p.maxPages)
+	log.Printf("[vision] queued request (prio=%s depth=%d active=%d max=%d)", prioName(interactive), depth+1, p.active, p.maxPages)
 
-	select {
-	case page := <-p.pages:
-		waitMs := time.Since(queueStarted).Milliseconds()
-		atomic.AddInt64(&p.queueWaitTotalMs, waitMs)
-		for {
-			old := atomic.LoadInt64(&p.queueWaitMaxMs)
-			if waitMs <= old || atomic.CompareAndSwapInt64(&p.queueWaitMaxMs, old, waitMs) {
-				break
-			}
+	for {
+		waitedMs := time.Since(queueStarted).Milliseconds()
+		if !interactive && batchShouldYield(atomic.LoadInt64(&p.interQueued), waitedMs) {
+			time.Sleep(20 * time.Millisecond)
+			continue
 		}
-		atomic.AddInt64(&p.queued, -1)
-		atomic.AddInt64(&p.queueDone, 1)
-		p.mu.Lock()
-		p.recordQueueWaitSampleLocked(waitMs)
-		p.active++
-		p.mu.Unlock()
-		return page, nil
-	case <-time.After(QueueWaitMax):
-		atomic.AddInt64(&p.queued, -1)
-		atomic.AddInt64(&p.queueDrop, 1)
-		return nil, ErrQueueTimeout
+		select {
+		case page := <-p.pages:
+			waitMs := time.Since(queueStarted).Milliseconds()
+			atomic.AddInt64(&p.queueWaitTotalMs, waitMs)
+			for {
+				old := atomic.LoadInt64(&p.queueWaitMaxMs)
+				if waitMs <= old || atomic.CompareAndSwapInt64(&p.queueWaitMaxMs, old, waitMs) {
+					break
+				}
+			}
+			atomic.AddInt64(&p.queued, -1)
+			atomic.AddInt64(&p.queueDone, 1)
+			p.mu.Lock()
+			p.recordQueueWaitSampleLocked(waitMs)
+			p.active++
+			p.mu.Unlock()
+			return page, nil
+		case <-time.After(QueueWaitMax):
+			atomic.AddInt64(&p.queued, -1)
+			atomic.AddInt64(&p.queueDrop, 1)
+			return nil, ErrQueueTimeout
+		}
 	}
+}
+
+func prioName(interactive bool) string {
+	if interactive {
+		return "interactive"
+	}
+	return "batch"
 }
 
 // GetPage returns a page from the pool (exported for interactive routes)
 func (p *Pool) GetPage() (*rod.Page, error) {
-	return p.getPage()
+	return p.getPagePrio(true)
+}
+
+// GetPageBatch returns a page at batch priority: it defers to queued
+// interactive callers until the starvation window elapses (C-010-12).
+func (p *Pool) GetPageBatch() (*rod.Page, error) {
+	return p.getPagePrio(false)
+}
+
+// BatchStarvationMs bounds how long batch defers to interactive waiters.
+var BatchStarvationMs int64 = 5000
+
+// batchShouldYield decides whether a batch waiter defers this tick.
+func batchShouldYield(interQueued, elapsedMs int64) bool {
+	return interQueued > 0 && elapsedMs < BatchStarvationMs
 }
 
 // ReleasePage returns a page to the pool (exported for interactive routes)
