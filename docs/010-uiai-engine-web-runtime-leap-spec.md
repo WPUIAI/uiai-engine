@@ -59,6 +59,9 @@ Every claim carries: owner surface, phase, regression proof, closure condition. 
 | C-010-24 | North-star prefetch: Focusa current-ask feeds Speculation-Rules prerender (opt-in) | launcher hooks | W5 | prerender hit-rate counter >0 on scripted flow | first-nav latency improvement recorded |
 | C-010-25 | Identity ↔ device pairing binding; walls show acting persona read-only | pairing + personas | W5 | paired persona acts; wall labels correctly | no persona action without bound device |
 | C-010-26 | Ops floor: Caddy active checks (5s/2s/fail_duration 10s); Prometheus `/metrics` (pool,queue,egress,budgets); rod pin policy + provenance note; structured dedup logs | ops configs + routes | W1/W5 | hung worker pulled ≤10s; scrape contains series | runbook updated in ENGINE_RELEASE_DEPLOY_RUNBOOK |
+| C-010-27 | **Browser-native Audit Ledger**: hash-chained browsing-art ledger (session/nav/act/input-class/capture/challenge/budget/lease/state/egress/error); writer-boundary redaction; values+cookies+tokens never serialized | `internal/auditledger` | W2 | tamper→verify fails; redaction fuzz clean | `/api/audit`+SSE tail+export chain-verify green |
+| C-010-28 | **Audit Time Travel**: rows pair artifact_ref+dom_revision_ref+metadata bundle; LRU evict heavy artifacts, hashes permanent | capture pipeline + `/api/audit/{seq}/context` | W4 | random-instant reconstruction test | Cockpit scrubber (filmstrip/DOM/metadata/T005 keyboard/jump-live/moment-export) |
+| C-010-29 | **Licensing closure** vs wpuiai.com authority per matrix doc; fail-closed; offline grace bounded; recovery exempt | entitlement middleware + new routes | W1 gates; waves enforce rows | bypass-resistance suite (stale/refunded/unbound denied); live probe evidence | operator sign-off; zero unguarded premium paths |
 
 ## 4. Cockpit integration contract (amends COCKPIT-004/005/008/009)
 
@@ -70,6 +73,10 @@ For every claim touching an agent-visible surface:
 4. **Documents:** same-PR row in `UIAI_COCKPIT_DOCUMENT_REGISTER.md`.
 5. **Regression through cockpit path**, not just API tests — mirrors 009 §0 completion rule.
 6. **Modes respect 005:** `detect/no_detect/operator/research/auto` semantics unchanged; personas compose *within* mode boundaries; `no_detect`/`operator` remain coherent-identity representations, never deception tooling.
+
+### 4c. Licensing closure (C-010-29 normative)
+
+Every UIAI-ENGINE-010 surface enforces the **wpuiai.com license authority** per `docs/UIAI_ENGINE_010_LICENSING_MATRIX.md`. Premium pillars — personas/stealth (P2.1), consensus N>1 (P2.5), mesh remote workers (P2.6), captcha solver, media jobs — require an entitled tier. Enforcement is fail-closed on missing/expired/refunded/unbound leases, bounded offline grace, recovery surfaces exempt. Bypass-resistance tests mirror Focusa Spec152F patterns.
 
 ## 5. Waves
 
