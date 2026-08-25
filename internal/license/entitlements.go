@@ -66,6 +66,15 @@ const (
 	FeatureComparison      = "comparison"
 	FeatureMigration       = "migration"
 
+	// UIAI-ENGINE-010 premium pillars (C-010-29 licensing closure)
+	FeaturePersonaStealth    = "persona_stealth"     // C-010-14/30 — identity personas + stealth hardening
+	FeatureAdaptiveRotation  = "adaptive_rotation"   // C-010-31 — rotate-on-flag intelligence
+	FeatureSolverCoveragePro = "solver_coverage_pro" // C-010-32 — extended provider/type matrix
+	FeatureConsensusReads    = "consensus_reads"     // C-010-18 — N>1 persona diff/trust
+	FeatureMeshWorkers       = "mesh_workers"        // C-010-19/25 — remote tailnet/container workers
+	FeatureWebStateContinuity = "web_state_continuity" // C-010-07/23 — checkpoints beyond single session
+	FeatureTimeTravelExport  = "time_travel_export"  // C-010-28 — moment-bundle export
+
 	// Spec §6.5 eval-allowed (loopback only) features
 	FeatureLocalSession    = "local_session"
 	FeatureLocalSearch     = "local_search"
@@ -140,6 +149,12 @@ func tierFeatures(tier string) map[string]bool {
 		FeatureLayoutCompare, FeatureSectionDetect, FeatureCopilot, FeatureMediaAccess,
 		FeatureShareAccess, FeatureReferenceAccess, FeatureDesignSystem, FeatureContentMap,
 		FeatureBlockRecipes, FeatureComparison, FeatureMigration,
+
+		// UIAI-ENGINE-010 premium pillars (C-010-29). Granted to known licensed
+		// tiers by default; authority-issued explicit feature lists override.
+		FeaturePersonaStealth, FeatureAdaptiveRotation, FeatureSolverCoveragePro,
+		FeatureConsensusReads, FeatureMeshWorkers, FeatureWebStateContinuity,
+		FeatureTimeTravelExport,
 	}
 	features := make(map[string]bool, len(all))
 	for _, f := range all {
