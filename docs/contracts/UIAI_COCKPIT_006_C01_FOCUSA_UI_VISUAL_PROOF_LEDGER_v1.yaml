@@ -1,0 +1,74 @@
+schema: uiai.cockpit_focusa_ui_visual_proof_ledger.v1
+version: 1
+parent: UIAI-COCKPIT-006
+truth_statuses:
+  - missing
+  - contract_only
+  - implemented_unverified
+  - functional_verified
+  - visual_verified
+  - release_verified
+proof_snapshot:
+  implementation_head_sha: f9b36c344f3098aca922075a77a61356c80a944f
+  workflow_run_id: 30705812364
+  artifact_id: 8820286643
+  artifact_digest: sha256:344f84e551eabe2beac1c061854a379525320bcdadef7bab4c400cf968415345
+  build_merge_sha: 2df1aa312a4eec59c6ce9e118bd8e401ef441526
+  idle_capture_sha256: 09106392db28b5458f3ecdd773a7ab719b60741f04f83769afa140126ab726de
+  live_capture_sha256: b01e9f888199e0d39916ffcf00876450016c2e25d20613c743e7d48705d05d3f
+  viewport: 1440x1200
+  inspected: true
+requirements:
+  - id: FUI-006-001
+    requirement: Focusa Live Projection Fabric is implemented as compiled Cockpit UI code.
+    implementation:
+      - apps/cockpit/src/lib/components/FocusaLiveSurfaces.svelte
+      - apps/cockpit/src/routes/+page.svelte
+    status: release_verified
+  - id: FUI-006-002
+    requirement: Cockpit contains production connection code for Focusa event health and durable SSE routes.
+    operations:
+      - GET /v1/events/health
+      - GET /v1/events/stream
+    implementation:
+      - apps/cockpit/src/lib/components/FocusaLiveSurfaces.svelte
+    status: functional_verified
+    limitation: Exact pinned Focusa-daemon network integration remains a separate end-to-end release proof requirement.
+  - id: FUI-006-003
+    requirement: Focusa contract-faithful events pass through the production event application path and visibly update projections.
+    expected_events:
+      - temporal_forecast_revised
+      - prediction_authority_event_appended
+      - runtime_constitution_activated
+    expected_visible_state:
+      cursor: "103"
+      source_state_revision: "43"
+      connection_state: live
+      activity_count: 3
+    status: release_verified
+  - id: FUI-006-004
+    requirement: Quiet state contains no synthetic activity.
+    expected_capture: cockpit-focusa-idle.png
+    status: release_verified
+  - id: FUI-006-005
+    requirement: Post-event state has screen-capture proof generated from the compiled build.
+    expected_capture: cockpit-focusa-live-after-events.png
+    status: release_verified
+  - id: FUI-006-006
+    requirement: Captures have SHA-256 hashes, rendered-DOM hashes, explicit dimensions, and exact build-SHA binding.
+    expected_manifest: visual-proof/manifest.json
+    status: release_verified
+  - id: FUI-006-007
+    requirement: Visual proof artifacts are mandatory CI outputs; missing or invalid artifacts fail the job.
+    workflow: .github/workflows/cockpit.yml
+    artifact_pattern: cockpit-functional-ui-evidence-*
+    status: release_verified
+  - id: FUI-006-008
+    requirement: Typecheck, web build, Tauri packaging, macOS validation, unit tests, and backend smoke are release-blocking.
+    workflow: .github/workflows/cockpit.yml
+    status: release_verified
+closure:
+  current_scope: focusa_live_projection_foundation
+  current_scope_status: release_verified
+  full_focusa_api_ui_surface_status: open
+  rule: Every additional Focusa workbench, mutation, approval, verification, or conformance surface must obtain its own functional and visual proof on the exact implementation SHA.

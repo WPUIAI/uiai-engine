@@ -1,0 +1,695 @@
+schema: uiai.cockpit_notebook_functional_ui_visual_proof_matrix.v1
+version: 1
+parent: UIAI-COCKPIT-007
+inherits:
+  - UIAI-COCKPIT-006
+status: proposed_documentation_only
+implementation_implied: false
+
+truth_statuses:
+  - missing
+  - proposed
+  - contract_only
+  - implementation_open
+  - implemented_unverified
+  - functional_verified
+  - visual_verified
+  - release_verified
+  - blocked_external_contract
+
+global_release_law:
+  - actual compiled Cockpit code is required for every claimed surface
+  - production adapters, parsers, reducers, stores, and action controllers are used by tests
+  - deterministic fixtures may supply contract-faithful events but may not bypass production logic
+  - screenshot existence alone is insufficient
+  - rendered state and interaction assertions must pass before capture
+  - before and after captures must differ when a transition is claimed
+  - captures, DOM or accessibility snapshots, hashes, dimensions, and build SHA are recorded
+  - at least one approved networked Jupyter Server run is required for integration closure
+  - exact Focusa-daemon proof is required before claiming active Focusa bindings
+  - transport keepalives and polling cannot create fake Activity
+
+workspace:
+  id: computational_workbench
+  default_sidebar: false
+  pinnable: true
+  entry_points:
+    - Research
+    - Studio
+    - Test_Lab
+    - Evidence
+    - Capabilities
+    - Mission_or_Workpoint_context
+    - Global_Search
+  primary_sections:
+    - Notebook
+    - Files
+    - Running
+    - Kernels
+    - Variables
+    - Equations
+    - Data
+    - Simulation
+    - Predictions
+    - Verification
+    - Evidence
+    - Reproducibility
+    - Activity
+  status: implementation_open
+
+surfaces:
+  - surface_id: notebook.server_connection
+    purpose: Configure, probe, authenticate, inspect, and connect to a notebook server.
+    required_ui:
+      - server profile list
+      - add_edit_server form
+      - endpoint and route classification
+      - credential label without secret display
+      - provider and version
+      - health and capabilities
+      - kernel specs
+      - TLS and trust posture
+      - one primary recovery action
+    required_states:
+      - unconfigured
+      - probing
+      - connected
+      - unauthorized
+      - certificate_error
+      - incompatible
+      - degraded
+      - offline
+    required_interactions:
+      - add server profile
+      - probe server
+      - select credential label
+      - approve trust posture
+      - connect
+      - disconnect
+      - remove profile
+    required_assertions:
+      - raw credentials never render
+      - probe calls registered server operation
+      - failed authentication does not retry with broader credentials
+      - capability result changes visible configuration
+      - disconnect closes structured and browser sessions
+    required_captures:
+      - notebook_server_unconfigured
+      - notebook_server_probe_running
+      - notebook_server_connected
+      - notebook_server_unauthorized
+      - notebook_server_certificate_error
+      - notebook_server_incompatible
+      - notebook_server_offline
+    status: implementation_open
+
+  - surface_id: notebook.files_and_documents
+    purpose: Browse, open, create, edit, save, rename, checkpoint, restore, and delete notebooks with revision safety.
+    required_ui:
+      - bounded file tree
+      - notebook metadata summary
+      - revision identifier
+      - dirty state
+      - save and conflict state
+      - checkpoints
+      - external change warning
+      - destructive confirmation
+    required_states:
+      - empty_root
+      - loading
+      - document_loaded
+      - dirty
+      - saving
+      - saved
+      - stale_revision
+      - external_change
+      - read_only
+      - save_failed
+      - deleted
+    required_interactions:
+      - open notebook
+      - create notebook
+      - edit cell or metadata
+      - save with revision check
+      - create checkpoint
+      - restore checkpoint
+      - rename
+      - delete with confirmation
+    required_assertions:
+      - unknown notebook metadata round trips
+      - stale writes are blocked
+      - checkpoint restore previews data loss
+      - deletion uses typed destructive operation
+      - notebook revision changes after accepted save
+    required_captures:
+      - notebook_files_empty
+      - notebook_document_loaded
+      - notebook_dirty
+      - notebook_saved
+      - notebook_save_conflict
+      - notebook_external_change
+      - notebook_checkpoint_restore_preview
+      - notebook_delete_confirmation
+    status: implementation_open
+
+  - surface_id: notebook.kernel_and_sessions
+    purpose: Manage sessions, kernels, ownership, leases, lifecycle, resource use, and recovery.
+    required_ui:
+      - session list
+      - kernel list
+      - owner and scope
+      - kernel spec and environment
+      - lifecycle status
+      - current attempt
+      - resource usage
+      - interrupt restart shutdown controls
+      - recovery guidance
+    required_states:
+      - no_kernel
+      - starting
+      - idle
+      - busy
+      - interrupting
+      - interrupted
+      - restarting
+      - restarted
+      - resource_pressure
+      - lease_conflict
+      - lost
+      - reconnecting
+      - recovered
+      - shutting_down
+      - shutdown
+    required_interactions:
+      - start kernel
+      - attach notebook session
+      - interrupt active attempt
+      - restart with state-loss preview
+      - shutdown
+      - reconnect
+      - transfer or release lease
+    required_assertions:
+      - anonymous kernel ownership is forbidden
+      - restart and interrupt remain distinct
+      - state-loss warning names affected attempts
+      - lost kernel preserves unknown attempt posture
+      - resource pressure does not silently terminate consequential work
+    required_captures:
+      - notebook_kernel_none
+      - notebook_kernel_starting
+      - notebook_kernel_idle
+      - notebook_kernel_busy
+      - notebook_kernel_interrupt_preview
+      - notebook_kernel_restart_state_loss
+      - notebook_kernel_resource_pressure
+      - notebook_kernel_lost
+      - notebook_kernel_recovered
+      - notebook_kernel_shutdown
+    status: implementation_open
+
+  - surface_id: notebook_cell_canvas
+    purpose: Edit, classify, queue, execute, stream, cancel, and inspect cells and immutable attempts.
+    required_ui:
+      - cell source editor
+      - stable cell ID and revision in inspector
+      - semantic role
+      - execution mode
+      - dependency and input summary
+      - queue and running state
+      - stream and result output
+      - attempt history
+      - duration and resource use
+      - error and recovery
+      - output trust posture
+    required_states:
+      - draft
+      - ready
+      - blocked_dependency
+      - blocked_authority
+      - queued
+      - dispatched
+      - running
+      - awaiting_input
+      - streaming_output
+      - succeeded
+      - failed
+      - interrupted
+      - timed_out
+      - cancelled
+      - unknown_terminal_state
+      - output_stale
+      - superseded
+    required_interactions:
+      - edit source
+      - select semantic role
+      - select execution mode
+      - execute
+      - supply approved input
+      - cancel
+      - interrupt
+      - inspect prior attempt
+      - capture output
+    required_assertions:
+      - execution uses exact cell revision and source hash
+      - each rerun creates a new attempt
+      - duplicate provider messages do not duplicate output
+      - transport loss can produce unknown rather than invented failure or success
+      - cell status updates Activity once per meaningful transition
+      - current edited source is not substituted for executed source in receipts
+    required_captures:
+      - notebook_cell_draft
+      - notebook_cell_blocked_dependency
+      - notebook_cell_queued
+      - notebook_cell_running
+      - notebook_cell_streaming
+      - notebook_cell_succeeded
+      - notebook_cell_failed
+      - notebook_cell_interrupted
+      - notebook_cell_timed_out
+      - notebook_cell_cancelled
+      - notebook_cell_unknown_terminal
+      - notebook_cell_attempt_history
+    status: implementation_open
+
+  - surface_id: notebook_outputs_and_renderers
+    purpose: Render structured and rich outputs safely with immutable artifact lineage.
+    required_ui:
+      - text stream
+      - structured result
+      - table or dataframe
+      - image and plot
+      - LaTeX or math
+      - audio and video
+      - sanitized HTML
+      - approved widget
+      - unsupported renderer placeholder
+      - artifact integrity and source attempt
+      - redaction and evidence status
+    required_states:
+      - output_empty
+      - streaming
+      - rendered
+      - updating_display
+      - sanitized
+      - isolated
+      - unsupported
+      - oversized
+      - redacted
+      - captured_as_evidence
+      - stale
+    required_assertions:
+      - untrusted scripts cannot execute in Cockpit origin
+      - display updates create output versions
+      - unknown widget degrades safely
+      - large outputs use artifact refs
+      - source attempt and hashes are visible in inspector
+      - illustrative imagery cannot satisfy verification predicates
+    required_captures:
+      - notebook_output_text
+      - notebook_output_table
+      - notebook_output_plot
+      - notebook_output_latex
+      - notebook_output_sanitized_html
+      - notebook_output_widget_approved
+      - notebook_output_widget_unsupported
+      - notebook_output_oversized
+      - notebook_output_redacted
+      - notebook_output_evidence_captured
+    status: implementation_open
+
+  - surface_id: notebook_variables_data_assumptions
+    purpose: Expose kernel variables, declared inputs, assumptions, dataset snapshots, measurements, and stale lineage.
+    required_ui:
+      - variable list and type
+      - size and preview bounds
+      - declared versus inferred inputs
+      - parameter set
+      - assumption set
+      - dataset source and hash
+      - schema and units
+      - observation acquisition and ingestion times
+      - transformation lineage
+      - mutable source warning
+      - stale and superseded data
+    required_states:
+      - no_variables
+      - loading
+      - current
+      - preview_truncated
+      - dataset_unbound
+      - dataset_bound
+      - mutable_source
+      - data_stale
+      - schema_changed
+      - superseded
+      - restricted
+    required_assertions:
+      - kernel memory is not treated as dataset provenance
+      - source, hash, schema, units, and times remain distinct
+      - restricted values are redacted
+      - stale data degrades dependent outputs and reproducibility posture
+    required_captures:
+      - notebook_variables_empty
+      - notebook_variables_loaded
+      - notebook_variable_truncated
+      - notebook_dataset_unbound
+      - notebook_dataset_bound
+      - notebook_dataset_mutable_warning
+      - notebook_dataset_stale
+      - notebook_dataset_schema_change
+      - notebook_measurement_lineage
+    status: implementation_open
+
+  - surface_id: notebook_environment_reproducibility
+    purpose: Snapshot environment, detect drift, preview clean runs, execute reproducibly, and explain limitations.
+    required_ui:
+      - environment summary
+      - language and kernel versions
+      - package and solver inventory
+      - OS architecture hardware and accelerators
+      - locale timezone encoding numeric posture
+      - data model parameter and assumption refs
+      - seed and nondeterminism
+      - network and external service dependencies
+      - resource policy
+      - preflight blockers and warnings
+      - manifest digest
+      - drift comparison
+    required_states:
+      - not_snapshotted
+      - snapshotting
+      - snapshot_complete
+      - incomplete
+      - preflight_passed
+      - preflight_warning
+      - preflight_blocked
+      - run_queued
+      - run_running
+      - reproducible_candidate
+      - reproducible_verified
+      - drift_detected
+      - reproduction_failed
+    required_interactions:
+      - snapshot environment
+      - inspect inventory
+      - compare manifests
+      - bind missing input
+      - accept warnings
+      - launch clean run
+      - inspect receipt
+    required_assertions:
+      - same kernel name does not imply same environment
+      - secrets are represented only by approved names or labels
+      - clean run uses frozen notebook revision
+      - mutable external dependencies remain visible limitations
+      - drift changes reproducibility status
+    required_captures:
+      - notebook_environment_not_snapshotted
+      - notebook_environment_snapshot
+      - notebook_repro_preflight_passed
+      - notebook_repro_preflight_warning
+      - notebook_repro_preflight_blocked
+      - notebook_repro_run_running
+      - notebook_repro_verified
+      - notebook_environment_drift
+      - notebook_reproduction_failed
+    status: implementation_open
+
+  - surface_id: notebook_verification
+    purpose: Independently challenge attempts, results, claims, predictions, simulations, and conclusions.
+    required_ui:
+      - verification target
+      - method and independence class
+      - environment comparison
+      - alternate solver or implementation
+      - comparison results
+      - uncertainty and applicability
+      - findings and evidence
+      - verdict and limitations
+      - dispute and supersession history
+    required_states:
+      - not_requested
+      - preview
+      - blocked
+      - queued
+      - running
+      - supported
+      - disputed
+      - contradicted
+      - insufficient
+      - inconclusive
+      - superseded
+    required_interactions:
+      - select target
+      - select verification method
+      - preview resource and authority
+      - run verification
+      - compare outputs
+      - create finding
+      - request human review
+      - prepare Focusa handoff
+    required_assertions:
+      - same kernel repeat is visibly low independence
+      - verdict references evidence and limitations
+      - verification cannot silently promote canonical truth
+      - contradictory findings remain visible
+    required_captures:
+      - notebook_verification_not_requested
+      - notebook_verification_preview
+      - notebook_verification_running
+      - notebook_verification_supported
+      - notebook_verification_disputed
+      - notebook_verification_contradicted
+      - notebook_verification_insufficient
+      - notebook_verification_environment_diff
+    status: implementation_open
+
+  - surface_id: notebook_math_statistics
+    purpose: Present mathematical, statistical, uncertainty, calibration, and forecast-specific computational context when external Focusa contracts exist.
+    required_ui:
+      - symbols domains expressions and equations
+      - assumptions and constraints
+      - exact versus approximate result
+      - solver method tolerance convergence and conditioning
+      - units and dimensions
+      - uncertainty and error bounds
+      - sampling and missingness
+      - scoring and calibration
+      - residual sensitivity and leakage analysis
+      - alternate derivation and counterexample
+      - explicit external contract status
+    required_states:
+      - contract_only
+      - external_contract_unavailable
+      - partial_binding
+      - analysis_current
+      - solver_warning
+      - convergence_failed
+      - dimension_error
+      - calibration_warning
+      - temporal_leakage_detected
+      - counterexample_found
+      - verified
+    required_assertions:
+      - symbolic output does not become formal proof automatically
+      - notebook probability does not become prediction commitment without accepted Focusa handoff
+      - exact and approximate results are distinct
+      - uncertainty and applicability remain visible
+    required_captures:
+      - notebook_math_contract_only
+      - notebook_math_derivation
+      - notebook_math_solver_warning
+      - notebook_math_convergence_failure
+      - notebook_math_dimension_error
+      - notebook_statistics_uncertainty
+      - notebook_prediction_calibration
+      - notebook_prediction_temporal_leakage
+      - notebook_math_counterexample
+    status: blocked_external_contract
+
+  - surface_id: notebook_physics_simulation
+    purpose: Present analytical, simulated, observed, measured, estimated, and control-proposal truth classes without conflation.
+    required_ui:
+      - physical quantities units constants and frames
+      - initial and boundary conditions
+      - solver mesh timestep and tolerance
+      - analytical prediction
+      - simulation result
+      - sensor observation
+      - experimental measurement
+      - estimated state
+      - residual and uncertainty
+      - validity region
+      - safety envelope
+      - control proposal boundary
+      - explicit external contract status
+    required_states:
+      - contract_only
+      - external_contract_unavailable
+      - analytical_only
+      - simulation_running
+      - simulation_complete
+      - observation_unavailable
+      - measurement_ingested
+      - residual_warning
+      - model_invalid_outside_region
+      - safety_blocked
+      - control_proposal_only
+      - verified_physical_finding
+    required_assertions:
+      - simulation cannot render as observation or measurement
+      - control proposal has no direct actuator control
+      - units dimensions frames and times are explicit
+      - sensor degradation reduces authority where external contracts require it
+    required_captures:
+      - notebook_physics_contract_only
+      - notebook_physics_analytical
+      - notebook_physics_simulation_running
+      - notebook_physics_simulation_complete
+      - notebook_physics_simulation_vs_measurement
+      - notebook_physics_residual_warning
+      - notebook_physics_validity_region
+      - notebook_physics_safety_blocked
+      - notebook_physics_control_proposal_only
+    status: blocked_external_contract
+
+  - surface_id: notebook_evidence_focusa_handoff
+    purpose: Preview, capture, commit, and track notebook evidence and bounded Focusa submissions.
+    required_ui:
+      - what will be captured
+      - what stays local
+      - scope and authority
+      - notebook revision and attempt refs
+      - environment data parameters assumptions
+      - output artifacts and hashes
+      - what the receipt proves and does not prove
+      - target Focusa operation and contract status
+      - redaction and public-safe posture
+      - accepted rejected conflict and settlement states
+    required_states:
+      - not_ready
+      - preview
+      - blocked_missing_lineage
+      - blocked_external_contract
+      - ready
+      - committing
+      - committed
+      - handoff_submitted
+      - handoff_accepted
+      - handoff_rejected
+      - handoff_conflicted
+      - settled
+      - failed
+    required_interactions:
+      - select attempts and artifacts
+      - preview receipt
+      - resolve missing lineage
+      - redact
+      - commit local evidence
+      - submit Focusa handoff
+      - inspect response
+      - create followup
+    required_assertions:
+      - commit cannot bypass preview for consequential handoff
+      - exact external Focusa operation is registered and pinned
+      - rejected handoff does not mark evidence canonical
+      - receipt lists limitations
+      - raw secrets and private outputs do not appear in captures
+    required_captures:
+      - notebook_evidence_not_ready
+      - notebook_evidence_preview
+      - notebook_evidence_blocked_lineage
+      - notebook_evidence_ready
+      - notebook_evidence_committed
+      - notebook_focusa_handoff_contract_only
+      - notebook_focusa_handoff_submitted
+      - notebook_focusa_handoff_accepted
+      - notebook_focusa_handoff_rejected
+      - notebook_focusa_handoff_conflicted
+    status: implementation_open
+
+  - surface_id: notebook_activity
+    purpose: Show meaningful notebook, server, kernel, cell, output, environment, verification, evidence, and handoff changes.
+    required_ui:
+      - current running work
+      - queue
+      - failures and recovery
+      - history
+      - evidence and handoff events
+      - filters by notebook kernel cell and attempt
+      - cursor freshness and replay posture
+    forbidden_activity:
+      - transport_keepalive
+      - websocket_ping_pong
+      - health_poll_without_change
+      - cursor_ack_without_projection_change
+      - timer_based_fake_pulse
+    required_states:
+      - quiet
+      - replaying
+      - live
+      - stale
+      - degraded
+      - offline
+    required_assertions:
+      - quiet state contains zero synthetic events
+      - duplicate events do not duplicate Activity
+      - replay restores durable meaningful history
+      - stale and offline remain visibly different
+    required_captures:
+      - notebook_activity_quiet
+      - notebook_activity_replaying
+      - notebook_activity_live
+      - notebook_activity_failure_recovery
+      - notebook_activity_stale
+      - notebook_activity_offline
+    status: implementation_open
+
+visual_proof_manifest:
+  schema: uiai.notebook_visual_proof.v1
+  required_fields:
+    - implementation_head_sha
+    - build_or_merge_sha
+    - surface_id
+    - provider_fixture_or_server_ref
+    - data_truth_posture
+    - viewport
+    - captures
+    - interaction_assertion_report_ref
+    - console_error_report_ref
+    - accessibility_report_ref
+    - artifact_digest
+  data_truth_postures:
+    - deterministic_contract_fixture
+    - networked_test_jupyter
+    - exact_pinned_jupyter
+    - exact_pinned_jupyter_and_focusa
+  capture_fields:
+    - file
+    - state
+    - sha256
+    - dimensions
+    - rendered_snapshot_ref
+    - expected_visible_facts
+    - redaction_posture
+
+release_suites:
+  notebook_contract_fixture_suite:
+    required: true
+    status: implementation_open
+  networked_jupyter_suite:
+    required_for_integration_claim: true
+    status: implementation_open
+  exact_supported_jupyter_version_suite:
+    required_for_release_verified: true
+    status: implementation_open
+  exact_focusa_binding_suite:
+    required_for_focusa_integration_claim: true
+    status: blocked_external_contract
+  packaged_tauri_visual_suite:
+    required_for_desktop_release: true
+    status: implementation_open
+
+closure:
+  current_status: proposed_documentation_only
+  rule: No Notebook Runtime surface may become release_verified until all activated operations have working UI code, complete operational states, interaction assertions, production reducers and adapters, inspected screen captures, SHA-bound manifests, security and resource tests, and the required networked provider proof.

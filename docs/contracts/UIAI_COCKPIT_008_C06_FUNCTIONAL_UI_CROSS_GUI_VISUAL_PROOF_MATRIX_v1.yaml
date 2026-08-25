@@ -1,0 +1,546 @@
+schema: uiai.cockpit_cross_gui_functional_ui_visual_proof_matrix.v1
+version: 1
+parent: UIAI-COCKPIT-008
+inherits:
+  - UIAI-COCKPIT-006
+status: proposed_documentation_only
+implementation_implied: false
+
+release_law:
+  - actual_compiled_cockpit_ui_code_required
+  - actual_focusa_mission_canvas_or_generated_projection_required
+  - generated_focusa_client_and_action_bindings_required
+  - production_projection_adapter_cache_and_event_reducer_required
+  - deterministic_events_may_enter_only_through_production_paths
+  - at_least_one_pinned_networked_focusa_daemon_run_required
+  - at_least_one_real_uiai_runtime_object_required
+  - screenshot_existence_is_not_sufficient
+  - rendered_state_interaction_and_accessibility_assertions_precede_capture
+  - build_focusa_and_uiai_contract_digests_are_recorded
+  - secret_scanning_is_release_blocking
+
+surfaces:
+  - id: focusa_mission_context_strip
+    component: FocusaMissionContextStrip
+    status: implementation_open
+    states:
+      - loading
+      - unbound_local
+      - binding_pending
+      - live
+      - stale
+      - offline
+      - scope_mismatch
+      - contract_mismatch
+      - focusa_object_missing
+      - recovery_required
+    required_visible:
+      - project_and_workstream
+      - workpoint_and_work_surface
+      - mission_or_session_state
+      - next_safe_action_from_focusa
+      - authority_or_approval
+      - proof_posture
+      - source_revision_cursor_and_freshness
+      - open_mission_canvas
+    forbidden_visible:
+      - duplicate_work_rail
+      - locally_computed_next_work
+    interactions:
+      - open_exact_mission_canvas_surface
+      - open_binding_details
+      - recover_stale_or_missing_binding
+    captures:
+      - context_strip_live
+      - context_strip_stale
+      - context_strip_offline
+      - context_strip_scope_mismatch
+
+  - id: focusa_mission_inspector
+    component: FocusaMissionInspector
+    status: implementation_open
+    tabs:
+      - Mission
+      - Current_work
+      - Next_safe_action
+      - Authority
+      - Proof
+      - Attachments
+      - Contention
+      - Receipts
+    states:
+      - loading
+      - live
+      - stale
+      - offline
+      - permission_limited
+      - unsupported_contract
+    interactions:
+      - execute_generated_read
+      - preview_generated_action
+      - commit_generated_action
+      - open_focusa_evidence_or_receipt
+    captures:
+      - mission_inspector_live
+      - mission_inspector_approval_required
+      - mission_inspector_contention
+
+  - id: focusa_projection_host
+    component: FocusaProjectionHost
+    status: implementation_open
+    modes:
+      - hosted_dock
+      - full_work_object_tab
+    required:
+      - approved_focusa_generated_ui_package
+      - exact_scope
+      - generated_action_bindings
+      - cursor_replay
+      - source_revision_and_freshness
+      - unsupported_component_recovery
+    forbidden:
+      - duplicate_surface_model
+      - duplicate_focusa_reducer
+      - duplicate_operation_registry
+      - hand_authored_work_rail
+    captures:
+      - hosted_mission_canvas_dock
+      - full_mission_canvas_tab
+      - hosted_projection_contract_mismatch
+
+  - id: focusa_work_surface_link
+    component: FocusaWorkSurfaceLink
+    status: implementation_open
+    directions:
+      - cockpit_to_mission_canvas
+      - mission_canvas_to_cockpit
+    states:
+      - resolvable
+      - stale_revision
+      - runtime_ended
+      - permission_blocked
+      - scope_mismatch
+      - retention_expired
+    assertions:
+      - exact_bound_object_opens
+      - no_silent_replacement
+      - recovery_surface_for_stale_link
+    captures:
+      - open_in_cockpit_exact_object
+      - open_mission_canvas_exact_surface
+      - stale_deep_link_recovery
+
+  - id: contextual_handoff_composer
+    component: ContextualHandoffComposer
+    status: implementation_open
+    steps:
+      - Outcome
+      - Context
+      - Destination
+      - Proof
+      - Review
+      - Result
+    states:
+      - drafting
+      - previewing
+      - ready
+      - scope_required
+      - approval_required
+      - duplicate_found
+      - redaction_required
+      - commit_pending
+      - committed
+      - blocked
+      - offline
+    interactions:
+      - include_or_exclude_context_ref
+      - classify_untrusted_context
+      - select_existing_workpoint
+      - propose_new_workpoint
+      - choose_steering_or_follow_up
+      - set_expected_evidence
+      - preview_focusa_commit
+      - commit_focusa_handoff
+      - open_resulting_work_surface
+    captures:
+      - handoff_draft_with_browser_context
+      - handoff_untrusted_content_preview
+      - handoff_duplicate_found
+      - handoff_approval_required
+      - handoff_committed_with_work_surface_binding
+
+  - id: task_intake_status
+    component: TaskIntakeStatus
+    status: implementation_open
+    states:
+      - proposed
+      - scope_review
+      - accepted
+      - attached
+      - rejected
+      - duplicate
+      - blocked
+    required_visible:
+      - verified_principal
+      - origin_surface
+      - trusted_instruction_summary
+      - untrusted_context_posture
+      - destination_scope
+      - resulting_workpoint_or_queue_ref
+    captures:
+      - intake_scope_review
+      - intake_attached
+      - intake_unverified_principal_blocked
+
+  - id: operator_control_bar
+    component: OperatorControlBar
+    status: implementation_open
+    states:
+      - agent_controlled
+      - freeze_requested
+      - local_safety_freeze
+      - focusa_pause_pending
+      - operator_controlled
+      - delta_capture
+      - reobservation_required
+      - return_pending
+      - resumed
+      - redirected
+      - stopped
+      - fencing_conflict
+      - orphaned
+    interactions:
+      - pause
+      - take_over
+      - stop
+      - return_control
+      - return_with_note
+    required_visible:
+      - focusa_session_state
+      - uiai_control_state
+      - exact_target_and_scope
+      - lease_generation_and_expiry
+      - pending_side_effect
+      - reconciliation_posture
+    captures:
+      - agent_controlled
+      - local_freeze_focusa_pending
+      - operator_controlled
+      - delta_capture
+      - reobservation_required
+      - resumed_after_reconciliation
+      - fencing_conflict
+
+  - id: operator_delta_review
+    component: OperatorDeltaReview
+    status: implementation_open
+    states:
+      - collecting
+      - ready
+      - redaction_required
+      - confirmed
+      - capture_failed
+    required_visible:
+      - changed
+      - not_performed
+      - current_state_refs
+      - pending_side_effect
+      - reobservation_requirement
+    interactions:
+      - confirm_delta
+      - add_note
+      - continue_operator_control
+      - request_reobservation
+      - stop
+    captures:
+      - operator_delta_ready
+      - operator_delta_pending_side_effect_unknown
+
+  - id: credential_grant_status
+    component: CredentialGrantStatus
+    status: implementation_open
+    states:
+      - unavailable
+      - approval_required
+      - active
+      - expiring
+      - expired
+      - revoked
+      - origin_mismatch
+      - operation_mismatch
+      - spend_or_use_limit_reached
+      - reconciliation_required
+    required_visible:
+      - account_label_without_secret
+      - focusa_scope
+      - origin
+      - operation_class
+      - side_effect_and_spend_ceiling
+      - expiry
+      - receipt_posture
+    captures:
+      - credential_approval_required
+      - credential_active
+      - credential_expired
+      - credential_revoked
+      - credential_origin_mismatch
+
+  - id: secret_binding_inspector
+    component: SecretBindingInspector
+    status: implementation_open
+    location: Cockpit_Settings_or_Service_Detail
+    states:
+      - configured
+      - health_checking
+      - healthy
+      - rotation_required
+      - revoked
+      - vault_unavailable
+      - injection_failed
+    required_visible:
+      - opaque_binding_id
+      - account_label
+      - vault_provider
+      - allowed_origins_routes_methods
+      - injection_mode
+      - rotation_and_revocation
+      - recent_secret_safe_use_receipts
+    forbidden_visible:
+      - raw_secret
+      - cookie
+      - authorization_header
+    captures:
+      - secret_binding_healthy
+      - secret_binding_rotation_required
+      - secret_binding_revoked
+
+  - id: workflow_context_summary
+    component: WorkflowContextSummary
+    status: implementation_open
+    states:
+      - ready
+      - context_refreshing
+      - context_stale
+      - prohibited_reuse_detected
+      - approval_required
+      - credential_blocked
+      - placement_blocked
+      - equivalent_run_active
+      - running
+      - result_pending_focusa_settlement
+    required_visible:
+      - focusa_policy_ref
+      - purpose_and_scope
+      - next_run_or_trigger
+      - frozen_ref_summary
+      - refresh_each_run_summary
+      - carry_forward_summary
+      - prohibited_reuse_summary
+      - last_verified_outcome
+      - current_uiai_run
+    captures:
+      - workflow_context_ready
+      - workflow_context_stale_blocked
+      - prohibited_reuse_detected
+      - equivalent_run_active
+      - result_pending_focusa_settlement
+
+  - id: execution_context_manifest_view
+    component: ExecutionContextManifestView
+    status: implementation_open
+    states:
+      - assembling
+      - running
+      - complete
+      - incomplete
+      - drift_detected
+      - evidence_link_failed
+    required_visible:
+      - runner_and_node
+      - browser_notebook_document_test_refs
+      - data_model_tool_and_provider_versions
+      - credential_grant_and_binding_refs
+      - resource_use
+      - actual_inputs_and_outputs
+      - diagnostics_and_receipts
+    captures:
+      - execution_manifest_running
+      - execution_manifest_complete
+      - execution_manifest_drift_detected
+
+  - id: cross_gui_recovery_card
+    component: CrossGuiRecoveryCard
+    status: implementation_open
+    reasons:
+      - focusa_offline
+      - uiai_runtime_missing
+      - stale_binding
+      - contract_mismatch
+      - scope_mismatch
+      - runtime_generation_changed
+      - deep_link_stale
+      - grant_expired
+      - control_lease_orphaned
+      - read_model_lag
+    interactions:
+      - reconnect
+      - replay_from_cursor
+      - refresh_contracts
+      - rebind_with_preview
+      - open_ended_runtime_history
+      - revoke_stale_lease
+      - choose_explicit_recovery_target
+    captures:
+      - recovery_focusa_offline
+      - recovery_stale_binding
+      - recovery_contract_mismatch
+      - recovery_runtime_ended
+
+mission_canvas_required_captures:
+  description: Captured through UIAI Engine Eval against the actual Focusa Mission Canvas projection.
+  captures:
+    - mission_canvas_uiai_browser_work_surface
+    - mission_canvas_uiai_notebook_work_surface
+    - mission_canvas_take_control_action
+    - mission_canvas_credential_grant_posture
+    - mission_canvas_open_in_cockpit_exact_binding
+    - mission_canvas_close_view_vs_terminate_preview
+
+functional_suites:
+  binding_and_projection:
+    - create_real_focusa_binding
+    - hydrate_context_strip
+    - apply_focusa_event
+    - assert_revision_cursor_and_visible_change
+    - navigate_both_directions
+    - stale_link_opens_recovery
+  contextual_handoff:
+    - capture_real_browser_or_notebook_context
+    - preserve_trusted_untrusted_boundary
+    - preview_focusa_operation
+    - commit_real_workpoint_or_attachment
+    - assert_focusa_event_and_binding
+    - assert_both_guis_update
+  takeover:
+    - request_takeover_from_mission_canvas
+    - open_exact_cockpit_object
+    - local_freeze
+    - commit_focusa_intervention
+    - operator_changes_state
+    - capture_delta
+    - reobserve
+    - resume_or_redirect
+  credential:
+    - block_without_focusa_grant
+    - block_without_secret_binding
+    - allow_matching_origin_operation_and_scope
+    - emit_secret_safe_receipt
+    - expire_or_revoke_and_block
+    - scan_logs_dom_screenshots_and_artifacts_for_secret
+  workflow_context:
+    - load_focusa_policy
+    - refresh_required_context
+    - block_prohibited_reuse
+    - run_uiai_recipe
+    - produce_execution_manifest
+    - link_result_to_focusa
+    - remain_pending_until_focusa_completion
+  reconnect_and_restoration:
+    - disconnect_focusa
+    - preserve_uiai_runtime_identity
+    - reconnect_from_cursor
+    - restore_exact_binding
+    - reject_replacement_scope
+    - restore_control_and_credential_posture
+
+viewport_and_accessibility:
+  viewports:
+    - 1440x1200
+    - 1024x768
+    - 768x1024
+    - narrow_minimum_supported
+  required:
+    - full_keyboard_operation
+    - visible_focus
+    - screen_reader_names_roles_states
+    - color_independent_status
+    - high_contrast
+    - reduced_motion
+    - no_drag_only_interaction
+    - minimum_target_size
+    - responsive_inspector_and_strip
+
+proof_manifest:
+  schema_id: uiai.cockpit_cross_gui_visual_proof.v1
+  required:
+    - uiai_commit_sha
+    - focusa_commit_sha
+    - uiai_build_digest
+    - focusa_contract_digest
+    - uiai_contract_digest
+    - generated_client_digest
+    - surface_id
+    - scenario_id
+    - viewport
+    - focusa_project_workstream_attachment_and_work_surface_refs
+    - uiai_work_object_and_runtime_refs
+    - event_cursor
+    - source_state_revision
+    - screenshots_with_hashes
+    - dom_or_accessibility_snapshots
+    - functional_assertion_results
+    - diagnostics
+    - evidence_refs
+    - receipt_refs
+    - secret_scan_result
+  truthful_data_source:
+    - pinned_networked_focusa_daemon
+    - real_uiai_runtime
+    - deterministic_contract_replay_through_production_path
+
+ci_release_gate:
+  - validate_yaml_and_schema
+  - generate_or_check_focusa_client
+  - typecheck_and_build_cockpit
+  - start_pinned_focusa_daemon
+  - start_real_uiai_runtime_fixture
+  - execute_cross_gui_functional_suites
+  - execute_accessibility_assertions
+  - capture_all_required_states
+  - hash_captures_and_snapshots
+  - scan_for_secrets
+  - write_manifest
+  - upload_immutable_artifacts
+  - fail_on_missing_capture_assertion_manifest_or_receipt
+
+requirements:
+  - id: PROOF-008-001
+    statement: Every cross-GUI surface has actual compiled code and complete truthful states.
+  - id: PROOF-008-002
+    statement: At least one approved run uses a pinned real Focusa daemon and real UIAI runtime.
+  - id: PROOF-008-003
+    statement: Deterministic fixtures cannot bypass production adapters, reducers, or actions.
+  - id: PROOF-008-004
+    statement: Bidirectional navigation proves exact object identity.
+  - id: PROOF-008-005
+    statement: Handoff proof includes a real Focusa commit and visible update in both GUIs.
+  - id: PROOF-008-006
+    statement: Takeover proof includes lease, freeze, intervention, delta, reobservation, and resume.
+  - id: PROOF-008-007
+    statement: Credential proof scans all outputs and blocks mismatched or expired authority.
+  - id: PROOF-008-008
+    statement: Workflow proof preserves one Focusa recurrence authority and truthful pending settlement.
+  - id: PROOF-008-009
+    statement: Reconnect proof preserves exact identities and rejects silent scope adoption.
+  - id: PROOF-008-010
+    statement: Screenshots complement functional assertions and never replace them.
+
+closure:
+  status: implementation_open
+  full_integration_claim_requires:
+    - all_required_surfaces_functional_verified
+    - all_required_captures_visual_verified
+    - pinned_cross_repo_networked_run
+    - secret_scan_pass
+    - evidence_and_receipt_linkage
+    - green_release_blocking_ci

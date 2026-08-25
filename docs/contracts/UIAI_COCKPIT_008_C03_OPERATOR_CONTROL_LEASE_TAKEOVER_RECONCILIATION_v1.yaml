@@ -1,0 +1,243 @@
+schema: uiai.cockpit_operator_control_lease_takeover_reconciliation.v1
+version: 1
+parent: UIAI-COCKPIT-008
+status: proposed_documentation_only
+implementation_implied: false
+
+purpose: >-
+  Coordinate Focusa session-level intervention with UIAI actuator-level control
+  without treating a local browser freeze as canonical pause or allowing an agent
+  to resume from stale pre-takeover assumptions.
+
+focusa_intervention:
+  owner: focusa
+  states:
+    - running
+    - pause_requested
+    - paused_for_operator
+    - operator_intervention
+    - resume_proposed
+    - resumed
+    - redirected
+    - stopped
+    - blocked
+  owns:
+    - session_and_run_identity
+    - attachment_and_work_surface
+    - operator_steering
+    - mission_consequence
+    - canonical_pause_resume_stop
+    - durable_event_and_receipt
+
+uiai_control_lease:
+  schema_id: uiai.browser_or_computer_control_lease.v1
+  owner: uiai_engine
+  states:
+    - agent_controlled
+    - freeze_requested
+    - local_freeze
+    - operator_controlled
+    - delta_capture
+    - reobservation_required
+    - return_pending
+    - agent_controlled
+    - terminated
+    - orphaned
+    - fencing_conflict
+  required_fields:
+    - control_lease_id
+    - lease_generation
+    - work_surface_binding_ref
+    - uiai_session_or_job_ref
+    - browser_context_or_actuator_ref
+    - holder_principal_ref
+    - issued_at
+    - expires_at
+    - fencing_token
+    - state
+    - focusa_intervention_ref
+
+control_laws:
+  - one_active_holder_per_actuator_scope
+  - lease_generation_and_fencing_prevent_stale_control
+  - local_freeze_may_precede_focusa_ack_for_safety
+  - local_freeze_is_not_canonical_focusa_pause
+  - operator_control_requires_visible_scope_and_target
+  - return_control_requires_delta_and_reobservation
+  - expired_or_orphaned_lease_blocks_actuation
+  - browser_context_or_target_change_requires_lease_revalidation
+  - cross_project_control_transfer_forbidden
+  - credential_grants_do_not_transfer_with_control_unless_explicitly_valid
+
+immediate_safety_freeze:
+  allowed_when:
+    - pending_irreversible_action
+    - operator_takeover_requested
+    - actuator_state_uncertain
+    - origin_or_scope_mismatch
+    - Focusa_connection_temporarily_unavailable
+  required_ui_label: Local safety freeze · Focusa reconciliation pending
+  prohibited_claims:
+    - Focusa_session_paused
+    - operator_intervention_committed
+    - task_safely_resumable
+
+operator_delta:
+  schema_id: uiai.operator_delta_receipt.v1
+  required_fields:
+    - delta_receipt_id
+    - control_lease_ref
+    - work_surface_binding_ref
+    - started_at
+    - ended_at
+    - changed
+    - not_performed
+    - current_state_refs
+    - pending_side_effect
+    - reobservation_required
+  observable_change_classes:
+    - navigation
+    - target_created_or_closed
+    - browser_context_changed
+    - account_or_identity_selection
+    - form_value_changed
+    - file_attachment_changed
+    - download_or_upload_state
+    - permission_prompt_resolved
+    - dialog_or_modal_state
+    - clipboard_or_paste_action
+    - submitted_or_not_submitted
+    - document_or_notebook_state_changed
+  required_state_refs_where_applicable:
+    - url_and_title
+    - screenshot
+    - dom_accessibility_snapshot
+    - browser_target_set
+    - form_or_dialog_summary
+    - diagnostics
+  secret_policy:
+    raw_values_from_secret_fields: prohibited
+    redacted_field_change_summary: allowed
+
+reobservation:
+  required_before_agent_resume: true
+  minimum:
+    - validate_binding_revision
+    - validate_runtime_generation
+    - validate_control_lease_generation
+    - observe_current_target_or_object
+    - observe_pending_side_effect
+    - refresh_focusa_authority_and_next_safe_action
+    - refresh_credential_grant_posture
+  possible_results:
+    - resume_same_plan
+    - redirect_plan
+    - request_operator_decision
+    - block_due_to_unknown_state
+    - stop
+
+ui:
+  component: OperatorControlBar
+  agent_controlled:
+    controls:
+      - pause
+      - take_over
+      - stop
+    visible:
+      - focusa_session_state
+      - actuator_control_state
+      - current_target
+      - pending_side_effect
+  operator_controlled:
+    controls:
+      - return_control
+      - return_with_note
+      - stop
+    visible:
+      - exact_scope
+      - lease_expiry
+      - actions_being_recorded
+      - credential_posture
+  reconciliation:
+    component: OperatorDeltaReview
+    controls:
+      - confirm_delta
+      - add_note
+      - continue_operator_control
+      - request_agent_reobservation
+      - stop
+
+mission_canvas_controls:
+  take_control:
+    behavior: open_or_focus_exact_cockpit_work_object_and_request_lease
+  pause:
+    behavior: generated_focusa_intervention_operation
+  stop:
+    behavior: generated_focusa_stop_operation_with_impact_preview
+  forbidden:
+    - embedded_duplicate_browser_control
+    - implicit_target_from_focused_tab_only
+
+cockpit_controls:
+  pause:
+    behavior: local_freeze_if_needed_then_focusa_preview_commit
+  stop:
+    behavior: local_freeze_then_focusa_preview_commit_then_actuator_termination
+  return_control:
+    behavior: delta_capture_then_focusa_reconcile_then_reobservation
+
+failure_states:
+  - focusa_offline_after_local_freeze
+  - intervention_rejected
+  - stale_session_generation
+  - stale_control_lease
+  - fencing_conflict
+  - target_missing
+  - browser_context_changed
+  - operator_delta_capture_failed
+  - reobservation_failed
+  - pending_side_effect_unknown
+  - credential_grant_expired_during_takeover
+  - runtime_terminated_during_takeover
+  - cross_project_scope_mismatch
+
+receipts:
+  - focusa_operator_intervention_receipt
+  - uiai_control_lease_receipt
+  - uiai_operator_delta_receipt
+  - focusa_resume_or_redirect_receipt
+  - uiai_reobservation_receipt
+
+requirements:
+  - id: CTRL-001
+    statement: Focusa session intervention and UIAI actuator control remain separate state machines.
+  - id: CTRL-002
+    statement: Immediate local freeze is truthful and cannot masquerade as canonical pause.
+  - id: CTRL-003
+    statement: Control leases use generation and fencing.
+  - id: CTRL-004
+    statement: Mission Canvas Take control opens the exact bound Cockpit object.
+  - id: CTRL-005
+    statement: Cockpit pause and stop route through Focusa lifecycle operations.
+  - id: CTRL-006
+    statement: Operator actions produce a bounded redacted delta receipt.
+  - id: CTRL-007
+    statement: Agent resume requires fresh observation and authority refresh.
+  - id: CTRL-008
+    statement: Unknown pending side effects fail closed.
+  - id: CTRL-009
+    statement: Cross-project control transfer is forbidden.
+  - id: CTRL-010
+    statement: Restart restores lease posture without adopting stale control.
+
+closure:
+  status: implementation_open
+  requires:
+    - real_focusa_intervention
+    - real_uiai_control_lease
+    - local_safety_freeze
+    - operator_input
+    - delta_receipt
+    - reobservation
+    - resume_or_redirect
+    - cross_gui_functional_and_visual_proof

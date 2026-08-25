@@ -27,10 +27,6 @@ jobs:
         if: runner.os == 'macOS'
         working-directory: apps/cockpit
         run: |
-          # npm's optional-dependency resolution drops platform binaries
-          # that match the runner's host but not the runner's architecture
-          # in some npm versions. Install the binary explicitly so vite's
-          # rollup native call does not fail with the known npm cli #4828.
           npm install --no-save --no-package-lock \
             @rollup/rollup-darwin-arm64@4.62.2
       - name: Typecheck
@@ -39,6 +35,114 @@ jobs:
       - name: Web build
         working-directory: apps/cockpit
         run: npm run build
+      - name: Functional UI visual proof
+        working-directory: apps/cockpit
+        run: |
+          set -euo pipefail
+          mkdir -p visual-proof
+          npm exec --yes playwright@1.54.2 install chromium
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/uiai-cockpit-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:4173/ >/dev/null
+
+          BROWSER=$(find "$HOME/Library/Caches/ms-playwright" -type f \
+            \( -name "Chromium" -o -name "Google Chrome for Testing" -o -name "chrome-headless-shell" \) \
+            2>/dev/null | grep -E '/Contents/MacOS/|chrome-headless-shell$' | head -1)
+          test -n "$BROWSER"
+          echo "Visual proof browser: $BROWSER"
+
+          "$BROWSER" --headless --disable-gpu --no-sandbox --virtual-time-budget=1500 \
+            --dump-dom "http://127.0.0.1:4173/" > visual-proof/cockpit-focusa-idle.dom.html
+          grep -q 'data-live-state="idle"' visual-proof/cockpit-focusa-idle.dom.html
+          grep -q 'data-cursor="0"' visual-proof/cockpit-focusa-idle.dom.html
+          grep -q 'data-activity-count="0"' visual-proof/cockpit-focusa-idle.dom.html
+          grep -q 'data-evidence-ready="false"' visual-proof/cockpit-focusa-idle.dom.html
+
+          "$BROWSER" --headless --disable-gpu --no-sandbox --virtual-time-budget=1500 \
+            --dump-dom "http://127.0.0.1:4173/?evidence=focusa-live" > visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-live-state="live"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-cursor="103"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-source-revision="43"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-activity-count="3"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'data-evidence-ready="true"' visual-proof/cockpit-focusa-live.dom.html
+          grep -q '2.5–4.0 hours' visual-proof/cockpit-focusa-live.dom.html
+          grep -q '12 authority events' visual-proof/cockpit-focusa-live.dom.html
+          grep -q 'Profile A partial verified' visual-proof/cockpit-focusa-live.dom.html
+          grep -q '>active<' visual-proof/cockpit-focusa-live.dom.html
+          echo "Rendered-state assertions passed"
+
+          IDLE_PATH="$(pwd)/visual-proof/cockpit-focusa-idle.png"
+          LIVE_PATH="$(pwd)/visual-proof/cockpit-focusa-live-after-events.png"
+          "$BROWSER" --headless --disable-gpu --no-sandbox --hide-scrollbars \
+            --force-device-scale-factor=1 --window-size=1440,1200 --virtual-time-budget=1500 \
+            --screenshot="$IDLE_PATH" "http://127.0.0.1:4173/"
+          "$BROWSER" --headless --disable-gpu --no-sandbox --hide-scrollbars \
+            --force-device-scale-factor=1 --window-size=1440,1200 --virtual-time-budget=1500 \
+            --screenshot="$LIVE_PATH" "http://127.0.0.1:4173/?evidence=focusa-live"
+
+          test -s visual-proof/cockpit-focusa-idle.png
+          test -s visual-proof/cockpit-focusa-live-after-events.png
+          IDLE_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-idle.png | awk '{print $1}')
+          LIVE_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-live-after-events.png | awk '{print $1}')
+          IDLE_DOM_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-idle.dom.html | awk '{print $1}')
+          LIVE_DOM_SHA=$(shasum -a 256 visual-proof/cockpit-focusa-live.dom.html | awk '{print $1}')
+          IDLE_SIZE=$(sips -g pixelWidth -g pixelHeight visual-proof/cockpit-focusa-idle.png | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w"x"h}')
+          LIVE_SIZE=$(sips -g pixelWidth -g pixelHeight visual-proof/cockpit-focusa-live-after-events.png | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w"x"h}')
+          echo "Idle screenshot: sha256=$IDLE_SHA size=$IDLE_SIZE"
+          echo "Live screenshot: sha256=$LIVE_SHA size=$LIVE_SIZE"
+          echo "Idle DOM: sha256=$IDLE_DOM_SHA"
+          echo "Live DOM: sha256=$LIVE_DOM_SHA"
+          if [[ "$IDLE_SHA" == "$LIVE_SHA" ]]; then
+            echo "Visual proof failure: idle and live screenshots are identical" >&2
+            exit 1
+          fi
+          if [[ "$IDLE_SIZE" != "1440x1200" || "$LIVE_SIZE" != "1440x1200" ]]; then
+            echo "Visual proof failure: expected 1440x1200 captures" >&2
+            exit 1
+          fi
+
+          cat > visual-proof/manifest.json <<JSON
+          {
+            "schema": "uiai.cockpit_visual_proof.v1",
+            "commit_sha": "${GITHUB_SHA}",
+            "viewport": "1440x1200",
+            "production_reducer_asserted": true,
+            "captures": [
+              {
+                "file": "cockpit-focusa-idle.png",
+                "dom_file": "cockpit-focusa-idle.dom.html",
+                "state": "idle_no_synthetic_activity",
+                "sha256": "${IDLE_SHA}",
+                "dom_sha256": "${IDLE_DOM_SHA}",
+                "asserted_live_state": "idle",
+                "asserted_activity_count": 0
+              },
+              {
+                "file": "cockpit-focusa-live-after-events.png",
+                "dom_file": "cockpit-focusa-live.dom.html",
+                "state": "durable_event_replay_applied",
+                "expected_cursor": "103",
+                "expected_source_revision": "43",
+                "expected_activity_count": 3,
+                "sha256": "${LIVE_SHA}",
+                "dom_sha256": "${LIVE_DOM_SHA}"
+              }
+            ]
+          }
+          JSON
+      - name: Upload functional UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-functional-ui-evidence-${{ github.sha }}
+          path: apps/cockpit/visual-proof
+          if-no-files-found: error
+          retention-days: 30
       - name: Generate icons (if missing)
         working-directory: apps/cockpit
         run: ./scripts/generate-icons.sh
@@ -53,9 +157,9 @@ jobs:
           echo "Found bundle: $APP_PATH"
           test -f "$APP_PATH/Contents/Info.plist"
           /usr/bin/plutil -lint "$APP_PATH/Contents/Info.plist"
-      - name: Vitest (optional)
+      - name: Vitest
         working-directory: apps/cockpit
-        run: npm run test || true
+        run: npm run test
       - name: Backend smoke (mock external)
         working-directory: apps/cockpit
-        run: npm run cockpit:smoke -- --mode local-only --mock-external || true
+        run: npm run cockpit:smoke -- --mode local-only --mock-external

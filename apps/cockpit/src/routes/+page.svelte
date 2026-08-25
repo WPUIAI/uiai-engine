@@ -1,4 +1,5 @@
 <script lang="ts">
+<<<<<<< HEAD
   import { onMount } from "svelte";
   import "$lib/ui/screen.css";
   import { openInFocusa } from "$lib/controllers/desktop-handoff-controller";
@@ -69,6 +70,17 @@
 </script>
 
 <svelte:head><title>Overview · UIAI Engine Cockpit</title></svelte:head>
+=======
+  import { phase0Cards } from "$lib/cards/phase0-card-manifest";
+  import BrowserProfileSettings from "$lib/components/BrowserProfileSettings.svelte";
+  import FocusaLiveSurfaces from "$lib/components/FocusaLiveSurfaces.svelte";
+</script>
+
+<h1>UIAI Engine Cockpit</h1>
+<p class="muted">Operator workspace for live Focusa mission intelligence and UIAI Engine execution.</p>
+
+<FocusaLiveSurfaces />
+>>>>>>> pr-4
 
 <div class="screen overview-screen">
   <div class="screen-header">
@@ -175,6 +187,8 @@
     </div>
   </section>
 </div>
+
+<BrowserProfileSettings />
 
 <style>
   .overview-screen { display: grid; gap: 24px; }

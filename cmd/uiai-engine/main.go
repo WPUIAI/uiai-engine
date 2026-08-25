@@ -62,7 +62,7 @@ func main() {
 		log.Fatalf("Failed to create data dir %s: %v", cfg.Storage.DataDir, err)
 	}
 
-	eng := server.New(cfg)
+	eng := server.NewWithBrowserProfiles(cfg, cfgPath)
 	if err := eng.Run(); err != nil {
 		log.Fatalf("Engine stopped: %v", err)
 	}

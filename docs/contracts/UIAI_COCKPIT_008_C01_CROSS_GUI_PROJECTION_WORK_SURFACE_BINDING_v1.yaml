@@ -1,0 +1,256 @@
+schema: uiai.cockpit_cross_gui_projection_work_surface_binding.v1
+version: 1
+parent: UIAI-COCKPIT-008
+status: proposed_documentation_only
+implementation_implied: false
+
+external_focusa_contract:
+  repository: Startempire-Wire/focusa
+  document: docs/current/SPEC135_UIAI_COCKPIT_MISSION_CANVAS_INTERLOCK_2026-08-01.md
+  machine_contract: docs/contracts/spec135-uiai-cockpit-mission-canvas-interlock.v1.yaml
+  required_compatibility: exact_schema_operation_and_event_digest_handshake
+
+constitutional_law:
+  focusa_mission_canvas: canonical_mission_and_work_projection
+  uiai_cockpit: execution_verification_inspection_and_control_shell
+  owns_focusa_canonical_state: false
+  owns_uiai_execution_state: true
+  prohibited:
+    - duplicate_work_rail
+    - duplicate_steering_or_follow_up
+    - cockpit_local_focusa_task_authority
+    - cockpit_local_focusa_approval_or_completion
+    - visual_focus_as_scope
+
+binding:
+  schema_id: focusa.uiai_work_surface_binding.v1
+  identity:
+    - binding_id
+    - binding_revision
+  scope:
+    - project_root
+    - project_identity_ref
+    - continuity_id
+    - workpoint_id
+    - work_item_ref
+  focusa_refs:
+    - instance_id
+    - session_id
+    - attachment_id
+    - work_surface_id
+    - mission_ref
+  uiai_refs:
+    - work_object_id
+    - work_object_kind
+    - uiai_session_id
+    - browser_context_id
+    - browser_target_ids
+    - notebook_session_id
+    - document_session_id
+    - test_run_id
+    - job_id
+  control:
+    - access_mode
+    - authority_posture
+    - operator_control_state
+    - browser_isolation_class
+    - authentication_sharing
+    - credential_grant_refs
+    - resource_policy_ref
+    - retention_policy
+  freshness:
+    - source_state_revision
+    - event_cursor
+    - observed_at
+    - stale_after
+
+work_object_kinds:
+  - browser
+  - research
+  - document
+  - notebook
+  - test_run
+  - visual_compare
+  - automation_run
+  - report
+  - media_job
+
+binding_states:
+  - unbound_local
+  - previewing
+  - commit_pending
+  - bound_live
+  - bound_stale
+  - offline_projection
+  - revision_conflict
+  - scope_mismatch
+  - origin_mismatch
+  - runtime_missing
+  - focusa_object_missing
+  - unbind_pending
+  - unbound
+  - recovery_required
+
+binding_laws:
+  - focusa_mints_binding_and_exact_scope
+  - uiai_supplies_stable_runtime_refs
+  - unbound_local_is_visibly_noncanonical
+  - bind_and_rebind_use_focusa_preview_commit
+  - idempotency_and_expected_revisions_are_required
+  - close_view_does_not_terminate_runtime
+  - terminate_runtime_does_not_silently_delete_focusa_surface
+  - aggregate_views_require_explicit_mutation_target
+  - cross_project_binding_is_forbidden_by_default
+  - stale_or_missing_binding_never_silently_adopts_replacement
+
+projection_levels:
+  mission_context_strip:
+    required:
+      - project_and_workstream
+      - workpoint_and_work_surface
+      - mission_or_session_status
+      - focusa_next_safe_action
+      - authority_and_approval
+      - proof_posture
+      - source_revision_cursor_and_freshness
+      - open_mission_canvas
+    forbidden:
+      - work_rail
+      - client_computed_next_action
+  mission_inspector:
+    tabs:
+      - Mission
+      - Current_work
+      - Next_safe_action
+      - Authority
+      - Proof
+      - Attachments
+      - Contention
+      - Receipts
+    mutation: generated_focusa_action_bindings_only
+  hosted_mission_canvas_dock:
+    source: approved_focusa_generated_ui_package
+    owns_surface_model: false
+    owns_operation_registry: false
+  full_mission_canvas_work_object:
+    source: approved_focusa_generated_ui_package
+    focusa_owned_projection: true
+
+mission_canvas_uiai_projection:
+  required:
+    - exact_uiai_object_and_runtime_refs
+    - lifecycle_and_health
+    - profile_isolation_authentication_or_environment
+    - node_runner_and_resource_posture
+    - current_observed_target_or_object
+    - last_observed_at
+    - operator_control_state
+    - credential_grant_posture
+    - artifact_diagnostic_and_proof_status
+    - retention_and_cleanup
+    - open_in_cockpit
+  excluded_detail:
+    - full_browser_chrome
+    - raw_dom_or_network_inspector
+    - secret_configuration
+    - notebook_editor
+    - full_test_lab
+    - full_visual_compare
+
+adapter:
+  id: focusa_projection_adapter
+  generated_from:
+    - focusa_openapi_3_0_3
+    - focusa_json_schema_2020_12
+  required:
+    - contract_digest_handshake
+    - capability_and_operation_discovery
+    - cursor_replay_and_live_tail
+    - exact_scope_filters
+    - source_revision_tracking
+    - event_deduplication
+    - query_key_invalidation
+    - offline_cache_as_projection_only
+  forbidden:
+    - handwritten_duplicate_focusa_dto
+    - handwritten_duplicate_focusa_operation_registry
+    - client_side_focusa_reducer
+
+navigation:
+  deep_link_payload:
+    allowed:
+      - stable_opaque_refs
+      - expected_revision
+      - optional_view_hint
+    forbidden:
+      - secrets
+      - cookies
+      - raw_artifacts
+      - inline_canonical_state
+  resolution_checks:
+    - scope
+    - capability
+    - permission
+    - existence
+    - binding_revision
+    - runtime_generation
+    - freshness
+    - retention
+  stale_behavior: recovery_surface
+
+focusa_events_consumed:
+  - mission_canvas_projection_invalidated
+  - mission_canvas_work_surface_created
+  - mission_canvas_work_surface_revised
+  - mission_canvas_work_surface_suspended
+  - mission_canvas_work_surface_resumed
+  - mission_canvas_work_surface_closed
+  - uiai_work_surface_binding_created
+  - uiai_work_surface_binding_revised
+  - uiai_work_surface_binding_unbound
+  - uiai_work_surface_binding_stale
+  - workpoint_binding_revised
+  - capability_or_permission_changed
+  - evidence_or_receipt_linked
+  - source_state_revision_changed
+
+activity_truth:
+  canonical_focusa_event_label: Focusa_event
+  uiai_operational_event_label: UIAI_operation
+  local_pending_label: Pending_local
+  evidence_candidate_label: Evidence_candidate
+  reconciled_receipt_label: Reconciled_receipt
+  silent_duplicate_history: forbidden
+
+requirements:
+  - id: XGUI-001
+    statement: Every mission-bound UIAI object uses an exact versioned Focusa binding.
+  - id: XGUI-002
+    statement: Cockpit Focusa projections are generated-client projections, not canonical stores.
+  - id: XGUI-003
+    statement: Mission Context Strip never duplicates Work Rail or computes next work locally.
+  - id: XGUI-004
+    statement: Hosted Mission Canvas uses the approved Focusa renderer and action bindings.
+  - id: XGUI-005
+    statement: Mission Canvas exposes bounded UIAI status and deep-links to Cockpit for detail.
+  - id: XGUI-006
+    statement: Closing views and terminating runtimes remain distinct.
+  - id: XGUI-007
+    statement: Deep links revalidate exact scope, revision, generation, and freshness.
+  - id: XGUI-008
+    statement: Aggregate views cannot mutate without explicit target selection.
+  - id: XGUI-009
+    statement: Reconnect preserves exact Focusa and UIAI identities.
+  - id: XGUI-010
+    statement: Cross-project silent rebinding is forbidden.
+
+closure:
+  status: implementation_open
+  requires:
+    - generated_adapter
+    - real_focusa_binding
+    - real_event_replay
+    - compiled_cockpit_projection
+    - exact_bidirectional_navigation
+    - interaction_assertions
+    - inspected_visual_proof

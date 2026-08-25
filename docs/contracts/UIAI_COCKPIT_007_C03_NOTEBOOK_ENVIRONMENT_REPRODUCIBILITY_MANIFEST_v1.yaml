@@ -1,0 +1,338 @@
+schema: uiai.notebook_reproducibility_manifest.v1
+version: 1
+parent: UIAI-COCKPIT-007
+status: proposed_documentation_only
+implementation_implied: false
+
+manifest_contract:
+  required:
+    - manifest_id
+    - created_at
+    - created_by
+    - notebook
+    - execution_mode
+    - runtime
+    - kernel
+    - environment
+    - source_integrity
+    - inputs
+    - determinism
+    - resource_policy
+    - security_posture
+    - integrity
+    - reproducibility_posture
+  properties:
+    manifest_id: string
+    parent_manifest_ref: string_or_null
+    created_at: rfc3339_utc_preserving_fractional_precision
+    created_by: principal_ref
+    scope_ref: object_or_null
+    notebook:
+      notebook_id: string
+      notebook_revision_id: string
+      notebook_path: redacted_or_scoped_string
+      format: ipynb
+      nbformat_major: integer
+      nbformat_minor: integer
+      content_hash: sha256_digest
+      declared_semantic_profile:
+        enum: [general, math, statistics, forecasting, physics, control, mixed]
+    execution_mode:
+      enum: [exploratory, reproducible, verification]
+    runtime:
+      provider_kind: string
+      provider_version: string
+      server_version: string_or_null
+      jupyterlab_version: string_or_null
+      uiai_engine_version: string
+      uiai_contract_digest: sha256_digest
+      adapter_id: string
+      adapter_version: string
+      node_ref: string
+      container_or_vm_ref: string_or_null
+    kernel:
+      kernel_spec_name: string
+      kernel_display_name: string
+      language: string
+      language_version: string
+      kernel_implementation: string
+      kernel_implementation_version: string
+      kernel_protocol_version: string_or_null
+      clean_kernel: boolean
+      preexisting_state_allowed: boolean
+    environment:
+      os_name: string
+      os_version: string
+      architecture: string
+      libc_or_runtime: string_or_null
+      locale: string
+      timezone: string
+      text_encoding: string
+      numeric_locale: string_or_null
+      floating_point_posture: object
+      package_manager: string_or_null
+      package_lock_refs: array
+      package_inventory_ref: string_or_null
+      package_inventory_digest: sha256_digest_or_null
+      native_library_inventory_ref: string_or_null
+      solver_inventory_ref: string_or_null
+      environment_variable_names: array
+      secret_variable_names_redacted: array
+      filesystem_root_classification: string
+      network_policy_ref: string
+      accelerator_inventory: array
+      hardware_summary: object
+    source_integrity:
+      cell_order_policy:
+        enum: [not_declared, notebook_order, dependency_graph, explicit_plan]
+      cell_revision_refs: array
+      cell_source_hashes: array
+      execution_plan_ref: string_or_null
+      hidden_state_check:
+        enum: [not_run, clean, warning, failed]
+      mutable_source_warning: boolean
+    inputs:
+      dataset_snapshot_refs: array
+      model_refs: array
+      parameter_set_ref: string_or_null
+      assumption_set_ref: string_or_null
+      equation_definition_refs: array
+      measurement_series_refs: array
+      external_service_refs: array
+      input_integrity_complete: boolean
+      unresolved_mutable_inputs: array
+    determinism:
+      declared_deterministic: boolean
+      seed_policy:
+        enum: [not_applicable, fixed, recorded_dynamic, provider_default, uncontrolled]
+      seed_values_ref: string_or_null
+      known_nondeterminism: array
+      concurrency_posture: string
+      hardware_specific_behavior: array
+      external_time_dependency: boolean
+      external_network_dependency: boolean
+    resource_policy:
+      policy_ref: string
+      cpu_limit: string_or_null
+      memory_limit_bytes: integer_or_null
+      gpu_limit: string_or_null
+      disk_limit_bytes: integer_or_null
+      output_limit_bytes: integer_or_null
+      timeout_ns: integer_or_null
+      network_transfer_limit_bytes: integer_or_null
+      actual_resource_usage_ref: string_or_null
+    security_posture:
+      trust_class:
+        enum: [trusted_local, approved_remote, untrusted_notebook, untrusted_server, restricted]
+      credential_labels: array
+      raw_credentials_present: false
+      filesystem_write_policy: string
+      network_egress_policy: string
+      package_install_policy: string
+      shell_policy: string
+      widget_extension_policy: string
+      redaction_policy_ref: string
+    integrity:
+      algorithm: sha256
+      manifest_digest: sha256_digest
+      component_digests: array
+      signature_ref: string_or_null
+    reproducibility_posture:
+      enum:
+        - not_claimed
+        - exploratory_only
+        - incomplete_inputs
+        - incomplete_environment
+        - hidden_state_detected
+        - mutable_dependency
+        - nondeterministic_declared
+        - reproducible_candidate
+        - reproducible_verified
+        - drifted
+        - failed
+      limitations: array
+      what_can_be_reproduced: array
+      what_cannot_be_reproduced: array
+
+package_inventory_contract:
+  schema: uiai.notebook_package_inventory.v1
+  required:
+    - inventory_id
+    - ecosystem
+    - packages
+    - integrity
+  properties:
+    inventory_id: string
+    ecosystem: string
+    generated_at: rfc3339_utc
+    source_commands_redacted: array
+    packages:
+      item:
+        name: string
+        version: string
+        source: string_or_null
+        artifact_hash: string_or_null
+        editable: boolean
+        local_path_redacted: string_or_null
+        license: string_or_null
+    integrity:
+      algorithm: sha256
+      digest: sha256_digest
+
+external_service_contract:
+  schema: uiai.notebook_external_service_ref.v1
+  required:
+    - service_id
+    - service_kind
+    - endpoint_classification
+    - version_posture
+    - mutable
+  properties:
+    service_id: string
+    service_kind: string
+    endpoint_classification:
+      enum: [local, tailscale, private_remote, public_remote, cloud_managed]
+    endpoint_redacted: string
+    credential_label: string_or_null
+    version_posture:
+      enum: [pinned, reported, inferred, unknown]
+    version: string_or_null
+    mutable: boolean
+    snapshot_or_request_refs: array
+    time_dependency: object_or_null
+    limitations: array
+
+reproducible_run_preflight:
+  blocking_checks:
+    - notebook_revision_is_frozen
+    - cell_sources_are_hashed
+    - clean_kernel_is_available
+    - environment_manifest_is_complete
+    - required_packages_are_resolvable
+    - dataset_snapshots_are_bound
+    - parameters_and_assumptions_are_bound
+    - secret_requirements_are_authorized
+    - network_dependencies_are_declared
+    - resource_policy_is_accepted
+    - output_and_artifact_limits_are_accepted
+    - execution_plan_is_valid
+  warning_checks:
+    - provider_version_not_pinned
+    - package_artifact_hashes_incomplete
+    - hardware_specific_numerics
+    - nondeterministic_library
+    - external_service_mutable
+    - mutable_model_or_dataset
+    - locale_or_timezone_dependency
+    - stochastic_seed_uncontrolled
+    - native_library_inventory_incomplete
+    - clock_unsynchronized
+  outcomes:
+    - passed
+    - passed_with_warnings
+    - blocked
+    - cancelled
+
+verification_environment_comparison:
+  required_dimensions:
+    - notebook_source
+    - cell_source
+    - execution_plan
+    - language_runtime
+    - kernel_implementation
+    - package_inventory
+    - solver_inventory
+    - operating_system
+    - architecture
+    - hardware_acceleration
+    - dataset_inputs
+    - model_inputs
+    - parameter_set
+    - assumption_set
+    - seed_policy
+    - network_services
+    - resource_policy
+  comparison_results:
+    - identical
+    - equivalent_declared
+    - intentionally_independent
+    - drifted
+    - unknown
+  independence_classes:
+    same_kernel_repeat:
+      minimum_difference: none
+      independent_verification: false
+    clean_kernel_same_environment:
+      minimum_difference: kernel_state
+      independent_verification: limited
+    independent_environment_same_method:
+      minimum_difference: environment_instance
+      independent_verification: moderate
+    alternate_implementation:
+      minimum_difference: implementation_or_library
+      independent_verification: strong_when_inputs_are_independent
+    alternate_solver:
+      minimum_difference: solver_or_numerical_method
+      independent_verification: strong_for_numerical_cross_check
+    independent_dataset_or_measurement:
+      minimum_difference: empirical_source
+      independent_verification: strong_for_external_validity
+
+math_reproducibility_fields:
+  - expression_and_equation_refs
+  - symbol_domains
+  - assumptions_and_constraints
+  - exact_or_approximate
+  - solver_and_version
+  - tolerance
+  - convergence_criteria
+  - conditioning
+  - precision
+  - unit_and_dimension_posture
+  - proof_or_derivation_posture
+  - counterexample_search_posture
+
+statistics_reproducibility_fields:
+  - sampling_frame
+  - exclusions
+  - missingness
+  - weighting
+  - random_seed
+  - model_specification
+  - prior_or_regularization
+  - scoring_rule
+  - calibration_bins_or_method
+  - multiple_comparison_posture
+  - causal_assumptions
+  - train_validation_test_time_boundaries
+  - temporal_leakage_checks
+
+physics_reproducibility_fields:
+  - physical_quantity_units
+  - constants_and_versions
+  - reference_frames
+  - initial_and_boundary_conditions
+  - solver_and_discretization
+  - timestep_and_tolerance
+  - mesh_or_geometry_ref
+  - material_or_component_models
+  - sensor_calibration_refs
+  - measurement_uncertainty
+  - simulation_truth_class
+  - observation_truth_class
+  - validity_region
+  - safety_envelope_ref
+
+prohibited_claims:
+  - same_notebook_path_implies_same_source
+  - same_kernel_name_implies_same_environment
+  - successful_execution_implies_reproducibility
+  - fixed_seed_implies_full_determinism
+  - matching_plot_implies_matching_data
+  - simulation_output_implies_measurement
+  - environment_snapshot_implies_secret_capture
+  - package_name_and_version_alone_imply_identical_binary
+
+closure:
+  status: proposed_documentation_only
+  rule: A reproducibility manifest can support a reproducibility claim only after schema validation, complete source and input hashes, clean-run execution, drift analysis, output receipts, and release tests against supported notebook providers.

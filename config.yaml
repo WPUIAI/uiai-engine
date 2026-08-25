@@ -42,6 +42,139 @@ vision:
   share_dir: "/home/wpuiai/ai-api/shares"
   allow_private_urls: false
 
+# Shared browser profile system used by the Go-core profile launcher and Cockpit.
+browser:
+  default_profile: "detect"
+  profiles:
+    detect:
+      label: "Detect / Diagnostic"
+      mode: "detect"
+      engine: "system_chromium"
+      headless: true
+      launch:
+        no_sandbox: true
+        disable_gpu: true
+        disable_extensions: true
+        disable_web_security: false
+        ignore_cert_errors: false
+        block_trackers: false
+      identity:
+        locale: "en-US"
+        languages: ["en-US", "en"]
+        viewport:
+          width: 1280
+          height: 800
+          device_scale_factor: 1
+      network:
+        route: "direct"
+      storage:
+        cookie_mode: "ephemeral"
+        cache_mode: "ephemeral"
+        local_storage_mode: "ephemeral"
+      challenge:
+        policy: "detect"
+        max_attempts: 1
+        operator_escalation: true
+      behavior:
+        timing_profile: "deterministic"
+        pointer_profile: "direct"
+        scrolling_profile: "direct"
+        navigation_profile: "deterministic"
+      observability:
+        diagnostics_level: "developer"
+        fingerprint_capture: true
+        challenge_capture: true
+        network_capture: true
+
+    no_detect:
+      extends: "detect"
+      label: "No Detect"
+      mode: "no_detect"
+      identity:
+        patch_webdriver: true
+        patch_chrome_object: true
+        patch_plugins: true
+        patch_languages: true
+        disable_automation_controlled: true
+        # Retain the runtime browser UA unless a coherent UA catalog is configured.
+        random_user_agent: false
+      network:
+        route: "local_ip_pool"
+        route_ref: "captcha-default"
+        dns_mode: "proxy"
+        webrtc_mode: "proxy_only"
+        geo_consistency: true
+        sticky: true
+      storage:
+        isolation_key: "no-detect-default"
+        cookie_mode: "profile"
+        cache_mode: "profile"
+        local_storage_mode: "profile"
+      challenge:
+        policy: "solve_and_retry"
+        max_attempts: 3
+        route_rotation: true
+        operator_escalation: true
+        text_solver: "auto"
+        image_grid_solver: "auto"
+        audio_solver: "whisper"
+      behavior:
+        timing_profile: "humanized"
+        pointer_profile: "humanized"
+        scrolling_profile: "humanized"
+        navigation_profile: "humanized"
+
+    operator:
+      extends: "detect"
+      label: "Operator"
+      mode: "operator"
+      headless: false
+      launch:
+        persistent_context: true
+        user_data_dir: "${UIAI_OPERATOR_PROFILE_DIR}"
+      network:
+        route: "operator_route"
+        route_ref: "operator-default"
+        geo_consistency: true
+        sticky: true
+      storage:
+        isolation_key: "operator-default"
+        cookie_mode: "persistent"
+        cache_mode: "persistent"
+        local_storage_mode: "persistent"
+        credential_profile_ref: "operator-default"
+        exclusive_lock: true
+      challenge:
+        policy: "assist"
+        max_attempts: 1
+        operator_escalation: true
+      observability:
+        diagnostics_level: "standard"
+        challenge_capture: true
+
+    research:
+      extends: "no_detect"
+      label: "Research / Eval"
+      mode: "research"
+      storage:
+        isolation_key: "research-ephemeral"
+        cookie_mode: "ephemeral"
+        cache_mode: "ephemeral"
+        local_storage_mode: "ephemeral"
+      observability:
+        diagnostics_level: "full"
+        fingerprint_capture: true
+        challenge_capture: true
+        network_capture: true
+        evidence_grade: true
+
+  domain_rules: []
+  # Example:
+  # - pattern: "*.example.com"
+  #   profile: "no_detect"
+  #   challenge_policy: "solve_and_retry"
+  #   priority: 100
+
 media:
   script_dir: "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"
   job_timeout: 300
