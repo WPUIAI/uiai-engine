@@ -14,7 +14,7 @@
     <false/>
     <key>keychain-access-groups</key>
     <array>
-        <string>$(AppIdentifierPrefix)com.focusa.shared-focusa</string>
+        <string>$(AppIdentifierPrefix)com.wpuiai.uiaiengine.cockpit</string>
     </array>
     <key>com.apple.security.application-groups</key>
     <array>

@@ -1,0 +1,520 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "UIAI Engine API",
+    "version": "2.0.0-dev",
+    "description": "Machine-readable Engine API \u2014 every JSON payload carries schema: uiai.*.v1"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "local engine"
+    }
+  ],
+  "paths": {
+    "/api/status": {
+      "get": {
+        "summary": "Engine status (machine-readable)",
+        "responses": {
+          "200": {
+            "description": "status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_status_v1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/browser": {
+      "get": {
+        "summary": "Agent pressure telemetry (advisory, noncanonical)",
+        "responses": {
+          "200": {
+            "description": "agent_pressure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_agent_pressure_v1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "summary": "OpenAPI 3.1 document for this engine build",
+        "responses": {
+          "200": {
+            "description": "openapi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/schema/{id}": {
+      "get": {
+        "summary": "Serve one JSON Schema by $id (e.g. uiai.status.v1)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not found"
+          }
+        }
+      }
+    },
+    "/api/session": {
+      "post": {
+        "summary": "Create browser session",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      },
+      "get": {
+        "summary": "List sessions",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/api/errors": {
+      "get": {
+        "summary": "Bounded redacted error history",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "uiai_desktop_presentation_request_v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "uiai.desktop_presentation_request.v1",
+        "title": "Desktop Presentation Request",
+        "type": "object",
+        "required": [
+          "schema",
+          "mode",
+          "reason",
+          "requested_by",
+          "focus",
+          "expires_in_ms",
+          "idempotency_key"
+        ],
+        "properties": {
+          "schema": {
+            "const": "uiai.desktop_presentation_request.v1"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "full",
+              "pip",
+              "focus_existing"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "operator_request",
+              "takeover_required",
+              "policy_confirmation",
+              "failure_recovery",
+              "workflow"
+            ]
+          },
+          "scope_ref": {
+            "$ref": "uiai.scope_ref.v1.schema.json"
+          },
+          "requested_by": {
+            "$ref": "uiai.client_ref.v1.schema.json"
+          },
+          "focus": {
+            "type": "boolean"
+          },
+          "expires_in_ms": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 300000
+          },
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiai_scope_ref_v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "uiai.scope_ref.v1",
+        "title": "ScopeRef \u2014 WorkstreamKey = ProjectRootKey::ContinuityId",
+        "type": "object",
+        "required": [
+          "authority_state"
+        ],
+        "properties": {
+          "project_root_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$"
+          },
+          "project_label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "workstream_key": {
+            "type": "string",
+            "pattern": "^[^:/?#]+::[A-Za-z0-9._:-]{1,160}$"
+          },
+          "continuity_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+          },
+          "thread_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+          },
+          "session_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+          },
+          "cloud_node_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+          },
+          "machine_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+          },
+          "daemon_endpoint": {
+            "type": "string",
+            "format": "uri"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "assistant",
+              "observer",
+              "reviewer",
+              "ci_runner",
+              "support"
+            ]
+          },
+          "authority_state": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "missing",
+              "stale",
+              "conflict",
+              "read_only"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiai_client_ref_v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "uiai.client_ref.v1",
+        "title": "ClientRef",
+        "type": "object",
+        "required": [
+          "client_type",
+          "client_id"
+        ],
+        "properties": {
+          "client_type": {
+            "type": "string",
+            "enum": [
+              "pi",
+              "cockpit",
+              "menubar",
+              "api",
+              "mcp",
+              "cli"
+            ]
+          },
+          "client_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiai_cockpit_ota_activation_receipt_v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "uiai.cockpit_ota_activation_receipt.v1",
+        "title": "Cockpit OTA Activation Receipt",
+        "type": "object",
+        "required": [
+          "schema",
+          "status",
+          "version",
+          "activated_at",
+          "activation"
+        ],
+        "properties": {
+          "schema": {
+            "const": "uiai.cockpit_ota_activation_receipt.v1"
+          },
+          "status": {
+            "const": "installed_relaunching"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-dev)?$"
+          },
+          "activated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activation": {
+            "const": "signed_updater_install_and_relaunch"
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiai_agent_pressure_v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "uiai.agent_pressure.v1",
+        "title": "Agent Pressure \u2014 /api/health/browser",
+        "type": "object",
+        "required": [
+          "schema",
+          "overall_pressure",
+          "browser",
+          "recommended_action"
+        ],
+        "properties": {
+          "schema": {
+            "const": "uiai.agent_pressure.v1"
+          },
+          "telemetry_class": {
+            "const": "noncanonical_operational"
+          },
+          "authority": {
+            "const": "advisory_only"
+          },
+          "overall_pressure": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical",
+              "unknown"
+            ]
+          },
+          "recommended_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommended_action": {
+            "type": "string"
+          },
+          "browser": {
+            "type": "object",
+            "required": [
+              "pressure",
+              "active_pages",
+              "max_pages"
+            ],
+            "properties": {
+              "pressure": {
+                "type": "string"
+              },
+              "active_pages": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "available_pages": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "max_pages": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "fail_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "queue_depth": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          "focusa_routing_hint": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "focusa_cockpit_bundle_manifest_v1": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$id": "focusa.cockpit.bundle_manifest.v1",
+        "title": "Cockpit Bundle Manifest",
+        "type": "object",
+        "required": [
+          "schema",
+          "version",
+          "built_at",
+          "source_commit",
+          "artifacts"
+        ],
+        "properties": {
+          "schema": {
+            "const": "focusa.cockpit.bundle_manifest.v1"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-dev)?$"
+          },
+          "built_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source_commit": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{7,40}$"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "sha256",
+                "size"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "uiai_status_v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "uiai.status.v1",
+        "title": "UIAI Engine Status \u2014 GET /api/status",
+        "type": "object",
+        "required": [
+          "schema",
+          "type",
+          "services",
+          "timestamp"
+        ],
+        "properties": {
+          "schema": {
+            "const": "uiai.status.v1"
+          },
+          "type": {
+            "const": "status"
+          },
+          "services": {
+            "type": "object",
+            "required": [
+              "uiai-engine"
+            ],
+            "properties": {
+              "uiai-engine": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name",
+                  "running",
+                  "port",
+                  "health"
+                ],
+                "properties": {
+                  "id": {
+                    "const": "uiai-engine"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "running": {
+                    "type": "boolean"
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "health": {
+                    "type": "string",
+                    "enum": [
+                      "healthy",
+                      "degraded",
+                      "unavailable"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

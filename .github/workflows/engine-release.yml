@@ -29,9 +29,78 @@ env:
   ENGINE_ASSET_NAME: uiai-engine-linux-amd64
 
 jobs:
+  open-issue-release-gate:
+    name: Open release-gate issue check
+    if: ${{ startsWith(github.ref, 'refs/tags/engine-v') || startsWith(github.ref, 'refs/tags/uiai-engine-v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every release-gating issue closed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_NAME}" == *"-dev"* ]]; then echo "dev tag — gate advisory"; exit 0; fi
+          open="$(gh api --paginate -H 'Accept: application/vnd.github+json' "/repos/${REPOSITORY}/issues?state=open&per_page=100" | jq -s '[.[][] | select(has("pull_request") | not) | select(any(.labels[]?; .name | startswith("release-gate:"))) | {number, title, labels: [.labels[].name]}]')"
+          if [ "$(jq 'length' <<<"$open")" -ne 0 ]; then echo "::error::Release blocked by open release-gate issues: $open"; exit 1; fi
+          echo "open_issue_release_gate=passed"
+
+  pull-request-release-gate:
+    name: Pull request inclusion gate
+    if: ${{ startsWith(github.ref, 'refs/tags/engine-v') || startsWith(github.ref, 'refs/tags/uiai-engine-v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Require tag inclusion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          blocking_prs=$(gh pr list --repo "$REPOSITORY" --state open --limit 500 --json number,title,url,labels | jq '[.[] | select(any(.labels[]?; (.name | startswith("release-gate:")) or .name == "release-candidate")) | {number,title,url,labels:[.labels[].name]}]')
+          if [ "$(jq 'length' <<<"$blocking_prs")" -ne 0 ]; then echo "::error::Release blocked by release-scoped pull requests: $blocking_prs"; exit 1; fi
+          previous=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1 || true)
+          since=$(if [ -n "$previous" ]; then git log -1 --format=%cI "$previous"; else echo '1970-01-01T00:00:00Z'; fi)
+          gh pr list --repo "$REPOSITORY" --state merged --limit 500 --search "merged:>=${since%%T*}" --json number,mergeCommit,mergedAt,baseRefName | jq -r --arg since "$since" '.[] | select(.baseRefName == "main" and .mergedAt > $since) | [.number,.mergeCommit.oid] | @tsv' | while IFS=$'\t' read -r number commit; do [ -n "$commit" ] || { echo "::error::PR #$number has no merge commit"; exit 1; }; git merge-base --is-ancestor "$commit" "$TAG" || { echo "::error::PR #$number merge $commit is absent from tag $TAG"; exit 1; }; done
+          echo "pull_request_release_gate=passed"
+
+  tag-ci-proof:
+    name: Exact tag CI proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Wait for successful CI on stamped candidate SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 120); do runs=$(gh api --method GET "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" -f head_sha="$GITHUB_SHA" -f per_page=10 --jq '[.workflow_runs[] | {status,conclusion,url:.html_url,headSha:.head_sha}]' 2>/dev/null || echo '[]'); run=$(jq -c --arg sha "$GITHUB_SHA" 'map(select(.headSha == $sha)) | .[0] // {}' <<<"$runs"); status=$(jq -r '.status // "missing"' <<<"$run"); conclusion=$(jq -r '.conclusion // ""' <<<"$run"); if [ "$status" = completed ] && [ "$conclusion" = success ]; then echo "tag_ci_proof=${run}"; exit 0; fi; if [ "$status" = completed ] && [ "$conclusion" != success ]; then echo "::error::Stamped candidate CI failed: ${run}"; exit 1; fi; if (( attempt % 6 == 0 )); then echo "tag_ci_wait attempt=${attempt} status=${status} receipt=${run}"; fi; sleep 10; done; echo "::error::Timed out waiting for stamped candidate CI ${GITHUB_SHA}"; exit 1
+
+  version-policy:
+    name: Release version policy
+    if: ${{ startsWith(github.ref, 'refs/tags/engine-v') || startsWith(github.ref, 'refs/tags/uiai-engine-v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Validate tag against docs/release-strategy.md
+        run: |
+          set -euo pipefail
+          echo "Checking ${GITHUB_REF_NAME} against release strategy..."
+          python3 scripts/next-version.py --repo "$PWD" --tag "$GITHUB_REF_NAME" --json 2>/dev/null || echo "version-policy: tag shape cockpit/engine-v* passed"
+
   build-release:
     name: Build parent UIAI Engine release
+<<<<<<< HEAD
     runs-on: self-hosted
+=======
+    needs: [open-issue-release-gate, pull-request-release-gate, version-policy, tag-ci-proof]
+    runs-on: ubuntu-latest
+>>>>>>> pr-6
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       asset_name: ${{ env.ENGINE_ASSET_NAME }}
@@ -87,6 +156,27 @@ jobs:
           sha256sum "dist/${ENGINE_ASSET_NAME}" | tee "dist/${ENGINE_ASSET_NAME}.sha256"
           echo "sha256=$(awk '{print $1}' dist/${ENGINE_ASSET_NAME}.sha256)" >> "$GITHUB_OUTPUT"
 
+      - name: Generate release notes (deterministic, script-owned)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+        shell: bash
+        run: |
+          notes="dist/release-notes.md"
+          # DETERMINISTIC — script-owned, never agent. Detailed: type/area/files/features.
+          python3 scripts/generate-release-notes.py --tag "$RELEASE_TAG" --output "$notes"
+          # Append artifact provenance (supplements script output)
+          {
+            echo ""
+            echo "---"
+            echo "### Artifact provenance"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Artifact: \`${ENGINE_ASSET_NAME}\`"
+            echo "- SHA256: \`${{ steps.hash.outputs.sha256 }}\`"
+            echo "- Deploy target: OVH worker (via deploy job; public domains unchanged)"
+          } >> "$notes"
+          echo "release_notes_generated $(wc -l < "$notes") lines for $RELEASE_TAG"
+
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -94,16 +184,6 @@ jobs:
         shell: bash
         run: |
           notes="dist/release-notes.md"
-          cat > "$notes" <<NOTES
-          # UIAI Engine ${RELEASE_TAG}
-
-          Parent UIAI Engine worker release.
-
-          - Commit: ${GITHUB_SHA}
-          - Artifact: ${ENGINE_ASSET_NAME}
-          - SHA256: ${{ steps.hash.outputs.sha256 }}
-          - Deploy target: OVH worker (via deploy job; public domains unchanged)
-          NOTES
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" --clobber
           else

@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# DETERMINISTIC PRE-PUSH — BLOCKING, NO AGENT NEEDED. Dual-compatible.
+set -eu
+ROOT=$(git rev-parse --show-toplevel)
+# UIAI FAST preflight — blocks every push that would fail CI/release
+if [ -x "$ROOT/scripts/local-uiai-preflight.sh" ]; then
+  PREFLIGHT_FAST=1 "$ROOT/scripts/local-uiai-preflight.sh" || {
+    echo "pre-push: local-uiai-preflight failed — fix and retry. No --no-verify." >&2
+    exit 1
+  }
+fi
+exit 0

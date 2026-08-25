@@ -4,8 +4,8 @@
 # and apps/cockpit/src-tauri/tauri.conf.json.
 
 set -euo pipefail
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-APPS_COCKPIT="${APPS_COCKPIT:-$ROOT_DIR/apps/cockpit}"
+COCKPIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+APPS_COCKPIT="${APPS_COCKPIT:-$COCKPIT_ROOT}"
 VERSION="${1:-}"
 if [[ -z "$VERSION" ]]; then
   VERSION=$(grep -m1 '^version = ' "$APPS_COCKPIT/src-tauri/Cargo.toml" | sed -E 's/version = "([^"]+)"/\1/')

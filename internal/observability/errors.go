@@ -59,6 +59,12 @@ type ErrorStore struct {
 	seq    uint64
 }
 
+// defaultStore is process-global bounded telemetry — classified as runtime-infra per Spec 104 §5.5.5.
+// It is explicitly NOT per-scope authority: callers share a 500-event ledger for process-health
+// visibility (like Focusa INF-01/INF-02). Cross-project bleed is documented: consumers
+// correlating per-project errors must filter by Scope/session_id client-side or pass
+// ScopeRef via focusapacket context. Upgrading to per-scope partitioning is tracked via
+// bead uiai-engine-x7d; until then this exception is load-bearing and tested.
 var defaultStore = &ErrorStore{}
 
 // DefaultFreshWindow is how far back "fresh" errors count for pressure

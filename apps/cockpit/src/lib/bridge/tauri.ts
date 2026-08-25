@@ -7,16 +7,26 @@ export interface BridgeStartResult {
   callbackUrl?: string;
 }
 
-export interface BridgeCompletionPayload {
-  protocol: "focusa-connect-v1";
-  role: "mac_completion_payload";
-  mac_completion_payload: string;
+export interface PairingBridgeDescriptor {
+  room_id: string;
+  callback_url: string;
+  ttl_secs: number;
+  bridge_owner: "cockpit";
 }
 
 export interface BonjourDiscovery {
   url: string;
   host: string;
   port: number;
+}
+
+export interface FocusaSiblingManifest {
+  schema: "focusa.app.manifest.v2";
+  app: string;
+  version: string;
+  channel: string;
+  protocols: Record<string, string>;
+  capabilities: string[];
 }
 
 export async function startBridgeCallback(nonce: string): Promise<BridgeStartResult> {
@@ -31,13 +41,13 @@ export async function startBridgeCallback(nonce: string): Promise<BridgeStartRes
   }
 }
 
-export async function takeBridgeCompletion(nonce: string): Promise<string | null> {
+export async function startPairingBridge(roomId: string, nonce: string, ttlSecs: number): Promise<PairingBridgeDescriptor | null> {
   if (!isTauri()) return null;
   try {
     const invoke = (await import("@tauri-apps/api/core")).invoke;
-    return await invoke<string | null>("focusa_take_bridge_completion", { nonce });
+    return await invoke<PairingBridgeDescriptor>("focusa_start_pairing_bridge", { roomId, nonce, ttlSecs });
   } catch (err) {
-    console.error("takeBridgeCompletion failed:", err);
+    console.error("startPairingBridge failed:", err);
     return null;
   }
 }
@@ -49,6 +59,23 @@ export async function clearBridge(nonce: string): Promise<void> {
     await invoke("focusa_clear_bridge", { nonce });
   } catch (err) {
     console.error("clearBridge failed:", err);
+  }
+}
+
+export async function cockpitManifestEndpoint(): Promise<string | null> {
+  if (!isTauri()) return null;
+  const invoke = (await import("@tauri-apps/api/core")).invoke;
+  return invoke<string>("cockpit_focusa_manifest_endpoint");
+}
+
+export async function fetchFocusaSiblingManifest(endpoint: string): Promise<FocusaSiblingManifest | null> {
+  if (!isTauri()) return null;
+  try {
+    const invoke = (await import("@tauri-apps/api/core")).invoke;
+    return await invoke<FocusaSiblingManifest>("cockpit_fetch_focusa_manifest", { endpoint });
+  } catch (err) {
+    console.error("fetchFocusaSiblingManifest failed:", err);
+    return null;
   }
 }
 

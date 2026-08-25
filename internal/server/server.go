@@ -18,6 +18,7 @@ import (
 	captchaPkg "github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
+	"github.com/WPUIAI/uiai-engine/internal/desktop"
 	"github.com/WPUIAI/uiai-engine/internal/intelligence"
 	"github.com/WPUIAI/uiai-engine/internal/license"
 	"github.com/WPUIAI/uiai-engine/internal/media"
@@ -45,6 +46,7 @@ type Engine struct {
 	usage     *storage.UsageStore
 	vision    vision.PoolSource
 	sessions  *vision.SessionManager
+	presenter desktop.DesktopPresenter
 	mediaJobs *media.JobStore
 	captcha   *captchaPkg.Solver
 }
@@ -167,6 +169,14 @@ func New(cfg *config.Config) *Engine {
 	}
 	captchaSolver := captchaPkg.NewSolver(aiProvider, captchaCfg)
 
+	presenter := desktop.NewPresenter(func(sessionID string) bool {
+		if sessionMgr == nil {
+			return false
+		}
+		_, ok := sessionMgr.Get(sessionID)
+		return ok
+	}, desktop.NewPlatformLauncher())
+
 	e := &Engine{
 		cfg:       cfg,
 		router:    r,
@@ -177,6 +187,7 @@ func New(cfg *config.Config) *Engine {
 		usage:     usage,
 		vision:    visionPool,
 		sessions:  sessionMgr,
+		presenter: presenter,
 		mediaJobs: mediaJobs,
 		captcha:   captchaSolver,
 	}
@@ -215,6 +226,10 @@ func (e *Engine) mountRoutes() {
 
 	// API status
 	r.Get("/api/status", e.handleStatus)
+
+	// Machine-readable contracts — MR-P0-03/MR-P0-04: OpenAPI 3.1 + per-schema serve
+	r.Get("/api/openapi.json", routes.HandleOpenAPI)
+	r.Get("/api/schema/{id}", routes.HandleSchema)
 
 	// -- All /api/* routes below get auth middleware in Phase A2 --
 
@@ -309,6 +324,10 @@ func (e *Engine) mountRoutes() {
 	// Open → interact → screenshot → close (page stays alive between calls)
 	r.Route("/api/session", func(r chi.Router) {
 		routes.MountSessionRoutes(r, e.cfg, e.sessions, e.captcha)
+		routes.MountSessionPresentationRoute(r, e.presenter)
+	})
+	r.Route("/api/presentation", func(r chi.Router) {
+		routes.MountPresentationRoutes(r, e.presenter)
 	})
 
 	// Captcha solver — stateless image solve + status
@@ -410,10 +429,11 @@ func (e *Engine) handleRoot(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleStatus returns service status — same shape as Bun.
+// handleStatus returns service status — same shape as Bun, now with machine schema id.
 func (e *Engine) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
-		"type": "status",
+		"schema": "uiai.status.v1",
+		"type":   "status",
 		"services": map[string]any{
 			"uiai-engine": map[string]any{
 				"id":      "uiai-engine",

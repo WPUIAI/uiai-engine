@@ -1,0 +1,34 @@
+{
+  "schema": "uiai.schema_manifest.v1",
+  "generated_at": "2026-08-20T02:20:00Z",
+  "schemas": [
+    {
+      "id": "uiai.desktop_presentation_request.v1",
+      "src": "contracts/schemas/uiai.desktop_presentation_request.v1.schema.json"
+    },
+    {
+      "id": "uiai.scope_ref.v1",
+      "src": "contracts/schemas/uiai.scope_ref.v1.schema.json"
+    },
+    {
+      "id": "uiai.client_ref.v1",
+      "src": "contracts/schemas/uiai.client_ref.v1.schema.json"
+    },
+    {
+      "id": "uiai.cockpit_ota_activation_receipt.v1",
+      "src": "contracts/schemas/uiai.cockpit_ota_activation_receipt.v1.schema.json"
+    },
+    {
+      "id": "uiai.agent_pressure.v1",
+      "src": "contracts/schemas/uiai.agent_pressure.v1.schema.json"
+    },
+    {
+      "id": "focusa.cockpit.bundle_manifest.v1",
+      "src": "contracts/schemas/focusa.cockpit.bundle_manifest.v1.schema.json"
+    },
+    {
+      "id": "uiai.status.v1",
+      "src": "contracts/schemas/uiai.status.v1.schema.json"
+    }
+  ]
+}

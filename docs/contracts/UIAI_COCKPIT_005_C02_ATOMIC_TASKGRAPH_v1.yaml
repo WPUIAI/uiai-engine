@@ -1,0 +1,134 @@
+schema: uiai.cockpit.005.atomic_taskgraph.v1
+document: UIAI-COCKPIT-005
+version: 1.0
+status: executable
+rules:
+  - Every work package has one bounded implementation or proof outcome.
+  - A parent T005 task closes only after every child is closed with evidence.
+  - The first child of a stream depends on all prerequisite parent streams.
+  - Remaining children form an explicit implementation-to-proof chain.
+  - Security and authority invariants from UIAI-COCKPIT-005 remain mandatory.
+streams:
+  T005-02:
+    title: Sibling compatibility manifest
+    packages:
+      - [schema, Define manifest schema and compatibility policy, Manifest v2 fields capabilities versions and fail-closed negotiation are fixture-backed.]
+      - [server, Expose Cockpit sibling manifest, Packaged Cockpit exposes a credential-free bounded manifest on its supported local surface.]
+      - [client, Implement sibling manifest client, Client validates size timeout origin schema and unknown fields before returning capabilities.]
+      - [proof, Prove compatibility negotiation, Compatible versions enable Path B and mismatches produce bounded recovery without mutation.]
+  T005-03:
+    title: Focusa daemon discovery
+    packages:
+      - [model, Implement discovery source interface, Every source returns bounded candidates and cannot create profiles or bindings.]
+      - [direct, Implement loopback environment and manual discovery, Direct sources validate URLs timeouts local-only policy and health.]
+      - [sibling, Implement sibling and saved-hint discovery, Non-secret hints are validated and stale hints remain advisory.]
+      - [bonjour, Complete Bonjour discovery, Service browsing resolves bounded endpoints and terminates cleanly.]
+      - [tailscale, Implement Tailscale discovery, Approved MagicDNS and tailnet candidates are explicit remote candidates with no implicit trust.]
+      - [merge, Implement candidate deduplication and ranking, Verified daemon IDs dominate normalized URLs and source provenance is retained.]
+      - [proof, Prove discovery matrix, All sources timeout dedupe malformed input and local-only tests pass.]
+  T005-04:
+    title: Native secure credential storage
+    packages:
+      - [boundary, Define native credential boundary and redaction policy, Frontend APIs expose handles and status only and secret-shaped values are redacted.]
+      - [macos, Implement macOS Keychain adapter, Create read update delete lock and deny behavior passes under signed access policy.]
+      - [linux, Implement Linux Secret Service adapter, libsecret unavailable locked denied and normal paths fail safely.]
+      - [windows, Implement Windows Credential Manager adapter, Create read update delete and denied paths pass without plaintext persistence.]
+      - [native, Implement native token-handle resolver, Authenticated native requests resolve credentials internally and never return tokens to JavaScript.]
+      - [signing, Configure entitlements and package policy, Signed packages retain least-privilege credential access through update and rollback.]
+      - [proof, Prove credential secrecy, Cross-platform tests and repository artifact log URL event and crash secret scans pass.]
+  T005-05:
+    title: Fresh VPS pairing Path A
+    packages:
+      - [machine, Implement pairing state machine, Legal transitions cancellation retry expiry and terminal cleanup are deterministic.]
+      - [start, Implement native pair-start request, Cockpit identity scopes context and local-only policy are validated before network access.]
+      - [bridge, Implement Cockpit bridge ownership, Room nonce TTL callback ownership and shutdown behavior follow canonical daemon status.]
+      - [present, Implement code and QR presentation, Daemon pair data renders without secret logging clipboard leakage or URL mutation.]
+      - [poll, Implement canonical status polling, Polling uses bounded cadence backoff cancellation timeout and pressure handling.]
+      - [complete, Validate and persist pairing completion, Room nonce daemon client type scopes TTL and one-time consumption validate before native storage.]
+      - [verify, Verify profile and emit receipt, Authenticated read succeeds before profile activation and transient room state is cleared.]
+      - [proof, Prove Path A adversarial matrix, Success replay expiry mismatch cancellation crash and storage-denial cases pass.]
+  T005-06:
+    title: Menubar-assisted pairing Path B
+    packages:
+      - [eligibility, Implement auto-add eligibility gates, Same-user machine policy manifest daemon match dismissal and capabilities are all required.]
+      - [prompt, Implement explicit auto-add prompt, Add pair-from-scratch and details actions are accessible and never pre-authorized.]
+      - [proof_request, Implement Menubar cross-reference request, Request contains device reference and nonce but no Menubar credential.]
+      - [mint, Complete distinct Cockpit token minting, Daemon proof creates a new cockpit device and native token handle.]
+      - [fallback, Implement denial mismatch and absence fallback, Path A remains available with no partial profile or authority mutation.]
+      - [tests, Prove Path B matrix, Compatible stopped absent denied stale mismatch and token-separation cases pass.]
+  T005-07:
+    title: Authenticated daemon profile registry
+    packages:
+      - [metadata, Implement non-secret profile metadata repository, Metadata persists atomically without token material.]
+      - [resolver, Bind profiles to native token handles, Missing locked expired and revoked credentials produce typed unavailable states.]
+      - [client, Implement profile-scoped authenticated native client, Requests bind exactly one profile daemon identity and scope set.]
+      - [lifecycle, Implement profile health and lifecycle, Active unavailable expired revoked and conflict transitions are evidence-backed.]
+      - [selection, Implement active profile selection, Selection is explicit durable reversible and cannot cross-bind credentials.]
+      - [proof, Prove profile isolation, Concurrent profiles scope denial restart expiry and identity-change tests pass.]
+  T005-08:
+    title: Multi-daemon fleet picker
+    packages:
+      - [model, Implement fleet view model, Health location version scopes source expiry and last use retain profile provenance.]
+      - [cardinality, Implement zero one and many behavior, Zero shows pairing one may default and many always requires selection.]
+      - [picker, Implement accessible fleet picker, Keyboard screen-reader filtering details and explicit confirmation work.]
+      - [all_mode, Implement independent all-profile enumeration, All queries profiles separately and never creates shared mutation authority.]
+      - [proof, Prove fleet selection invariants, Restart unavailable profile Menubar-active and multi-profile tests pass without silent choice.]
+  T005-09:
+    title: Daemon-qualified project and scope enumeration
+    packages:
+      - [api, Implement profile-scoped project API adapter, Each query uses one authenticated profile and typed bounded response.]
+      - [identity, Verify daemon project identity, Project ID root remote and identity status retain daemon provenance.]
+      - [scope, Enumerate continuities and Workpoints, Scope data remains qualified by daemon profile project and continuity.]
+      - [normalize, Normalize project candidates, Canonical candidate contracts reject ambiguous or unsupported identity data.]
+      - [cache, Implement bounded stale/error behavior, Cache provenance age and unavailable status are visible and cannot authorize mutation.]
+      - [proof, Prove project enumeration matrix, Duplicate roots remotes malformed payload stale cache scope conflict and profile isolation tests pass.]
+  T005-10:
+    title: Explicit project and scope reconciliation
+    packages:
+      - [match, Implement equivalence candidate scoring, Durable project ID remote and root evidence are advisory with explainable confidence.]
+      - [conflict, Implement reconciliation conflict model, Equivalent projects remain separate authorities until a decision exists.]
+      - [decision_ui, Implement explicit reconciliation decision UI, All four relations evidence and operator confirmation are accessible and reviewable.]
+      - [ledger, Persist reconciliation decisions, Append-only decisions retain both binding IDs evidence and supersession history.]
+      - [guard, Enforce singular mutation binding, Every mutation requires one verified active binding and conflicts fail closed.]
+      - [aggregate, Implement provenance-safe aggregate reads, Combined views label daemon and profile and cannot imply merged canonical state.]
+      - [proof, Prove reconciliation invariants, Duplicate identity conflicting remote supersession restart and mutation-guard tests pass.]
+  T005-11:
+    title: Expiry revoke and repair
+    packages:
+      - [expiry, Implement credential expiry preflight, Expired profiles block authenticated mutation before request and retain safe metadata.]
+      - [revoke, Implement canonical daemon revoke, Local credential deletion follows receipt or explicit local-forget branch.]
+      - [forget, Implement local forget, Operator-confirmed forget removes local credential and profile authority without claiming remote revoke.]
+      - [repair, Implement re-pair and token replacement, Repair verifies daemon identity before atomically replacing the token handle.]
+      - [identity, Handle daemon identity changes, URL move needs confirmation and same-URL new-daemon conflicts fail closed.]
+      - [recovery, Implement interrupted-operation recovery, Restart reconciles pending revoke repair and credential writes without duplicate authority.]
+      - [proof, Prove revoke and repair matrix, Expiry remote revoke offline forget identity change crash retry and replay tests pass.]
+  T005-12:
+    title: Pairing UX accessibility and observability
+    packages:
+      - [settings, Implement daemon profiles settings surface, Pair inspect select repair revoke and forget states are truthful and accessible.]
+      - [nodes, Integrate fleet and project state into Nodes and Services, Health provenance conflicts and active binding are visible.]
+      - [wizard, Complete pairing and recovery state UX, Every Path A and Path B state has bounded progress cancellation and recovery.]
+      - [a11y, Prove accessibility behavior, Keyboard focus announcements contrast reduced motion and error association pass.]
+      - [telemetry, Implement redacted events and receipts, Structured events include IDs outcomes and evidence but exclude secrets and full payloads.]
+      - [proof, Prove UX and observability, Component visual accessibility recovery and secret-scan suites pass.]
+  T005-13:
+    title: Cross-platform pairing adapters
+    packages:
+      - [matrix, Define platform capability and CI matrix, Required optional unavailable and fallback behavior is explicit per platform.]
+      - [macos, Prove macOS packaged behavior, Signed notarized Keychain Bonjour sandbox deep-link and update paths pass.]
+      - [linux, Prove Linux packaged behavior, Secret Service mDNS desktop integration unavailable-service and package paths pass.]
+      - [windows, Prove Windows packaged behavior, Credential Manager discovery protocol registration installer and update paths pass.]
+      - [policy, Prove sandbox and local-only policy, Remote network attempts are blocked before request and policy transitions are auditable.]
+      - [ci, Implement deterministic headless adapters, CI uses explicit fakes with parity fixtures and never silently weakens production policy.]
+      - [proof, Publish cross-platform proof bundle, Build test package signatures environment versions and known limitations are evidence-linked.]
+  T005-14:
+    title: End-to-end proof and signed rollout
+    packages:
+      - [harness, Build governed E2E harness, Disposable daemons devices projects clocks credential stores and redacted artifacts are deterministic.]
+      - [local, Prove local daemon journey, Discovery pairing profile project selection restart and revoke pass without remote traffic.]
+      - [path_a, Prove VPS Path A journey, Phone approval bridge completion secure persistence and repair pass over production-like TLS.]
+      - [path_b, Prove Menubar-assisted journey, Distinct tokens same-machine proof absence stopped mismatch denial and fallback pass.]
+      - [fleet, Prove multi-daemon reconciliation journey, Duplicate projects explicit decision provenance aggregate reads and mutation guard pass.]
+      - [security, Complete adversarial and secrecy review, Replay spoof downgrade malformed payload pressure crash and comprehensive secret scans pass.]
+      - [upgrade, Prove signed update and rollback, Profiles credentials bindings and compatibility survive or truthfully require repair.]
+      - [release, Publish signed release evidence, Immutable matrix receipts rollback artifact and operator approval gate stable promotion.]

@@ -13,6 +13,11 @@ type window struct {
 	resetAt time.Time
 }
 
+// Limiter is process-health rate limiting — classified as runtime-infra per Spec 104 §5.5.5.
+// Windows are keyed by (key,tier) only; two projects sharing the same key string share windows.
+// This is intentional process-protection, NOT project-isolated authority. Per-scope keying is
+// tracked via bead uiai-engine-fg1 (child of h6s); until then callers must not rely on
+// rate-limit isolation across scopes. Documented bleed + mitigation in docs/ratelimit.md.
 type Limiter struct {
 	tiers  map[string]config.TierLimit
 	hourly sync.Map // key → *window

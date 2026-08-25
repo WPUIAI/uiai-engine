@@ -22,11 +22,25 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost https://api.focusa.dev http://127.0.0.1:7456 http://127.0.0.1:8787"
+      "csp": "default-src 'self'; img-src 'self' asset: data: http://127.0.0.1:7456; frame-src http://127.0.0.1:7456; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost https://api.focusa.dev http://127.0.0.1:7456 http://127.0.0.1:8787"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["cockpit"]
+      }
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/WPUIAI/uiai-engine/releases/download/cockpit-latest/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUzQzdCRDQ2OEZEODU1RUIKUldUclZkaVBScjNIVSt6SFlKdnJkOFJWTmNwUXBMRjZkMWg4R1ZxbWZqSWt6L1BmN3Izb1JLQ28K"
     }
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
