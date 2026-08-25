@@ -131,10 +131,8 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource,
 		if body.FocusaScope != nil {
 			focusaEvidence["focusa_scope"] = body.FocusaScope
 		}
-		inline := true
-		if body.Inline != nil {
-			inline = *body.Inline
-		}
+		// C-010-09 default: pixels stay out of envelopes; inline only on demand.
+		inline := body.Inline != nil && *body.Inline
 		resp := map[string]any{
 			"width":           result.Width,
 			"height":          result.Height,
