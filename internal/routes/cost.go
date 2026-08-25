@@ -29,6 +29,9 @@ func (c *costWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
+// Unwrap lets downstream wrappers reach the instrumented writer.
+func (c *costWriter) Unwrap() http.ResponseWriter { return c.ResponseWriter }
+
 func (c *costWriter) WriteHeader(code int) {
 	if !c.wrote {
 		c.wrote = true
@@ -62,8 +65,8 @@ func CostTouchPage(r *http.Request, n int) {
 // InjectCost adds the cost object to top-level map envelopes when the writer
 // is cost-instrumented (C-010-05). Safe no-op otherwise.
 func InjectCost(data any, w http.ResponseWriter) any {
-	cw, ok := w.(*costWriter)
-	if !ok || cw == nil || cw.holder == nil {
+	cw := resolveCost(w)
+	if cw == nil || cw.holder == nil {
 		return data
 	}
 	m, ok := data.(map[string]any)
@@ -101,4 +104,18 @@ func itoa64(v int64) string {
 		buf[i] = '-'
 	}
 	return string(buf[i:])
+}
+
+// resolveCost walks wrapped ResponseWriters to find the cost instrument.
+func resolveCost(w http.ResponseWriter) *costWriter {
+	for {
+		if cw, ok := w.(*costWriter); ok {
+			return cw
+		}
+		u, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return nil
+		}
+		w = u.Unwrap()
+	}
 }

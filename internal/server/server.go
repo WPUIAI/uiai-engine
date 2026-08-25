@@ -325,6 +325,7 @@ func (e *Engine) mountRoutes() {
 	// Browser Sessions — persistent pages for LLM tool use
 	// Open → interact → screenshot → close (page stays alive between calls)
 	r.Route("/api/session", func(r chi.Router) {
+		r.Use(routes.CostMiddleware)                 // C-010-05 innermost-instrumented
 		r.Use(routes.WithDeadline(25 * time.Second)) // C-010-04
 		routes.MountSessionRoutes(r, e.cfg, e.sessions, e.captcha)
 		routes.MountSessionPresentationRoute(r, e.presenter)

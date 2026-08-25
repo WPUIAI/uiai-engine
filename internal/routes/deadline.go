@@ -41,9 +41,13 @@ func WithDeadline(d time.Duration) func(http.Handler) http.Handler {
 // responseCopy is a passthrough writer retained for future body buffering.
 type responseCopy struct {
 	http.ResponseWriter
+
 	buf  growBuf
 	code int
 }
+
+// Unwrap preserves cost instrumentation through the deadline wrapper.
+func (r *responseCopy) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
 type growBuf struct{ Len int }
 
