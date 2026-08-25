@@ -58,7 +58,8 @@ func New(cfg *config.Config) *Engine {
 	// Global middleware
 	r.Use(middleware.RequestID)
 	r.Use(errorRecovery)
-	r.Use(middleware.Compress(5))        // gzip compression — reduces transfer size for JSON + screenshot data
+	r.Use(middleware.Compress(5))
+	r.Use(routes.CostMiddleware)         // C-010-05        // gzip compression — reduces transfer size for JSON + screenshot data
 	r.Use(maxBodySize(10 * 1024 * 1024)) // 10MB max request body
 	r.Use(requestLogger)
 	r.Use(corsMiddleware(cfg))
@@ -301,6 +302,7 @@ func (e *Engine) mountRoutes() {
 
 	// Screenshot & Share (Rod vision pool — Phase A8)
 	r.Route("/api/screenshot", func(r chi.Router) {
+		r.Use(routes.WithDeadline(25 * time.Second)) // C-010-04
 		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage)
 		routes.MountScreenshotCompare(r, e.cfg, e.vision, e.ai, e.credits, e.limiter, e.usage)
 	})
@@ -323,6 +325,7 @@ func (e *Engine) mountRoutes() {
 	// Browser Sessions — persistent pages for LLM tool use
 	// Open → interact → screenshot → close (page stays alive between calls)
 	r.Route("/api/session", func(r chi.Router) {
+		r.Use(routes.WithDeadline(25 * time.Second)) // C-010-04
 		routes.MountSessionRoutes(r, e.cfg, e.sessions, e.captcha)
 		routes.MountSessionPresentationRoute(r, e.presenter)
 	})

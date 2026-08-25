@@ -79,5 +79,5 @@ h1{color:#059669}iframe{width:100%;height:80vh;border:1px solid #e2e8f0;border-r
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	json.NewEncoder(w).Encode(InjectCost(data, w))
 }
