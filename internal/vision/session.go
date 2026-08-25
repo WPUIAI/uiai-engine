@@ -116,16 +116,10 @@ type Session struct {
 // SessionManager manages persistent browser sessions.
 // Spec 104: authority-bearing singleton eliminated — sessions are indexed by (scope, id) and MaxSessions is enforced per-scope with a global cap.
 type SessionManager struct {
-<<<<<<< HEAD
 	mu         sync.RWMutex
-	sessions   map[string]*Session
+	sessions   map[string]*Session // id → Session (Scope inside)
 	pool       PoolSource
 	reconciler *Reconciler
-=======
-	mu       sync.RWMutex
-	sessions map[string]*Session // id → Session (Scope inside)
-	pool     PoolSource
->>>>>>> pr-6
 }
 
 const globalMaxSessions = 16 // hard global cap across all scopes
@@ -367,6 +361,13 @@ func (sm *SessionManager) GetScoped(id string, scope ScopeRef) (*Session, bool) 
 }
 
 // CountForScope returns live session count for a given scope.
+// CountAll returns the total number of live sessions across scopes (#96 F2).
+func (sm *SessionManager) CountAll() int {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	return len(sm.sessions)
+}
+
 func (sm *SessionManager) CountForScope(scope ScopeRef) int {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()

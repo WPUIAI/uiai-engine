@@ -310,6 +310,21 @@ drained:
 }
 
 // isBrowserAlive checks if the Chrome process is still running.
+
+// tryLockWithin polls mu.TryLock until deadline — keeps health responsive (#96).
+func (p *Pool) tryLockWithin(d time.Duration) bool {
+	deadline := time.Now().Add(d)
+	for {
+		if p.mu.TryLock() {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(15 * time.Millisecond)
+	}
+}
+
 func (p *Pool) isBrowserAlive() bool {
 	if p.browserPID <= 0 {
 		return false
@@ -1092,7 +1107,16 @@ func percentileInt64(values []int64, pct float64) int64 {
 }
 
 func (p *Pool) Stats() map[string]any {
-	p.mu.Lock()
+	// #96 F1: never block health on a wedged pool — bounded try-lock window.
+	if !p.tryLockWithin(400 * time.Millisecond) {
+		return map[string]any{
+			"degraded":     true,
+			"reason":       "stats_lock_timeout",
+			"max_pages":    p.maxPages,
+			"active_pages": p.active,
+			"fail_count":   p.failCount,
+		}
+	}
 	defer p.mu.Unlock()
 
 	browserState := "idle-off"

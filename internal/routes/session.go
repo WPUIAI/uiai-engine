@@ -39,7 +39,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		for _, s := range sessions {
 			out = append(out, sessionInfoPayload(s))
 		}
-		writeJSON(w, 200, map[string]any{"sessions": out, "count": len(out), "max": vision.MaxSessions})
+		writeJSON(w, 200, map[string]any{"sessions": out, "count": len(out), "max": vision.MaxSessions, "max_sessions": vision.MaxSessions})
 	})
 
 	// Open a new session
