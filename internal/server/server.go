@@ -464,8 +464,14 @@ func (e *Engine) handleStatus(w http.ResponseWriter, r *http.Request) {
 // Run starts the server and blocks until shutdown signal.
 func (e *Engine) Run() error {
 	e.server = &http.Server{
-		Addr:         e.cfg.Addr(),
-		Handler:      e.router,
+		Addr: e.cfg.Addr(),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/focusa-events" { // C-010-02: raw writer, no compress/cost wrappers (SSE needs Flusher)
+				routes.FocusaEventsRaw(w, r)
+				return
+			}
+			e.router.ServeHTTP(w, r)
+		}),
 		ReadTimeout:  e.cfg.Server.ReadTimeout,
 		WriteTimeout: e.cfg.Server.WriteTimeout,
 	}
