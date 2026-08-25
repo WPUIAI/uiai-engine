@@ -62,6 +62,10 @@ Every claim carries: owner surface, phase, regression proof, closure condition. 
 | C-010-27 | **Browser-native Audit Ledger**: hash-chained browsing-art ledger (session/nav/act/input-class/capture/challenge/budget/lease/state/egress/error); writer-boundary redaction; values+cookies+tokens never serialized | `internal/auditledger` | W2 | tamper→verify fails; redaction fuzz clean | `/api/audit`+SSE tail+export chain-verify green |
 | C-010-28 | **Audit Time Travel**: rows pair artifact_ref+dom_revision_ref+metadata bundle; LRU evict heavy artifacts, hashes permanent | capture pipeline + `/api/audit/{seq}/context` | W4 | random-instant reconstruction test | Cockpit scrubber (filmstrip/DOM/metadata/T005 keyboard/jump-live/moment-export) |
 | C-010-29 | **Licensing closure** vs wpuiai.com authority per matrix doc; fail-closed; offline grace bounded; recovery exempt | entitlement middleware + new routes | W1 gates; waves enforce rows | bypass-resistance suite (stale/refunded/unbound denied); live probe evidence | operator sign-off; zero unguarded premium paths |
+| C-010-30 | **Stealth hardening**: per-persona persistent fingerprint seeds — full UA-CH set, platform/UA coherence (009 §defects), fonts, WebGL/WebGPU vendor strings, stable canvas/audio noise, plugins, hardwareConcurrency/deviceMemory realism, timezone/locale/geo consistency with egress class | browserprofile + launcher flags | W4 | 009 baseline defect suite passes zero-exposure on fixture panel (creepjs-style self-audit) | seeded persona yields byte-stable fingerprint across restarts |
+| C-010-31 | **Adaptive IP rotation**: rotate-on-challenge/flag signals, per-domain reputation memory, sticky-vs-rotate policies, cooldown auto-tuning from solve rates | IPPool + policy engine | W4 | simulated flag event rotates mid-task without session loss | flagged-domain solve-rate improves vs static baseline bench |
+| C-010-32 | **Challenge resolution upgrades**: provider/type coverage matrix, perception-assisted solving (P2.2 anchors), budget-aware retry ladders | captcha subsystem (#70) | W5 | coverage matrix test per supported type | solver success rate tracked in metrics; failures typed envelopes |
+| C-010-33 | **Anti-detection telemetry loop**: detection-event corpus (site, leaked signal, persona build), redteam harness regressing against top detectors | observability + fixtures | W5 | injected detector page catches nothing on hardened personas | corpus drives ≥1 shipped coherence fix |
 
 ## 4. Cockpit integration contract (amends COCKPIT-004/005/008/009)
 
@@ -87,6 +91,9 @@ Every UIAI-ENGINE-010 surface enforces the **wpuiai.com license authority** per 
 - **W5:** C-010-15,17,18,19,24,25,26(metrics remainder)
 
 Behavior-changing items ship behind config flags (`features.web_runtime.*`) with defaults preserving current behavior until their wave's bench+soak evidence lands.
+
+
+> Licensing (C-010-29): C-010-30..33 are `optional_premium` — fail-closed without entitled tier; enforcement lands with each row.
 
 ## 6. Test & evidence plan
 
