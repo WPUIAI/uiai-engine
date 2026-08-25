@@ -3,6 +3,7 @@ package captcha
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -42,21 +43,30 @@ type ProxyConfig struct {
 	MaxConcurrentPerIP int      `yaml:"max_concurrent_per_ip" json:"max_concurrent_per_ip"` // default 2
 	CooldownMinutes    int      `yaml:"cooldown_minutes" json:"cooldown_minutes"`           // default 60
 	HealthFile         string   `yaml:"health_file" json:"health_file"`
-	HealthProbeURL     string   `yaml:"health_probe_url" json:"health_probe_url"`         // URL to probe (default: https://www.google.com/recaptcha/api.js)
-	HealthProbeSeconds int      `yaml:"health_probe_seconds" json:"health_probe_seconds"` // probe interval (default: 300 = 5min)
-	MaxRetries         int      `yaml:"max_retries" json:"max_retries"`                   // auto-retry on different IP (default: 2)
+	HealthProbeURL     string   `yaml:"health_probe_url" json:"health_probe_url"`             // URL to probe (default: https://www.google.com/recaptcha/api.js)
+	HealthProbeSeconds int      `yaml:"health_probe_seconds" json:"health_probe_seconds"`     // probe interval (default: 300 = 5min)
+	MaxRetries         int      `yaml:"max_retries" json:"max_retries"`                       // auto-retry on different IP (default: 2)
+	DirectFallback     bool     `yaml:"direct_egress_fallback" json:"direct_egress_fallback"` // C-010-13: allow direct egress when pool circuit is open
 }
 
 // ─── IP Pool ───────────────────────────────────────────────────────────────
 
+// ErrEgressUnavailable is returned when every pool IP is unhealthy and the
+// circuit breaker is open (C-010-13). Callers may fall back to direct egress
+// when configuration explicitly allows it.
+var ErrEgressUnavailable = errors.New("egress unavailable: no healthy pool IPs (circuit open)")
+
 // IPPool manages a fleet of outgoing IPs with health tracking.
 type IPPool struct {
-	mu       sync.RWMutex
-	nodes    []*IPNode
-	index    int // for round_robin
-	config   ProxyConfig
-	socksMap map[string]*socksProxy // local IP → running SOCKS5 listener
-	stopCh   chan struct{}          // stops the probe loop on shutdown
+	// C-010-13 circuit breaker state
+	breakerOpen     bool
+	breakerOpenedAt time.Time
+	mu              sync.RWMutex
+	nodes           []*IPNode
+	index           int // for round_robin
+	config          ProxyConfig
+	socksMap        map[string]*socksProxy // local IP → running SOCKS5 listener
+	stopCh          chan struct{}          // stops the probe loop on shutdown
 }
 
 // IPNode is a single IP endpoint with health state.
@@ -174,6 +184,9 @@ func (p *IPPool) PickExcluding(exclude map[string]bool) (string, func(), error) 
 	}
 
 	if len(available) == 0 {
+		if p.breakerOpen {
+			return "", nil, ErrEgressUnavailable
+		}
 		return "", nil, fmt.Errorf("no healthy IPs available (%d total, all flagged/busy/cooling/excluded)", len(p.nodes))
 	}
 
@@ -794,7 +807,48 @@ func (p *IPPool) probeAll() {
 	}
 	wg.Wait()
 	p.saveHealth()
+	p.evaluateBreaker()
 }
+
+// evaluateBreaker opens the circuit when zero IPs are healthy and closes it
+// again once any probe succeeds (C-010-13).
+func (p *IPPool) evaluateBreaker() {
+	healthy := p.HealthyIPs()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	switch {
+	case healthy == 0 && !p.breakerOpen:
+		p.breakerOpen = true
+		p.breakerOpenedAt = time.Now()
+		log.Printf("[ip-pool] Circuit OPEN: 0/%d IPs healthy", len(p.nodes))
+	case healthy > 0 && p.breakerOpen:
+		p.breakerOpen = false
+		log.Printf("[ip-pool] Circuit CLOSED: %d/%d IPs healthy", healthy, len(p.nodes))
+	}
+}
+
+// HealthyIPs returns the number of IPs whose latest probe succeeded (C-010-13).
+func (p *IPPool) HealthyIPs() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	n := 0
+	for _, node := range p.nodes {
+		if node.ProbeOK {
+			n++
+		}
+	}
+	return n
+}
+
+// BreakerOpen reports whether egress is currently considered down (C-010-13).
+func (p *IPPool) BreakerOpen() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.breakerOpen
+}
+
+// DirectFallbackEnabled reports the configured C-010-13 fallback posture.
+func (p *IPPool) DirectFallbackEnabled() bool { return p.config.DirectFallback }
 
 // probeOne tests if an IP can reach the health probe URL.
 func (p *IPPool) probeOne(endpoint string) bool {

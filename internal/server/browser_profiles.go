@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -86,6 +87,12 @@ func launchFromCaptchaPool(ctx context.Context, pool *captchaPkg.IPPool, profile
 	}
 	endpoint, release, err := pool.Pick()
 	if err != nil {
+		if errors.Is(err, captchaPkg.ErrEgressUnavailable) && pool.DirectFallbackEnabled() {
+			log.Printf("[ip-pool] circuit open — direct_egress_fallback engaged for profile %q", profile.ID)
+			direct := profile
+			direct.Network.Route = "direct"
+			return browserprofile.Launch(ctx, direct)
+		}
 		return nil, fmt.Errorf("select local IP route: %w", err)
 	}
 	proxied, err := pool.LaunchWithEndpoint(endpoint)
