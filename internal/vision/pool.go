@@ -141,8 +141,17 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 	p.StartPressureRecycler(45 * time.Second) // C-010-11
 
 	// C-010-06 warm fleet: launch immediately so first action is warm.
+	// Single-flight via launchMu so prelaunch never races on-demand launches (#99).
 	if cfg.KeepAlive {
 		go func() {
+			p.launchMu.Lock()
+			defer p.launchMu.Unlock()
+			p.mu.Lock()
+			alive := p.browser != nil && p.isBrowserAlive()
+			p.mu.Unlock()
+			if alive {
+				return
+			}
 			if err := p.launchBrowser(); err != nil {
 				log.Printf("[vision] keepalive prelaunch failed: %v", err)
 			}
@@ -659,6 +668,32 @@ func (p *Pool) releasePage(page *rod.Page) {
 			p.created--
 			p.active--
 			p.scheduleIdleShutdown()
+			p.mu.Unlock()
+			return
+		}
+		// C-010-13 follow-up (#99): liveness probe — survive about:blank but fail trivial eval ⇒ poisoned; discard.
+		live := make(chan bool, 1)
+		go func() {
+			_, err := cleanPage.Eval("() => 1+1")
+			live <- err == nil
+		}()
+		select {
+		case ok2 := <-live:
+			if !ok2 {
+				log.Printf("[vision] release liveness probe failed; discarding page")
+				cleanPage.Close()
+				p.mu.Lock()
+				p.created--
+				p.active--
+				p.mu.Unlock()
+				return
+			}
+		case <-time.After(1500 * time.Millisecond):
+			log.Printf("[vision] release liveness probe timed out; discarding page")
+			cleanPage.Close()
+			p.mu.Lock()
+			p.created--
+			p.active--
 			p.mu.Unlock()
 			return
 		}

@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"github.com/WPUIAI/uiai-engine/internal/events"
 	"log"
 	"os"
 	"strconv"
@@ -105,6 +106,7 @@ func (p *Pool) StartPressureRecycler(every time.Duration) {
 
 // scheduleDrainRestart waits for active pages to drain, then restarts Chrome.
 func (p *Pool) scheduleDrainRestart(reason string) {
+	events.Emit("browser.restarted", map[string]any{"reason": reason}, []string{"browser_fleet"}, nil)
 	go func() {
 		for i := 0; i < 30; i++ {
 			p.mu.Lock()
