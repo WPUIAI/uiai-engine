@@ -37,6 +37,7 @@ type StoreConfig struct {
 	GCGrace              time.Duration
 	Now                  func() time.Time
 	AdmissionProbe       func(Admission) error
+	Inspector            AssetInspector
 }
 
 type Admission struct {
@@ -48,11 +49,12 @@ type Admission struct {
 }
 
 type Store struct {
-	mu     sync.Mutex
-	cfg    StoreConfig
-	index  storeIndex
-	health StoreHealth
-	fault  func(string) error
+	mu        sync.Mutex
+	cfg       StoreConfig
+	index     storeIndex
+	health    StoreHealth
+	inspector AssetInspector
+	fault     func(string) error
 }
 
 type CommitResult struct {
@@ -65,14 +67,15 @@ type CommitResult struct {
 }
 
 type Entry struct {
-	ArtifactID     string         `json:"artifact_id"`
-	Revision       uint64         `json:"revision"`
-	ManifestSHA256 string         `json:"manifest_sha256"`
-	CommitID       string         `json:"commit_id"`
-	CommittedAt    string         `json:"committed_at"`
-	RetentionClass RetentionClass `json:"retention_class"`
-	ExpiresAt      string         `json:"expires_at,omitempty"`
-	Assets         []AssetRecord  `json:"assets"`
+	ArtifactID     string             `json:"artifact_id"`
+	Revision       uint64             `json:"revision"`
+	ManifestSHA256 string             `json:"manifest_sha256"`
+	CommitID       string             `json:"commit_id"`
+	CommittedAt    string             `json:"committed_at"`
+	RetentionClass RetentionClass     `json:"retention_class"`
+	ExpiresAt      string             `json:"expires_at,omitempty"`
+	Assets         []AssetRecord      `json:"assets"`
+	Inspections    []InspectionRecord `json:"inspections"`
 }
 
 type AssetRecord struct {
@@ -83,13 +86,14 @@ type AssetRecord struct {
 }
 
 type CommitRecord struct {
-	Schema         string        `json:"schema"`
-	CommitID       string        `json:"commit_id"`
-	ArtifactID     string        `json:"artifact_id"`
-	Revision       uint64        `json:"revision"`
-	ManifestSHA256 string        `json:"manifest_sha256"`
-	CommittedAt    string        `json:"committed_at"`
-	Assets         []AssetRecord `json:"assets"`
+	Schema         string             `json:"schema"`
+	CommitID       string             `json:"commit_id"`
+	ArtifactID     string             `json:"artifact_id"`
+	Revision       uint64             `json:"revision"`
+	ManifestSHA256 string             `json:"manifest_sha256"`
+	CommittedAt    string             `json:"committed_at"`
+	Assets         []AssetRecord      `json:"assets"`
+	Inspections    []InspectionRecord `json:"inspections"`
 }
 
 type Tombstone struct {
@@ -136,7 +140,10 @@ func OpenStore(cfg StoreConfig) (*Store, StoreHealth, error) {
 	if cfg.Now == nil {
 		cfg.Now = func() time.Time { return time.Now().UTC() }
 	}
-	s := &Store{cfg: cfg}
+	if cfg.Inspector == nil {
+		cfg.Inspector = NewBuiltinInspector()
+	}
+	s := &Store{cfg: cfg, inspector: cfg.Inspector}
 	if err := s.initializeLayout(); err != nil {
 		return nil, StoreHealth{}, err
 	}
@@ -210,6 +217,7 @@ func (s *Store) List() []Entry {
 	out := append([]Entry(nil), s.index.Entries...)
 	for i := range out {
 		out[i].Assets = append([]AssetRecord(nil), out[i].Assets...)
+		out[i].Inspections = append([]InspectionRecord(nil), out[i].Inspections...)
 	}
 	return out
 }

@@ -22,6 +22,7 @@ func Normalize(in Manifest) Manifest {
 	out.Assets = normalizeAssets(in.Assets)
 	out.Provenance = normalizeProvenance(in.Provenance)
 	out.Verification = normalizeVerification(in.Verification)
+	out.Security = normalizeSecurity(in.Security)
 	out.ReceiptRefs = normalizeSet(in.ReceiptRefs)
 	out.Policy = normalizePolicy(in.Policy)
 	out.Integrity = normalizeIntegrity(in.Integrity)
@@ -189,6 +190,14 @@ func normalizeVerification(in Verification) Verification {
 	in.JudgeResultRefs = normalizeSet(in.JudgeResultRefs)
 	in.DecisionRefs = normalizeSet(in.DecisionRefs)
 	in.InformationSetHash = strings.ToLower(strings.TrimSpace(in.InformationSetHash))
+	return in
+}
+
+func normalizeSecurity(in Security) Security {
+	in.PolicyRef = strings.TrimSpace(in.PolicyRef)
+	in.InspectionReceiptRefs = normalizeSet(in.InspectionReceiptRefs)
+	in.SanitizationRefs = normalizeSet(in.SanitizationRefs)
+	in.RedactionRefs = normalizeSet(in.RedactionRefs)
 	return in
 }
 

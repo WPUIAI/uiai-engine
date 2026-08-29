@@ -114,6 +114,7 @@ type Manifest struct {
 	Assets       []Asset      `json:"assets"`
 	Provenance   Provenance   `json:"provenance"`
 	Verification Verification `json:"verification"`
+	Security     Security     `json:"security"`
 	ReceiptRefs  []string     `json:"receipt_refs"`
 	Policy       Policy       `json:"policy"`
 	Integrity    Integrity    `json:"integrity"`
@@ -287,6 +288,13 @@ type Verification struct {
 	JudgeResultRefs    []string           `json:"judge_result_refs"`
 	DecisionRefs       []string           `json:"decision_refs"`
 	InformationSetHash string             `json:"information_set_hash,omitempty"`
+}
+
+type Security struct {
+	PolicyRef             string   `json:"policy_ref"`
+	InspectionReceiptRefs []string `json:"inspection_receipt_refs"`
+	SanitizationRefs      []string `json:"sanitization_refs"`
+	RedactionRefs         []string `json:"redaction_refs"`
 }
 
 type Policy struct {

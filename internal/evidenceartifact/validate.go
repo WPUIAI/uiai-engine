@@ -1,7 +1,6 @@
 package evidenceartifact
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -57,6 +56,9 @@ func Validate(in Manifest) error {
 		return err
 	}
 	if err := validateVerification(m.Verification); err != nil {
+		return err
+	}
+	if err := validateSecurity(m.Security); err != nil {
 		return err
 	}
 	if err := validateRefs(m.ReceiptRefs, 1, MaxReceiptRefs); err != nil {
@@ -458,11 +460,6 @@ func validSHA256(value string) bool {
 	}
 	_, err := hex.DecodeString(value)
 	return err == nil && value == strings.ToLower(value)
-}
-
-func textSHA256(value string) string {
-	digest := sha256.Sum256([]byte(value))
-	return hex.EncodeToString(digest[:])
 }
 
 func validRelativePath(value string) bool {

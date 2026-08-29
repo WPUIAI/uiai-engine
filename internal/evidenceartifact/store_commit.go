@@ -104,6 +104,20 @@ func (s *Store) commitLocked(ctx context.Context, manifest Manifest, inputs map[
 	if err := s.callFault("after_assets_staged"); err != nil {
 		return CommitResult{}, storeError(ErrStoreUnavailable, "after assets staged")
 	}
+	inspections := make([]InspectionRecord, 0, len(manifest.Assets))
+	for _, asset := range manifest.Assets {
+		record, err := s.inspector.Inspect(ctx, InspectionRequest{
+			Path: stageAssets[asset.AssetID], Asset: asset, Security: manifest.Security, Policy: manifest.Policy,
+		})
+		if err != nil {
+			return CommitResult{}, err
+		}
+		if !validInspectionRecord(record) || record.AssetID != asset.AssetID || record.InspectionSHA256 != inspectionDigest(record, asset) {
+			return CommitResult{}, ErrInspectionFailed
+		}
+		inspections = append(inspections, record)
+	}
+	sort.Slice(inspections, func(i, j int) bool { return inspections[i].AssetID < inspections[j].AssetID })
 	manifestStage := filepath.Join(staging, "manifest.json")
 	if err := writeSyncedFile(manifestStage, sealedBytes, 0o600); err != nil {
 		return CommitResult{}, storeError(ErrStoreUnavailable, "stage manifest")
@@ -112,7 +126,7 @@ func (s *Store) commitLocked(ctx context.Context, manifest Manifest, inputs map[
 	committedAt := s.cfg.Now().UTC().Format(time.RFC3339Nano)
 	record := CommitRecord{
 		Schema: StoreSchemaV1, CommitID: commitID, ArtifactID: manifest.ArtifactID, Revision: manifest.Revision,
-		ManifestSHA256: manifest.Integrity.ManifestSHA256, CommittedAt: committedAt, Assets: assetRecords,
+		ManifestSHA256: manifest.Integrity.ManifestSHA256, CommittedAt: committedAt, Assets: assetRecords, Inspections: inspections,
 	}
 	sort.Slice(record.Assets, func(i, j int) bool { return record.Assets[i].AssetID < record.Assets[j].AssetID })
 	commitBytes, err := json.Marshal(record)

@@ -424,10 +424,15 @@ func installCommitForTest(t *testing.T, store *Store, manifest Manifest, payload
 		t.Fatal(err)
 	}
 	commitID := deterministicID(manifest.ArtifactID, uintString(manifest.Revision), manifest.Integrity.ManifestSHA256)
+	inspection, err := store.inspector.Inspect(context.Background(), InspectionRequest{Path: store.blobPath(asset.SHA256), Asset: asset, Security: manifest.Security, Policy: manifest.Policy})
+	if err != nil {
+		t.Fatal(err)
+	}
 	record := CommitRecord{
 		Schema: StoreSchemaV1, CommitID: commitID, ArtifactID: manifest.ArtifactID, Revision: manifest.Revision,
 		ManifestSHA256: manifest.Integrity.ManifestSHA256, CommittedAt: now.UTC().Format(time.RFC3339Nano),
-		Assets: []AssetRecord{{AssetID: asset.AssetID, SHA256: asset.SHA256, ByteSize: asset.ByteSize, MediaType: asset.MediaType}},
+		Assets:      []AssetRecord{{AssetID: asset.AssetID, SHA256: asset.SHA256, ByteSize: asset.ByteSize, MediaType: asset.MediaType}},
+		Inspections: []InspectionRecord{inspection},
 	}
 	if err := writeAtomicJSON(store.commitPath(commitID), record, 0o640); err != nil {
 		t.Fatal(err)
@@ -461,6 +466,7 @@ func storedManifest(t *testing.T, artifactID string, revision uint64, payload []
 	digest := sha256.Sum256(payload)
 	manifest.Assets[0].SHA256 = hex.EncodeToString(digest[:])
 	manifest.Assets[0].ByteSize = int64(len(payload))
+	manifest.Assets[0].MediaType = "text/plain"
 	manifest.Policy.RetentionClass = retention
 	manifest.Integrity.ManifestSHA256 = ""
 	sealed, err := Seal(manifest)

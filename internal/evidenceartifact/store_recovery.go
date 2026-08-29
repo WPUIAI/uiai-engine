@@ -1,6 +1,7 @@
 package evidenceartifact
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -103,6 +104,7 @@ func (s *Store) reconcileLocked() (StoreHealth, error) {
 			ArtifactID: record.ArtifactID, Revision: record.Revision, ManifestSHA256: record.ManifestSHA256,
 			CommitID: record.CommitID, CommittedAt: record.CommittedAt, RetentionClass: manifest.Policy.RetentionClass,
 			ExpiresAt: manifest.Policy.ExpiresAt, Assets: append([]AssetRecord(nil), record.Assets...),
+			Inspections: append([]InspectionRecord(nil), record.Inspections...),
 		})
 	}
 	for commitID, tombstone := range tombstoned {
@@ -182,12 +184,22 @@ func (s *Store) validateCommitFile(path string) (CommitRecord, Manifest, error) 
 	if manifest.ArtifactID != record.ArtifactID || manifest.Revision != record.Revision || manifest.Integrity.ManifestSHA256 != record.ManifestSHA256 {
 		return record, Manifest{}, ErrStoreCorrupt
 	}
-	if len(record.Assets) != len(manifest.Assets) {
+	if len(record.Assets) != len(manifest.Assets) || len(record.Inspections) != len(manifest.Assets) {
 		return record, Manifest{}, ErrStoreCorrupt
 	}
 	manifestAssets := make(map[string]Asset, len(manifest.Assets))
 	for _, asset := range manifest.Assets {
 		manifestAssets[asset.AssetID] = asset
+	}
+	inspections := make(map[string]InspectionRecord, len(record.Inspections))
+	for _, inspection := range record.Inspections {
+		if !validInspectionRecord(inspection) {
+			return record, Manifest{}, ErrStoreCorrupt
+		}
+		if _, duplicate := inspections[inspection.AssetID]; duplicate {
+			return record, Manifest{}, ErrStoreCorrupt
+		}
+		inspections[inspection.AssetID] = inspection
 	}
 	seen := make(map[string]struct{}, len(record.Assets))
 	for _, asset := range record.Assets {
@@ -199,8 +211,17 @@ func (s *Store) validateCommitFile(path string) (CommitRecord, Manifest, error) 
 			return record, Manifest{}, ErrStoreCorrupt
 		}
 		seen[asset.AssetID] = struct{}{}
-		digest, size, err := hashFile(s.blobPath(asset.SHA256))
+		path := s.blobPath(asset.SHA256)
+		digest, size, err := hashFile(path)
 		if err != nil || digest != asset.SHA256 || size != asset.ByteSize {
+			return record, Manifest{}, ErrStoreCorrupt
+		}
+		inspection, ok := inspections[asset.AssetID]
+		if !ok {
+			return record, Manifest{}, ErrStoreCorrupt
+		}
+		actual, err := s.inspector.Inspect(context.Background(), InspectionRequest{Path: path, Asset: manifestAsset, Security: manifest.Security, Policy: manifest.Policy})
+		if err != nil || !equalInspection(actual, inspection) {
 			return record, Manifest{}, ErrStoreCorrupt
 		}
 	}
