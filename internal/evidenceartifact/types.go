@@ -100,25 +100,26 @@ const (
 )
 
 type Manifest struct {
-	Schema       string       `json:"schema"`
-	ArtifactID   string       `json:"artifact_id"`
-	Revision     uint64       `json:"revision"`
-	Title        string       `json:"title"`
-	Summary      string       `json:"summary,omitempty"`
-	Kinds        []string     `json:"kinds"`
-	CapturedAt   string       `json:"captured_at"`
-	CreatedAt    string       `json:"created_at"`
-	Scope        Scope        `json:"scope"`
-	Authority    Authority    `json:"authority"`
-	Claims       []Claim      `json:"claims"`
-	Assets       []Asset      `json:"assets"`
-	Provenance   Provenance   `json:"provenance"`
-	Verification Verification `json:"verification"`
-	Security     Security     `json:"security"`
-	ReceiptRefs  []string     `json:"receipt_refs"`
-	Policy       Policy       `json:"policy"`
-	Integrity    Integrity    `json:"integrity"`
-	Links        Links        `json:"links"`
+	Schema       string           `json:"schema"`
+	ArtifactID   string           `json:"artifact_id"`
+	Revision     uint64           `json:"revision"`
+	Title        string           `json:"title"`
+	Summary      string           `json:"summary,omitempty"`
+	Kinds        []string         `json:"kinds"`
+	CapturedAt   string           `json:"captured_at"`
+	CreatedAt    string           `json:"created_at"`
+	Scope        Scope            `json:"scope"`
+	Authority    Authority        `json:"authority"`
+	Claims       []Claim          `json:"claims"`
+	Assets       []Asset          `json:"assets"`
+	Provenance   Provenance       `json:"provenance"`
+	Verification Verification     `json:"verification"`
+	Security     Security         `json:"security"`
+	Capture      *CaptureMetadata `json:"capture,omitempty"`
+	ReceiptRefs  []string         `json:"receipt_refs"`
+	Policy       Policy           `json:"policy"`
+	Integrity    Integrity        `json:"integrity"`
+	Links        Links            `json:"links"`
 }
 
 type Scope struct {

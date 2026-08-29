@@ -23,6 +23,10 @@ func Normalize(in Manifest) Manifest {
 	out.Provenance = normalizeProvenance(in.Provenance)
 	out.Verification = normalizeVerification(in.Verification)
 	out.Security = normalizeSecurity(in.Security)
+	if in.Capture != nil {
+		capture := normalizeCapture(*in.Capture)
+		out.Capture = &capture
+	}
 	out.ReceiptRefs = normalizeSet(in.ReceiptRefs)
 	out.Policy = normalizePolicy(in.Policy)
 	out.Integrity = normalizeIntegrity(in.Integrity)

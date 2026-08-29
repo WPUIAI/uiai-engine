@@ -61,6 +61,11 @@ func Validate(in Manifest) error {
 	if err := validateSecurity(m.Security); err != nil {
 		return err
 	}
+	if m.Capture != nil {
+		if err := validateCaptureManifest(m); err != nil {
+			return err
+		}
+	}
 	if err := validateRefs(m.ReceiptRefs, 1, MaxReceiptRefs); err != nil {
 		return invalid(ErrInvalidIntegrity, "receipt_refs")
 	}
