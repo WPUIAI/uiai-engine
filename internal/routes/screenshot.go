@@ -99,6 +99,9 @@ func scopeWorkstream(scope *vision.FocusaScope) string {
 
 func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore) {
 	settingsStore, _ := evidenceshare.NewSettingsStore(cfg.Storage.DataDir)
+	if settingsStore != nil {
+		mountEvidenceShareSettings(r, settingsStore)
+	}
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
 			URL         string              `json:"url"`
