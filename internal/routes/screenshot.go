@@ -60,7 +60,45 @@ func screenshotFocusaMetadata(targetURL, artifactRef, format string, bytes int, 
 	return evidence
 }
 
+func settingMap(values map[string]any, group string) map[string]any {
+	m, _ := values[group].(map[string]any)
+	return m
+}
+func settingString(values map[string]any, group, key string) string {
+	v, _ := settingMap(values, group)[key].(string)
+	return v
+}
+func settingInt(values map[string]any, group, key string) int {
+	switch v := settingMap(values, group)[key].(type) {
+	case int:
+		return v
+	case float64:
+		return int(v)
+	}
+	return 0
+}
+func settingBool(values map[string]any, group, key string, fallback bool) bool {
+	v, ok := settingMap(values, group)[key].(bool)
+	if !ok {
+		return fallback
+	}
+	return v
+}
+func scopeProject(scope *vision.FocusaScope) string {
+	if scope == nil {
+		return ""
+	}
+	return scope.ProjectRoot
+}
+func scopeWorkstream(scope *vision.FocusaScope) string {
+	if scope == nil {
+		return ""
+	}
+	return scope.DerivedWorkstreamKey()
+}
+
 func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore) {
+	settingsStore, _ := evidenceshare.NewSettingsStore(cfg.Storage.DataDir)
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
 			URL         string              `json:"url"`
@@ -89,6 +127,17 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 		if pool == nil {
 			writeJSON(w, 503, map[string]string{"error": "vision pool not initialized"})
 			return
+		}
+		autoPacket := true
+		if settingsStore != nil {
+			effective := settingsStore.Effective(evidenceshare.SettingsScope{ProjectRef: scopeProject(body.FocusaScope), WorkstreamRef: scopeWorkstream(body.FocusaScope)})
+			if body.Format == "" {
+				body.Format = settingString(effective.Values, "image", "format")
+			}
+			if body.Quality == 0 {
+				body.Quality = settingInt(effective.Values, "image", "quality")
+			}
+			autoPacket = settingBool(effective.Values, "enablement", "auto_screenshot", true)
 		}
 
 		result, err := pool.Screenshot(vision.ScreenshotOpts{
@@ -155,13 +204,17 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 		if body.FocusaScope != nil {
 			shareInput.Scope = evidenceshare.Scope{WorkpointRef: body.FocusaScope.WorkpointID, ContinuityRef: body.FocusaScope.ContinuityID}
 		}
-		if share, err := evidenceshare.Assemble(evidenceShareDir(cfg), shareInput); err == nil {
-			artifactPath := "/api/screenshot/share/" + strings.TrimPrefix(share.RelativePath, "./")
-			resp["artifact_ref"] = share.ArtifactRef
-			resp["artifact_path"] = artifactPath
-			resp["artifact_url"] = requestArtifactURL(req, artifactPath)
+		if autoPacket {
+			if share, err := evidenceshare.Assemble(evidenceShareDir(cfg), shareInput); err == nil {
+				artifactPath := "/api/screenshot/share/" + strings.TrimPrefix(share.RelativePath, "./")
+				resp["artifact_ref"] = share.ArtifactRef
+				resp["artifact_path"] = artifactPath
+				resp["artifact_url"] = requestArtifactURL(req, artifactPath)
+			} else {
+				resp["share_artifact_error"] = err.Error()
+			}
 		} else {
-			resp["share_artifact_error"] = err.Error()
+			resp["share_disabled"] = true
 		}
 		if inline {
 			resp["screenshot"] = base64.StdEncoding.EncodeToString(result.Data)
