@@ -1,4 +1,5 @@
 import { requireCapabilityEntitlement } from "./contracts/entitlement";
+import type { EvidenceShareList, EvidenceShareManifest, EvidenceShareVerification } from "./evidence-share";
 
 export const DEFAULT_ENGINE_URL = "http://127.0.0.1:7456";
 
@@ -81,4 +82,7 @@ export const engineClient = {
     requireCapabilityEntitlement("uiai.browser.screenshot.execute");
     return engineRequest<ScreenshotResult & { focusa?: Record<string, unknown> }>("/api/screenshot/", { method: "POST", body: JSON.stringify({ url, width: 1440, height: 900, format: "jpeg", quality: 78 }) });
   },
+  evidenceShares: () => engineRequest<EvidenceShareList>("/api/screenshot/share"),
+  evidenceShare: (packetId: string) => engineRequest<EvidenceShareManifest>(`/api/screenshot/share/${encodeURIComponent(packetId)}`),
+  verifyEvidenceShare: (packetId: string) => engineRequest<EvidenceShareVerification>(`/api/screenshot/share/${encodeURIComponent(packetId)}/verify`),
 };
