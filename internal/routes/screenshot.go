@@ -291,7 +291,7 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 				continue
 			}
 			artifactPath := "/api/screenshot/share/" + entry.Name() + "/"
-			packets = append(packets, map[string]any{"packet_id": entry.Name(), "descriptor": "Screenshot evidence · " + manifest.CapturedAt.Format(time.RFC3339), "artifact_ref": manifest.ArtifactRef, "artifact_path": artifactPath, "artifact_url": requestArtifactURL(req, artifactPath), "captured_at": manifest.CapturedAt, "source_url": manifest.SourceURL})
+			packets = append(packets, map[string]any{"packet_id": entry.Name(), "descriptor": "Screenshot evidence · " + manifest.CapturedAt.Format(time.RFC3339), "artifact_ref": manifest.ArtifactRef, "artifact_path": artifactPath, "artifact_url": requestArtifactURL(req, artifactPath), "thumbnail_url": requestArtifactURL(req, artifactPath+strings.TrimPrefix(manifest.ScreenshotRef, "./")), "captured_at": manifest.CapturedAt, "source_url": manifest.SourceURL, "availability": manifest.Availability, "workpoint_ref": manifest.Scope.WorkpointRef, "continuity_ref": manifest.Scope.ContinuityRef})
 			if len(packets) == 100 {
 				break
 			}
