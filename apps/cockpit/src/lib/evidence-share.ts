@@ -19,6 +19,7 @@ export type EvidenceShareManifest = {
   interaction: string; scope?: { workpoint_ref?: string; continuity_ref?: string }; truth_notice: string;
 };
 export type EvidenceShareVerification = { packet_id: string; descriptor: string; valid: boolean; issues: string[] };
+export type EvidenceShareSettings = { schema: string; scope: { project_ref?: string; workstream_ref?: string }; revision: number; sources: string[]; values: Record<string, any>; warnings?: string[] };
 
 export function sourceHost(value?: string): string {
   if (!value) return "Source not disclosed";
