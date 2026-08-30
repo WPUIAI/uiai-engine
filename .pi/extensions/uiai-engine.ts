@@ -967,7 +967,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_screenshot",
 		label: "UIAI Screenshot",
-		description: "One-shot screenshot for public http/https targets: navigate, capture, forget. Private/internal targets require explicit local/dev allow_private_urls; use sessions for multi-step browsing.",
+		description: "Capture a one-shot screenshot and automatically create a beautiful portable Evidence Share Packet. Returns artifact_ref plus a human-viewable artifact_url; use sessions for multi-step browsing.",
 		parameters: Type.Object({
 			url: Type.String({ description: "URL to screenshot" }),
 			width: Type.Optional(Type.Number({ description: "Viewport width", default: 1280 })),
@@ -978,7 +978,48 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			const data = await post("/api/screenshot", params);
-			return textResult(withoutScreenshot(data), { endpoint: "/api/screenshot", has_screenshot: Boolean(data.screenshot) });
+			return textResult({
+				descriptor: "Screenshot Evidence Share Packet",
+				artifact_url: data.artifact_url,
+				artifact_ref: data.artifact_ref,
+				artifact_path: data.artifact_path,
+				...withoutScreenshot(data),
+			}, { endpoint: "/api/screenshot", has_screenshot: Boolean(data.screenshot) });
+		},
+	});
+
+	const sharePacketParameters = Type.Object({
+		packet_id: Type.String({ description: "Exact 64-character Evidence Share Packet id", pattern: "^[a-f0-9]{64}$" }),
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_list",
+		label: "UIAI Evidence Share List",
+		description: "List recent Screenshot Evidence Share Packets with ID + human descriptor, source, capture time, and clickable artifact_url.",
+		parameters: Type.Object({}),
+		async execute() { return textResult(await callEngine("/api/screenshot/share"), { endpoint: "/api/screenshot/share" }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_inspect",
+		label: "UIAI Evidence Share Inspect",
+		description: "Inspect one immutable Screenshot Evidence Share Packet manifest by exact packet id.",
+		parameters: sharePacketParameters,
+		async execute(_toolCallId, params) { return textResult(await callEngine(`/api/screenshot/share/${params.packet_id}`), { endpoint: "/api/screenshot/share/{id}" }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_verify",
+		label: "UIAI Evidence Share Verify",
+		description: "Verify one Screenshot Evidence Share Packet identity and screenshot digest; returns typed issues without mutation.",
+		parameters: sharePacketParameters,
+		async execute(_toolCallId, params) { return textResult(await callEngine(`/api/screenshot/share/${params.packet_id}/verify`), { endpoint: "/api/screenshot/share/{id}/verify" }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_resolve",
+		label: "UIAI Evidence Share Resolve",
+		description: "Resolve an exact Screenshot Evidence Share Packet to its clickable human-viewable URL with ID + descriptor.",
+		parameters: sharePacketParameters,
+		async execute(_toolCallId, params) {
+			await callEngine(`/api/screenshot/share/${params.packet_id}`);
+			return textResult({ packet_id: params.packet_id, descriptor: "Screenshot Evidence Share Packet", artifact_url: `${engineUrl()}/api/screenshot/share/${params.packet_id}/` });
 		},
 	});
 

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Evidence · UIAI</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23141712'/%3E%3Cpath d='M18 17v20c0 9 5 14 14 14s14-5 14-14V17h-8v20c0 5-2 7-6 7s-6-2-6-7V17z' fill='%23c9ff3d'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#evidence">Skip to evidence</a>
+  <header class="masthead">
+    <a class="brand" href="#overview" aria-label="UIAI evidence overview"><span class="mark">U</span><span>UIAI Evidence</span></a>
+    <div id="status" class="status" role="status" aria-live="polite"><i></i><span>Loading verified artifact</span></div>
+  </header>
+  <main id="evidence">
+    <section id="overview" class="hero" aria-labelledby="title">
+      <div class="eyebrow">Portable screenshot evidence</div>
+      <h1 id="title">A captured state,<br><em>made inspectable.</em></h1>
+      <p id="truth" class="lede">Loading the bounded evidence record.</p>
+      <dl id="facts" class="facts"></dl>
+    </section>
+    <section id="visual" class="visual" aria-labelledby="visual-title">
+      <div class="section-head"><span>01</span><h2 id="visual-title">Evidence</h2></div>
+      <figure class="frame"><div class="browser-bar" aria-hidden="true"><b></b><b></b><b></b><span id="source-label">Captured page</span></div><a id="image-link" href="./screenshot.png" target="_blank" rel="noopener"><img id="screenshot" alt="Captured browser screenshot evidence" decoding="async"></a><figcaption id="caption">Immutable screenshot bytes</figcaption></figure>
+    </section>
+    <section id="timeline" class="panel" aria-labelledby="timeline-title"><div class="section-head"><span>02</span><h2 id="timeline-title">Timeline</h2></div><ol id="events" class="timeline"></ol></section>
+    <section id="inspect" class="panel" aria-labelledby="inspect-title"><div class="section-head"><span>03</span><h2 id="inspect-title">Inspect</h2></div><div id="inspect-grid" class="inspect-grid"></div></section>
+    <section id="developer" class="panel developer" aria-labelledby="developer-title"><div class="section-head"><span>04</span><h2 id="developer-title">Developer</h2></div><a href="./artifact.json">Open machine-readable artifact JSON <span>↗</span></a></section>
+  </main>
+  <footer><span>Read-only portable evidence</span><span>Review ≠ completion ≠ settlement</span></footer>
+</body>
+</html>
