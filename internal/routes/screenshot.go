@@ -61,6 +61,9 @@ func screenshotFocusaMetadata(targetURL, artifactRef, format string, bytes int, 
 }
 
 func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore) {
+	if settings, err := evidenceshare.NewSettingsStore(cfg.Storage.DataDir); err == nil {
+		mountEvidenceShareSettings(r, settings)
+	}
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
 			URL         string              `json:"url"`
