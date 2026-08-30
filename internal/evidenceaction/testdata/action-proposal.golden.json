@@ -1,0 +1,33 @@
+{
+  "schema": "uiai.evidence_action_proposal.v1",
+  "proposal_id": "proposal:1",
+  "scope": {
+    "project_ref": "project:1",
+    "workstream_ref": "workstream:1",
+    "workset_ref": "workset:1",
+    "callgraph_ref": "callgraph:1",
+    "workpoint_ref": "workpoint:1",
+    "work_item_ref": "github:WPUIAI/uiai-engine#117"
+  },
+  "artifact_ref": "artifact:1",
+  "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "target_acceptance_atom_refs": [
+    "atom:1",
+    "atom:2"
+  ],
+  "capability_snapshot_ref": "capability:1",
+  "capability_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "operation_ref": "operation:evidence.reproof",
+  "operation_version": "v1",
+  "action": "reproof",
+  "actor_ref": "actor:1",
+  "delegation_ref": "delegation:1",
+  "idempotency_key": "idempotency:1",
+  "expected_state_ref": "state:1",
+  "expected_state_version": 7,
+  "expires_at": "2026-08-30T01:00:00Z",
+  "side_effect": "evidence_append",
+  "source_trust": "verified",
+  "human_review_mandated": false,
+  "autonomous_eligibility": "autonomous_eligible"
+}
