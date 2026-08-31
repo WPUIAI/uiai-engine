@@ -1,9 +1,22 @@
 package vision
 
 import (
+	"os"
 	"sync/atomic"
 	"testing"
 )
+
+func TestProcessAliveRejectsInvalidPID(t *testing.T) {
+	if processAlive(0) {
+		t.Fatal("processAlive(0) = true, want false")
+	}
+}
+
+func TestProcessAliveFindsCurrentProcess(t *testing.T) {
+	if !processAlive(os.Getpid()) {
+		t.Fatalf("processAlive(%d) = false for current process", os.Getpid())
+	}
+}
 
 func TestPoolStatsQueueMetrics(t *testing.T) {
 	p := &Pool{maxPages: 4, queueMax: 8}
