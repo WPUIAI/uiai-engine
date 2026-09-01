@@ -28,6 +28,10 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 			t.Fatalf("missing %s: %v", name, err)
 		}
 	}
+	indexBody, _ := os.ReadFile(filepath.Join(result.Directory, "index.html"))
+	if strings.Contains(string(indexBody), "__UIAI_ASSET_VERSION__") || !strings.Contains(string(indexBody), "?v="+embeddedAssetsSHA256()[:12]) {
+		t.Fatal("generated page does not bind its exact asset revision")
+	}
 	body, _ := os.ReadFile(filepath.Join(result.Directory, "artifact.json"))
 	var manifest Manifest
 	if err := json.Unmarshal(body, &manifest); err != nil {

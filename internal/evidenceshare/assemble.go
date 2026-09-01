@@ -99,10 +99,14 @@ func Assemble(root string, input Input) (Result, error) {
 	if len(projectionBody) != 0 {
 		writes["projection.json"] = projectionBody
 	}
+	assetVersion := embeddedAssetsSHA256()[:12]
 	for _, name := range []string{"index.html", "styles.css", "app.js"} {
 		data, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			return Result{}, err
+		}
+		if name == "index.html" {
+			data = []byte(strings.ReplaceAll(string(data), "__UIAI_ASSET_VERSION__", assetVersion))
 		}
 		writes[name] = data
 	}
