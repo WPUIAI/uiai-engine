@@ -95,12 +95,8 @@ jobs:
 
   build-release:
     name: Build parent UIAI Engine release
-<<<<<<< HEAD
-    runs-on: self-hosted
-=======
     needs: [open-issue-release-gate, pull-request-release-gate, version-policy, tag-ci-proof]
-    runs-on: ubuntu-latest
->>>>>>> pr-6
+    runs-on: self-hosted
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       asset_name: ${{ env.ENGINE_ASSET_NAME }}
