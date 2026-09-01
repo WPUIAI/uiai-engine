@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main, feat/*]
+    tags: [engine-v*, uiai-engine-v*, cockpit-v*]
   pull_request:
     branches: [main]
 
