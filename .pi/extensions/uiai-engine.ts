@@ -967,7 +967,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_screenshot",
 		label: "UIAI Screenshot",
-		description: "One-shot screenshot for public http/https targets: navigate, capture, forget. Private/internal targets require explicit local/dev allow_private_urls; use sessions for multi-step browsing.",
+		description: "Capture a one-shot screenshot and automatically create a beautiful portable Evidence Share Packet. Returns artifact_ref plus a human-viewable artifact_url; use sessions for multi-step browsing.",
 		parameters: Type.Object({
 			url: Type.String({ description: "URL to screenshot" }),
 			width: Type.Optional(Type.Number({ description: "Viewport width", default: 1280 })),
@@ -978,7 +978,78 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			const data = await post("/api/screenshot", params);
-			return textResult(withoutScreenshot(data), { endpoint: "/api/screenshot", has_screenshot: Boolean(data.screenshot) });
+			return textResult({
+				descriptor: "Screenshot Evidence Share Packet",
+				artifact_url: data.artifact_url,
+				artifact_ref: data.artifact_ref,
+				artifact_path: data.artifact_path,
+				...withoutScreenshot(data),
+			}, { endpoint: "/api/screenshot", has_screenshot: Boolean(data.screenshot) });
+		},
+	});
+
+	const sharePacketParameters = Type.Object({
+		packet_id: Type.String({ description: "Exact 64-character Evidence Share Packet id", pattern: "^[a-f0-9]{64}$" }),
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_list",
+		label: "UIAI Evidence Share List",
+		description: "List recent Screenshot Evidence Share Packets with ID + human descriptor, source, capture time, and clickable artifact_url.",
+		parameters: Type.Object({}),
+		async execute() { return textResult(await callEngine("/api/screenshot/share"), { endpoint: "/api/screenshot/share" }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_inspect",
+		label: "UIAI Evidence Share Inspect",
+		description: "Inspect one immutable Screenshot Evidence Share Packet manifest by exact packet id.",
+		parameters: sharePacketParameters,
+		async execute(_toolCallId, params) { return textResult(await callEngine(`/api/screenshot/share/${params.packet_id}`), { endpoint: "/api/screenshot/share/{id}" }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_verify",
+		label: "UIAI Evidence Share Verify",
+		description: "Verify one Screenshot Evidence Share Packet identity and screenshot digest; returns typed issues without mutation.",
+		parameters: sharePacketParameters,
+		async execute(_toolCallId, params) { return textResult(await callEngine(`/api/screenshot/share/${params.packet_id}/verify`), { endpoint: "/api/screenshot/share/{id}/verify" }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_settings_get",
+		description: "Read effective Evidence Share Settings. Returns defaults plus global/project/workstream inheritance; no mutation.",
+		parameters: Type.Object({
+			project_ref: Type.Optional(Type.String({ description: "Canonical project ref" })),
+			workstream_ref: Type.Optional(Type.String({ description: "Canonical workstream ref" })),
+		}),
+		async execute(_toolCallId, params) {
+			const query = new URLSearchParams(cleanBody(params as Record<string, any>) as Record<string, string>);
+			return textResult(await callEngine(`/api/screenshot/settings${query.size ? `?${query}` : ""}`), { endpoint: "/api/screenshot/settings", mutation: false });
+		},
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_settings_preview",
+		description: "Preview Evidence Share Settings changes without saving them.",
+		parameters: Type.Object({ project_ref: Type.Optional(Type.String()), workstream_ref: Type.Optional(Type.String()), values: Type.Record(Type.String(), Type.Any()) }),
+		async execute(_toolCallId, params) { return textResult(await post("/api/screenshot/settings/preview", params as Record<string, any>), { endpoint: "/api/screenshot/settings/preview", mutation: false }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_settings_set",
+		description: "Save scoped Evidence Share Settings after a preview. Requires the current expected revision.",
+		parameters: Type.Object({ project_ref: Type.Optional(Type.String()), workstream_ref: Type.Optional(Type.String()), expected_revision: Type.Number(), values: Type.Record(Type.String(), Type.Any()) }),
+		async execute(_toolCallId, params) { return textResult(await callEngine("/api/screenshot/settings", { method: "PUT", body: JSON.stringify(params) }), { endpoint: "/api/screenshot/settings", mutation: true }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_settings_reset",
+		description: "Reset one scoped Evidence Share Settings override after explicit revision confirmation.",
+		parameters: Type.Object({ project_ref: Type.Optional(Type.String()), workstream_ref: Type.Optional(Type.String()), expected_revision: Type.Number() }),
+		async execute(_toolCallId, params) { return textResult(await callEngine("/api/screenshot/settings", { method: "DELETE", body: JSON.stringify(params) }), { endpoint: "/api/screenshot/settings", mutation: true }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_resolve",
+		label: "UIAI Evidence Share Resolve",
+		description: "Resolve an exact Screenshot Evidence Share Packet to its clickable human-viewable URL with ID + descriptor.",
+		parameters: sharePacketParameters,
+		async execute(_toolCallId, params) {
+			await callEngine(`/api/screenshot/share/${params.packet_id}`);
+			return textResult({ packet_id: params.packet_id, descriptor: "Screenshot Evidence Share Packet", artifact_url: `${engineUrl()}/api/screenshot/share/${params.packet_id}/` });
 		},
 	});
 
