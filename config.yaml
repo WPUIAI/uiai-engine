@@ -251,6 +251,18 @@ storage:
   data_dir: "/home/wpuiai/uiai-engine/data"
   usage_file: "usage.json"
 
+# Project-scoped Evidence PWA registry. Provider observations remain
+# focusa_binding_pending until exact Focusa/artifact revisions reconcile.
+evidence_registry:
+  provider_sync_enabled: false
+  focusa_url: "http://127.0.0.1:8787"
+  br_path: "/usr/local/bin/br"
+  project_ids: []
+  allowed_root_prefixes: []
+  max_projects: 100
+  max_items: 100000
+  reconcile_interval: 5s
+
 logging:
   level: "info"
   file: "/var/log/uiai/engine.log"
