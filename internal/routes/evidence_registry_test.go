@@ -2,8 +2,12 @@ package routes
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -65,7 +69,7 @@ func TestEvidenceRegistryReadRoutes(t *testing.T) {
 
 	router := chi.NewRouter()
 	router.Route("/api/evidence/registry", func(r chi.Router) {
-		r.Route("/public", func(r chi.Router) { MountPublicEvidenceRegistry(r, manager, []string{"project:uiai-engine"}) })
+		r.Route("/public", func(r chi.Router) { MountPublicEvidenceRegistry(r, manager, nil, []string{"project:uiai-engine"}) })
 		MountEvidenceRegistry(r, manager)
 	})
 	project := url.QueryEscape("project:uiai-engine")
@@ -144,7 +148,7 @@ func TestPublicProjectsIncludesAllowlistedArtifactOnlyProject(t *testing.T) {
 
 	router := chi.NewRouter()
 	router.Route("/api/evidence/registry/public", func(r chi.Router) {
-		MountPublicEvidenceRegistry(r, manager, []string{projectRef, "project:missing"})
+		MountPublicEvidenceRegistry(r, manager, nil, []string{projectRef, "project:missing"})
 	})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/evidence/registry/public/projects", nil))
@@ -153,6 +157,92 @@ func TestPublicProjectsIncludesAllowlistedArtifactOnlyProject(t *testing.T) {
 	}
 	if strings.Contains(response.Body.String(), "project:missing") {
 		t.Fatalf("missing allowlisted project leaked without public artifacts: %s", response.Body.String())
+	}
+}
+
+func TestPublicArtifactDetailAndAssetsAreExactAllowlistedReads(t *testing.T) {
+	ctx := context.Background()
+	artifacts, _, err := evidenceartifact.OpenStore(evidenceartifact.StoreConfig{
+		Root: t.TempDir(), MaxStoreBytes: 64 << 20, MaxArtifacts: 100, MaxAssetBytes: 8 << 20,
+		StagingQuarantineAge: time.Hour, GCGrace: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := evidenceregistry.NewManager(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.Close()
+	manifest := routeGoldenManifest(t)
+	manifest.Scope.Project.ProjectRef = "project:public-detail"
+	manifest.Policy.AccessClass = evidenceartifact.AccessPublicSafe
+	manifest.Policy.RedactionState = evidenceartifact.RedactionPublicSafe
+	payload := []byte("public immutable evidence bytes")
+	digest := sha256.Sum256(payload)
+	manifest.Assets[0].SHA256 = hex.EncodeToString(digest[:])
+	manifest.Assets[0].ByteSize = int64(len(payload))
+	manifest.Assets[0].MediaType = "text/plain"
+	manifest.Assets[0].RedactionState = evidenceartifact.RedactionPublicSafe
+	manifest.Integrity.ManifestSHA256 = ""
+	manifest, err = evidenceartifact.Seal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, err := artifacts.Commit(ctx, manifest, map[string]io.Reader{manifest.Assets[0].AssetID: bytes.NewReader(payload)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Integrity.ManifestSHA256 != commit.ManifestSHA256 {
+		t.Fatalf("sealed manifest hash=%s commit hash=%s", manifest.Integrity.ManifestSHA256, commit.ManifestSHA256)
+	}
+	privateManifest := manifest
+	privateManifest.ArtifactID = "artifact:private-detail"
+	privateManifest.Scope.Project.ProjectRef = "project:private-detail"
+	privateManifest.Policy.AccessClass = evidenceartifact.AccessPrivateTeam
+	privateManifest.Integrity.ManifestSHA256 = ""
+	privateManifest, err = evidenceartifact.Seal(privateManifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := artifacts.Commit(ctx, privateManifest, map[string]io.Reader{privateManifest.Assets[0].AssetID: bytes.NewReader(payload)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.RebuildFromArtifactStore(ctx, artifacts); err != nil {
+		t.Fatal(err)
+	}
+
+	router := chi.NewRouter()
+	router.Route("/api/evidence/registry/public", func(r chi.Router) {
+		MountPublicEvidenceRegistry(r, manager, artifacts, []string{manifest.Scope.Project.ProjectRef})
+	})
+	base := publicArtifactBasePath(manifest.ArtifactID, manifest.Revision)
+	detail := httptest.NewRecorder()
+	router.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, base, nil))
+	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), publicArtifactDetailSchemaV1) || !strings.Contains(detail.Body.String(), commit.ManifestSHA256) || !strings.Contains(detail.Body.String(), `"interaction":"read_only"`) {
+		t.Fatalf("detail status=%d body=%s", detail.Code, detail.Body.String())
+	}
+	manifestRead := httptest.NewRecorder()
+	router.ServeHTTP(manifestRead, httptest.NewRequest(http.MethodGet, base+"/manifest", nil))
+	if manifestRead.Code != http.StatusOK || !strings.Contains(manifestRead.Body.String(), `"artifact_id":"`+manifest.ArtifactID+`"`) || manifestRead.Header().Get("ETag") != `"sha256:`+commit.ManifestSHA256+`"` {
+		t.Fatalf("manifest status=%d headers=%v body=%s", manifestRead.Code, manifestRead.Header(), manifestRead.Body.String())
+	}
+	assetPath := base + "/assets/" + manifest.Assets[0].SHA256
+	asset := httptest.NewRecorder()
+	router.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, assetPath, nil))
+	if asset.Code != http.StatusOK || asset.Body.String() != string(payload) || asset.Header().Get("ETag") != `"sha256:`+manifest.Assets[0].SHA256+`"` {
+		t.Fatalf("asset status=%d headers=%v body=%q", asset.Code, asset.Header(), asset.Body.String())
+	}
+	for _, path := range []string{
+		publicArtifactBasePath(manifest.ArtifactID, manifest.Revision+1),
+		publicArtifactBasePath(privateManifest.ArtifactID, privateManifest.Revision),
+		base + "/assets/" + strings.Repeat("f", 64),
+	} {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		if response.Code != http.StatusNotFound || !strings.Contains(response.Body.String(), `"code":"not_found"`) {
+			t.Fatalf("GET %s status=%d body=%s", path, response.Code, response.Body.String())
+		}
 	}
 }
 
