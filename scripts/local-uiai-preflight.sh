@@ -32,20 +32,15 @@ if not mp.exists():
 m = json.loads(mp.read_text())
 head_short = subprocess.check_output(["git","rev-parse","--short","HEAD"]).decode().strip()
 head_full = subprocess.check_output(["git","rev-parse","HEAD"]).decode().strip()
-cargo_v = None
-for p in [root/"cmd/uiai-engine/main.go", root/"apps/cockpit/package.json"]:
-    try:
-        if p.suffix == ".go":
-            import re
-            mv = re.search(r'version\s*=\s*"([^"]+)"', p.read_text()).group(1)
-        else:
-            mv = json.loads(p.read_text())["version"]
-        cargo_v = mv
-        break
-    except Exception:
-        pass
-if cargo_v and m.get("release_version") != cargo_v:
-    print(f"FAIL release_version {m.get('release_version')} != {cargo_v}", file=sys.stderr); sys.exit(1)
+import re
+engine_v = re.search(r'version\s*=\s*"([^"]+)"', (root/"cmd/uiai-engine/main.go").read_text()).group(1)
+cockpit_v = json.loads((root/"apps/cockpit/package.json").read_text())["version"]
+manifest_engine_v = m.get("engine_version", m.get("release_version"))
+manifest_cockpit_v = m.get("cockpit_version", m.get("release_version"))
+if manifest_engine_v != engine_v:
+    print(f"FAIL engine_version {manifest_engine_v} != {engine_v}", file=sys.stderr); sys.exit(1)
+if manifest_cockpit_v != cockpit_v:
+    print(f"FAIL cockpit_version {manifest_cockpit_v} != {cockpit_v}", file=sys.stderr); sys.exit(1)
 import os
 source_commit = m.get("source_commit","")
 head_parent = subprocess.check_output(["git","rev-parse","--short","HEAD~1"], stderr=subprocess.DEVNULL).decode().strip() if subprocess.call(["git","rev-parse","--verify","HEAD~1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)==0 else head_short
@@ -66,7 +61,7 @@ try:
         print(f"FAIL stale generated_at {m.get('generated_at')}", file=sys.stderr); sys.exit(1)
 except Exception:
     pass
-print(f"manifest FRESH: release_version={m.get('release_version')} source_commit={m.get('source_commit')} head={head_short}")
+print(f"manifest FRESH: engine_version={manifest_engine_v} cockpit_version={manifest_cockpit_v} source_commit={m.get('source_commit')} head={head_short}")
 PYFRESH
 if [[ $? -ne 0 ]]; then echo "FAIL manifest freshness"; exit 1; fi
 echo "manifest: FRESH"

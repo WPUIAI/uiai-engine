@@ -55,13 +55,24 @@ def main() -> int:
             ("apps/cockpit/src-tauri/Cargo.toml", read_cargo_version("apps/cockpit/src-tauri/Cargo.toml")),
         ]
     mismatches = [(label, actual) for label, actual in checks if actual != expected]
-    # manifest release_version must match too if present
+    # The distribution manifest is dual-track. Legacy v1 manifests fall back to release_version.
     mp = ROOT / "docs/distribution-manifest.json"
     if mp.exists():
-        mv = json.loads(mp.read_text(encoding="utf-8")).get("release_version", "")
-        checks.append(("docs/distribution-manifest.json::release_version", mv))
-        if mv != expected:
-            mismatches.append(("docs/distribution-manifest.json::release_version", mv))
+        manifest = json.loads(mp.read_text(encoding="utf-8"))
+        if is_engine:
+            manifest_checks = [("engine_version", manifest.get("engine_version", manifest.get("release_version", "")))]
+        elif is_cockpit:
+            manifest_checks = [("cockpit_version", manifest.get("cockpit_version", manifest.get("release_version", "")))]
+        else:
+            manifest_checks = [
+                ("engine_version", manifest.get("engine_version", manifest.get("release_version", ""))),
+                ("cockpit_version", manifest.get("cockpit_version", manifest.get("release_version", ""))),
+            ]
+        for key, actual in manifest_checks:
+            label = f"docs/distribution-manifest.json::{key}"
+            checks.append((label, actual))
+            if actual != expected:
+                mismatches.append((label, actual))
     if mismatches:
         print(f"Version surface mismatch; expected {expected}:", file=sys.stderr)
         for label, actual in mismatches:
