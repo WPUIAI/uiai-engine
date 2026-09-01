@@ -222,6 +222,12 @@ func TestPublicArtifactDetailAndAssetsAreExactAllowlistedReads(t *testing.T) {
 	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), publicArtifactDetailSchemaV1) || !strings.Contains(detail.Body.String(), commit.ManifestSHA256) || !strings.Contains(detail.Body.String(), `"interaction":"read_only"`) {
 		t.Fatalf("detail status=%d body=%s", detail.Code, detail.Body.String())
 	}
+	encodedBase := strings.Replace(base, "artifact:", "artifact%3A", 1)
+	encodedDetail := httptest.NewRecorder()
+	router.ServeHTTP(encodedDetail, httptest.NewRequest(http.MethodGet, encodedBase, nil))
+	if encodedDetail.Code != http.StatusOK || encodedDetail.Body.String() != detail.Body.String() {
+		t.Fatalf("encoded detail status=%d body=%s literal=%s", encodedDetail.Code, encodedDetail.Body.String(), detail.Body.String())
+	}
 	manifestRead := httptest.NewRecorder()
 	router.ServeHTTP(manifestRead, httptest.NewRequest(http.MethodGet, base+"/manifest", nil))
 	if manifestRead.Code != http.StatusOK || !strings.Contains(manifestRead.Body.String(), `"artifact_id":"`+manifest.ArtifactID+`"`) || manifestRead.Header().Get("ETag") != `"sha256:`+commit.ManifestSHA256+`"` {
