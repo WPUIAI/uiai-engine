@@ -26,10 +26,18 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install Chromium
+      - name: Ensure Chrome or Chromium is available
         run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
+          set -euo pipefail
+          if command -v google-chrome >/dev/null || command -v chromium-browser >/dev/null || command -v chromium >/dev/null; then
+            echo "existing browser runtime available"
+          elif sudo -n true; then
+            sudo -n apt-get update
+            sudo -n apt-get install -y chromium-browser || sudo -n apt-get install -y chromium
+          else
+            echo "::error::No Chrome/Chromium runtime and runner has no governed passwordless sudo"
+            exit 1
+          fi
       - name: Go tests
         run: go test ./...
       - name: Focusa packet drift check
