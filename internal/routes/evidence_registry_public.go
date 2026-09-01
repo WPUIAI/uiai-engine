@@ -33,8 +33,12 @@ func MountPublicEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager
 		})
 	})
 	allowed := make(map[string]struct{}, len(projectRefs))
+	allowedRefs := make([]string, 0, len(projectRefs))
 	for _, ref := range projectRefs {
 		if ref = strings.TrimSpace(ref); ref != "" {
+			if _, exists := allowed[ref]; !exists {
+				allowedRefs = append(allowedRefs, ref)
+			}
 			allowed[ref] = struct{}{}
 		}
 	}
@@ -49,12 +53,25 @@ func MountPublicEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager
 			writeRegistryError(w, err)
 			return
 		}
-		public := make([]publicProjectProjection, 0, len(projects))
+		projectByRef := make(map[string]evidenceregistry.ProjectProjection, len(projects))
 		for _, project := range projects {
-			if !isAllowed(project.ProjectRef) {
+			projectByRef[project.ProjectRef] = project
+		}
+		public := make([]publicProjectProjection, 0, len(allowedRefs))
+		for _, projectRef := range allowedRefs {
+			if project, ok := projectByRef[projectRef]; ok {
+				public = append(public, publicProjectProjection{ProjectRef: project.ProjectRef, ProjectID: project.ProjectID, DisplayName: project.DisplayName, WorkspaceKind: project.WorkspaceKind, ScopeSafety: project.ScopeSafety, ObservedAt: project.ObservedAt})
 				continue
 			}
-			public = append(public, publicProjectProjection{ProjectRef: project.ProjectRef, ProjectID: project.ProjectID, DisplayName: project.DisplayName, WorkspaceKind: project.WorkspaceKind, ScopeSafety: project.ScopeSafety, ObservedAt: project.ObservedAt})
+			store, err := manager.Project(req.Context(), projectRef)
+			if err != nil {
+				continue
+			}
+			page, err := store.List(req.Context(), evidenceregistry.Query{ProjectRef: projectRef, Access: "public_safe", PageSize: 1})
+			if err != nil || len(page.Rows) == 0 {
+				continue
+			}
+			public = append(public, publicProjectProjection{ProjectRef: projectRef, ProjectID: projectRef, DisplayName: projectRef, ScopeSafety: "artifact_public_safe", ObservedAt: page.ObservedAt})
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"schema": publicRegistrySchemaV1, "interaction": "read_only", "projects": public})
 	})

@@ -123,6 +123,39 @@ func TestEvidenceRegistryReadRoutes(t *testing.T) {
 	}
 }
 
+func TestPublicProjectsIncludesAllowlistedArtifactOnlyProject(t *testing.T) {
+	ctx := context.Background()
+	manager, err := evidenceregistry.NewManager(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.Close()
+	projectRef := "project:artifact-only"
+	store, err := manager.EnsureProject(ctx, projectRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := routeGoldenManifest(t)
+	manifest.Scope.Project.ProjectRef = projectRef
+	manifest.Policy.AccessClass = evidenceartifact.AccessPublicSafe
+	if _, err := store.Index(ctx, evidenceregistry.IndexInput{Manifest: manifest, ManifestSHA256: strings.Repeat("a", 64), ObservedAt: time.Date(2026, 9, 2, 13, 0, 0, 0, time.UTC)}); err != nil {
+		t.Fatal(err)
+	}
+
+	router := chi.NewRouter()
+	router.Route("/api/evidence/registry/public", func(r chi.Router) {
+		MountPublicEvidenceRegistry(r, manager, []string{projectRef, "project:missing"})
+	})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/evidence/registry/public/projects", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"project_ref":"project:artifact-only"`) || !strings.Contains(response.Body.String(), `"scope_safety":"artifact_public_safe"`) {
+		t.Fatalf("artifact-only public project status=%d body=%s", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "project:missing") {
+		t.Fatalf("missing allowlisted project leaked without public artifacts: %s", response.Body.String())
+	}
+}
+
 func TestPublicRegistryEventFiltersPrivateProjectCountsAndResults(t *testing.T) {
 	event := evidenceregistry.RegistryEvent{Projects: 2, ChangedProjects: 2, Items: 12, Results: []evidenceregistry.ProviderGraphResult{
 		{ProjectRef: "project:public", Items: 5, Changed: true},
