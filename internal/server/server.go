@@ -219,7 +219,7 @@ func New(cfg *config.Config) *Engine {
 	var evidenceSync *evidenceregistry.ContinuousSync
 	if evidenceRegistry != nil && cfg.EvidenceRegistry.ProviderSyncEnabled {
 		evidenceSync, err = evidenceregistry.StartContinuousSync(evidenceRegistry, evidenceregistry.FocusaSyncConfig{
-			BaseURL: cfg.EvidenceRegistry.FocusaURL, BRPath: cfg.EvidenceRegistry.BRPath,
+			BaseURL: cfg.EvidenceRegistry.FocusaURL, TokenFile: cfg.EvidenceRegistry.FocusaTokenFile, BRPath: cfg.EvidenceRegistry.BRPath,
 			ProjectIDs: cfg.EvidenceRegistry.ProjectIDs, AllowedRootPrefixes: cfg.EvidenceRegistry.AllowedRootPrefixes,
 			MaxProjects: cfg.EvidenceRegistry.MaxProjects, MaxItems: cfg.EvidenceRegistry.MaxItems,
 		}, cfg.EvidenceRegistry.ReconcileInterval)
@@ -371,7 +371,7 @@ func (e *Engine) mountRoutes() {
 			})
 			if e.cfg.EvidenceRegistry.ProviderSyncEnabled {
 				routes.MountEvidenceRegistry(r, e.evidenceRegistry, evidenceregistry.FocusaSyncConfig{
-					BaseURL: e.cfg.EvidenceRegistry.FocusaURL, BRPath: e.cfg.EvidenceRegistry.BRPath,
+					BaseURL: e.cfg.EvidenceRegistry.FocusaURL, TokenFile: e.cfg.EvidenceRegistry.FocusaTokenFile, BRPath: e.cfg.EvidenceRegistry.BRPath,
 					ProjectIDs: e.cfg.EvidenceRegistry.ProjectIDs, AllowedRootPrefixes: e.cfg.EvidenceRegistry.AllowedRootPrefixes,
 					MaxProjects: e.cfg.EvidenceRegistry.MaxProjects,
 					MaxItems:    e.cfg.EvidenceRegistry.MaxItems,

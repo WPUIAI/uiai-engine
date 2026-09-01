@@ -4,9 +4,38 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
+
+func TestFocusaTokenFileTransportInjectsWithoutMutatingCallerRequest(t *testing.T) {
+	const token = "renewable-test-token"
+	path := filepath.Join(t.TempDir(), "focusa-token")
+	if err := os.WriteFile(path, []byte(token+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Header.Get("Authorization") != "Bearer "+token {
+			t.Fatal("expected bearer token from credential file")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	request, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := syncHTTPClient(FocusaSyncConfig{TokenFile: path}).Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if request.Header.Get("Authorization") != "" {
+		t.Fatal("credential transport mutated caller request")
+	}
+}
 
 func TestRegistryEventHubPublishesRevisionAndDegradedTruth(t *testing.T) {
 	manager, err := NewManager(t.TempDir())

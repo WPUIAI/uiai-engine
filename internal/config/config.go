@@ -143,6 +143,7 @@ type EvidenceRegistryConfig struct {
 	MaxAssetBytes        int64         `yaml:"max_asset_bytes"`
 	ProviderSyncEnabled  bool          `yaml:"provider_sync_enabled"`
 	FocusaURL            string        `yaml:"focusa_url"`
+	FocusaTokenFile      string        `yaml:"focusa_token_file"`
 	BRPath               string        `yaml:"br_path"`
 	ProjectIDs           []string      `yaml:"project_ids"`
 	PublicProjectRefs    []string      `yaml:"public_project_refs"`

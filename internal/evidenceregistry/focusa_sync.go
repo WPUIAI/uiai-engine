@@ -19,6 +19,7 @@ import (
 
 type FocusaSyncConfig struct {
 	BaseURL             string
+	TokenFile           string
 	BRPath              string
 	ProjectIDs          []string
 	AllowedRootPrefixes []string

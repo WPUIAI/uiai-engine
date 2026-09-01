@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -305,8 +306,41 @@ func queueTrigger(triggers chan<- string, trigger string) {
 }
 
 func syncHTTPClient(cfg FocusaSyncConfig) *http.Client {
+	client := &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
 	if cfg.HTTPClient != nil {
-		return cfg.HTTPClient
+		copy := *cfg.HTTPClient
+		client = &copy
 	}
-	return &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+	if tokenFile := strings.TrimSpace(cfg.TokenFile); tokenFile != "" {
+		base := client.Transport
+		if base == nil {
+			base = http.DefaultTransport
+		}
+		client.Transport = focusaTokenFileTransport{base: base, path: tokenFile}
+	}
+	return client
+}
+
+type focusaTokenFileTransport struct {
+	base http.RoundTripper
+	path string
+}
+
+func (t focusaTokenFileTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	file, err := os.Open(t.path) // #nosec G304 -- operator-configured credential path; value never leaves the request header.
+	if err != nil {
+		return nil, fmt.Errorf("focusa credential file unavailable: %w", err)
+	}
+	defer file.Close()
+	token, err := io.ReadAll(io.LimitReader(file, 4097))
+	if err != nil {
+		return nil, fmt.Errorf("read focusa credential file: %w", err)
+	}
+	if len(token) > 4096 || strings.TrimSpace(string(token)) == "" {
+		return nil, fmt.Errorf("focusa credential file invalid")
+	}
+	clone := req.Clone(req.Context())
+	clone.Header = req.Header.Clone()
+	clone.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(token)))
+	return t.base.RoundTrip(clone)
 }
