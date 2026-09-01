@@ -243,6 +243,9 @@ func replaceBindings(ctx context.Context, tx *sql.Tx, input IndexInput, acceptan
 			return fmt.Errorf("%w: closure: %v", ErrIndexUnavailable, err)
 		}
 	}
+	if err := reconcileProviderBindings(ctx, tx, input.Manifest.Scope.Project.ProjectRef); err != nil {
+		return err
+	}
 	return nil
 }
 

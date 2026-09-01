@@ -52,6 +52,7 @@ type Engine struct {
 	mediaJobs        *media.JobStore
 	captcha          *captchaPkg.Solver
 	evidenceRegistry *evidenceregistry.Manager
+	evidenceSync     *evidenceregistry.ContinuousSync
 }
 
 // New creates a new Engine with all routes wired.
@@ -185,6 +186,18 @@ func New(cfg *config.Config) *Engine {
 		return ok
 	}, desktop.NewPlatformLauncher())
 
+	var evidenceSync *evidenceregistry.ContinuousSync
+	if evidenceRegistry != nil && cfg.EvidenceRegistry.ProviderSyncEnabled {
+		evidenceSync, err = evidenceregistry.StartContinuousSync(evidenceRegistry, evidenceregistry.FocusaSyncConfig{
+			BaseURL: cfg.EvidenceRegistry.FocusaURL, BRPath: cfg.EvidenceRegistry.BRPath,
+			ProjectIDs: cfg.EvidenceRegistry.ProjectIDs, AllowedRootPrefixes: cfg.EvidenceRegistry.AllowedRootPrefixes,
+			MaxProjects: cfg.EvidenceRegistry.MaxProjects, MaxItems: cfg.EvidenceRegistry.MaxItems,
+		}, cfg.EvidenceRegistry.ReconcileInterval)
+		if err != nil {
+			log.Printf("[evidence-registry] WARNING: continuous sync unavailable: %v", err)
+		}
+	}
+
 	e := &Engine{
 		cfg:              cfg,
 		router:           r,
@@ -199,6 +212,7 @@ func New(cfg *config.Config) *Engine {
 		mediaJobs:        mediaJobs,
 		captcha:          captchaSolver,
 		evidenceRegistry: evidenceRegistry,
+		evidenceSync:     evidenceSync,
 	}
 
 	e.mountRoutes()
@@ -316,6 +330,15 @@ func (e *Engine) mountRoutes() {
 	})
 	if e.evidenceRegistry != nil {
 		r.Route("/api/evidence/registry", func(r chi.Router) {
+			if e.cfg.EvidenceRegistry.ProviderSyncEnabled {
+				routes.MountEvidenceRegistry(r, e.evidenceRegistry, evidenceregistry.FocusaSyncConfig{
+					BaseURL: e.cfg.EvidenceRegistry.FocusaURL, BRPath: e.cfg.EvidenceRegistry.BRPath,
+					ProjectIDs: e.cfg.EvidenceRegistry.ProjectIDs, AllowedRootPrefixes: e.cfg.EvidenceRegistry.AllowedRootPrefixes,
+					MaxProjects: e.cfg.EvidenceRegistry.MaxProjects,
+					MaxItems:    e.cfg.EvidenceRegistry.MaxItems,
+				})
+				return
+			}
 			routes.MountEvidenceRegistry(r, e.evidenceRegistry)
 		})
 	}
@@ -517,6 +540,9 @@ func (e *Engine) Run() error {
 		if e.vision != nil {
 			log.Printf("Closing vision pool...")
 			e.vision.Close()
+		}
+		if e.evidenceSync != nil {
+			e.evidenceSync.Close()
 		}
 		if e.evidenceRegistry != nil {
 			if err := e.evidenceRegistry.Close(); err != nil {

@@ -1,10 +1,13 @@
 package routes
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/evidenceregistry"
 	"github.com/go-chi/chi/v5"
@@ -22,7 +25,65 @@ func (p evidenceRegistryManager) Project(req *http.Request, projectRef string) (
 	return p.manager.Project(req.Context(), projectRef)
 }
 
-func MountEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager) {
+func MountEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager, syncConfig ...evidenceregistry.FocusaSyncConfig) {
+	r.Get("/sync-status", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, manager.RegistrySyncStatus())
+	})
+	r.Get("/events", func(w http.ResponseWriter, req *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			writeRegistryError(w, evidenceregistry.ErrIndexUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache, no-store")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("X-Accel-Buffering", "no")
+		events := manager.RegistryEvents(req.Context())
+		heartbeat := time.NewTicker(15 * time.Second)
+		defer heartbeat.Stop()
+		for {
+			select {
+			case <-req.Context().Done():
+				return
+			case event, open := <-events:
+				if !open {
+					return
+				}
+				body, err := json.Marshal(event)
+				if err != nil {
+					return
+				}
+				_, _ = fmt.Fprintf(w, "id: %s\nevent: registry_revision\ndata: %s\n\n", event.EventID, body)
+				flusher.Flush()
+			case <-heartbeat.C:
+				_, _ = fmt.Fprint(w, ": keep-alive\n\n")
+				flusher.Flush()
+			}
+		}
+	})
+	r.Get("/projects", func(w http.ResponseWriter, req *http.Request) {
+		projects, err := manager.ProjectProjections(req.Context())
+		if err != nil {
+			writeRegistryError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"schema": "uiai.evidence_project_registry.v1", "projects": projects})
+	})
+	if len(syncConfig) > 0 {
+		r.Post("/sync", func(w http.ResponseWriter, req *http.Request) {
+			cfg := syncConfig[0]
+			if ids := req.URL.Query()["project_id"]; len(ids) > 0 {
+				cfg.ProjectIDs = ids
+			}
+			result, err := manager.SyncAndPublish(req.Context(), cfg, "manual")
+			if err != nil {
+				writeRegistryError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"schema": "uiai.evidence_provider_sync.v1", "status": "completed", "result": result})
+		})
+	}
 	mountEvidenceRegistry(r, evidenceRegistryManager{manager: manager})
 }
 
@@ -110,6 +171,44 @@ func mountEvidenceRegistry(r chi.Router, provider registryProvider) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"schema": evidenceregistry.RegistrySchemaV1, "project_ref": req.URL.Query().Get("project_ref"), "work_items": items})
+	})
+
+	r.Get("/provider-work-items", func(w http.ResponseWriter, req *http.Request) {
+		store, ok := registryStore(w, req, provider)
+		if !ok {
+			return
+		}
+		limit, ok := registryUint(w, req, "limit", 100)
+		if !ok {
+			return
+		}
+		page, err := store.ListProviderWorkItems(req.Context(), evidenceregistry.ProviderWorkItemQuery{
+			ProjectRef: req.URL.Query().Get("project_ref"), Text: req.URL.Query().Get("q"),
+			Status: req.URL.Query().Get("status"), ItemType: req.URL.Query().Get("item_type"),
+			Limit: uint32(limit), Cursor: req.URL.Query().Get("cursor"),
+		})
+		if err != nil {
+			writeRegistryError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, page)
+	})
+
+	r.Get("/provider-edges", func(w http.ResponseWriter, req *http.Request) {
+		store, ok := registryStore(w, req, provider)
+		if !ok {
+			return
+		}
+		limit, ok := registryUint(w, req, "limit", 100)
+		if !ok {
+			return
+		}
+		edges, err := store.ProviderWorkItemEdges(req.Context(), req.URL.Query().Get("object_ref"), evidenceregistry.EdgeDirection(req.URL.Query().Get("direction")), req.URL.Query().Get("relation"), uint32(limit))
+		if err != nil {
+			writeRegistryError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"schema": "uiai.evidence_provider_work_item_edges.v1", "project_ref": req.URL.Query().Get("project_ref"), "edges": edges})
 	})
 
 	r.Get("/edges", func(w http.ResponseWriter, req *http.Request) {

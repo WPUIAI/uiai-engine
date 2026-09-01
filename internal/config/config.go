@@ -11,18 +11,19 @@ import (
 )
 
 type Config struct {
-	Server     ServerConfig    `yaml:"server"`
-	WordPress  WordPressConfig `yaml:"wordpress"`
-	AI         AIConfig        `yaml:"ai"`
-	Vision     VisionConfig    `yaml:"vision"`
-	Credits    CreditsConfig   `yaml:"credits"`
-	RateLimits RateLimitConfig `yaml:"rate_limits"`
-	Storage    StorageConfig   `yaml:"storage"`
-	Logging    LoggingConfig   `yaml:"logging"`
-	CORS       CORSConfig      `yaml:"cors"`
-	Media      MediaConfig     `yaml:"media"`
-	Captcha    CaptchaYAML     `yaml:"captcha"`
-	TwoFactor  TwoFactorConfig `yaml:"two_factor"`
+	Server           ServerConfig           `yaml:"server"`
+	WordPress        WordPressConfig        `yaml:"wordpress"`
+	AI               AIConfig               `yaml:"ai"`
+	Vision           VisionConfig           `yaml:"vision"`
+	Credits          CreditsConfig          `yaml:"credits"`
+	RateLimits       RateLimitConfig        `yaml:"rate_limits"`
+	Storage          StorageConfig          `yaml:"storage"`
+	Logging          LoggingConfig          `yaml:"logging"`
+	CORS             CORSConfig             `yaml:"cors"`
+	Media            MediaConfig            `yaml:"media"`
+	Captcha          CaptchaYAML            `yaml:"captcha"`
+	TwoFactor        TwoFactorConfig        `yaml:"two_factor"`
+	EvidenceRegistry EvidenceRegistryConfig `yaml:"evidence_registry"`
 }
 
 // CaptchaYAML mirrors the YAML structure for captcha config loading.
@@ -134,6 +135,17 @@ type TierLimit struct {
 	PerDay  int `yaml:"per_day"`
 }
 
+type EvidenceRegistryConfig struct {
+	ProviderSyncEnabled bool          `yaml:"provider_sync_enabled"`
+	FocusaURL           string        `yaml:"focusa_url"`
+	BRPath              string        `yaml:"br_path"`
+	ProjectIDs          []string      `yaml:"project_ids"`
+	AllowedRootPrefixes []string      `yaml:"allowed_root_prefixes"`
+	MaxProjects         int           `yaml:"max_projects"`
+	MaxItems            int           `yaml:"max_items"`
+	ReconcileInterval   time.Duration `yaml:"reconcile_interval"`
+}
+
 type StorageConfig struct {
 	DataDir   string `yaml:"data_dir"`
 	UsageFile string `yaml:"usage_file"`
@@ -214,6 +226,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Vision.ScreenshotQuality == 0 {
 		c.Vision.ScreenshotQuality = 65
+	}
+	if c.EvidenceRegistry.ReconcileInterval == 0 {
+		c.EvidenceRegistry.ReconcileInterval = 5 * time.Second
 	}
 	if c.Storage.DataDir == "" {
 		c.Storage.DataDir = "./data"

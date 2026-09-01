@@ -78,6 +78,72 @@ type Config struct {
 	Now         func() time.Time
 }
 
+type ProjectProjection struct {
+	ProjectRef     string    `json:"project_ref"`
+	ProjectID      string    `json:"project_id"`
+	DisplayName    string    `json:"display_name"`
+	Fingerprint    string    `json:"fingerprint"`
+	WorkspaceKind  string    `json:"workspace_kind,omitempty"`
+	ScopeSafety    string    `json:"scope_safety"`
+	SourceSchema   string    `json:"source_schema"`
+	SourceRevision string    `json:"source_revision,omitempty"`
+	ObservedAt     time.Time `json:"observed_at"`
+}
+
+type ProviderWorkItem struct {
+	ProjectRef      string    `json:"project_ref"`
+	WorkItemRef     string    `json:"work_item_ref"`
+	ProviderSurface string    `json:"provider_surface"`
+	ItemID          string    `json:"item_id"`
+	ItemType        string    `json:"item_type"`
+	Title           string    `json:"title"`
+	Description     string    `json:"description,omitempty"`
+	Status          string    `json:"status"`
+	Priority        int       `json:"priority"`
+	Revision        string    `json:"revision"`
+	Digest          string    `json:"digest"`
+	ParentRefs      []string  `json:"parent_refs"`
+	DependencyRefs  []string  `json:"dependency_refs"`
+	BlockerRefs     []string  `json:"blocker_refs"`
+	AcceptanceRefs  []string  `json:"acceptance_refs"`
+	SpecRefs        []string  `json:"spec_refs"`
+	ExternalRef     string    `json:"external_ref,omitempty"`
+	SourceAuthority string    `json:"source_authority"`
+	BindingState    string    `json:"binding_state"`
+	ObservedAt      time.Time `json:"observed_at"`
+}
+
+type ProviderGraphInput struct {
+	Project ProjectProjection
+	Items   []ProviderWorkItem
+}
+
+type ProviderGraphResult struct {
+	ProjectRef string `json:"project_ref"`
+	Items      uint64 `json:"items"`
+	Revision   uint64 `json:"index_revision"`
+	Changed    bool   `json:"changed"`
+}
+
+type ProviderWorkItemQuery struct {
+	ProjectRef string
+	Text       string
+	Status     string
+	ItemType   string
+	Limit      uint32
+	Cursor     string
+}
+
+type ProviderWorkItemPage struct {
+	Schema        string             `json:"schema"`
+	ProjectRef    string             `json:"project_ref"`
+	WorkItems     []ProviderWorkItem `json:"work_items"`
+	NextCursor    string             `json:"next_cursor,omitempty"`
+	PageSize      uint32             `json:"page_size"`
+	IndexRevision uint64             `json:"index_revision"`
+	ObservedAt    time.Time          `json:"observed_at"`
+}
+
 type IndexInput struct {
 	Manifest                evidenceartifact.Manifest
 	ManifestSHA256          string
@@ -170,6 +236,17 @@ type Edge struct {
 	Relation          RelationType `json:"relation"`
 	ProvenanceReceipt string       `json:"provenance_receipt,omitempty"`
 	ObservedAt        time.Time    `json:"observed_at"`
+}
+
+type ProviderWorkItemEdge struct {
+	ProjectRef      string    `json:"project_ref"`
+	SourceRef       string    `json:"source_ref"`
+	TargetRef       string    `json:"target_ref"`
+	Relation        string    `json:"relation"`
+	SourceRevision  string    `json:"source_revision"`
+	TargetRevision  string    `json:"target_revision,omitempty"`
+	SourceAuthority string    `json:"source_authority"`
+	ObservedAt      time.Time `json:"observed_at"`
 }
 
 type EdgeDirection string
