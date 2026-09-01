@@ -115,7 +115,11 @@ func readPublicArtifact(req *http.Request, artifacts *evidenceartifact.Store, is
 	if err != nil || revision == 0 {
 		return evidenceartifact.Manifest{}, evidenceartifact.Entry{}, false
 	}
-	manifest, entry, err := artifacts.GetManifest(chi.URLParam(req, "artifact_ref"), revision)
+	artifactRef, err := url.PathUnescape(chi.URLParam(req, "artifact_ref"))
+	if err != nil {
+		return evidenceartifact.Manifest{}, evidenceartifact.Entry{}, false
+	}
+	manifest, entry, err := artifacts.GetManifest(artifactRef, revision)
 	if err != nil || !isAllowed(manifest.Scope.Project.ProjectRef) || manifest.Policy.AccessClass != evidenceartifact.AccessPublicSafe || manifest.Policy.RedactionState != evidenceartifact.RedactionPublicSafe {
 		return evidenceartifact.Manifest{}, evidenceartifact.Entry{}, false
 	}
