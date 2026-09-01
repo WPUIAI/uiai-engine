@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
 	"github.com/WPUIAI/uiai-engine/internal/desktop"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceregistry"
 	"github.com/WPUIAI/uiai-engine/internal/intelligence"
 	"github.com/WPUIAI/uiai-engine/internal/license"
 	"github.com/WPUIAI/uiai-engine/internal/media"
@@ -36,19 +38,20 @@ var startTime = time.Now()
 
 // Engine is the main server instance.
 type Engine struct {
-	cfg       *config.Config
-	router    chi.Router
-	server    *http.Server
-	auth      *auth.Authenticator
-	ai        *ai.Provider
-	credits   *credits.Service
-	limiter   *ratelimit.Limiter
-	usage     *storage.UsageStore
-	vision    vision.PoolSource
-	sessions  *vision.SessionManager
-	presenter desktop.DesktopPresenter
-	mediaJobs *media.JobStore
-	captcha   *captchaPkg.Solver
+	cfg              *config.Config
+	router           chi.Router
+	server           *http.Server
+	auth             *auth.Authenticator
+	ai               *ai.Provider
+	credits          *credits.Service
+	limiter          *ratelimit.Limiter
+	usage            *storage.UsageStore
+	vision           vision.PoolSource
+	sessions         *vision.SessionManager
+	presenter        desktop.DesktopPresenter
+	mediaJobs        *media.JobStore
+	captcha          *captchaPkg.Solver
+	evidenceRegistry *evidenceregistry.Manager
 }
 
 // New creates a new Engine with all routes wired.
@@ -115,6 +118,10 @@ func New(cfg *config.Config) *Engine {
 
 	// Media job store + periodic cleanup
 	mediaJobs := media.NewJobStore(cfg.Storage.DataDir)
+	evidenceRegistry, err := evidenceregistry.NewManager(filepath.Join(cfg.Storage.DataDir, "evidence-registry"))
+	if err != nil {
+		log.Printf("[evidence-registry] WARNING: manager unavailable: %v", err)
+	}
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
@@ -179,18 +186,19 @@ func New(cfg *config.Config) *Engine {
 	}, desktop.NewPlatformLauncher())
 
 	e := &Engine{
-		cfg:       cfg,
-		router:    r,
-		auth:      authenticator,
-		ai:        aiProvider,
-		credits:   creditSvc,
-		limiter:   limiter,
-		usage:     usage,
-		vision:    visionPool,
-		sessions:  sessionMgr,
-		presenter: presenter,
-		mediaJobs: mediaJobs,
-		captcha:   captchaSolver,
+		cfg:              cfg,
+		router:           r,
+		auth:             authenticator,
+		ai:               aiProvider,
+		credits:          creditSvc,
+		limiter:          limiter,
+		usage:            usage,
+		vision:           visionPool,
+		sessions:         sessionMgr,
+		presenter:        presenter,
+		mediaJobs:        mediaJobs,
+		captcha:          captchaSolver,
+		evidenceRegistry: evidenceRegistry,
 	}
 
 	e.mountRoutes()
@@ -306,6 +314,11 @@ func (e *Engine) mountRoutes() {
 		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage)
 		routes.MountScreenshotCompare(r, e.cfg, e.vision, e.ai, e.credits, e.limiter, e.usage)
 	})
+	if e.evidenceRegistry != nil {
+		r.Route("/api/evidence/registry", func(r chi.Router) {
+			routes.MountEvidenceRegistry(r, e.evidenceRegistry)
+		})
+	}
 	r.Route("/api/share", func(r chi.Router) {
 		r.Use(license.RequireFeatureMiddleware(license.FeatureShareAccess))
 		routes.MountShareReal(r, e.cfg, e.vision)
@@ -504,6 +517,11 @@ func (e *Engine) Run() error {
 		if e.vision != nil {
 			log.Printf("Closing vision pool...")
 			e.vision.Close()
+		}
+		if e.evidenceRegistry != nil {
+			if err := e.evidenceRegistry.Close(); err != nil {
+				log.Printf("[evidence-registry] close failed: %v", err)
+			}
 		}
 		return e.server.Shutdown(ctx)
 	}
