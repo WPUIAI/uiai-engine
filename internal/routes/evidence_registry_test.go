@@ -30,6 +30,7 @@ func TestEvidenceRegistryReadRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 	manifest := routeGoldenManifest(t)
+	manifest.Policy.AccessClass = evidenceartifact.AccessPublicSafe
 	_, err = store.Index(ctx, evidenceregistry.IndexInput{
 		Manifest:              manifest,
 		ManifestSHA256:        strings.Repeat("d", 64),
@@ -50,14 +51,31 @@ func TestEvidenceRegistryReadRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	privateStore, err := manager.EnsureProject(ctx, "project:private")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = privateStore.ReplaceProviderGraph(ctx, evidenceregistry.ProviderGraphInput{
+		Project: evidenceregistry.ProjectProjection{ProjectRef: "project:private", ProjectID: "private", DisplayName: "Private Project", Fingerprint: "project-fingerprint:private", ScopeSafety: "safe", SourceSchema: "focusa.project_dashboard.v1", ObservedAt: time.Date(2026, 9, 2, 12, 2, 0, 0, time.UTC)},
+		Items:   []evidenceregistry.ProviderWorkItem{{ProjectRef: "project:private", WorkItemRef: "work-item:private", ProviderSurface: "bd", ItemID: "private", ItemType: "task", Title: "Private title", Description: "private filesystem /home/private", Status: "open", Revision: "1", Digest: strings.Repeat("f", 64), SourceAuthority: "provider:br", BindingState: "focusa_binding_pending"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	router := chi.NewRouter()
-	router.Route("/api/evidence/registry", func(r chi.Router) { MountEvidenceRegistry(r, manager) })
+	router.Route("/api/evidence/registry", func(r chi.Router) {
+		r.Route("/public", func(r chi.Router) { MountPublicEvidenceRegistry(r, manager, []string{"project:uiai-engine"}) })
+		MountEvidenceRegistry(r, manager)
+	})
 	project := url.QueryEscape("project:uiai-engine")
 	cases := []struct {
 		path string
 		want string
 	}{
+		{"/api/evidence/registry/public/projects", `"interaction":"read_only","projects":[{"project_ref":"project:uiai-engine"`},
+		{"/api/evidence/registry/public/artifacts?project_ref=" + project, `"artifact_ref":"artifact:epwa-001"`},
+		{"/api/evidence/registry/public/work-items?project_ref=" + project, `"source_authority":"provider:br"`},
 		{"/api/evidence/registry/sync-status", `"freshness":"unavailable"`},
 		{"/api/evidence/registry/projects", `"display_name":"UIAI Engine"`},
 		{"/api/evidence/registry/?project_ref=" + project + "&q=golden%20tests", `"artifact_ref":"artifact:epwa-001"`},
@@ -77,9 +95,21 @@ func TestEvidenceRegistryReadRoutes(t *testing.T) {
 		}
 	}
 
+	publicProjects := httptest.NewRecorder()
+	router.ServeHTTP(publicProjects, httptest.NewRequest(http.MethodGet, "/api/evidence/registry/public/projects", nil))
+	if strings.Contains(publicProjects.Body.String(), "Private Project") || strings.Contains(publicProjects.Body.String(), "/home/private") {
+		t.Fatalf("public project list leaked private project: %s", publicProjects.Body.String())
+	}
+	publicWorkItems := httptest.NewRecorder()
+	router.ServeHTTP(publicWorkItems, httptest.NewRequest(http.MethodGet, "/api/evidence/registry/public/work-items?project_ref="+project, nil))
+	if strings.Contains(publicWorkItems.Body.String(), "external_ref") {
+		t.Fatalf("public work item leaked provider external_ref: %s", publicWorkItems.Body.String())
+	}
+
 	for _, path := range []string{
 		"/api/evidence/registry/",
 		"/api/evidence/registry/?project_ref=project:unknown",
+		"/api/evidence/registry/public/work-items?project_ref=project:private",
 		"/api/evidence/registry/resolve?project_ref=" + project + "&artifact_ref=artifact:epwa-001&revision=bad",
 	} {
 		recorder := httptest.NewRecorder()
@@ -90,6 +120,20 @@ func TestEvidenceRegistryReadRoutes(t *testing.T) {
 		if !strings.Contains(recorder.Body.String(), registryErrorSchema) {
 			t.Fatalf("GET %s missing typed error: %s", path, recorder.Body.String())
 		}
+	}
+}
+
+func TestPublicRegistryEventFiltersPrivateProjectCountsAndResults(t *testing.T) {
+	event := evidenceregistry.RegistryEvent{Projects: 2, ChangedProjects: 2, Items: 12, Results: []evidenceregistry.ProviderGraphResult{
+		{ProjectRef: "project:public", Items: 5, Changed: true},
+		{ProjectRef: "project:private", Items: 7, Changed: true},
+	}}
+	filtered := filterPublicRegistryEvent(event, func(ref string) bool { return ref == "project:public" })
+	if filtered.Projects != 1 || filtered.ChangedProjects != 1 || filtered.Items != 5 || len(filtered.Results) != 1 || filtered.Results[0].ProjectRef != "project:public" {
+		t.Fatalf("filtered=%#v", filtered)
+	}
+	if event.Results[0].ProjectRef != "project:public" || event.Results[1].ProjectRef != "project:private" {
+		t.Fatalf("source event mutated=%#v", event)
 	}
 }
 

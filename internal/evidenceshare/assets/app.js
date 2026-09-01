@@ -4,6 +4,10 @@ const byId = (id) => document.getElementById(id);
 const text = (node, value) => { node.textContent = value ?? "—"; };
 const availabilityStates = new Set(["loading", "ready", "unavailable", "blocked", "corrupt", "stale", "redacted", "degraded"]);
 const expectedSections = ["overview", "evidence", "timeline", "inspect", "developer"];
+const registryAPI = "/api/evidence/registry/public";
+const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 2;
+const registryPageSize = lowMemory ? 25 : 100;
+const registryState = { project: "", query: "", status: "", type: "", artifactCursor: "", workItemCursor: "", artifacts: [], workItems: [], eventSource: null, reloadTimer: 0 };
 
 const safeRef = (value) => typeof value === "string" && /^\.\/[A-Za-z0-9._/-]+$/.test(value) && !value.includes("../") ? value : null;
 const validSHA256 = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -109,7 +113,202 @@ function renderLineage(scope) {
   );
 }
 
-async function render() {
+const queryString = (values) => {
+  const params = new URLSearchParams();
+  Object.entries(values).forEach(([key, value]) => { if (value) params.set(key, String(value)); });
+  return params.toString();
+};
+
+const publicPath = (value) => typeof value === "string" && /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]+$/.test(value) && !value.includes("..") ? value : null;
+
+function registryRow(kind, record) {
+  const tr = document.createElement("tr");
+  const kindCell = document.createElement("td");
+  const recordCell = document.createElement("td");
+  const statusCell = document.createElement("td");
+  const bindingCell = document.createElement("td");
+  const revisionCell = document.createElement("td");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "registry-record";
+  button.dataset.kind = kind;
+  button.dataset.ref = kind === "artifact" ? record.artifact_ref : record.work_item_ref;
+  text(kindCell, kind === "artifact" ? "Artifact" : record.item_type || "Work item");
+  const strong = document.createElement("strong");
+  const code = document.createElement("code");
+  text(strong, kind === "artifact" ? record.title : record.title);
+  text(code, kind === "artifact" ? record.artifact_ref : record.item_id);
+  button.append(strong, code);
+  recordCell.append(button);
+  text(statusCell, kind === "artifact" ? record.verification : record.status);
+  text(bindingCell, kind === "artifact" ? record.closure : record.binding_state);
+  text(revisionCell, kind === "artifact" ? record.revision : record.revision);
+  tr.append(kindCell, recordCell, statusCell, bindingCell, revisionCell);
+  button.addEventListener("click", () => showRegistryDetail(kind, record));
+  return tr;
+}
+
+async function showRegistryDetail(kind, record) {
+  const panel = byId("registry-detail");
+  const title = document.createElement("h2");
+  const copy = document.createElement("p");
+  const facts = document.createElement("dl");
+  title.textContent = record.title || record.item_id || record.artifact_ref;
+  copy.textContent = kind === "artifact" ? `Public-safe immutable artifact revision ${record.revision}.` : (record.description || "No provider description was projected.");
+  facts.className = "registry-detail-facts";
+  const entries = kind === "artifact" ? [
+    ["Artifact", record.artifact_ref], ["Work item", record.first_work_item_ref], ["Verification", record.verification], ["Closure", record.closure], ["Captured", formatTime(record.captured_at)],
+  ] : [
+    ["Work item", record.work_item_ref], ["Provider", record.provider_surface], ["Type", record.item_type], ["Status", record.status], ["Binding", record.binding_state], ["Revision", record.revision],
+  ];
+  facts.replaceChildren(...entries.map(([label, value]) => fact(label, value || "Unavailable")));
+  const children = [title, copy, facts];
+  if (kind === "artifact" && publicPath(record.pwa_path)) {
+    const link = document.createElement("a");
+    link.href = record.pwa_path;
+    link.textContent = "Open forensic evidence record";
+    children.push(link);
+  }
+  if (kind === "work_item") {
+    try {
+      const base = { project_ref: registryState.project, object_ref: record.work_item_ref, limit: 100 };
+      const [forward, reverse] = await Promise.all([
+        fetchJSON(`${registryAPI}/edges?${queryString({ ...base, direction: "forward" })}`),
+        fetchJSON(`${registryAPI}/edges?${queryString({ ...base, direction: "reverse" })}`),
+      ]);
+      const relationships = document.createElement("p");
+      relationships.textContent = `${forward.edges?.length || 0} outgoing · ${reverse.edges?.length || 0} incoming relationships`;
+      children.push(relationships);
+    } catch { /* Detail remains useful when relationship projection is degraded. */ }
+  }
+  panel.replaceChildren(...children);
+  panel.hidden = false;
+  const url = new URL(location.href);
+  url.searchParams.set("selected", kind === "artifact" ? record.artifact_ref : record.work_item_ref);
+  history.replaceState(null, "", url);
+}
+
+function updateRegistryURL() {
+  const url = new URL(location.href);
+  [["project", registryState.project], ["q", registryState.query], ["status", registryState.status], ["type", registryState.type]].forEach(([key, value]) => value ? url.searchParams.set(key, value) : url.searchParams.delete(key));
+  history.replaceState(null, "", url);
+}
+
+async function loadRegistry({ append = false } = {}) {
+  const status = byId("status");
+  if (!registryState.project) return;
+  if (!append) {
+    registryState.artifactCursor = "";
+    registryState.workItemCursor = "";
+    registryState.artifacts = [];
+    registryState.workItems = [];
+  }
+  setStatus(status, "loading", "Synchronizing registry");
+  const shared = { project_ref: registryState.project, q: registryState.query };
+  const [artifacts, workItems, syncStatus] = await Promise.all([
+    append && !registryState.artifactCursor ? Promise.resolve({ rows: [] }) : fetchJSON(`${registryAPI}/artifacts?${queryString({ ...shared, page_size: registryPageSize, cursor: registryState.artifactCursor })}`),
+    append && !registryState.workItemCursor ? Promise.resolve({ work_items: [] }) : fetchJSON(`${registryAPI}/work-items?${queryString({ ...shared, status: registryState.status, item_type: registryState.type, limit: registryPageSize, cursor: registryState.workItemCursor })}`),
+    fetchJSON(`${registryAPI}/sync-status`),
+  ]);
+  registryState.artifacts.push(...(artifacts.rows || []));
+  registryState.workItems.push(...(workItems.work_items || []));
+  registryState.artifactCursor = artifacts.next_cursor || "";
+  registryState.workItemCursor = workItems.next_cursor || "";
+  const rows = [...registryState.artifacts.map((row) => registryRow("artifact", row)), ...registryState.workItems.map((row) => registryRow("work_item", row))];
+  byId("registry-rows").replaceChildren(...rows);
+  byId("registry-empty").hidden = rows.length !== 0;
+  byId("registry-more").hidden = !registryState.artifactCursor && !registryState.workItemCursor;
+  text(byId("registry-count"), `${rows.length} records`);
+  text(byId("registry-revision"), Math.max(artifacts.index_revision || 0, workItems.index_revision || 0));
+  text(byId("registry-freshness"), syncStatus.freshness || "unavailable");
+  byId("registry-facets").replaceChildren(
+    fact("Artifacts", registryState.artifacts.length), fact("Work items", registryState.workItems.length),
+    fact("Epics", registryState.workItems.filter((item) => item.item_type === "epic").length),
+    fact("Blocked", registryState.workItems.filter((item) => item.status === "blocked").length),
+  );
+  byId("registry").dataset.registryState = syncStatus.freshness || "degraded";
+  text(byId("registry-truth"), rows.length ? "Public-safe immutable artifacts and provider-observed Work Items. Focusa bindings remain independently revisioned." : "The project is available, but no public-safe records are currently indexed.");
+  setStatus(status, syncStatus.freshness === "live" ? "ready" : "degraded", `Registry ${syncStatus.freshness || "degraded"}`);
+  updateRegistryURL();
+  const selected = new URL(location.href).searchParams.get("selected");
+  const selectedArtifact = registryState.artifacts.find((record) => record.artifact_ref === selected);
+  const selectedWorkItem = registryState.workItems.find((record) => record.work_item_ref === selected);
+  if (selectedArtifact) showRegistryDetail("artifact", selectedArtifact);
+  else if (selectedWorkItem) showRegistryDetail("work_item", selectedWorkItem);
+}
+
+function connectRegistryEvents() {
+  registryState.eventSource?.close();
+  const source = new EventSource(`${registryAPI}/events`);
+  registryState.eventSource = source;
+  source.addEventListener("registry_revision", (message) => {
+    try {
+      const event = JSON.parse(message.data);
+      const relevant = !event.results?.length || event.results.some((result) => result.project_ref === registryState.project);
+      if (relevant) {
+        clearTimeout(registryState.reloadTimer);
+        registryState.reloadTimer = setTimeout(() => loadRegistry().catch(showRegistryUnavailable), 150);
+      }
+    } catch { showRegistryUnavailable(new Error("Registry event contract is invalid")); }
+  });
+  source.onerror = () => {
+    text(byId("registry-freshness"), "degraded · reconnecting");
+    setStatus(byId("status"), "degraded", "Registry reconnecting");
+  };
+}
+
+function showRegistryUnavailable(error) {
+  byId("registry").dataset.registryState = "unavailable";
+  text(byId("registry-truth"), error instanceof Error ? error.message : "Registry unavailable");
+  text(byId("registry-freshness"), "unavailable");
+  byId("registry-empty").hidden = false;
+  byId("registry-rows").replaceChildren();
+  setStatus(byId("status"), "unavailable", "Registry unavailable");
+}
+
+async function renderRegistry() {
+  const url = new URL(location.href);
+  registryState.query = url.searchParams.get("q") || "";
+  registryState.status = url.searchParams.get("status") || "";
+  registryState.type = url.searchParams.get("type") || "";
+  byId("registry-query").value = registryState.query;
+  byId("registry-status").value = registryState.status;
+  byId("registry-type").value = registryState.type;
+  const response = await fetchJSON(`${registryAPI}/projects`);
+  const projects = response.projects || [];
+  const select = byId("registry-project");
+  select.replaceChildren(...projects.map((project) => {
+    const option = document.createElement("option");
+    option.value = project.project_ref;
+    option.textContent = project.display_name;
+    return option;
+  }));
+  registryState.project = projects.some((project) => project.project_ref === url.searchParams.get("project")) ? url.searchParams.get("project") : (projects[0]?.project_ref || "");
+  select.value = registryState.project;
+  if (!registryState.project) throw new Error("No public-safe project registry is configured.");
+  await loadRegistry();
+  connectRegistryEvents();
+  requestAnimationFrame(() => scrollTo(0, Number(sessionStorage.getItem("epwa-registry-scroll") || 0)));
+}
+
+function wireRegistryControls() {
+  let debounce = 0;
+  byId("registry-project").addEventListener("change", (event) => { registryState.project = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
+  byId("registry-query").addEventListener("input", (event) => { registryState.query = event.target.value.trim(); clearTimeout(debounce); debounce = setTimeout(() => loadRegistry().catch(showRegistryUnavailable), 250); });
+  byId("registry-status").addEventListener("change", (event) => { registryState.status = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
+  byId("registry-type").addEventListener("change", (event) => { registryState.type = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
+  byId("registry-more").addEventListener("click", () => loadRegistry({ append: true }).catch(showRegistryUnavailable));
+  byId("registry-rows").addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    const controls = [...byId("registry-rows").querySelectorAll("button")];
+    const current = controls.indexOf(document.activeElement);
+    controls[Math.max(0, Math.min(controls.length - 1, current + (event.key === "ArrowDown" ? 1 : -1)))]?.focus();
+    event.preventDefault();
+  });
+  addEventListener("beforeunload", () => sessionStorage.setItem("epwa-registry-scroll", String(scrollY)));
+}
+
+async function renderRecord() {
   const status = byId("status");
   try {
     const manifest = await fetchJSON("./artifact.json");
@@ -206,4 +405,9 @@ async function render() {
   }
 }
 
-render();
+wireRegistryControls();
+renderRegistry().catch(showRegistryUnavailable);
+if (new URL(location.href).searchParams.get("view") === "record") {
+  byId("record-detail").hidden = false;
+  renderRecord();
+}

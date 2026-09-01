@@ -128,7 +128,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		}
 		cursor = next
 	}
-	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
+	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, `id="registry"`, `id="registry-project"`, `id="registry-rows"`, `id="record-detail"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
 		if !strings.Contains(htmlText, required) {
 			t.Fatalf("semantic shell missing %s", required)
 		}
@@ -140,6 +140,17 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 	}
 	if strings.Contains(htmlText, "Evidence ready") {
 		t.Fatal("renderer must not collapse validity layers into a success badge")
+	}
+	app, _ := assets.ReadFile("assets/app.js")
+	for _, required := range []string{"/api/evidence/registry/public", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage"} {
+		if !strings.Contains(string(app), required) {
+			t.Fatalf("registry consumer missing %s", required)
+		}
+	}
+	for _, forbidden := range []string{"/api/evidence/registry/closure", "/api/evidence/registry/sync?"} {
+		if strings.Contains(string(app), forbidden) {
+			t.Fatalf("public consumer references private authority endpoint %s", forbidden)
+		}
 	}
 	css, _ := assets.ReadFile("assets/styles.css")
 	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "overflow-x:hidden"} {

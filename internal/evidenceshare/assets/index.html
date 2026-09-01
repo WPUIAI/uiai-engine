@@ -10,13 +10,33 @@
   <script src="./app.js?v=__UIAI_ASSET_VERSION__" defer></script>
 </head>
 <body data-epwa-shell="v1" data-interaction="read-only">
-  <a class="skip" href="#artifact">Skip to evidence record</a>
+  <a class="skip" href="#registry">Skip to evidence registry</a>
   <header class="masthead">
-    <a class="brand" href="#overview" aria-label="Evidence record overview"><span class="mark">E</span><span>UIAI <b>×</b> Focusa</span><small>Evidence</small></a>
-    <div id="status" class="status" role="status" aria-live="polite" data-epwa-status="loading"><i></i><span>Loading record</span></div>
+    <a class="brand" href="#registry" aria-label="Evidence registry"><span class="mark">E</span><span>UIAI <b>×</b> Focusa</span><small>Evidence</small></a>
+    <div id="status" class="status" role="status" aria-live="polite" data-epwa-status="loading"><i></i><span>Loading registry</span></div>
   </header>
   <main id="artifact">
-    <article aria-labelledby="title" data-epwa-article="true">
+    <section id="registry" class="registry" aria-labelledby="registry-title" data-registry-state="loading">
+      <div class="registry-head">
+        <div><p class="eyebrow">Project-scoped evidence</p><h1 id="registry-title">Evidence registry</h1><p id="registry-truth" class="lede">Loading public-safe project, artifact, and Work Item projections.</p></div>
+        <dl class="registry-freshness"><div><dt>Freshness</dt><dd id="registry-freshness">Loading</dd></div><div><dt>Index revision</dt><dd id="registry-revision">—</dd></div></dl>
+      </div>
+      <form id="registry-controls" class="registry-controls" role="search">
+        <label>Project<select id="registry-project" name="project"><option value="">Loading projects</option></select></label>
+        <label>Search<input id="registry-query" name="q" type="search" autocomplete="off" placeholder="Artifact, digest, task, epic, description"></label>
+        <label>Status<select id="registry-status" name="status"><option value="">All states</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="closed">Closed</option></select></label>
+        <label>Type<select id="registry-type" name="type"><option value="">All types</option><option value="epic">Epic</option><option value="task">Task</option><option value="bug">Bug</option></select></label>
+      </form>
+      <div id="registry-facets" class="registry-facets" aria-live="polite"></div>
+      <div class="registry-table-wrap" tabindex="0" aria-label="Evidence registry results; use arrow keys to move between rows">
+        <table class="registry-table"><thead><tr><th>Kind</th><th>Record</th><th>Status</th><th>Binding</th><th>Revision</th></tr></thead><tbody id="registry-rows"></tbody></table>
+      </div>
+      <div id="registry-empty" class="registry-empty" hidden>No public-safe records match this view.</div>
+      <div class="registry-actions"><button id="registry-more" type="button" hidden>Load next page</button><span id="registry-count">0 records</span></div>
+      <aside id="registry-detail" class="registry-detail" hidden aria-live="polite"></aside>
+    </section>
+
+    <article id="record-detail" aria-labelledby="title" data-epwa-article="true" hidden>
       <section id="overview" class="overview" data-epwa-section="overview" aria-labelledby="title">
         <div class="record-heading">
           <div>

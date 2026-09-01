@@ -20,6 +20,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
 	"github.com/WPUIAI/uiai-engine/internal/desktop"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceregistry"
 	"github.com/WPUIAI/uiai-engine/internal/intelligence"
 	"github.com/WPUIAI/uiai-engine/internal/license"
@@ -38,21 +39,22 @@ var startTime = time.Now()
 
 // Engine is the main server instance.
 type Engine struct {
-	cfg              *config.Config
-	router           chi.Router
-	server           *http.Server
-	auth             *auth.Authenticator
-	ai               *ai.Provider
-	credits          *credits.Service
-	limiter          *ratelimit.Limiter
-	usage            *storage.UsageStore
-	vision           vision.PoolSource
-	sessions         *vision.SessionManager
-	presenter        desktop.DesktopPresenter
-	mediaJobs        *media.JobStore
-	captcha          *captchaPkg.Solver
-	evidenceRegistry *evidenceregistry.Manager
-	evidenceSync     *evidenceregistry.ContinuousSync
+	cfg               *config.Config
+	router            chi.Router
+	server            *http.Server
+	auth              *auth.Authenticator
+	ai                *ai.Provider
+	credits           *credits.Service
+	limiter           *ratelimit.Limiter
+	usage             *storage.UsageStore
+	vision            vision.PoolSource
+	sessions          *vision.SessionManager
+	presenter         desktop.DesktopPresenter
+	mediaJobs         *media.JobStore
+	captcha           *captchaPkg.Solver
+	evidenceArtifacts *evidenceartifact.Store
+	evidenceRegistry  *evidenceregistry.Manager
+	evidenceSync      *evidenceregistry.ContinuousSync
 }
 
 // New creates a new Engine with all routes wired.
@@ -122,6 +124,34 @@ func New(cfg *config.Config) *Engine {
 	evidenceRegistry, err := evidenceregistry.NewManager(filepath.Join(cfg.Storage.DataDir, "evidence-registry"))
 	if err != nil {
 		log.Printf("[evidence-registry] WARNING: manager unavailable: %v", err)
+	}
+	var evidenceArtifacts *evidenceartifact.Store
+	if evidenceRegistry != nil && cfg.EvidenceRegistry.ArtifactStoreEnabled {
+		root := strings.TrimSpace(cfg.EvidenceRegistry.ArtifactStoreRoot)
+		if root == "" {
+			root = filepath.Join(cfg.Storage.DataDir, "evidence-artifacts")
+		}
+		maxStoreBytes := cfg.EvidenceRegistry.MaxArtifactBytes
+		if maxStoreBytes <= 0 {
+			maxStoreBytes = 10 << 30
+		}
+		maxArtifacts := cfg.EvidenceRegistry.MaxArtifactCount
+		if maxArtifacts <= 0 {
+			maxArtifacts = 100000
+		}
+		maxAssetBytes := cfg.EvidenceRegistry.MaxAssetBytes
+		if maxAssetBytes <= 0 {
+			maxAssetBytes = 512 << 20
+		}
+		evidenceArtifacts, _, err = evidenceartifact.OpenStore(evidenceartifact.StoreConfig{Root: root, MaxStoreBytes: maxStoreBytes, MaxArtifacts: maxArtifacts, MaxAssetBytes: maxAssetBytes, StagingQuarantineAge: time.Hour, GCGrace: 24 * time.Hour})
+		if err != nil {
+			log.Printf("[evidence-registry] WARNING: immutable artifact store unavailable: %v", err)
+			evidenceArtifacts = nil
+		} else if result, rebuildErr := evidenceRegistry.RebuildFromArtifactStore(context.Background(), evidenceArtifacts); rebuildErr != nil {
+			log.Printf("[evidence-registry] WARNING: immutable rebuild incomplete: %v", rebuildErr)
+		} else {
+			log.Printf("[evidence-registry] projected %d immutable artifacts across %d projects", result.Artifacts, result.Projects)
+		}
 	}
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
@@ -199,20 +229,21 @@ func New(cfg *config.Config) *Engine {
 	}
 
 	e := &Engine{
-		cfg:              cfg,
-		router:           r,
-		auth:             authenticator,
-		ai:               aiProvider,
-		credits:          creditSvc,
-		limiter:          limiter,
-		usage:            usage,
-		vision:           visionPool,
-		sessions:         sessionMgr,
-		presenter:        presenter,
-		mediaJobs:        mediaJobs,
-		captcha:          captchaSolver,
-		evidenceRegistry: evidenceRegistry,
-		evidenceSync:     evidenceSync,
+		cfg:               cfg,
+		router:            r,
+		auth:              authenticator,
+		ai:                aiProvider,
+		credits:           creditSvc,
+		limiter:           limiter,
+		usage:             usage,
+		vision:            visionPool,
+		sessions:          sessionMgr,
+		presenter:         presenter,
+		mediaJobs:         mediaJobs,
+		captcha:           captchaSolver,
+		evidenceArtifacts: evidenceArtifacts,
+		evidenceRegistry:  evidenceRegistry,
+		evidenceSync:      evidenceSync,
 	}
 
 	e.mountRoutes()
@@ -328,8 +359,16 @@ func (e *Engine) mountRoutes() {
 		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage)
 		routes.MountScreenshotCompare(r, e.cfg, e.vision, e.ai, e.credits, e.limiter, e.usage)
 	})
+	if e.evidenceRegistry != nil && e.evidenceArtifacts != nil {
+		r.Route("/api/evidence/artifacts", func(r chi.Router) {
+			routes.MountEvidenceArtifacts(r, e.evidenceArtifacts, e.evidenceRegistry)
+		})
+	}
 	if e.evidenceRegistry != nil {
 		r.Route("/api/evidence/registry", func(r chi.Router) {
+			r.Route("/public", func(r chi.Router) {
+				routes.MountPublicEvidenceRegistry(r, e.evidenceRegistry, e.cfg.EvidenceRegistry.PublicProjectRefs)
+			})
 			if e.cfg.EvidenceRegistry.ProviderSyncEnabled {
 				routes.MountEvidenceRegistry(r, e.evidenceRegistry, evidenceregistry.FocusaSyncConfig{
 					BaseURL: e.cfg.EvidenceRegistry.FocusaURL, BRPath: e.cfg.EvidenceRegistry.BRPath,

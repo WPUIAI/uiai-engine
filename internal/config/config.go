@@ -136,14 +136,20 @@ type TierLimit struct {
 }
 
 type EvidenceRegistryConfig struct {
-	ProviderSyncEnabled bool          `yaml:"provider_sync_enabled"`
-	FocusaURL           string        `yaml:"focusa_url"`
-	BRPath              string        `yaml:"br_path"`
-	ProjectIDs          []string      `yaml:"project_ids"`
-	AllowedRootPrefixes []string      `yaml:"allowed_root_prefixes"`
-	MaxProjects         int           `yaml:"max_projects"`
-	MaxItems            int           `yaml:"max_items"`
-	ReconcileInterval   time.Duration `yaml:"reconcile_interval"`
+	ArtifactStoreEnabled bool          `yaml:"artifact_store_enabled"`
+	ArtifactStoreRoot    string        `yaml:"artifact_store_root"`
+	MaxArtifactBytes     int64         `yaml:"max_artifact_bytes"`
+	MaxArtifactCount     int           `yaml:"max_artifact_count"`
+	MaxAssetBytes        int64         `yaml:"max_asset_bytes"`
+	ProviderSyncEnabled  bool          `yaml:"provider_sync_enabled"`
+	FocusaURL            string        `yaml:"focusa_url"`
+	BRPath               string        `yaml:"br_path"`
+	ProjectIDs           []string      `yaml:"project_ids"`
+	PublicProjectRefs    []string      `yaml:"public_project_refs"`
+	AllowedRootPrefixes  []string      `yaml:"allowed_root_prefixes"`
+	MaxProjects          int           `yaml:"max_projects"`
+	MaxItems             int           `yaml:"max_items"`
+	ReconcileInterval    time.Duration `yaml:"reconcile_interval"`
 }
 
 type StorageConfig struct {
