@@ -81,7 +81,10 @@ fi
 
 echo "=== UIAI preflight: FORMAT (blocking) ==="
 if command -v go >/dev/null 2>&1; then
-  if ! go fmt ./... 2>&1 | grep -q .; then echo "go fmt: PASS"; else echo "FAIL go fmt — run go fmt ./..."; exit 1; fi
+  bash scripts/check-go-format.sh || exit 1
+  if [[ "$STRICT" -eq 1 ]]; then
+    bash scripts/test-check-go-format.sh || { echo "FAIL go format regression"; exit 1; }
+  fi
 fi
 if [[ -f apps/cockpit/package.json ]] && command -v npm >/dev/null 2>&1; then
   if [[ "$STRICT" -eq 1 ]]; then
