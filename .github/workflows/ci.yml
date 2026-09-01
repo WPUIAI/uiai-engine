@@ -37,10 +37,11 @@ jobs:
         run: npm run check
       - working-directory: apps/cockpit
         run: npm run build
-      - name: Disable updater signing for PR CI (unsigned build — canonical release signs via GH)
+      - name: Disable updater artifact creation for PR CI (canonical release signs via GH)
         run: |
-          jq 'del(.plugins.updater.pubkey) | .bundle.createUpdaterArtifacts = false' apps/cockpit/src-tauri/tauri.conf.json > /tmp/tauri.ci.json && mv /tmp/tauri.ci.json apps/cockpit/src-tauri/tauri.conf.json
-          cat apps/cockpit/src-tauri/tauri.conf.json | grep -q updater && echo "tauri.conf patched for unsigned PR CI"
+          jq '.bundle.createUpdaterArtifacts = false' apps/cockpit/src-tauri/tauri.conf.json > /tmp/tauri.ci.json && mv /tmp/tauri.ci.json apps/cockpit/src-tauri/tauri.conf.json
+          jq -e '.plugins.updater.pubkey | startswith("dW50cnVzdGVk")' apps/cockpit/src-tauri/tauri.conf.json >/dev/null
+          echo "tauri.conf patched for unsigned PR CI; public verification key retained"
       - working-directory: apps/cockpit
         run: npm run tauri build -- --bundles app
       - run: |

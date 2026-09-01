@@ -146,6 +146,11 @@ jobs:
       - name: Generate icons (if missing)
         working-directory: apps/cockpit
         run: ./scripts/generate-icons.sh
+      - name: Disable updater artifact creation for unsigned CI package proof
+        run: |
+          jq '.bundle.createUpdaterArtifacts = false' apps/cockpit/src-tauri/tauri.conf.json > /tmp/tauri.ci.json && mv /tmp/tauri.ci.json apps/cockpit/src-tauri/tauri.conf.json
+          jq -e '.plugins.updater.pubkey | startswith("dW50cnVzdGVk")' apps/cockpit/src-tauri/tauri.conf.json >/dev/null
+          echo "tauri.conf patched for unsigned package proof; public verification key retained"
       - name: Tauri package proof
         working-directory: apps/cockpit
         run: npm run tauri build -- --bundles app
