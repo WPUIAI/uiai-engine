@@ -19,6 +19,8 @@ jobs:
           cache: true
       - run: go vet ./...
       - run: go test ./...
+      - name: Release-note publication bounds
+        run: python3 scripts/test-generate-release-notes.py
 
   cockpit:
     name: Cockpit (Node 22 + Tauri)
