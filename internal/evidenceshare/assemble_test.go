@@ -128,7 +128,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		}
 		cursor = next
 	}
-	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, `id="registry"`, `id="registry-project"`, `id="registry-rows"`, `id="record-detail"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
+	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, `id="registry"`, `id="registry-project"`, `id="registry-rows"`, `id="record-detail"`, `id="registry-back"`, `id="primary-evidence-frame"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
 		if !strings.Contains(htmlText, required) {
 			t.Fatalf("semantic shell missing %s", required)
 		}
@@ -142,7 +142,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		t.Fatal("renderer must not collapse validity layers into a success badge")
 	}
 	app, _ := assets.ReadFile("assets/app.js")
-	for _, required := range []string{"/api/evidence/registry/public", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage"} {
+	for _, required := range []string{"/api/evidence/registry/public", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord"} {
 		if !strings.Contains(string(app), required) {
 			t.Fatalf("registry consumer missing %s", required)
 		}
@@ -153,9 +153,14 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		}
 	}
 	css, _ := assets.ReadFile("assets/styles.css")
-	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "overflow-x:hidden"} {
+	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "overflow-x:hidden", `.registry-table td:nth-child(2){grid-column:1/-1`, ".record-navigation"} {
 		if !strings.Contains(string(css), required) {
 			t.Fatalf("responsive CSS missing %s", required)
+		}
+	}
+	for _, forbidden := range []string{"min-width:720px", `.registry[data-registry-state="unavailable"] .registry-table-wrap{display:none}`, ".record-heading{.record-heading"} {
+		if strings.Contains(string(css), forbidden) {
+			t.Fatalf("responsive CSS retains forbidden artifact-detail/registry rule %s", forbidden)
 		}
 	}
 }

@@ -37,6 +37,7 @@
     </section>
 
     <article id="record-detail" aria-labelledby="title" data-epwa-article="true" hidden>
+      <nav class="record-navigation" aria-label="Artifact navigation"><a id="registry-back" href="./">← Back to evidence registry</a></nav>
       <section id="overview" class="overview" data-epwa-section="overview" aria-labelledby="title">
         <div class="record-heading">
           <div>
@@ -85,7 +86,7 @@
 
       <section id="evidence" class="evidence" data-epwa-section="evidence" aria-labelledby="evidence-title">
         <div class="section-head"><span>01</span><div><p>Primary observation</p><h2 id="evidence-title">Evidence</h2></div></div>
-        <figure class="frame">
+        <figure id="primary-evidence-frame" class="frame">
           <div class="evidence-meta"><span id="source-label">Captured source</span><span id="capture-label">Loading capture metadata</span></div>
           <a id="image-link" href="./screenshot.png" target="_blank" rel="noopener"><img id="screenshot" alt="Captured browser screenshot evidence" decoding="async"></a>
           <figcaption id="caption">Immutable screenshot bytes</figcaption>
@@ -105,9 +106,9 @@
       <section id="developer" class="panel developer" data-epwa-section="developer" aria-labelledby="developer-title">
         <div class="section-head"><span>04</span><div><p>Canonical machine records</p><h2 id="developer-title">Developer</h2></div></div>
         <div class="developer-links">
-          <a href="./projection.json">Canonical Evidence PWA projection <span>Open ↗</span></a>
-          <a href="./artifact.json">Portable artifact manifest <span>Open ↗</span></a>
-          <a href="./inspection.json">Public-safe inspection receipt <span>Open ↗</span></a>
+          <a id="detail-json-link" href="./projection.json">Canonical Evidence PWA projection <span>Open ↗</span></a>
+          <a id="manifest-json-link" href="./artifact.json">Portable artifact manifest <span>Open ↗</span></a>
+          <a id="inspection-json-link" href="./inspection.json">Public-safe inspection receipt <span>Open ↗</span></a>
         </div>
       </section>
     </article>

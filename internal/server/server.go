@@ -367,7 +367,7 @@ func (e *Engine) mountRoutes() {
 	if e.evidenceRegistry != nil {
 		r.Route("/api/evidence/registry", func(r chi.Router) {
 			r.Route("/public", func(r chi.Router) {
-				routes.MountPublicEvidenceRegistry(r, e.evidenceRegistry, e.cfg.EvidenceRegistry.PublicProjectRefs)
+				routes.MountPublicEvidenceRegistry(r, e.evidenceRegistry, e.evidenceArtifacts, e.cfg.EvidenceRegistry.PublicProjectRefs)
 			})
 			if e.cfg.EvidenceRegistry.ProviderSyncEnabled {
 				routes.MountEvidenceRegistry(r, e.evidenceRegistry, evidenceregistry.FocusaSyncConfig{

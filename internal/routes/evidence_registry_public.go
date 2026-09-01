@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceregistry"
 	"github.com/go-chi/chi/v5"
 )
@@ -24,7 +25,7 @@ type publicProjectProjection struct {
 	ObservedAt    time.Time `json:"observed_at"`
 }
 
-func MountPublicEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager, projectRefs []string) {
+func MountPublicEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager, artifacts *evidenceartifact.Store, projectRefs []string) {
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			w.Header().Set("Cache-Control", "no-store")
@@ -46,6 +47,7 @@ func MountPublicEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager
 		_, ok := allowed[strings.TrimSpace(ref)]
 		return ok
 	}
+	mountPublicArtifactReads(r, artifacts, isAllowed)
 
 	r.Get("/projects", func(w http.ResponseWriter, req *http.Request) {
 		projects, err := manager.ProjectProjections(req.Context())
