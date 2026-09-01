@@ -110,7 +110,7 @@ Declarative actions only: inspect/link/capture/reproof/follow-up/adjudication/sh
 
 Gap coverage: 071–078, 124, 137–140. Depends T01–T05.
 
-Build FPV-token-based semantic article; Overview/Evidence/Timeline/Inspect/Developer; registry/list/search/filter/collections; local/LAN/tailnet/private/unlisted/public-safe hosting; relative subpath-safe assets; PWA/offline/update; large-set virtualization; LowMem; localization/RTL; WCAG 2.2 AA; all degraded states.
+Build FPV-token-based semantic article; Overview/Evidence/Timeline/Inspect/Developer; registry/list/search/filter/collections; local/LAN/tailnet/private/unlisted/public-safe hosting; relative subpath-safe assets; PWA/offline/update; large-set virtualization; LowMem; localization/RTL; WCAG 2.2 AA; all degraded states. `106s` is the normative T08-C/T08-F registry contract: rebuildable per-Project DB, compact high-scale table, stable search/cursors, typed bidirectional Artifact ↔ Work Item ↔ Acceptance Atom ↔ Completion Case edges, closure-eligibility projections, bulk-operation authority, and 10k/100k proof.
 
 ### T09 — Print/PDF/email/slides/portable derivatives
 

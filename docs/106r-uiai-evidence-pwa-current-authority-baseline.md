@@ -14,6 +14,11 @@
 
 A consumer may not assume a contract newer than its declared base. Stacked candidates remain unavailable to `main` consumers until their exact ancestry is adopted.
 
+## Post-baseline normative amendments
+
+- `106s-uiai-evidence-pwa-project-registry-bidirectional-closure-index-amendment.md` refines T08-C, T08-F, CG-12, CG-13, CG-16, CG-21, and CG-22. It requires a rebuildable per-Project registry database, compact high-scale list/search/filter UX, typed bidirectional Artifact ↔ Work Item ↔ Acceptance Atom ↔ Completion Case edges, closure-eligibility projections, stable cursor APIs, 10k/100k scale proof, and strict preservation of Focusa Completion Authority.
+- This post-baseline amendment adds contract authority only. It does not retroactively accept any implementation or change the captured compatibility floor above.
+
 ## Candidate inventory
 
 | ID + descriptor | Head | Base | State at capture | Authority posture |

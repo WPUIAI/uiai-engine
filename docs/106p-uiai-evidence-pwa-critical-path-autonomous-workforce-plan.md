@@ -39,11 +39,11 @@ File ownership should remain under a new `internal/evidencejudge/` boundary; T01
 
 1. **T08-A Contract/shell** — freeze semantic sections, projection schema, relative paths, hosting/access states, budgets, fixtures, rollback.
 2. **T08-B Renderer** — Overview/Evidence/Timeline/Inspect/Developer semantic article. Depends A.
-3. **T08-C Registry** — list/search/filter/collections and immutable artifact lookup. Depends A; parallel with B.
+3. **T08-C Registry** — implement `106s`: rebuildable per-Project registry DB, compact list/search/filter/facets/collections, immutable exact lookup, stable cursors, typed bidirectional Artifact ↔ Work Item ↔ Acceptance Atom ↔ Completion Case edges, closure-eligibility projection, and registry-to-detail navigation. Depends A; parallel with B.
 4. **T08-D Hosting/PWA** — localhost/LAN/tailnet/private/unlisted/public-safe, non-root subpaths, offline/update behavior. Depends A; parallel.
 5. **T08-E Accessibility/i18n** — WCAG 2.2 AA, keyboard, reduced motion, localization, RTL, 375/768/1024/1440. Depends A; parallel.
-6. **T08-F Scale/degradation** — lazy media, virtualization, LowMem, bounded payloads, explicit unavailable/blocked/corrupt states. Depends A; parallel.
-7. **T08-J Independent join** — browser, accessibility, offline, restart, subpath, pressure, and public-redaction matrices. Requires B+C+D+E+F.
+6. **T08-F Scale/degradation** — `106s` 10k/100k fixtures, virtualized rows, lazy media, stable keyset paging, LowMem/offline snapshots, index rebuild/recovery, bounded payloads, performance budgets, and explicit unavailable/blocked/corrupt/stale-index states. Depends A; parallel.
+7. **T08-J Independent join** — browser, accessibility, offline, restart, subpath, pressure, public-redaction, registry authorization, bidirectional edge, closure-gate, bulk-operation, index-rebuild, and 10k/100k performance matrices. Requires B+C+D+E+F.
 
 Use a new `internal/evidencepwa/` plus bounded `web/evidence/` ownership surface; legacy share-handler hardening remains separately owned by #107.
 
