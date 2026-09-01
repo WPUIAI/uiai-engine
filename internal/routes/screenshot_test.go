@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
@@ -29,7 +30,7 @@ func (screenshotSharePool) Reset()                             {}
 func (screenshotSharePool) Stats() map[string]any              { return map[string]any{} }
 func (screenshotSharePool) Close()                             {}
 func (screenshotSharePool) Screenshot(vision.ScreenshotOpts) (*vision.ScreenshotResult, error) {
-	return &vision.ScreenshotResult{Data: []byte("automatic-png-evidence"), Width: 375, Height: 812, Format: "png", Duration: 12 * time.Millisecond}, nil
+	return &vision.ScreenshotResult{Data: append([]byte("\x89PNG\r\n\x1a\n"), []byte("automatic-pixel-evidence")...), Width: 375, Height: 812, Format: "png", Duration: 12 * time.Millisecond}, nil
 }
 
 func TestScreenshotAutomaticallyReturnsHumanViewableEvidenceShare(t *testing.T) {
@@ -38,7 +39,7 @@ func TestScreenshotAutomaticallyReturnsHumanViewableEvidenceShare(t *testing.T) 
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
 	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil) })
-	request := httptest.NewRequest(http.MethodPost, "https://engine.example/api/screenshot/", bytes.NewBufferString(`{"url":"https://focusa.dev/","width":375,"height":812,"format":"png","focusa_scope":{"workpoint_id":"workpoint:homepage","continuity_id":"focusa-dev-homepage-main"}}`))
+	request := httptest.NewRequest(http.MethodPost, "https://engine.example/api/screenshot/", bytes.NewBufferString(`{"url":"https://focusa.dev/","width":375,"height":812,"format":"png","focusa_scope":{"workpoint_id":"workpoint:homepage","continuity_id":"focusa-dev-homepage-main"},"evidence_scope":{"project_ref":"project:focusa","workstream_ref":"workstream:epwa","workset_ref":"workset:t08","callgraph_ref":"callgraph:133","workpoint_ref":"workpoint:t08b","work_item_ref":"work-item:screenshot-share","continuity_ref":"epwa-t08b"}}`))
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
@@ -62,20 +63,26 @@ func TestScreenshotAutomaticallyReturnsHumanViewableEvidenceShare(t *testing.T) 
 	if view.Code != http.StatusOK || !strings.Contains(view.Body.String(), "UIAI Evidence") {
 		t.Fatalf("generated share not viewable: %d", view.Code)
 	}
+	projectionPath := strings.TrimSuffix(response["artifact_path"].(string), "/") + "/projection.json"
+	projection := httptest.NewRecorder()
+	router.ServeHTTP(projection, httptest.NewRequest(http.MethodGet, projectionPath, nil))
+	if projection.Code != http.StatusOK || !strings.Contains(projection.Body.String(), evidencepwa.ProjectionSchema) {
+		t.Fatalf("canonical projection not served: %d %s", projection.Code, projection.Body.String())
+	}
 }
 
 func TestEvidenceShareRouteServesPortablePackage(t *testing.T) {
 	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", "")
 	dataDir := t.TempDir()
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: dataDir}}
-	share, err := evidenceshare.Assemble(evidenceShareDir(cfg), evidenceshare.Input{Screenshot: []byte("png-bytes"), Format: "png", Width: 375, Height: 812, SourceURL: "https://example.com/page", CapturedAt: time.Date(2026, 8, 30, 1, 0, 0, 0, time.UTC)})
+	share, err := evidenceshare.Assemble(evidenceShareDir(cfg), evidenceshare.Input{Screenshot: append([]byte("\x89PNG\r\n\x1a\n"), []byte("bounded-route-pixels")...), Format: "png", Width: 375, Height: 812, SourceURL: "https://example.com/page", CapturedAt: time.Date(2026, 8, 30, 1, 0, 0, 0, time.UTC)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	id := filepath.Base(filepath.Clean(share.Directory))
 	router := chi.NewRouter()
 	mountEvidenceShare(router, cfg)
-	for path, mime := range map[string]string{"/share/" + id + "/": "text/html", "/share/" + id + "/styles.css": "text/css", "/share/" + id + "/app.js": "application/javascript", "/share/" + id + "/artifact.json": "application/json", "/share/" + id + "/screenshot.png": "image/png"} {
+	for path, mime := range map[string]string{"/share/" + id + "/": "text/html", "/share/" + id + "/styles.css": "text/css", "/share/" + id + "/app.js": "application/javascript", "/share/" + id + "/artifact.json": "application/json", "/share/" + id + "/inspection.json": "application/json", "/share/" + id + "/screenshot.png": "image/png"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, req)

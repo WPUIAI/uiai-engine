@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 )
 
 func TestAssemblePortableSharePackage(t *testing.T) {
@@ -21,7 +23,7 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if !strings.HasPrefix(result.ArtifactRef, "uiai-evidence-share:sha256:") || !strings.HasPrefix(result.RelativePath, "./") {
 		t.Fatal("invalid portable identity")
 	}
-	for _, name := range []string{"artifact.json", "screenshot.webp", "index.html", "styles.css", "app.js"} {
+	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "app.js"} {
 		if info, err := os.Stat(filepath.Join(result.Directory, name)); err != nil || info.Size() == 0 {
 			t.Fatalf("missing %s: %v", name, err)
 		}
@@ -34,12 +36,37 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if manifest.SourceURL != "https://example.com/path" {
 		t.Fatalf("source URL leaked credentials/query: %q", manifest.SourceURL)
 	}
-	if manifest.Interaction != "read_only" || manifest.Availability != "ready" {
+	if manifest.Interaction != "read_only" || manifest.Availability != "ready" || manifest.ProjectionRef != "./projection.json" {
 		t.Fatal("truth posture drift")
+	}
+	projectionBody, _ := os.ReadFile(filepath.Join(result.Directory, "projection.json"))
+	var projection evidencepwa.Projection
+	if err := json.Unmarshal(projectionBody, &projection); err != nil || evidencepwa.ValidateProjection(projection) != nil {
+		t.Fatal("canonical evidence PWA projection missing or invalid")
 	}
 	second, err := Assemble(root, input)
 	if err != nil || second != result {
 		t.Fatalf("assembly not idempotent: %#v %v", second, err)
+	}
+}
+
+func TestAssembleIncompleteScopeIsExplicitlyBlocked(t *testing.T) {
+	input := validInput()
+	input.Scope = Scope{WorkpointRef: "workpoint:homepage"}
+	result, err := Assemble(t.TempDir(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(filepath.Join(result.Directory, "artifact.json"))
+	var manifest Manifest
+	if err := json.Unmarshal(body, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Availability != "blocked" || manifest.ProjectionRef != "" {
+		t.Fatal("incomplete lineage did not fail closed")
+	}
+	if _, err := os.Stat(filepath.Join(result.Directory, "projection.json")); !os.IsNotExist(err) {
+		t.Fatal("projection emitted from incomplete lineage")
 	}
 }
 
@@ -119,7 +146,7 @@ func TestVisualProofFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := Assemble(root, Input{Screenshot: data, Format: "png", Width: 1440, Height: 1000, SourceURL: "https://focusa.dev/", CapturedAt: time.Date(2026, 8, 30, 2, 0, 0, 0, time.UTC), DurationMS: 87, Scope: Scope{WorkpointRef: "f1799444-9fe9-5815-9ade-3b41fbe37b8a", ContinuityRef: "focusa-dev-homepage-main"}})
+	result, err := Assemble(root, Input{Screenshot: data, Format: "png", Width: 1440, Height: 1000, SourceURL: "https://focusa.dev/", CapturedAt: time.Date(2026, 8, 30, 2, 0, 0, 0, time.UTC), DurationMS: 87, Scope: completeScope()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +154,10 @@ func TestVisualProofFixture(t *testing.T) {
 }
 
 func validInput() Input {
-	return Input{Screenshot: []byte("browser-optimized-webp"), Format: "webp", Width: 1440, Height: 900, SourceURL: "https://user:secret@example.com/path?token=secret#private", CapturedAt: time.Date(2026, 8, 30, 1, 2, 3, 0, time.UTC), DurationMS: 87, Scope: Scope{WorkpointRef: "workpoint:homepage", ContinuityRef: "focusa-dev-homepage-main"}}
+	return Input{Screenshot: append([]byte("\x89PNG\r\n\x1a\n"), []byte("bounded-pixel-data")...), Format: "png", Width: 1440, Height: 900, SourceURL: "https://user:secret@example.com/path?token=secret#private", CapturedAt: time.Date(2026, 8, 30, 1, 2, 3, 0, time.UTC), DurationMS: 87, Scope: completeScope()}
+}
+func completeScope() Scope {
+	return Scope{ProjectRef: "project:focusa", WorkstreamRef: "workstream:epwa", WorksetRef: "workset:t08", CallGraphRef: "callgraph:133", WorkpointRef: "workpoint:t08b", WorkItemRef: "work-item:screenshot-share", ContinuityRef: "epwa-t08b"}
 }
 func assemble(t *testing.T, input Input) error {
 	t.Helper()

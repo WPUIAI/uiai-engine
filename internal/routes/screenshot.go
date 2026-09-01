@@ -104,19 +104,20 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 	}
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
-			URL         string              `json:"url"`
-			Width       int                 `json:"width"`
-			Height      int                 `json:"height"`
-			FullPage    bool                `json:"fullPage"`
-			Format      string              `json:"format"`
-			Quality     int                 `json:"quality"`
-			WaitFor     string              `json:"waitFor"`
-			Delay       int                 `json:"delay"`
-			Cookies     string              `json:"cookies"` // "name=value; name2=value2"
-			Timeout     int                 `json:"timeout"` // overall timeout in seconds (default: 30)
-			NoCache     bool                `json:"nocache"` // skip cache, always take fresh screenshot
-			FocusaScope *vision.FocusaScope `json:"focusa_scope"`
-			Inline      *bool               `json:"inline"` // C-010-09: default false → artifact_ref only
+			URL           string               `json:"url"`
+			Width         int                  `json:"width"`
+			Height        int                  `json:"height"`
+			FullPage      bool                 `json:"fullPage"`
+			Format        string               `json:"format"`
+			Quality       int                  `json:"quality"`
+			WaitFor       string               `json:"waitFor"`
+			Delay         int                  `json:"delay"`
+			Cookies       string               `json:"cookies"` // "name=value; name2=value2"
+			Timeout       int                  `json:"timeout"` // overall timeout in seconds (default: 30)
+			NoCache       bool                 `json:"nocache"` // skip cache, always take fresh screenshot
+			FocusaScope   *vision.FocusaScope  `json:"focusa_scope"`
+			EvidenceScope *evidenceshare.Scope `json:"evidence_scope"`
+			Inline        *bool                `json:"inline"` // C-010-09: default false → artifact_ref only
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
@@ -204,7 +205,9 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 		}
 		resp["artifact_retrieval"] = "GET /api/screenshot/artifact/{sha256}"
 		shareInput := evidenceshare.Input{Screenshot: result.Data, Format: result.Format, Width: result.Width, Height: result.Height, SourceURL: body.URL, CapturedAt: time.Now().UTC(), DurationMS: result.Duration.Milliseconds()}
-		if body.FocusaScope != nil {
+		if body.EvidenceScope != nil {
+			shareInput.Scope = *body.EvidenceScope
+		} else if body.FocusaScope != nil {
 			shareInput.Scope = evidenceshare.Scope{WorkpointRef: body.FocusaScope.WorkpointID, ContinuityRef: body.FocusaScope.ContinuityID}
 		}
 		if autoPacket {
@@ -403,7 +406,7 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 		if name == "" {
 			name = "index.html"
 		}
-		allowed := map[string]string{"index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "application/javascript; charset=utf-8", "artifact.json": "application/json; charset=utf-8", "screenshot.png": "image/png", "screenshot.jpg": "image/jpeg", "screenshot.webp": "image/webp"}
+		allowed := map[string]string{"index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "application/javascript; charset=utf-8", "artifact.json": "application/json; charset=utf-8", "projection.json": "application/json; charset=utf-8", "inspection.json": "application/json; charset=utf-8", "screenshot.png": "image/png", "screenshot.jpg": "image/jpeg", "screenshot.webp": "image/webp"}
 		mime, ok := allowed[name]
 		if !ok {
 			http.NotFound(w, req)
@@ -416,7 +419,7 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 		}
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if name == "artifact.json" || strings.HasPrefix(name, "screenshot.") {
+		if name == "artifact.json" || name == "projection.json" || name == "inspection.json" || strings.HasPrefix(name, "screenshot.") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "public, max-age=300")
