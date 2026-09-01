@@ -128,13 +128,21 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		}
 		cursor = next
 	}
-	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, "Review ≠ completion ≠ settlement"} {
+	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
 		if !strings.Contains(htmlText, required) {
 			t.Fatalf("semantic shell missing %s", required)
 		}
 	}
+	for _, layer := range []string{"integrity", "provenance", "observation", "sufficiency", "verification", "completion", "settlement", "legal"} {
+		if strings.Count(htmlText, `data-validity-layer="`+layer+`"`) != 1 {
+			t.Fatalf("validity layer %s missing or duplicated", layer)
+		}
+	}
+	if strings.Contains(htmlText, "Evidence ready") {
+		t.Fatal("renderer must not collapse validity layers into a success badge")
+	}
 	css, _ := assets.ReadFile("assets/styles.css")
-	for _, required := range []string{"clamp(", "max-width:720px", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "overflow-x:hidden"} {
+	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "overflow-x:hidden"} {
 		if !strings.Contains(string(css), required) {
 			t.Fatalf("responsive CSS missing %s", required)
 		}

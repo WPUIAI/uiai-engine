@@ -4,35 +4,95 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Evidence · UIAI</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23141712'/%3E%3Cpath d='M18 17v20c0 9 5 14 14 14s14-5 14-14V17h-8v20c0 5-2 7-6 7s-6-2-6-7V17z' fill='%23c9ff3d'/%3E%3C/svg%3E">
+  <title>Evidence Record · UIAI × Focusa</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23182025'/%3E%3Cpath d='M17 18h30v7H24v7h18v7H24v7h23v7H17z' fill='%23f4f6f5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./styles.css?v=__UIAI_ASSET_VERSION__">
   <script src="./app.js?v=__UIAI_ASSET_VERSION__" defer></script>
 </head>
 <body data-epwa-shell="v1" data-interaction="read-only">
-  <a class="skip" href="#artifact">Skip to evidence artifact</a>
+  <a class="skip" href="#artifact">Skip to evidence record</a>
   <header class="masthead">
-    <a class="brand" href="#overview" aria-label="UIAI evidence overview"><span class="mark">U</span><span>UIAI Evidence</span></a>
-    <div id="status" class="status" role="status" aria-live="polite" data-epwa-status="loading"><i></i><span>Loading exact artifact projection</span></div>
+    <a class="brand" href="#overview" aria-label="Evidence record overview"><span class="mark">E</span><span>UIAI <b>×</b> Focusa</span><small>Evidence</small></a>
+    <div id="status" class="status" role="status" aria-live="polite" data-epwa-status="loading"><i></i><span>Loading record</span></div>
   </header>
   <main id="artifact">
     <article aria-labelledby="title" data-epwa-article="true">
-      <section id="overview" class="hero" data-epwa-section="overview" aria-labelledby="title">
-        <div class="eyebrow">Immutable Evidence Artifact</div>
-        <h1 id="title">Evidence Artifact</h1>
-        <p id="truth" class="lede">Loading the bounded evidence record.</p>
-        <dl id="facts" class="facts"></dl>
+      <section id="overview" class="overview" data-epwa-section="overview" aria-labelledby="title">
+        <div class="record-heading">
+          <div>
+            <p class="eyebrow">Immutable evidence record</p>
+            <h1 id="title">Evidence record</h1>
+            <p id="truth" class="lede">Loading the bounded evidentiary projection.</p>
+          </div>
+          <dl class="record-identity">
+            <div><dt>Artifact</dt><dd><code id="record-id">Loading</code></dd></div>
+            <div><dt>Revision</dt><dd id="record-revision">—</dd></div>
+            <div><dt>Record posture</dt><dd>Read-only projection</dd></div>
+          </dl>
+        </div>
+
+        <div class="authority-pair" aria-label="Authority separation">
+          <section aria-labelledby="uiai-authority"><p class="authority-label">Evidence authority</p><h2 id="uiai-authority">UIAI Engine</h2><p>Capture, immutable bytes, digest binding, inspection, custody inputs, and rendering.</p></section>
+          <section aria-labelledby="focusa-authority"><p class="authority-label">Execution authority</p><h2 id="focusa-authority">Focusa</h2><p>Project scope, Work Items, Acceptance Atoms, completion, provider reconciliation, reopen, and settlement.</p></section>
+        </div>
+
+        <nav class="lineage" aria-label="Bound execution lineage">
+          <p class="subhead">Bound execution chain</p>
+          <ol id="lineage-list"><li>Loading scope bindings</li></ol>
+        </nav>
+
+        <section class="validity" aria-labelledby="validity-title">
+          <div class="subhead-row"><h2 id="validity-title">Validity layers</h2><p>Independent states—not one “valid” badge</p></div>
+          <dl id="validity-grid" class="validity-grid">
+            <div data-validity-layer="integrity"><dt>Integrity</dt><dd id="validity-integrity">Loading</dd></div>
+            <div data-validity-layer="provenance"><dt>Provenance</dt><dd id="validity-provenance">Loading</dd></div>
+            <div data-validity-layer="observation"><dt>Observation</dt><dd id="validity-observation">Loading</dd></div>
+            <div data-validity-layer="sufficiency"><dt>Evidentiary sufficiency</dt><dd id="validity-sufficiency">Loading</dd></div>
+            <div data-validity-layer="verification"><dt>Verification</dt><dd id="validity-verification">Loading</dd></div>
+            <div data-validity-layer="completion"><dt>Completion</dt><dd id="validity-completion">Loading</dd></div>
+            <div data-validity-layer="settlement"><dt>Settlement</dt><dd id="validity-settlement">Loading</dd></div>
+            <div data-validity-layer="legal"><dt>Legal admissibility</dt><dd id="validity-legal">Loading</dd></div>
+          </dl>
+        </section>
+
+        <dl id="facts" class="facts" aria-label="Record facts"></dl>
+
+        <aside class="limitations" aria-labelledby="limitations-title">
+          <div><p class="subhead" id="limitations-title">Limitations and challenge posture</p><p id="limitations-copy">This technical record is loading. Technical records are not automatically legally admissible and their existence does not establish review, completion, or settlement.</p></div>
+          <a href="#developer">Inspect machine record</a>
+        </aside>
       </section>
-      <section id="evidence" class="visual" data-epwa-section="evidence" aria-labelledby="evidence-title">
-        <div class="section-head"><span>01</span><h2 id="evidence-title">Evidence</h2></div>
-        <figure class="frame"><div class="browser-bar" aria-hidden="true"><b></b><b></b><b></b><span id="source-label">Captured page</span></div><a id="image-link" href="./screenshot.png" target="_blank" rel="noopener"><img id="screenshot" alt="Captured browser screenshot evidence" decoding="async"></a><figcaption id="caption">Immutable screenshot bytes</figcaption></figure>
+
+      <section id="evidence" class="evidence" data-epwa-section="evidence" aria-labelledby="evidence-title">
+        <div class="section-head"><span>01</span><div><p>Primary observation</p><h2 id="evidence-title">Evidence</h2></div></div>
+        <figure class="frame">
+          <div class="evidence-meta"><span id="source-label">Captured source</span><span id="capture-label">Loading capture metadata</span></div>
+          <a id="image-link" href="./screenshot.png" target="_blank" rel="noopener"><img id="screenshot" alt="Captured browser screenshot evidence" decoding="async"></a>
+          <figcaption id="caption">Immutable screenshot bytes</figcaption>
+        </figure>
       </section>
-      <section id="timeline" class="panel" data-epwa-section="timeline" aria-labelledby="timeline-title"><div class="section-head"><span>02</span><h2 id="timeline-title">Timeline</h2></div><ol id="events" class="timeline"></ol></section>
-      <section id="inspect" class="panel" data-epwa-section="inspect" aria-labelledby="inspect-title"><div class="section-head"><span>03</span><h2 id="inspect-title">Inspect</h2></div><div id="inspect-grid" class="inspect-grid"></div></section>
-      <section id="developer" class="panel developer" data-epwa-section="developer" aria-labelledby="developer-title"><div class="section-head"><span>04</span><h2 id="developer-title">Developer</h2></div><div class="developer-links"><a href="./projection.json">Canonical Evidence PWA projection <span>↗</span></a><a href="./artifact.json">Portable artifact manifest <span>↗</span></a><a href="./inspection.json">Public-safe inspection receipt <span>↗</span></a></div></section>
+
+      <section id="timeline" class="panel" data-epwa-section="timeline" aria-labelledby="timeline-title">
+        <div class="section-head"><span>02</span><div><p>Observed events</p><h2 id="timeline-title">Timeline</h2></div></div>
+        <ol id="events" class="timeline"></ol>
+      </section>
+
+      <section id="inspect" class="panel" data-epwa-section="inspect" aria-labelledby="inspect-title">
+        <div class="section-head"><span>03</span><div><p>Integrity and custody fields</p><h2 id="inspect-title">Inspect</h2></div></div>
+        <div id="inspect-grid" class="inspect-grid"></div>
+      </section>
+
+      <section id="developer" class="panel developer" data-epwa-section="developer" aria-labelledby="developer-title">
+        <div class="section-head"><span>04</span><div><p>Canonical machine records</p><h2 id="developer-title">Developer</h2></div></div>
+        <div class="developer-links">
+          <a href="./projection.json">Canonical Evidence PWA projection <span>Open ↗</span></a>
+          <a href="./artifact.json">Portable artifact manifest <span>Open ↗</span></a>
+          <a href="./inspection.json">Public-safe inspection receipt <span>Open ↗</span></a>
+        </div>
+      </section>
     </article>
   </main>
-  <noscript>This read-only artifact remains inspectable without JavaScript. Dynamic evidence is unavailable.</noscript>
-  <footer><span>Read-only portable evidence</span><span>Review ≠ completion ≠ settlement</span></footer>
+  <noscript>This read-only record remains structurally inspectable without JavaScript. Dynamic projection fields are unavailable.</noscript>
+  <footer><span>UIAI evidence · Focusa execution authority</span><span>Integrity ≠ sufficiency ≠ verification ≠ completion ≠ settlement ≠ legal admissibility</span></footer>
 </body>
 </html>
