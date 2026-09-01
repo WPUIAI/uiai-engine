@@ -316,16 +316,13 @@ func evidenceShareDir(cfg *config.Config) string {
 	return filepath.Join(screenshotStoreDir(), "evidence-share")
 }
 
-func requestArtifactURL(req *http.Request, artifactPath string) string {
-	scheme := "http"
-	if req.TLS != nil {
-		scheme = "https"
-	}
-	host := req.Host
-	if strings.ContainsAny(host, "\r\n") || host == "" {
-		return artifactPath
-	}
-	return scheme + "://" + host + artifactPath
+func requestArtifactURL(_ *http.Request, artifactPath string) string {
+	// Keep generated links origin-relative. Reverse proxies and tunnels may
+	// expose an internal Host/port (for example :3000); absolute links would
+	// leak that routing detail and produce unreachable public URLs. Relative
+	// refs also preserve portability across localhost, LAN, tailnet, and offline
+	// copies without trusting forwarded-host headers.
+	return artifactPath
 }
 
 func mountEvidenceShare(r chi.Router, cfg *config.Config) {

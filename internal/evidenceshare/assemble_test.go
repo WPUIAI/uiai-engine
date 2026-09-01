@@ -84,6 +84,24 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 			}
 		}
 	}
+	html, _ := assets.ReadFile("assets/index.html")
+	htmlText := string(html)
+	if strings.Count(htmlText, "<article") != 1 || strings.Count(htmlText, "</article>") != 1 {
+		t.Fatal("semantic shell must contain exactly one evidence article")
+	}
+	cursor := -1
+	for _, id := range []string{"overview", "evidence", "timeline", "inspect", "developer"} {
+		next := strings.Index(htmlText, `id="`+id+`"`)
+		if next <= cursor || strings.Count(htmlText, `id="`+id+`"`) != 1 {
+			t.Fatalf("semantic section %s missing, duplicate, or out of order", id)
+		}
+		cursor = next
+	}
+	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, "Review ≠ completion ≠ settlement"} {
+		if !strings.Contains(htmlText, required) {
+			t.Fatalf("semantic shell missing %s", required)
+		}
+	}
 	css, _ := assets.ReadFile("assets/styles.css")
 	for _, required := range []string{"clamp(", "max-width:720px", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "overflow-x:hidden"} {
 		if !strings.Contains(string(css), required) {

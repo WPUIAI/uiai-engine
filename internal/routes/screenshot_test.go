@@ -54,8 +54,8 @@ func TestScreenshotAutomaticallyReturnsHumanViewableEvidenceShare(t *testing.T) 
 			t.Fatalf("automatic share missing %s: %#v", field, response)
 		}
 	}
-	if !strings.HasPrefix(response["artifact_url"].(string), "https://engine.example/api/screenshot/share/") {
-		t.Fatalf("non-viewable URL: %v", response["artifact_url"])
+	if got := response["artifact_url"].(string); !strings.HasPrefix(got, "/api/screenshot/share/") || strings.Contains(got, "://") || strings.Contains(got, ":3000") {
+		t.Fatalf("non-portable artifact URL: %v", got)
 	}
 	view := httptest.NewRecorder()
 	router.ServeHTTP(view, httptest.NewRequest(http.MethodGet, response["artifact_path"].(string), nil))
@@ -113,13 +113,10 @@ func TestEvidenceShareRouteServesPortablePackage(t *testing.T) {
 	}
 }
 
-func TestArtifactURLUsesRequestOriginWithoutForwardedInjection(t *testing.T) {
+func TestArtifactURLUsesPortableRelativeRef(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "https://share.example/api/screenshot", nil)
-	if got := requestArtifactURL(req, "/api/screenshot/share/abc/"); got != "https://share.example/api/screenshot/share/abc/" {
-		t.Fatalf("url=%q", got)
-	}
-	req.Host = "bad.example\r\nInjected: yes"
-	if got := requestArtifactURL(req, "/safe"); got != "/safe" {
-		t.Fatalf("unsafe host accepted: %q", got)
+	req.Host = "share.example:3000"
+	if got := requestArtifactURL(req, "/api/screenshot/share/abc/"); got != "/api/screenshot/share/abc/" {
+		t.Fatalf("non-portable URL=%q", got)
 	}
 }
