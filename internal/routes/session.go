@@ -68,14 +68,8 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		}
 		sess.SetFocusaScope(resolveFocusaScope(body.FocusaScope, body.WorkpointID, body.ContinuityID, body.ProjectRoot, body.EvidenceRef))
 
-		fpvShare, fpvErr := fpvCreateShare(sess.ID, 60, true, false, 0)
-		if fpvErr != nil {
-			writeSessionError(w, 500, "fpv_share_failed", fpvErr, sess)
-			return
-		}
 		writeJSON(w, 201, map[string]any{
 			"session":     sessionInfoPayload(sess),
-			"fpv_share":   fpvShare,
 			"screenshot":  snap.Screenshot,
 			"size":        snap.Size,
 			"duration_ms": snap.Duration,
