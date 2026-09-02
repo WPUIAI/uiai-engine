@@ -90,6 +90,8 @@ func classRecovery(class string) (bool, []string) {
 		return false, []string{"snapshot", "resync_refs"}
 	case "url_not_allowed":
 		return false, []string{"adjust_target"}
+	case "invalid_request":
+		return false, []string{"adjust_request"}
 	case "page_unavailable", "session_reaped", "session_closed_by_operator", "session_not_found":
 		return false, []string{"reopen_session"}
 	case "aborted_open_retryable":
