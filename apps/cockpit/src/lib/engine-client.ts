@@ -1,4 +1,5 @@
 import { requireCapabilityEntitlement } from "./contracts/entitlement";
+import type { EvidenceShareList, EvidenceShareManifest, EvidenceShareSettings, EvidenceShareVerification } from "./evidence-share";
 
 export const DEFAULT_ENGINE_URL = "http://127.0.0.1:7456";
 
@@ -81,4 +82,10 @@ export const engineClient = {
     requireCapabilityEntitlement("uiai.browser.screenshot.execute");
     return engineRequest<ScreenshotResult & { focusa?: Record<string, unknown> }>("/api/screenshot/", { method: "POST", body: JSON.stringify({ url, width: 1440, height: 900, format: "jpeg", quality: 78 }) });
   },
+  evidenceShares: () => engineRequest<EvidenceShareList>("/api/screenshot/share"),
+  evidenceShare: (packetId: string) => engineRequest<EvidenceShareManifest>(`/api/screenshot/share/${encodeURIComponent(packetId)}`),
+  verifyEvidenceShare: (packetId: string) => engineRequest<EvidenceShareVerification>(`/api/screenshot/share/${encodeURIComponent(packetId)}/verify`),
+  evidenceShareSettings: (scope = savedScope()) => engineRequest<EvidenceShareSettings>(`/api/screenshot/settings?project_ref=${encodeURIComponent(scope.project_root || "")}&workstream_ref=${encodeURIComponent(scope.workstream_key || "")}`),
+  previewEvidenceShareSettings: (body: Record<string, unknown>) => engineRequest<EvidenceShareSettings>("/api/screenshot/settings/preview", { method: "POST", body: JSON.stringify(body) }),
+  updateEvidenceShareSettings: (body: Record<string, unknown>) => engineRequest<EvidenceShareSettings>("/api/screenshot/settings", { method: "PUT", body: JSON.stringify(body) }),
 };
