@@ -45,6 +45,30 @@ func TestNormalizeIsDeterministicAndNonMutating(t *testing.T) {
 	}
 }
 
+func TestCanonicalBytesMatchesV1CompatibilityAlias(t *testing.T) {
+	manifest := testManifest()
+	manifest.Integrity.ManifestSHA256 = digestA
+
+	got, err := CanonicalBytes(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := CanonicalJSON(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, legacy) {
+		t.Fatal("CanonicalBytes and CanonicalJSON diverged")
+	}
+	var decoded Manifest
+	if err := json.Unmarshal(got, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Integrity.ManifestSHA256 != "" {
+		t.Fatal("canonical bytes retained self-referential manifest hash")
+	}
+}
+
 func TestCoreBindingsAreRequired(t *testing.T) {
 	tests := map[string]func(*Manifest){
 		"project":    func(m *Manifest) { m.Scope.Project.State = BindingMissing },

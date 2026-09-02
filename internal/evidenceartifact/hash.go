@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 )
 
-// CanonicalJSON returns the deterministic normalized manifest JSON used for
+// CanonicalBytes returns the deterministic normalized manifest JSON used for
 // hashing. The self-referential manifest_sha256 field is always cleared.
-func CanonicalJSON(in Manifest) ([]byte, error) {
+func CanonicalBytes(in Manifest) ([]byte, error) {
 	m := Normalize(in)
 	m.Integrity.ManifestSHA256 = ""
 	if err := Validate(m); err != nil {
@@ -17,8 +17,13 @@ func CanonicalJSON(in Manifest) ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// CanonicalJSON is the compatibility alias retained for existing v1 callers.
+func CanonicalJSON(in Manifest) ([]byte, error) {
+	return CanonicalBytes(in)
+}
+
 func ComputeManifestSHA256(in Manifest) (string, error) {
-	canonical, err := CanonicalJSON(in)
+	canonical, err := CanonicalBytes(in)
 	if err != nil {
 		return "", err
 	}
