@@ -3,6 +3,7 @@ package evidencejudge
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sort"
 	"strconv"
 	"time"
@@ -264,16 +265,25 @@ func RunJudgeQuorum(ctx context.Context, plan JudgeExecutionPlan, inputs []Judge
 			response, callErr := executor.ExecuteJudge(ctx, envelope)
 			attempt := newRuntimeAttempt(input, ordinal, AttemptFailed, "executor_unavailable")
 			if callErr != nil {
-				attempt.FailureCode = runtimeFailureCode(callErr)
-				if errors.Is(callErr, ErrJudgeOutcomeUnknown) {
-					attempt.Status = AttemptOutcomeUnknown
+				if executionResponseHasPosture(response) || errors.Is(callErr, ErrJudgeOutcomeUnknown) {
+					attempt.Status, attempt.FailureCode = AttemptOutcomeUnknown, "outcome_unknown"
+					if response.ProviderReceiptRef != "" && validAssignmentRef(response.ProviderReceiptRef) {
+						attempt.ProviderReceiptRef = response.ProviderReceiptRef
+					}
+					if usageWithinBudget(response.Usage, input.Request.Budget) && usageFitsTotal(result.Usage, response.Usage, plan.TotalBudget) {
+						attempt.Usage = response.Usage
+						result.Usage = addJudgeUsage(result.Usage, response.Usage)
+					} else {
+						result.FailureCodes = append(result.FailureCodes, "budget_exhausted")
+					}
+					result.Attempts = append(result.Attempts, attempt)
+					result.FailureCodes = append(result.FailureCodes, attempt.FailureCode)
+					return finalizeQuorumResult(result, accepted, plan, QuorumBlocked, ErrJudgeOutcomeUnknown)
 				}
+				attempt.FailureCode = runtimeFailureCode(callErr)
 				result.Attempts = append(result.Attempts, attempt)
 				result.FailureCodes = append(result.FailureCodes, attempt.FailureCode)
 				consecutiveFailures++
-				if errors.Is(callErr, ErrJudgeOutcomeUnknown) {
-					return finalizeQuorumResult(result, accepted, plan, QuorumBlocked, ErrJudgeOutcomeUnknown)
-				}
 				if consecutiveFailures >= plan.MaxConsecutiveFailures ||
 					!errors.Is(callErr, ErrJudgeExecutorUnavailable) || ordinal == plan.MaxAttemptsPerJudge {
 					break
@@ -336,12 +346,35 @@ func BuildJudgeAppeal(result JudgeQuorumResult, policy AppealPolicy, now time.Ti
 }
 
 func buildFrozenEnvelope(input JudgeExecutionInput, plan JudgeExecutionPlan) FrozenJudgeEnvelope {
+	citations := append([]Citation(nil), input.View.Citations...)
+	for index := range citations {
+		citations[index].SupportsAtoms = append([]string(nil), citations[index].SupportsAtoms...)
+		citations[index].RebutsAtoms = append([]string(nil), citations[index].RebutsAtoms...)
+	}
+	request := input.Request
+	request.PolicyRefs = append([]string(nil), request.PolicyRefs...)
+	request.AcceptanceAtomRefs = append([]string(nil), request.AcceptanceAtomRefs...)
+	request.RequiredModalities = append([]ModalityRequirement(nil), request.RequiredModalities...)
+	for index := range request.RequiredModalities {
+		request.RequiredModalities[index].CitationIDs = append([]string(nil), request.RequiredModalities[index].CitationIDs...)
+	}
+	assignment := input.Assignment
+	assignment.Artifact.AttestationRefs = append([]string(nil), assignment.Artifact.AttestationRefs...)
+	assignment.Artifact.TrustRefs = append([]string(nil), assignment.Artifact.TrustRefs...)
+	assignment.Artifact.SecurityRefs = append([]string(nil), assignment.Artifact.SecurityRefs...)
+	assignment.IndependenceEvidenceRefs = append([]string(nil), assignment.IndependenceEvidenceRefs...)
+	assignment.CalibrationRefs = append([]string(nil), assignment.CalibrationRefs...)
 	return FrozenJudgeEnvelope{ViewRef: input.View.ViewID, ViewSHA256: input.Request.ViewSHA256,
 		InformationSetRef: input.View.InformationSetRef, InformationSetSHA256: input.View.InformationSetSHA256,
-		Sources: append([]EvidenceSource(nil), input.View.Sources...), Citations: append([]Citation(nil), input.View.Citations...),
-		Omissions: append([]Omission(nil), input.View.Omissions...), Request: input.Request, Assignment: input.Assignment,
+		Sources: append([]EvidenceSource(nil), input.View.Sources...), Citations: citations,
+		Omissions: append([]Omission(nil), input.View.Omissions...), Request: request, Assignment: assignment,
 		CapabilityDigest: input.Capability.CapabilityDigest, TrustedPolicyRef: plan.PolicyRef,
 		TrustedPolicyRevision: plan.PolicyRevision, EvidenceClass: "untrusted_evidence_data", EvaluationAt: plan.EvaluationAt.UTC()}
+}
+
+func executionResponseHasPosture(response JudgeExecutionResponse) bool {
+	return response.OutcomeKnown || response.ProviderReceiptRef != "" || response.Usage != (JudgeUsage{}) ||
+		!reflect.DeepEqual(response.Result, JudgeResult{})
 }
 
 func newRuntimeAttempt(input JudgeExecutionInput, ordinal uint32, status AttemptStatus, code string) JudgeExecutionAttempt {
