@@ -36,9 +36,21 @@ func RenderCanonicalJSON(request DerivativeRequest, projection []byte, renderer 
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
+	return buildRenderedDerivative(request, canonical, "json", "application/json", renderer, matrix, licenses, receiptRef, createdAt)
+}
+
+func buildRenderedDerivative(request DerivativeRequest, output []byte, extension, mime string, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
+	if len(output) == 0 || extension == "" || strings.ContainsAny(extension, "/\\") || mime == "" {
+		return RenderedDerivative{}, ErrDerivativeContractInvalid
+	}
 	viewerMatrix := cloneViewerMatrix(matrix)
 	licenseSet := append([]LicenseAttestation(nil), licenses...)
-	sort.Slice(licenseSet, func(i, j int) bool { return licenseSet[i].AssetRef < licenseSet[j].AssetRef })
+	sort.Slice(licenseSet, func(i, j int) bool {
+		if licenseSet[i].AssetRef == licenseSet[j].AssetRef {
+			return licenseSet[i].LicenseRef < licenseSet[j].LicenseRef
+		}
+		return licenseSet[i].AssetRef < licenseSet[j].AssetRef
+	})
 	derivativeID, err := DerivativeID(request, renderer, viewerMatrix, licenseSet)
 	if err != nil {
 		return RenderedDerivative{}, err
@@ -47,13 +59,13 @@ func RenderCanonicalJSON(request DerivativeRequest, projection []byte, renderer 
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
-	outputDigest := sha256.Sum256(canonical)
+	outputDigest := sha256.Sum256(output)
 	manifest := DerivativeManifest{
 		Schema: ManifestSchema, DerivativeID: derivativeID, RequestRef: request.RequestID, RequestSHA256: requestDigest,
 		ArtifactRef: request.ArtifactRef, ArtifactSHA256: request.ArtifactSHA256,
 		ProjectionRef: request.ProjectionRef, ProjectionSHA256: request.ProjectionSHA256,
-		OutputRef:    "derivatives/" + strings.TrimPrefix(derivativeID, "derivative:") + ".json",
-		OutputSHA256: hex.EncodeToString(outputDigest[:]), OutputBytes: uint64(len(canonical)), OutputMIME: "application/json",
+		OutputRef:    "derivatives/" + strings.TrimPrefix(derivativeID, "derivative:") + "." + extension,
+		OutputSHA256: hex.EncodeToString(outputDigest[:]), OutputBytes: uint64(len(output)), OutputMIME: mime,
 		Renderer: renderer, Rendering: request.Rendering,
 		AccessibilityTarget: request.AccessibilityTarget, AccessibilityPosture: ConformanceNotClaimed,
 		ArchivePosture: ArchiveNotApplicable, ViewerMatrix: viewerMatrix, Licenses: licenseSet,
@@ -62,7 +74,7 @@ func RenderCanonicalJSON(request DerivativeRequest, projection []byte, renderer 
 	if err := ValidateManifest(manifest, request); err != nil {
 		return RenderedDerivative{}, err
 	}
-	return RenderedDerivative{Output: append([]byte(nil), canonical...), Manifest: manifest}, nil
+	return RenderedDerivative{Output: append([]byte(nil), output...), Manifest: manifest}, nil
 }
 
 func canonicalJSON(body []byte) ([]byte, error) {
@@ -88,6 +100,11 @@ func cloneViewerMatrix(matrix ViewerMatrix) ViewerMatrix {
 	for index := range matrix.Entries {
 		matrix.Entries[index].EvidenceRefs = append([]string(nil), matrix.Entries[index].EvidenceRefs...)
 	}
-	sort.Slice(matrix.Entries, func(i, j int) bool { return matrix.Entries[i].Client < matrix.Entries[j].Client })
+	sort.Slice(matrix.Entries, func(i, j int) bool {
+		if matrix.Entries[i].Client == matrix.Entries[j].Client {
+			return matrix.Entries[i].Version < matrix.Entries[j].Version
+		}
+		return matrix.Entries[i].Client < matrix.Entries[j].Client
+	})
 	return matrix
 }
