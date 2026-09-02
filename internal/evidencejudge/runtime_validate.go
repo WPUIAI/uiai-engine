@@ -46,12 +46,21 @@ func ValidateExecutionAttempt(attempt JudgeExecutionAttempt, plan JudgeExecution
 		(attempt.FailureCode != "" && !validAssignmentRef(attempt.FailureCode)) {
 		return ErrJudgeExecutionMalformed
 	}
+	if !usageWithinBudget(attempt.Usage, plan.TotalBudget) {
+		return ErrJudgeExecutionMalformed
+	}
 	if attempt.Status == AttemptSucceeded {
 		if attempt.FailureCode != "" || !validAssignmentRef(attempt.ResultRef) || !validAssignmentSHA256(attempt.ResultSHA256) ||
 			!validAssignmentRef(attempt.ProviderReceiptRef) {
 			return ErrJudgeExecutionMalformed
 		}
-	} else if attempt.FailureCode == "" || attempt.ResultRef != "" || attempt.ResultSHA256 != "" || attempt.ProviderReceiptRef != "" {
+	} else if attempt.Status == AttemptOutcomeUnknown {
+		if attempt.FailureCode == "" || attempt.ResultRef != "" || attempt.ResultSHA256 != "" ||
+			(attempt.ProviderReceiptRef != "" && !validAssignmentRef(attempt.ProviderReceiptRef)) {
+			return ErrJudgeExecutionMalformed
+		}
+	} else if attempt.FailureCode == "" || attempt.ResultRef != "" || attempt.ResultSHA256 != "" ||
+		attempt.ProviderReceiptRef != "" || attempt.Usage != (JudgeUsage{}) {
 		return ErrJudgeExecutionMalformed
 	}
 	return nil
@@ -72,10 +81,16 @@ func ValidateQuorumResult(result JudgeQuorumResult, plans ...JudgeExecutionPlan)
 		if err != nil || result.PlanID != plans[0].PlanID || result.PlanSHA256 != planDigest {
 			return ErrJudgeExecutionPlanInvalid
 		}
+		var accountedUsage JudgeUsage
 		for _, attempt := range result.Attempts {
-			if err := ValidateExecutionAttempt(attempt, plans[0]); err != nil {
-				return err
+			if err := ValidateExecutionAttempt(attempt, plans[0]); err != nil ||
+				!usageFitsTotal(accountedUsage, attempt.Usage, plans[0].TotalBudget) {
+				return ErrJudgeExecutionMalformed
 			}
+			accountedUsage = addJudgeUsage(accountedUsage, attempt.Usage)
+		}
+		if accountedUsage != result.Usage {
+			return ErrJudgeExecutionMalformed
 		}
 	}
 	seenResults, seenAssignments, seenJudges := map[string]struct{}{}, map[string]struct{}{}, map[string]struct{}{}

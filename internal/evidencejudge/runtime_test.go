@@ -33,6 +33,41 @@ func (executor *runtimeFakeExecutor) ExecuteJudge(_ context.Context, envelope Fr
 	return response, err
 }
 
+type runtimeMutatingExecutor struct {
+	response JudgeExecutionResponse
+}
+
+func (executor runtimeMutatingExecutor) ExecuteJudge(_ context.Context, envelope FrozenJudgeEnvelope) (JudgeExecutionResponse, error) {
+	if len(envelope.Citations) > 0 && len(envelope.Citations[0].SupportsAtoms) > 0 {
+		envelope.Citations[0].SupportsAtoms[0] = "atom:hostile-citation-mutation"
+	}
+	if len(envelope.Request.PolicyRefs) > 0 {
+		envelope.Request.PolicyRefs[0] = "policy:hostile-mutation"
+	}
+	if len(envelope.Request.AcceptanceAtomRefs) > 0 {
+		envelope.Request.AcceptanceAtomRefs[0] = "atom:hostile-request-mutation"
+	}
+	if len(envelope.Request.RequiredModalities) > 0 && len(envelope.Request.RequiredModalities[0].CitationIDs) > 0 {
+		envelope.Request.RequiredModalities[0].CitationIDs[0] = "citation:hostile-mutation"
+	}
+	if len(envelope.Assignment.Artifact.AttestationRefs) > 0 {
+		envelope.Assignment.Artifact.AttestationRefs[0] = "attestation:hostile-mutation"
+	}
+	if len(envelope.Assignment.Artifact.TrustRefs) > 0 {
+		envelope.Assignment.Artifact.TrustRefs[0] = "trust:hostile-mutation"
+	}
+	if len(envelope.Assignment.Artifact.SecurityRefs) > 0 {
+		envelope.Assignment.Artifact.SecurityRefs[0] = "security:hostile-mutation"
+	}
+	if len(envelope.Assignment.IndependenceEvidenceRefs) > 0 {
+		envelope.Assignment.IndependenceEvidenceRefs[0] = "independence:hostile-mutation"
+	}
+	if len(envelope.Assignment.CalibrationRefs) > 0 {
+		envelope.Assignment.CalibrationRefs[0] = "calibration:hostile-mutation"
+	}
+	return executor.response, nil
+}
+
 func TestRunJudgeQuorumGoldenDeterministicAndReadOnly(t *testing.T) {
 	inputs, responses, plan := runtimeTestInputs(t, 2)
 	beforeInputs := runtimeJSON(t, inputs)
@@ -102,6 +137,20 @@ func TestRunJudgeQuorumGoldenDeterministicAndReadOnly(t *testing.T) {
 	}
 }
 
+func TestRunJudgeQuorumFreezesNestedExecutorEnvelope(t *testing.T) {
+	inputs, responses, plan := runtimeTestInputs(t, 1)
+	before := runtimeJSON(t, inputs)
+	executor := runtimeMutatingExecutor{response: responses[0]}
+
+	result, err := RunJudgeQuorum(context.Background(), plan, inputs, map[string]JudgeExecutor{inputs[0].ExecutorRef: executor})
+	if err != nil || result.Status != QuorumMet {
+		t.Fatalf("mutating executor result = %#v, error = %v", result, err)
+	}
+	if got := runtimeJSON(t, inputs); got != before {
+		t.Fatalf("executor mutated frozen caller input\n got: %s\nwant: %s", got, before)
+	}
+}
+
 func TestRunJudgeQuorumDisagreementBuildsImmutableAppeal(t *testing.T) {
 	inputs, responses, plan := runtimeTestInputs(t, 2)
 	responses[1].Result.AtomDecisions[0].Verdict = VerdictRebutted
@@ -149,6 +198,25 @@ func TestRunJudgeQuorumRetriesOnlySafeKnownFailures(t *testing.T) {
 	_, _ = RunJudgeQuorum(context.Background(), plan, inputs, map[string]JudgeExecutor{inputs[0].ExecutorRef: unknownError})
 	if unknownError.calls != 1 {
 		t.Fatalf("outcome-unknown error retried %d times", unknownError.calls)
+	}
+
+	effectBearingError := &runtimeFakeExecutor{errors: []error{ErrJudgeExecutorUnavailable, nil}, responses: []JudgeExecutionResponse{responses[0], responses[0]}}
+	result, err = RunJudgeQuorum(context.Background(), plan, inputs, map[string]JudgeExecutor{inputs[0].ExecutorRef: effectBearingError})
+	if !errors.Is(err, ErrJudgeOutcomeUnknown) || effectBearingError.calls != 1 || len(result.Attempts) != 1 ||
+		result.Attempts[0].Status != AttemptOutcomeUnknown || result.Attempts[0].ProviderReceiptRef != responses[0].ProviderReceiptRef ||
+		result.Attempts[0].Usage != responses[0].Usage || result.Usage != responses[0].Usage {
+		t.Fatalf("effect-bearing error result = %#v, calls = %d, error = %v", result, effectBearingError.calls, err)
+	}
+
+	unboundedEffect := responses[0]
+	unboundedEffect.ProviderReceiptRef = "invalid receipt ref"
+	unboundedEffect.Usage.Tokens = plan.TotalBudget.MaxTokens + 1
+	unboundedError := &runtimeFakeExecutor{errors: []error{ErrJudgeExecutorUnavailable, nil}, responses: []JudgeExecutionResponse{unboundedEffect, responses[0]}}
+	result, err = RunJudgeQuorum(context.Background(), plan, inputs, map[string]JudgeExecutor{inputs[0].ExecutorRef: unboundedError})
+	if !errors.Is(err, ErrJudgeOutcomeUnknown) || unboundedError.calls != 1 || len(result.Attempts) != 1 ||
+		result.Attempts[0].Status != AttemptOutcomeUnknown || result.Attempts[0].ProviderReceiptRef != "" ||
+		result.Attempts[0].Usage != (JudgeUsage{}) || result.Usage != (JudgeUsage{}) {
+		t.Fatalf("unbounded effect metadata result = %#v, calls = %d, error = %v", result, unboundedError.calls, err)
 	}
 }
 
@@ -273,6 +341,12 @@ func TestRuntimeRejectsPlanInputResultAndPolicyDrift(t *testing.T) {
 	slices.Reverse(unsorted.JudgeOrder)
 	if err := ValidateExecutionPlanAt(unsorted, unsorted.EvaluationAt); !errors.Is(err, ErrJudgeExecutionPlanInvalid) {
 		t.Fatalf("unsorted plan error = %v", err)
+	}
+
+	unboundedAttempt := newRuntimeAttempt(inputs[0], 1, AttemptOutcomeUnknown, "outcome_unknown")
+	unboundedAttempt.Usage.Tokens = plan.TotalBudget.MaxTokens + 1
+	if err := ValidateExecutionAttempt(unboundedAttempt, plan); !errors.Is(err, ErrJudgeExecutionMalformed) {
+		t.Fatalf("unbounded attempt error = %v", err)
 	}
 }
 
