@@ -1,0 +1,1957 @@
+{
+  "schema": "focusa.callgraph.v1",
+  "graph_id": "callgraph:epwa-completion-v1",
+  "revision": 1,
+  "scope": {
+    "project_root": "/home/wirebot/focusa",
+    "continuity_id": "focusa-cont-root-b6cf3fbe-4a81-4456-8853-f6091625409f"
+  },
+  "mission_ref": "trajectory:project-fnv1a64:7fe93b6e889f4daa:bugsq-hlt-rebind-2026-09-03-v2",
+  "trajectory_ref": "trajectory:project-fnv1a64:7fe93b6e889f4daa:bugsq-hlt-rebind-2026-09-03-v2",
+  "workpoint_refs": [
+    "01a061a1-3c85-7530-afe7-97c64b31ee7c"
+  ],
+  "title": "Evidence PWA complete implementation, cross-surface integration, independent verification, and closure",
+  "description": "Spec 155 runtime projection of the canonical 32-node EPWA completion graph; it preserves the 55 dependency edges and does not itself authorize dispatch or settlement.",
+  "entry_frame_ids": [
+    "CG-01"
+  ],
+  "frames": [
+    {
+      "frame_id": "CG-01",
+      "name": "Freeze current authority baseline",
+      "purpose": "Freeze current authority baseline",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [],
+      "postconditions": [
+        "CG-01:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-02",
+      "name": "T01 immutable artifact independent join",
+      "purpose": "T01 immutable artifact independent join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-01:settled"
+      ],
+      "postconditions": [
+        "CG-02:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-03",
+      "name": "T02 store independent join",
+      "purpose": "T02 store independent join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-02:settled"
+      ],
+      "postconditions": [
+        "CG-03:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-04",
+      "name": "T03 hostile-content independent join",
+      "purpose": "T03 hostile-content independent join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-03:settled"
+      ],
+      "postconditions": [
+        "CG-04:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-05",
+      "name": "T04 capture assembly independent join",
+      "purpose": "T04 capture assembly independent join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-04:settled"
+      ],
+      "postconditions": [
+        "CG-05:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-06",
+      "name": "T05 crypto, time, and custody independent join",
+      "purpose": "T05 crypto, time, and custody independent join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-05:settled"
+      ],
+      "postconditions": [
+        "CG-06:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-07",
+      "name": "Foundation join",
+      "purpose": "Foundation join",
+      "kind": "join",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-02:settled",
+        "CG-03:settled",
+        "CG-04:settled",
+        "CG-05:settled",
+        "CG-06:settled"
+      ],
+      "postconditions": [
+        "CG-07:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-08",
+      "name": "T06 Judge runtime",
+      "purpose": "T06 Judge runtime",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-07:settled"
+      ],
+      "postconditions": [
+        "CG-08:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-09",
+      "name": "T06 independent join",
+      "purpose": "T06 independent join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-08:settled"
+      ],
+      "postconditions": [
+        "CG-09:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-10",
+      "name": "T07 Action and collaboration runtime",
+      "purpose": "T07 Action and collaboration runtime",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-09:settled"
+      ],
+      "postconditions": [
+        "CG-10:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-11",
+      "name": "T07 independent join",
+      "purpose": "T07 independent join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-10:settled"
+      ],
+      "postconditions": [
+        "CG-11:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-12",
+      "name": "T08 PWA runtime",
+      "purpose": "T08 PWA runtime",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-07:settled"
+      ],
+      "postconditions": [
+        "CG-12:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-13",
+      "name": "T08 independent join",
+      "purpose": "T08 independent join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-12:settled"
+      ],
+      "postconditions": [
+        "CG-13:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-14",
+      "name": "T09 derivative runtime",
+      "purpose": "T09 derivative runtime",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-13:settled"
+      ],
+      "postconditions": [
+        "CG-14:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-15",
+      "name": "T09 independent join",
+      "purpose": "T09 independent join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-14:settled"
+      ],
+      "postconditions": [
+        "CG-15:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-16",
+      "name": "Canonical packet API and registry",
+      "purpose": "Canonical packet API and registry",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-13:settled"
+      ],
+      "postconditions": [
+        "CG-16:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-17",
+      "name": "Pi complete parity",
+      "purpose": "Pi complete parity",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-16:settled"
+      ],
+      "postconditions": [
+        "CG-17:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-18",
+      "name": "Cockpit board and settings",
+      "purpose": "Cockpit board and settings",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-16:settled"
+      ],
+      "postconditions": [
+        "CG-18:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-19",
+      "name": "Chrome viewer and settings",
+      "purpose": "Chrome viewer and settings",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-16:settled"
+      ],
+      "postconditions": [
+        "CG-19:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-20",
+      "name": "Desktop Canvas object and settings",
+      "purpose": "Desktop Canvas object and settings",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-16:settled"
+      ],
+      "postconditions": [
+        "CG-20:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-21",
+      "name": "Veragensia durable EPWA mount",
+      "purpose": "Veragensia durable EPWA mount",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-16:settled"
+      ],
+      "postconditions": [
+        "CG-21:settled"
+      ],
+      "side_effect_class": "external",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-22",
+      "name": "Surface parity join",
+      "purpose": "Surface parity join",
+      "kind": "join",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-17:settled",
+        "CG-18:settled",
+        "CG-19:settled",
+        "CG-20:settled",
+        "CG-21:settled"
+      ],
+      "postconditions": [
+        "CG-22:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-23",
+      "name": "Settings completeness",
+      "purpose": "Settings completeness",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-16:settled"
+      ],
+      "postconditions": [
+        "CG-23:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-24",
+      "name": "Lifecycle and retention executor",
+      "purpose": "Lifecycle and retention executor",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-23:settled"
+      ],
+      "postconditions": [
+        "CG-24:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-25",
+      "name": "Image and video optimization",
+      "purpose": "Image and video optimization",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-23:settled"
+      ],
+      "postconditions": [
+        "CG-25:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-26",
+      "name": "T10 neutral connectors",
+      "purpose": "T10 neutral connectors",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-11:settled",
+        "CG-15:settled",
+        "CG-22:settled"
+      ],
+      "postconditions": [
+        "CG-26:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-27",
+      "name": "T11 generated API parity",
+      "purpose": "T11 generated API parity",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-09:settled",
+        "CG-11:settled",
+        "CG-13:settled",
+        "CG-15:settled",
+        "CG-22:settled",
+        "CG-26:settled"
+      ],
+      "postconditions": [
+        "CG-27:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-28",
+      "name": "T12 operations, migration, and reliability",
+      "purpose": "T12 operations, migration, and reliability",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-24:settled",
+        "CG-25:settled",
+        "CG-27:settled"
+      ],
+      "postconditions": [
+        "CG-28:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-29",
+      "name": "Focusa completion integration",
+      "purpose": "Focusa completion integration",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-09:settled",
+        "CG-11:settled",
+        "CG-13:settled",
+        "CG-15:settled",
+        "CG-22:settled",
+        "CG-26:settled",
+        "CG-27:settled",
+        "CG-28:settled"
+      ],
+      "postconditions": [
+        "CG-29:settled"
+      ],
+      "side_effect_class": "local",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-30",
+      "name": "Installed dogfood",
+      "purpose": "Installed dogfood",
+      "kind": "agent",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-29:settled"
+      ],
+      "postconditions": [
+        "CG-30:settled"
+      ],
+      "side_effect_class": "external",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      }
+    },
+    {
+      "frame_id": "CG-31",
+      "name": "Standards and public claim governance",
+      "purpose": "Standards and public claim governance",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-30:settled"
+      ],
+      "postconditions": [
+        "CG-31:settled"
+      ],
+      "side_effect_class": "external",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    },
+    {
+      "frame_id": "CG-32",
+      "name": "Final closure join",
+      "purpose": "Final closure join",
+      "kind": "approval",
+      "input_schema": {},
+      "return_schema": {},
+      "preconditions": [
+        "CG-31:settled"
+      ],
+      "postconditions": [
+        "CG-32:settled"
+      ],
+      "side_effect_class": "none",
+      "capability_refs": [],
+      "timeout_policy": {
+        "timeout_ms": 3600000,
+        "on_timeout": "block_without_settlement"
+      },
+      "retry_policy": {
+        "max_attempts": 2,
+        "backoff_ms": 1000,
+        "jitter": false
+      },
+      "failure_boundary": {
+        "kind": "frame",
+        "unwind_policy": "preserve_evidence_and_block_dependents"
+      },
+      "acceptance": {
+        "acceptance_atoms": [
+          "artifact_required",
+          "independent_verification_required",
+          "focusa_settlement_required"
+        ],
+        "verifier": "independent"
+      },
+      "authority_requirement": {
+        "authority_kind": "durable_approval",
+        "reference": null
+      }
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "CG-01--CG-02",
+      "from_frame_id": "CG-01",
+      "to_frame_id": "CG-02",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-02--CG-03",
+      "from_frame_id": "CG-02",
+      "to_frame_id": "CG-03",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-03--CG-04",
+      "from_frame_id": "CG-03",
+      "to_frame_id": "CG-04",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-04--CG-05",
+      "from_frame_id": "CG-04",
+      "to_frame_id": "CG-05",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-05--CG-06",
+      "from_frame_id": "CG-05",
+      "to_frame_id": "CG-06",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-02--CG-07",
+      "from_frame_id": "CG-02",
+      "to_frame_id": "CG-07",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-03--CG-07",
+      "from_frame_id": "CG-03",
+      "to_frame_id": "CG-07",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-04--CG-07",
+      "from_frame_id": "CG-04",
+      "to_frame_id": "CG-07",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-05--CG-07",
+      "from_frame_id": "CG-05",
+      "to_frame_id": "CG-07",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-06--CG-07",
+      "from_frame_id": "CG-06",
+      "to_frame_id": "CG-07",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-07--CG-08",
+      "from_frame_id": "CG-07",
+      "to_frame_id": "CG-08",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-08--CG-09",
+      "from_frame_id": "CG-08",
+      "to_frame_id": "CG-09",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-09--CG-10",
+      "from_frame_id": "CG-09",
+      "to_frame_id": "CG-10",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-10--CG-11",
+      "from_frame_id": "CG-10",
+      "to_frame_id": "CG-11",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-07--CG-12",
+      "from_frame_id": "CG-07",
+      "to_frame_id": "CG-12",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-12--CG-13",
+      "from_frame_id": "CG-12",
+      "to_frame_id": "CG-13",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-13--CG-14",
+      "from_frame_id": "CG-13",
+      "to_frame_id": "CG-14",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-14--CG-15",
+      "from_frame_id": "CG-14",
+      "to_frame_id": "CG-15",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-13--CG-16",
+      "from_frame_id": "CG-13",
+      "to_frame_id": "CG-16",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-16--CG-17",
+      "from_frame_id": "CG-16",
+      "to_frame_id": "CG-17",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-16--CG-18",
+      "from_frame_id": "CG-16",
+      "to_frame_id": "CG-18",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-16--CG-19",
+      "from_frame_id": "CG-16",
+      "to_frame_id": "CG-19",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-16--CG-20",
+      "from_frame_id": "CG-16",
+      "to_frame_id": "CG-20",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-16--CG-21",
+      "from_frame_id": "CG-16",
+      "to_frame_id": "CG-21",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-17--CG-22",
+      "from_frame_id": "CG-17",
+      "to_frame_id": "CG-22",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-18--CG-22",
+      "from_frame_id": "CG-18",
+      "to_frame_id": "CG-22",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-19--CG-22",
+      "from_frame_id": "CG-19",
+      "to_frame_id": "CG-22",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-20--CG-22",
+      "from_frame_id": "CG-20",
+      "to_frame_id": "CG-22",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-21--CG-22",
+      "from_frame_id": "CG-21",
+      "to_frame_id": "CG-22",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-16--CG-23",
+      "from_frame_id": "CG-16",
+      "to_frame_id": "CG-23",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-23--CG-24",
+      "from_frame_id": "CG-23",
+      "to_frame_id": "CG-24",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-23--CG-25",
+      "from_frame_id": "CG-23",
+      "to_frame_id": "CG-25",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-11--CG-26",
+      "from_frame_id": "CG-11",
+      "to_frame_id": "CG-26",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-15--CG-26",
+      "from_frame_id": "CG-15",
+      "to_frame_id": "CG-26",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-22--CG-26",
+      "from_frame_id": "CG-22",
+      "to_frame_id": "CG-26",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-09--CG-27",
+      "from_frame_id": "CG-09",
+      "to_frame_id": "CG-27",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-11--CG-27",
+      "from_frame_id": "CG-11",
+      "to_frame_id": "CG-27",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-13--CG-27",
+      "from_frame_id": "CG-13",
+      "to_frame_id": "CG-27",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-15--CG-27",
+      "from_frame_id": "CG-15",
+      "to_frame_id": "CG-27",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-22--CG-27",
+      "from_frame_id": "CG-22",
+      "to_frame_id": "CG-27",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-26--CG-27",
+      "from_frame_id": "CG-26",
+      "to_frame_id": "CG-27",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-24--CG-28",
+      "from_frame_id": "CG-24",
+      "to_frame_id": "CG-28",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-25--CG-28",
+      "from_frame_id": "CG-25",
+      "to_frame_id": "CG-28",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-27--CG-28",
+      "from_frame_id": "CG-27",
+      "to_frame_id": "CG-28",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-09--CG-29",
+      "from_frame_id": "CG-09",
+      "to_frame_id": "CG-29",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-11--CG-29",
+      "from_frame_id": "CG-11",
+      "to_frame_id": "CG-29",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-13--CG-29",
+      "from_frame_id": "CG-13",
+      "to_frame_id": "CG-29",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-15--CG-29",
+      "from_frame_id": "CG-15",
+      "to_frame_id": "CG-29",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-22--CG-29",
+      "from_frame_id": "CG-22",
+      "to_frame_id": "CG-29",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-26--CG-29",
+      "from_frame_id": "CG-26",
+      "to_frame_id": "CG-29",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-27--CG-29",
+      "from_frame_id": "CG-27",
+      "to_frame_id": "CG-29",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-28--CG-29",
+      "from_frame_id": "CG-28",
+      "to_frame_id": "CG-29",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": "all",
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-29--CG-30",
+      "from_frame_id": "CG-29",
+      "to_frame_id": "CG-30",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-30--CG-31",
+      "from_frame_id": "CG-30",
+      "to_frame_id": "CG-31",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    },
+    {
+      "edge_id": "CG-31--CG-32",
+      "from_frame_id": "CG-31",
+      "to_frame_id": "CG-32",
+      "kind": "call",
+      "condition": null,
+      "input_mapping": [],
+      "return_mapping": [],
+      "join_policy": null,
+      "cycle_policy": "deny",
+      "authority_requirement": null
+    }
+  ],
+  "policies": {
+    "max_depth": 32,
+    "default_cycle_policy": "deny"
+  },
+  "required_evidence": [
+    {
+      "evidence_type": "artifact",
+      "min_count": 32
+    },
+    {
+      "evidence_type": "independent_verification",
+      "min_count": 31
+    },
+    {
+      "evidence_type": "focusa_settlement",
+      "min_count": 32
+    }
+  ],
+  "created_at": "2026-09-02T10:33:22Z",
+  "created_by": {
+    "authority_kind": "agent",
+    "reference": "pi:epwa-callgraph-v1-projection"
+  },
+  "supersedes_revision": null
+}
