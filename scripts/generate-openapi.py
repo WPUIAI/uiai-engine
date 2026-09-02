@@ -53,6 +53,27 @@ openapi = {
             "post": {"summary": "Create browser session", "responses": {"200": {"description": "ok"}}},
             "get": {"summary": "List sessions", "responses": {"200": {"description": "ok"}}}
         },
+        "/api/session/{id}/read": {
+            "get": {
+                "summary": "Read bounded page text or Markdown",
+                "parameters": [
+                    {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+                    {"name": "selector", "in": "query", "schema": {"type": "string"}},
+                    {"name": "max_chars", "in": "query", "schema": {"type": "integer", "minimum": 0}},
+                    {"name": "include_links", "in": "query", "schema": {"type": "boolean"}},
+                    {"name": "format", "in": "query", "schema": {"type": "string"}},
+                    {"name": "mode", "in": "query", "schema": {"type": "string"}},
+                    {"name": "include_images", "in": "query", "schema": {"type": "boolean"}},
+                ],
+                "responses": {"200": {"description": "bounded read result"}, "400": {"description": "invalid query"}, "404": {"description": "session not found"}},
+            },
+            "post": {
+                "summary": "Read bounded page text or Markdown (legacy compatibility)",
+                "deprecated": True,
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "bounded read result"}, "404": {"description": "session not found"}},
+            },
+        },
         "/api/errors": {
             "get": {"summary": "Bounded redacted error history", "responses": {"200": {"description": "ok"}}}
         },
