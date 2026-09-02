@@ -23,7 +23,7 @@ var (
 	ErrConflict     = errors.New("screenshot evidence share content conflict")
 )
 
-//go:embed assets/index.html assets/styles.css assets/app.js
+//go:embed assets/index.html assets/styles.css assets/work-items.js assets/app.js
 var assets embed.FS
 
 func Assemble(root string, input Input) (Result, error) {
@@ -100,7 +100,7 @@ func Assemble(root string, input Input) (Result, error) {
 		writes["projection.json"] = projectionBody
 	}
 	assetVersion := embeddedAssetsSHA256()[:12]
-	for _, name := range []string{"index.html", "styles.css", "app.js"} {
+	for _, name := range []string{"index.html", "styles.css", "work-items.js", "app.js"} {
 		data, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			return Result{}, err
@@ -140,6 +140,7 @@ func buildProjection(manifest Manifest, manifestSHA string) (evidencepwa.Project
 				ProjectRef: manifest.Scope.ProjectRef, WorkstreamRef: manifest.Scope.WorkstreamRef,
 				WorksetRef: manifest.Scope.WorksetRef, CallGraphRef: manifest.Scope.CallGraphRef,
 				WorkpointRef: manifest.Scope.WorkpointRef, WorkItemRef: manifest.Scope.WorkItemRef,
+				WorkItems: manifest.Scope.WorkItems,
 			},
 		},
 		Title:   "Evidence Artifact",
@@ -203,7 +204,7 @@ func inspectScreenshot(data []byte, mediaType, screenshotSHA string) (evidencear
 
 func embeddedAssetsSHA256() string {
 	hash := sha256.New()
-	for _, name := range []string{"index.html", "styles.css", "app.js"} {
+	for _, name := range []string{"index.html", "styles.css", "work-items.js", "app.js"} {
 		data, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			return ""

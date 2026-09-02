@@ -71,12 +71,13 @@ const (
 )
 
 type ScopeBinding struct {
-	ProjectRef    string `json:"project_ref"`
-	WorkstreamRef string `json:"workstream_ref"`
-	WorksetRef    string `json:"workset_ref"`
-	CallGraphRef  string `json:"callgraph_ref"`
-	WorkpointRef  string `json:"workpoint_ref"`
-	WorkItemRef   string `json:"work_item_ref"`
+	ProjectRef    string               `json:"project_ref"`
+	WorkstreamRef string               `json:"workstream_ref"`
+	WorksetRef    string               `json:"workset_ref"`
+	CallGraphRef  string               `json:"callgraph_ref"`
+	WorkpointRef  string               `json:"workpoint_ref"`
+	WorkItemRef   string               `json:"work_item_ref"`
+	WorkItems     []WorkItemProjection `json:"work_items,omitempty"`
 }
 
 type ArtifactBinding struct {

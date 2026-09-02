@@ -90,7 +90,7 @@ func validateArtifact(binding ArtifactBinding) error {
 		blank(binding.Scope.WorkItemRef) {
 		return ErrProjectionBindingMismatch
 	}
-	return nil
+	return validateWorkItemScope(binding.Scope)
 }
 
 func validateSections(sections []Section) error {

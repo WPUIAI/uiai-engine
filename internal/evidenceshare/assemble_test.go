@@ -54,6 +54,47 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	}
 }
 
+func TestAssembleProjectsAllCanonicalWorkItems(t *testing.T) {
+	input := validInput()
+	input.Scope.WorkItemRef = "work-item:task"
+	input.Scope.WorkItems = []evidencepwa.WorkItemProjection{
+		{
+			ProviderSurface: "github", WorkItemRef: "work-item:task", ItemID: "task", ItemType: "task",
+			Title: "Implement projection", Description: "Project real work items.", DescriptionState: evidencepwa.WorkItemDescriptionVisible,
+			Revision: "revision:7", Digest: strings.Repeat("a", 64), RevisionState: evidencepwa.WorkItemRevisionCurrent,
+			StatusAtCapture: "in_progress", DependencyRefs: []string{"work-item:dependency"}, ClosurePosture: "evidence_pending",
+			Authority: evidencepwa.WorkItemAuthorityState{AcceptanceAtomRefs: []string{"atom:projection"}},
+		},
+		{
+			ProviderSurface: "github", WorkItemRef: "work-item:epic", ItemID: "epic", ItemType: "epic",
+			Title: "Evidence PWA", DescriptionRef: "description:epic", DescriptionSHA256: strings.Repeat("b", 64),
+			DescriptionState: evidencepwa.WorkItemDescriptionRedacted, Revision: "revision:3", Digest: strings.Repeat("c", 64),
+			RevisionState: evidencepwa.WorkItemRevisionStale, StatusAtCapture: "open", ClosurePosture: "reopened",
+			Authority: evidencepwa.WorkItemAuthorityState{CompletionCaseRef: "completion-case:epic", ReopenRef: "reopen:epic"},
+		},
+	}
+	result, err := Assemble(t.TempDir(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(result.Directory, "projection.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var projection evidencepwa.Projection
+	if err := json.Unmarshal(body, &projection); err != nil {
+		t.Fatal(err)
+	}
+	items := projection.Artifact.Scope.WorkItems
+	if len(items) != 2 || items[0].WorkItemRef != "work-item:task" || items[1].WorkItemRef != "work-item:epic" {
+		t.Fatalf("canonical work items missing or reordered: %+v", items)
+	}
+	if items[1].Description != "" || items[1].DescriptionState != evidencepwa.WorkItemDescriptionRedacted ||
+		items[1].Authority.CompletionCaseRef == "" || items[1].Authority.ReopenRef == "" {
+		t.Fatalf("redaction or closure states collapsed: %+v", items[1])
+	}
+}
+
 func TestAssembleIncompleteScopeIsExplicitlyBlocked(t *testing.T) {
 	input := validInput()
 	input.Scope = Scope{WorkpointRef: "workpoint:homepage"}
@@ -103,7 +144,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 	if digest := embeddedAssetsSHA256(); len(digest) != 64 {
 		t.Fatalf("embedded asset digest invalid: %q", digest)
 	}
-	for _, name := range []string{"index.html", "styles.css", "app.js"} {
+	for _, name := range []string{"index.html", "styles.css", "work-items.js", "app.js"} {
 		body, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			t.Fatal(err)
@@ -115,8 +156,20 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 			}
 		}
 	}
+	workItems, err := assets.ReadFile("assets/work-items.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"scopeWorkItems(scope)", "item.parent_refs", "authority.acceptance_atom_refs", "authority.completion_case_ref", "authority.settlement_posture"} {
+		if !strings.Contains(string(workItems), required) {
+			t.Fatalf("work-items.js does not render canonical work-item field %q", required)
+		}
+	}
 	html, _ := assets.ReadFile("assets/index.html")
 	htmlText := string(html)
+	if strings.Index(htmlText, "work-items.js") >= strings.Index(htmlText, "app.js") {
+		t.Fatal("work-item renderer must load before the main application")
+	}
 	if strings.Count(htmlText, "<article") != 1 || strings.Count(htmlText, "</article>") != 1 {
 		t.Fatal("semantic shell must contain exactly one evidence article")
 	}
