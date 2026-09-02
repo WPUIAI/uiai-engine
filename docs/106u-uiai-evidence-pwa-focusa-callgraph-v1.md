@@ -11,7 +11,7 @@ It does **not** authorize dispatch, independent verification, settlement, or clo
 - Canonical graph: `docs/106q-uiai-evidence-pwa-completion-callgraph.json`
 - Canonical graph SHA-256: `d4d0cf8c1d9ac3f08652c1de7d985199697b6fc5b7c60d39a7859e065e3957fb`
 - Runtime projection: `docs/106u-uiai-evidence-pwa-focusa-callgraph-v1.json`
-- Projection SHA-256: `1e474d258cb0c01b14df864209127b0896b9d5c9e19255db6795ec041e06806f`
+- Projection SHA-256: `8c908b58da1ca2a1a6de4a2a8e7f7abf31efa91a9eb63ec1303c39e1b3ab99c9`
 - Validator source: Focusa `origin/main` commit `14eea0336`
 - Exact validator module SHA-256: `13c35bf853cb3711c204505362b13f5a195b34b021d858c79d4ea534566fddac`
 
@@ -21,6 +21,7 @@ It does **not** authorize dispatch, independent verification, settlement, or clo
    - PASS: 32 ordered unique frames.
    - PASS: 55 dependency edges exactly match the canonical graph.
    - PASS: `CG-01` is the sole entry frame.
+   - PASS: CG-01 retains baseline-only acceptance; CG-02–CG-32 require independent verification.
    - PASS: every frame has explicit acceptance atoms.
 2. Thirty repeated projection audits preserved the projection hash above.
 3. The exact pure validator module from Focusa `crates/focusa-core/src/callgraph.rs` returned:

@@ -16,7 +16,12 @@ if len(new_ids)!=32 or len(set(new_ids))!=32: errors.append('expected 32 unique 
 if len(new_edges)!=55: errors.append('expected 55 unique edges')
 if new.get('entry_frame_ids')!=['CG-01']: errors.append('CG-01 must be sole entry')
 for f in new['frames']:
-    if not f.get('acceptance',{}).get('acceptance_atoms'): errors.append(f'{f["frame_id"]}: missing acceptance')
+    atoms=f.get('acceptance',{}).get('acceptance_atoms',[])
+    if not atoms: errors.append(f'{f["frame_id"]}: missing acceptance')
+    if f['frame_id']=='CG-01' and ('authority_baseline_frozen' not in atoms or 'independent_verification_required' in atoms):
+        errors.append('CG-01: baseline acceptance drift')
+    if f['frame_id']!='CG-01' and 'independent_verification_required' not in atoms:
+        errors.append(f'{f["frame_id"]}: independent verification missing')
     if f['frame_id'].startswith('CG-') and f['frame_id']!='CG-01':
         expected={d for d,n in old_edges if n==f['frame_id']}
         actual={d for d,n in new_edges if n==f['frame_id']}

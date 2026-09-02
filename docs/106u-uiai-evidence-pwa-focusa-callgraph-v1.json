@@ -45,11 +45,11 @@
       },
       "acceptance": {
         "acceptance_atoms": [
+          "authority_baseline_frozen",
           "artifact_required",
-          "independent_verification_required",
           "focusa_settlement_required"
         ],
-        "verifier": "independent"
+        "verifier": "canonical_authority"
       }
     },
     {
