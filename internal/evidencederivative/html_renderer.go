@@ -9,7 +9,7 @@ import (
 )
 
 func RenderProjectionHTML(request DerivativeRequest, projection evidencepwa.Projection, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
-	if request.DerivativeType != DerivativeHTML && request.DerivativeType != DerivativeEmailHTML {
+	if request.DerivativeType != DerivativeHTML && request.DerivativeType != DerivativeEmailHTML && request.DerivativeType != DerivativePrint && request.DerivativeType != DerivativeHTMLSlides {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	selection, err := selectProjection(request, projection)
@@ -23,6 +23,11 @@ func RenderProjectionHTML(request DerivativeRequest, projection evidencepwa.Proj
 	body.WriteString(htmlText(string(request.Direction)))
 	body.WriteString("\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<meta name=\"referrer\" content=\"no-referrer\">\n")
 	body.WriteString("<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'\">\n")
+	if request.DerivativeType == DerivativePrint {
+		body.WriteString("<style>@page{size:auto;margin:18mm}*{print-color-adjust:exact}section,article{break-inside:avoid}nav,button{display:none!important}</style>\n")
+	} else if request.DerivativeType == DerivativeHTMLSlides {
+		body.WriteString("<style>main>header,main>section{box-sizing:border-box;min-height:100vh;padding:6vh 7vw;break-after:page}main{max-width:none;padding:0}main>section{margin:0;border:0}</style>\n")
+	}
 	body.WriteString("<title>")
 	body.WriteString(htmlText(projection.Title))
 	body.WriteString("</title>\n<style>body{font-family:system-ui,sans-serif;line-height:1.5;margin:0;color:#171717;background:#fff}main{max-width:72rem;margin:auto;padding:2rem}h1,h2,h3{line-height:1.2}section{border-top:1px solid #d4d4d4;margin-top:1.5rem;padding-top:1rem}.posture{display:grid;grid-template-columns:max-content 1fr;gap:.25rem 1rem}.record{margin:1rem 0;padding:.75rem;border:1px solid #e5e5e5;border-radius:.4rem}code{overflow-wrap:anywhere}ul{padding-left:1.25rem}</style>\n</head>\n<body>\n<main>\n<header><h1>")
