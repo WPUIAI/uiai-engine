@@ -63,6 +63,10 @@ func (s *Store) CreateBackupManifest() (BackupManifest, error) {
 func (s *Store) VerifyBackupManifest(manifest BackupManifest) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return verifyBackupManifestAt(s.cfg.Root, manifest)
+}
+
+func verifyBackupManifestAt(root string, manifest BackupManifest) error {
 	if manifest.Schema != StoreSchemaV1 || !validSHA256(manifest.ManifestSHA256) {
 		return ErrBackupInvalid
 	}
@@ -81,7 +85,7 @@ func (s *Store) VerifyBackupManifest(manifest BackupManifest) error {
 		}
 		seen[record.Path] = struct{}{}
 		previous = record.Path
-		path := filepath.Join(s.cfg.Root, filepath.FromSlash(record.Path))
+		path := filepath.Join(root, filepath.FromSlash(record.Path))
 		digest, size, err := hashFile(path)
 		if err != nil || digest != record.SHA256 || size != record.ByteSize {
 			return ErrBackupInvalid
