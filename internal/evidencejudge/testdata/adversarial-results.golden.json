@@ -327,8 +327,8 @@
   ],
   "baseline": {
     "schema": "uiai.evidence_judge_calibration_result.v1",
-    "calibration_id": "calibration:b74b2c5f8f05d4e10e750068ca3c8e13",
-    "calibration_sha256": "d6052c8fb69484de5c7fb5bbf3a60f8c1d05a9b68dfc4decbe18be1abb895186",
+    "calibration_id": "calibration:d24da0eeda92beb45ee9ed82bb681e66",
+    "calibration_sha256": "27281aca9e3757c9233168532d279b4c43140bc7f0f7e86fe725bbafdb6221b7",
     "corpus_ref": "corpus:t06e-hostile-v1",
     "corpus_revision": "revision:2026-08-30",
     "corpus_sha256": "90b7dc858eb9673729905568be3c3a90c83e417f3204c4254210d6cd688fb0b6",
@@ -351,6 +351,7 @@
     "passed": 17,
     "failed": 0,
     "high_consequence_cases": 1,
+    "high_consequence_passed": 1,
     "mutation_counts": [
       {
         "key": "budget_pressure",
@@ -492,8 +493,8 @@
   },
   "candidate": {
     "schema": "uiai.evidence_judge_calibration_result.v1",
-    "calibration_id": "calibration:71599a76296061ccb618a7c798bf6803",
-    "calibration_sha256": "d1ce981cdc7021f744af37072148a81c6345e5b593a9b00ddfbcff512bd131c8",
+    "calibration_id": "calibration:347990baac9f608dfed918465bf9216e",
+    "calibration_sha256": "f6faf3344bec0e59dff2f44e531d97b7b0828e03e99fd6e51241af5bdbdece89",
     "corpus_ref": "corpus:t06e-hostile-v1",
     "corpus_revision": "revision:2026-08-30",
     "corpus_sha256": "90b7dc858eb9673729905568be3c3a90c83e417f3204c4254210d6cd688fb0b6",
@@ -516,6 +517,7 @@
     "passed": 16,
     "failed": 1,
     "high_consequence_cases": 1,
+    "high_consequence_passed": 1,
     "mutation_counts": [
       {
         "key": "budget_pressure",
@@ -550,8 +552,8 @@
       {
         "key": "high_consequence_threshold",
         "total": 1,
-        "passed": 0,
-        "failed": 1
+        "passed": 1,
+        "failed": 0
       },
       {
         "key": "identity_mismatch",
@@ -592,8 +594,8 @@
       {
         "key": "prompt_injection",
         "total": 1,
-        "passed": 1,
-        "failed": 0
+        "passed": 0,
+        "failed": 1
       },
       {
         "key": "provider_failure",
@@ -653,24 +655,24 @@
       "citation:temporal"
     ],
     "omission_refs": [
-      "case:17-high_consequence_threshold"
+      "case:01-prompt_injection"
     ],
     "evaluated_at": "2026-08-30T12:00:00Z",
     "expires_at": "2026-08-31T12:00:00Z"
   },
   "drift": {
     "schema": "uiai.evidence_judge_drift_report.v1",
-    "drift_report_id": "drift:7fea0be70d00b904cec53e48b4daba93",
-    "drift_report_sha256": "3f9e7c900f04840c341709b96c13bec5f98a4932e659db29bb8df0e97b9d4ec0",
-    "baseline_ref": "calibration:b74b2c5f8f05d4e10e750068ca3c8e13",
-    "baseline_sha256": "d6052c8fb69484de5c7fb5bbf3a60f8c1d05a9b68dfc4decbe18be1abb895186",
-    "candidate_ref": "calibration:71599a76296061ccb618a7c798bf6803",
-    "candidate_sha256": "d1ce981cdc7021f744af37072148a81c6345e5b593a9b00ddfbcff512bd131c8",
+    "drift_report_id": "drift:0fa0d056c060a09dae5cde2f48a92164",
+    "drift_report_sha256": "90d508391ddb4ba90fc21620da454b6956a1c5f1c970d1c5468a0e75ebd36422",
+    "baseline_ref": "calibration:d24da0eeda92beb45ee9ed82bb681e66",
+    "baseline_sha256": "27281aca9e3757c9233168532d279b4c43140bc7f0f7e86fe725bbafdb6221b7",
+    "candidate_ref": "calibration:347990baac9f608dfed918465bf9216e",
+    "candidate_sha256": "f6faf3344bec0e59dff2f44e531d97b7b0828e03e99fd6e51241af5bdbdece89",
     "corpus_ref": "corpus:t06e-hostile-v1",
     "corpus_revision": "revision:2026-08-30",
     "policy_ref": "policy:drift",
     "policy_revision": "revision:1",
-    "status": "warning",
+    "status": "blocked",
     "comparable": true,
     "baseline_pass_ppm": 1000000,
     "candidate_pass_ppm": 941176,
@@ -679,8 +681,9 @@
     "provider_changed": false,
     "policy_revision_changed": false,
     "capability_downgraded": false,
+    "class_drop_ppm": 1000000,
     "reason_codes": [
-      "drift_warning"
+      "mutation_class_drop_blocked"
     ],
     "evaluated_at": "2026-08-30T13:00:00Z"
   }
