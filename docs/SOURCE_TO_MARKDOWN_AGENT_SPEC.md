@@ -94,22 +94,10 @@ Value proposition:
 Extend current session read endpoint:
 
 ```http
-POST /api/session/{id}/read
+GET /api/session/{id}/read?format=markdown&selector=main&mode=main_content&max_chars=30000&include_links=true&include_images=false
 ```
 
-Request:
-
-```json
-{
-  "format": "markdown",
-  "selector": "main",
-  "mode": "main_content",
-  "max_chars": 30000,
-  "include_links": true,
-  "include_images": false,
-  "include_metadata": true
-}
-```
+`GET` is the canonical side-effect-free transport. The legacy `POST` JSON-body form remains temporarily compatible and returns deprecation headers for existing clients.
 
 Response keeps existing compatibility by preserving `text`:
 

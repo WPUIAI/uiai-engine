@@ -571,29 +571,14 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			writeJSON(w, 200, map[string]any{"text": text, "selector": body.Selector})
 		})
 
-		// Read — compact whole-page/region text extraction for agent web surfing (no screenshot)
+		// Read — GET is canonical for bounded, side-effect-free page extraction.
+		// POST remains temporarily compatible for existing clients.
+		readHandler := sessionReadHandler(sm)
+		r.Get("/read", readHandler)
 		r.Post("/read", func(w http.ResponseWriter, req *http.Request) {
-			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
-			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
-				return
-			}
-			var body vision.ReadOptions
-			json.NewDecoder(req.Body).Decode(&body)
-			if body.Selector != "" {
-				if resolved, resolveErr := sess.ResolveSelector(body.Selector); resolveErr == nil {
-					body.Selector = resolved
-				} else {
-					writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "read", "selector": body.Selector})
-					return
-				}
-			}
-			result, err := sess.ReadPage(body)
-			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "read", "selector": body.Selector})
-				return
-			}
-			writeJSON(w, 200, result)
+			w.Header().Set("Deprecation", "true")
+			w.Header().Set("Warning", `299 UIAI "POST /read is deprecated; use GET with query parameters"`)
+			readHandler(w, req)
 		})
 
 		// Cookies — get/set/clear

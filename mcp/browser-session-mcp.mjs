@@ -477,11 +477,18 @@ async function toolsCall(name, args) {
       body = { url: args.url, selector: args.selector, max_chars: args.max_chars, mode: args.mode, include_links: args.include_links, include_images: args.include_images, focusa_scope: args.focusa_scope };
       break;
 
-    case "browser_read":
-      url = `${ENGINE}/api/session/${args.session_id}/read`;
-      method = "POST";
-      body = { selector: args.selector, max_chars: args.max_chars, include_links: args.include_links, format: args.format, mode: args.mode, include_images: args.include_images };
+    case "browser_read": {
+      const q = new URLSearchParams();
+      if (args.selector !== undefined) q.set("selector", String(args.selector));
+      if (args.max_chars !== undefined) q.set("max_chars", String(args.max_chars));
+      if (args.include_links !== undefined) q.set("include_links", args.include_links ? "true" : "false");
+      if (args.format !== undefined) q.set("format", String(args.format));
+      if (args.mode !== undefined) q.set("mode", String(args.mode));
+      if (args.include_images !== undefined) q.set("include_images", args.include_images ? "true" : "false");
+      url = `${ENGINE}/api/session/${args.session_id}/read${q.toString() ? `?${q.toString()}` : ""}`;
+      method = "GET";
       break;
+    }
 
     case "browser_cookies":
       url = `${ENGINE}/api/session/${args.session_id}/cookies`;
