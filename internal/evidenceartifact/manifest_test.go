@@ -113,6 +113,56 @@ func TestAutonomySafetyStateIsRequired(t *testing.T) {
 	}
 }
 
+func TestCanonicalHashExcludesSelfAndIncludesAssetHashes(t *testing.T) {
+	baseline := testManifest()
+	baselineHash, err := ComputeManifestSHA256(baseline)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	withSelfHash := testManifest()
+	withSelfHash.Integrity.ManifestSHA256 = digestA
+	selfHash, err := ComputeManifestSHA256(withSelfHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selfHash != baselineHash {
+		t.Fatal("manifest_sha256 changed its own canonical hash")
+	}
+
+	withChangedAsset := testManifest()
+	withChangedAsset.Assets[0].SHA256 = digestB
+	assetHash, err := ComputeManifestSHA256(withChangedAsset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assetHash == baselineHash {
+		t.Fatal("asset SHA-256 change did not change manifest hash")
+	}
+}
+
+func TestCanonicalizationAndHashDoNotMutateInput(t *testing.T) {
+	manifest := testManifest()
+	manifest.Integrity.ManifestSHA256 = digestA
+	before, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CanonicalBytes(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ComputeManifestSHA256(manifest); err != nil {
+		t.Fatal(err)
+	}
+	after, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("canonicalization or hashing mutated the input manifest")
+	}
+}
+
 func TestExecutionRevisionChangesHash(t *testing.T) {
 	tests := map[string]func(*Manifest){
 		"workset":   func(m *Manifest) { m.Scope.Workset.Revision++ },
@@ -224,6 +274,46 @@ func TestProviderDescriptionRemainsJSONData(t *testing.T) {
 	}
 }
 
+func TestDuplicateClaimAndAssetIDsFail(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Manifest)
+		want   error
+	}{
+		{"claim", func(m *Manifest) { m.Claims = append(m.Claims, m.Claims[0]) }, ErrInvalidClaim},
+		{"asset", func(m *Manifest) { m.Assets = append(m.Assets, m.Assets[0]) }, ErrInvalidAsset},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := testManifest()
+			tt.mutate(&m)
+			if err := Validate(m); !errors.Is(err, tt.want) {
+				t.Fatalf("Validate() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestManifestLimitsFailClosed(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Manifest)
+	}{
+		{"kinds", func(m *Manifest) { m.Kinds = make([]string, MaxKinds+1) }},
+		{"claims", func(m *Manifest) { m.Claims = make([]Claim, MaxClaims+1) }},
+		{"assets", func(m *Manifest) { m.Assets = make([]Asset, MaxAssets+1) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := testManifest()
+			tt.mutate(&m)
+			if err := Validate(m); !errors.Is(err, ErrLimitExceeded) {
+				t.Fatalf("Validate() error = %v, want ErrLimitExceeded", err)
+			}
+		})
+	}
+}
+
 func TestRejectsRawLocalRefsAndUnsafeAssetPaths(t *testing.T) {
 	t.Run("local_ref", func(t *testing.T) {
 		m := testManifest()
@@ -232,13 +322,23 @@ func TestRejectsRawLocalRefsAndUnsafeAssetPaths(t *testing.T) {
 			t.Fatalf("Validate() error = %v, want ErrInvalidScope", err)
 		}
 	})
-	t.Run("asset_path", func(t *testing.T) {
-		m := testManifest()
-		m.Assets[0].Path = "../secret.json"
-		if err := Validate(m); !errors.Is(err, ErrInvalidAsset) {
-			t.Fatalf("Validate() error = %v, want ErrInvalidAsset", err)
-		}
-	})
+	unsafePaths := map[string]string{
+		"traversal":   "../secret.json",
+		"absolute":    "/assets/proof.json",
+		"url_scheme":  "https://example.com/proof.json",
+		"backslash":   `assets\proof.json`,
+		"dot_segment": "assets/./proof.json",
+		"control":     "assets/\x01proof.json",
+	}
+	for name, path := range unsafePaths {
+		t.Run(name, func(t *testing.T) {
+			m := testManifest()
+			m.Assets[0].Path = path
+			if err := Validate(m); !errors.Is(err, ErrInvalidAsset) {
+				t.Fatalf("Validate() error = %v, want ErrInvalidAsset", err)
+			}
+		})
+	}
 }
 
 func TestCustodyMustBeChronological(t *testing.T) {
