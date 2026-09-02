@@ -101,7 +101,14 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			id := chi.URLParam(req, "sessionID")
 			if err := sm.Close(id); err != nil {
 				if errors.Is(err, vision.ErrSessionNotFound) {
-					writeJSON(w, 200, map[string]string{"status": "already_closed", "id": id})
+					writeJSON(w, 200, map[string]any{
+						"status":     "already_closed",
+						"code":       "already_closed",
+						"id":         id,
+						"retryable":  false,
+						"recover":    []string{},
+						"state_lost": []string{},
+					})
 					return
 				}
 				writeJSON(w, 500, map[string]string{"error": err.Error()})

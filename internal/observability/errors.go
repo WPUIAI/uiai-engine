@@ -33,12 +33,14 @@ type ErrorEvent struct {
 type ErrorEnvelope struct {
 	Error               string               `json:"error"`
 	Message             string               `json:"message"`
+	Code                string               `json:"code"`
 	ErrorID             string               `json:"error_id,omitempty"`
 	ErrorClass          string               `json:"error_class,omitempty"`
 	Status              int                  `json:"status,omitempty"`
 	SuggestedNextAction string               `json:"suggested_next_action,omitempty"`
 	Retryable           bool                 `json:"retryable,omitempty"`
 	Recover             []string             `json:"recover,omitempty"`
+	StateLost           []string             `json:"state_lost,omitempty"`
 	Diagnostics         string               `json:"diagnostics,omitempty"`
 	Details             map[string]any       `json:"details,omitempty"`
 	Focusa              *ErrorFocusaMetadata `json:"focusa,omitempty"`
@@ -88,12 +90,27 @@ func classRecovery(class string) (bool, []string) {
 		return false, []string{"snapshot", "resync_refs"}
 	case "url_not_allowed":
 		return false, []string{"adjust_target"}
-	case "page_unavailable":
-		return true, []string{"reopen_session"}
+	case "page_unavailable", "session_reaped", "session_closed_by_operator", "session_not_found":
+		return false, []string{"reopen_session"}
+	case "aborted_open_retryable":
+		return true, []string{"retry_open", "health"}
+	case "pool_saturated":
+		return true, []string{"wait_capacity", "health"}
 	case "timeout", "navigation_failed", "screenshot_failed", "click_failed", "eval_failed":
 		return true, []string{"retry", "diagnostics"}
 	default:
 		return true, []string{"retry", "diagnostics"}
+	}
+}
+
+func classStateLost(class string) []string {
+	switch class {
+	case "session_reaped", "session_closed_by_operator", "page_unavailable":
+		return []string{"cookies", "sessionStorage", "navigation"}
+	case "session_not_found":
+		return []string{"session_state"}
+	default:
+		return nil
 	}
 }
 
@@ -106,13 +123,19 @@ func NewErrorEnvelope(event ErrorEvent, fallbackMessage string, details map[stri
 		message = "UIAI request failed"
 	}
 	retryable, recover := classRecovery(event.Class)
+	code := strings.TrimSpace(event.Class)
+	if code == "" {
+		code = "unknown"
+	}
 	return ErrorEnvelope{
 		Error:               message,
 		Message:             message,
+		Code:                code,
 		ErrorID:             event.ID,
 		ErrorClass:          event.Class,
 		Retryable:           retryable,
 		Recover:             recover,
+		StateLost:           classStateLost(code),
 		Status:              event.Status,
 		SuggestedNextAction: event.SuggestedNextAction,
 		Diagnostics:         "/api/errors?limit=20" + diagnosticsFilter(event),
