@@ -1,0 +1,61 @@
+# 106t — UIAI Evidence PWA CallGraph Disposition Audit
+
+**Parent authority:** issue #106 and the canonical completion graph in `106q`.
+**Audit purpose:** identify the earliest dependency-ready incomplete node without treating source, merge, publication, producer tests, independent verification, settlement, or closure as interchangeable.
+**Audited UIAI ancestry:** `origin/main` = `9a4bd981e058a842de1388a5902a6045d133b471`.
+**Graph identity:** `callgraph:epwa-completion-v1`; 32 nodes; 55 dependency edges; graph JSON SHA-256 `d4d0cf8c1d9ac3f08652c1de7d985199697b6fc5b7c60d39a7859e065e3957fb`.
+
+This is a disposition audit, not a node acceptance, independent-review, settlement, dispatch, release, installation, or final-closure receipt.
+
+## Disposition rules
+
+- **Complete baseline:** the node-specific recording condition is met, but no downstream completion is implied.
+- **Candidate-only:** committed implementation or repair evidence exists outside accepted main ancestry or without independent acceptance.
+- **Partial:** some named surfaces exist, but the node done condition is not met.
+- **Contract-only:** types or contracts exist without the required runtime and consumer behavior.
+- **Blocked:** at least one dependency or node-specific acceptance condition remains open.
+- **Unstarted:** no conforming implementation and proof package was located.
+- Producer tests never satisfy an independent join. Merge or publication never satisfies settlement.
+
+## Complete 32-node matrix
+
+| Node | Exact implementation ancestry and surfaces | Producer tests/evidence | Independent verification and settlement | Deterministic disposition |
+|---|---|---|---|---|
+| CG-01 — Freeze current authority baseline | Main `13cdb55` (`106q`/`106r`), `210f65a` (`106s`), and spec-family ancestry `28f3cf1`; dirty-workspace exclusions recorded. | Graph inventory: 32 nodes, 55 edges, stable digest above. No code test required by this recording node. | Node-specific baseline record exists; explicitly non-terminal. | **COMPLETE BASELINE ONLY** |
+| CG-02 — T01 immutable artifact independent join | Main `f9e73de`; `internal/evidenceartifact` manifest, types, validation, hashing. Frozen-API repair candidate `a7b8b26` adds `CanonicalBytes`, retains the v1 alias, and hardens immutable-manifest validation. | Main manifest/golden tests plus candidate self-hash exclusion, asset-hash inclusion, non-mutation, duplicate-ID, limit, unsafe-path, race, deterministic, full-suite, vet, Windows, and Darwin evidence. | No accepted fresh independent review or settlement. A governed verifier draft exists but has not started; installed Focusa approval-command parity is tracked separately. | **CANDIDATE-ONLY; EARLIEST READY INCOMPLETE FRONTIER** |
+| CG-03 — T02 store independent join | Main `7bad720`; evidence-artifact store/index. | Store tests cover crash, quarantine, and retention cases. | No independent power-loss, restore, garbage-collection acceptance, or settlement; CG-02 open. | **BLOCKED** |
+| CG-04 — T03 hostile-content independent join | Main `b7c0af4`; security inspection and redaction. | Hostile-fixture producer tests. | No independent threat-corpus or leakage-scan acceptance; CG-03 open. | **BLOCKED** |
+| CG-05 — T04 capture assembly independent join | Main `48f4bbd`; deterministic capture/media assembly. | Assembly producer tests. | No independent 30-run multimodal and anti-curation acceptance; CG-04 open. | **BLOCKED** |
+| CG-06 — T05 crypto, time, and custody independent join | Main `e9736e2`; identity, signing, time, and custody surfaces. | Authenticity producer tests. | No independent cryptographic/federation proof or settlement; CG-05 open. | **BLOCKED** |
+| CG-07 — Foundation join | No separate runtime; joins CG-02 through CG-06. | Prerequisite producer evidence exists only. | Required independent joins and settlement receipt do not exist. | **BLOCKED** |
+| CG-08 — T06 Judge runtime | Off-main candidates `2a7a16f`, `d0ddebe`, `b6f4d70`, join `332a739`, executor repair `d891d9d`, and adversarial repair `06bdf54`; `internal/evidencejudge`. | Focused, race, full-suite, vet, deterministic, and cross-platform repair evidence. | No accepted independent runtime evidence or settlement; CG-07 open. | **CANDIDATE-ONLY / BLOCKED** |
+| CG-09 — T06 independent join | No accepted runtime join. | Candidate producer evidence only. | No independent join or settlement; CG-08 unsettled. | **BLOCKED** |
+| CG-10 — T07 Action and collaboration runtime | Off-main contract candidate `e4c004a`; `internal/evidenceaction`. Proposal, execution, and collaboration runtime remain absent. | Contract tests only. | No integration acceptance or settlement; CG-09 open. | **CONTRACT-ONLY / BLOCKED** |
+| CG-11 — T07 independent join | No complete T07 implementation candidate. | No qualifying complete producer package. | No independent join or settlement; CG-10 incomplete. | **BLOCKED** |
+| CG-12 — T08 PWA runtime | Main contract `52d6d52`; portable share `79031ae`, `f5ef7bc`, `14f34d4`; registry/detail runtime `3a6472b` through `210f65a`; work-item projection candidate `ad970e9`. | Evidence PWA/share/registry tests; candidate focused, race, full-suite, vet, deterministic, Windows, and Darwin evidence. | Full runtime done condition and independent acceptance absent; CG-07 open. | **PARTIAL / BLOCKED** |
+| CG-13 — T08 independent join | Depends on incomplete CG-12. | Producer evidence is incomplete. | No accepted browser, offline, tamper, interoperability review, or settlement. | **BLOCKED** |
+| CG-14 — T09 derivative runtime | Off-main contract candidate `c515a22`; `internal/evidencederivative`. Renderer and delivery runtime absent. | Contract tests only. | No independent proof; CG-13 open. | **CONTRACT-ONLY / BLOCKED** |
+| CG-15 — T09 independent join | No complete derivative runtime. | No qualifying complete producer package. | No independent join or settlement; CG-14 incomplete. | **BLOCKED** |
+| CG-16 — Canonical packet API and registry | Main registry/read/sync/public/detail commits `3a6472b`, `c3f10c7`, `afb687b`, `387bb09`, `028cb44`, `29f1347`, `210f65a`. | Store, index, provider, rebuild, and live-sync tests. | Packet/registry done condition is partial; no independent parity acceptance or settlement; CG-13 open. | **PARTIAL / BLOCKED** |
+| CG-17 — Pi complete parity | No complete Pi projection, actions, diagnostics, settings, or consumer implementation located. | No complete consumer test package. | No independent proof or settlement; CG-16 open. | **UNSTARTED / BLOCKED** |
+| CG-18 — Cockpit board and settings | Partial evidence registry/detail UI on main; cockpit evidence-share candidate `77f1e014`. | Partial producer UI evidence. | Complete board/settings and consumer parity absent; no independent proof; CG-16 open. | **PARTIAL / BLOCKED** |
+| CG-19 — Chrome viewer and settings | Portable/static viewer exists on main; encoded/full-detail candidates partly superseded by main detail work. | Partial static viewer tests. | Complete extension settings/parity and independent Chrome proof absent; CG-16 open. | **PARTIAL / BLOCKED** |
+| CG-20 — Desktop Canvas object and settings | No conforming implementation located. | No qualifying tests or evidence. | No verification or settlement; CG-16 open. | **UNSTARTED / BLOCKED** |
+| CG-21 — Veragensia durable EPWA mount | No durable mounted runtime, settings, or offline behavior implementation located. | No qualifying tests or evidence. | No verification or settlement; CG-16 open. | **UNSTARTED / BLOCKED** |
+| CG-22 — Surface parity join | CG-17 through CG-21 incomplete. | No complete cross-surface producer package. | No consumer parity receipt or settlement. | **BLOCKED** |
+| CG-23 — Settings completeness | Main `287c69` settings foundation plus partial Cockpit candidate work. | Foundation producer tests. | All-surface defaults, precedence, policy, and migration acceptance absent; CG-16 open. | **PARTIAL / BLOCKED** |
+| CG-24 — Lifecycle and retention executor | Low-level artifact retention exists; complete policy executor, destructive-confirmation path, and receipts absent. | Partial store retention tests. | No lifecycle acceptance across PWA surfaces or settlement; CG-23 open. | **UNSTARTED / PARTIAL-BLOCKED** |
+| CG-25 — Image and video optimization | Screenshot inspection/share exists; complete deterministic derivative optimization pipeline absent. | Partial screenshot/share tests. | No media parity or deterministic optimization proof; CG-23 open. | **UNSTARTED / PARTIAL-BLOCKED** |
+| CG-26 — T10 neutral connectors | Focusa provider-graph sync exists on main; neutral provider contracts/runtimes and action/collaboration joins remain absent. | Partial sync tests. | No independent connector proof; CG-11, CG-15, and CG-22 open. | **PARTIAL / BLOCKED** |
+| CG-27 — T11 generated API parity | Handwritten API/public routes exist; generated API, client, and MCP parity absent. | Partial route tests. | No cross-version consumer acceptance or independent proof; prerequisite joins open. | **UNSTARTED / BLOCKED** |
+| CG-28 — T12 operations, migration, and reliability | Registry rebuild/store foundations exist; complete migrations, backup/restore, observability, soak, and recovery package absent. | Partial rebuild/store tests. | No operational acceptance or settlement; CG-24, CG-25, and CG-27 open. | **PARTIAL / BLOCKED** |
+| CG-29 — Focusa completion integration | Authenticated read/sync seam exists; governed completion, close, reopen, and settlement integration absent. UIAI authority remains intentionally read-only. | Partial sync evidence. | No cross-system receipts or independent settlement; upstream joins open. | **UNSTARTED / PARTIAL-BLOCKED** |
+| CG-30 — Installed dogfood | No exact-revision installed cross-surface dogfood package located. | No qualifying installed producer evidence. | No independent installed-runtime receipt; CG-29 open. | **UNSTARTED / BLOCKED** |
+| CG-31 — Standards and public claim governance | Specs and truth notices exist; standards mapping and public claim manifest incomplete. | Partial documentation evidence. | No independent legal/claims review or settlement; CG-30 open. | **PARTIAL / BLOCKED** |
+| CG-32 — Final closure join | All downstream prerequisites remain open. | No final evidence bundle. | No independent closure decision or settlement. | **BLOCKED** |
+
+## Deterministic frontier decision
+
+CG-01 satisfies only its baseline-recording condition. CG-02 is therefore the earliest dependency-ready incomplete frontier. Its remaining done condition is not another producer-only code claim: the exact candidate ancestry must receive bounded independent verification, any findings must be repaired and re-proved, and settlement must be recorded separately.
+
+No downstream node may be promoted from this audit while CG-02 remains unsettled. CallGraph dispatch remains prohibited until canonical graph validation is available.
