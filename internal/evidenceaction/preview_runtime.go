@@ -88,6 +88,19 @@ func (runtime *PreviewRuntime) BuildPreview(proposal ActionProposal, approval Op
 	return preview, nil
 }
 
+func (runtime *PreviewRuntime) ValidateIssued(preview ActionPreview) error {
+	previewDigest, err := DigestActionPreview(preview)
+	if err != nil {
+		return err
+	}
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	if runtime.issuedNonces[preview.AntiReplayNonce] != previewDigest {
+		return ErrPreviewMismatch
+	}
+	return nil
+}
+
 func (runtime *PreviewRuntime) ConsumeConfirmation(confirmation ActionConfirmation, preview ActionPreview, actorRef string) error {
 	runtime.mu.Lock()
 	defer runtime.mu.Unlock()
@@ -140,7 +153,7 @@ func (runtime *PreviewRuntime) releaseNonce(nonce string) {
 
 func confirmationRequired(proposal ActionProposal, risk RiskClass) bool {
 	return proposal.HumanReviewMandated || proposal.SourceTrust == SourceImportedUntrusted ||
-		proposal.AutonomousEligibility != AutonomousEligible || proposal.SideEffect == EffectExternalMutation || risk != RiskLow
+		proposal.AutonomousEligibility != AutonomousEligible || proposal.SideEffect != EffectReadOnly || risk != RiskLow
 }
 
 func secureNonce() (string, error) {
