@@ -40,6 +40,10 @@ func RenderCanonicalJSON(request DerivativeRequest, projection []byte, renderer 
 }
 
 func buildRenderedDerivative(request DerivativeRequest, output []byte, extension, mime string, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
+	return buildRenderedDerivativeWithArchive(request, output, extension, mime, renderer, matrix, licenses, receiptRef, createdAt, ArchiveNotApplicable, nil)
+}
+
+func buildRenderedDerivativeWithArchive(request DerivativeRequest, output []byte, extension, mime string, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time, archivePosture ArchivePosture, archiveEntries []ArchiveEntry) (RenderedDerivative, error) {
 	if len(output) == 0 || extension == "" || strings.ContainsAny(extension, "/\\") || mime == "" {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
@@ -68,7 +72,7 @@ func buildRenderedDerivative(request DerivativeRequest, output []byte, extension
 		OutputSHA256: hex.EncodeToString(outputDigest[:]), OutputBytes: uint64(len(output)), OutputMIME: mime,
 		Renderer: renderer, Rendering: request.Rendering,
 		AccessibilityTarget: request.AccessibilityTarget, AccessibilityPosture: ConformanceNotClaimed,
-		ArchivePosture: ArchiveNotApplicable, ViewerMatrix: viewerMatrix, Licenses: licenseSet,
+		ArchivePosture: archivePosture, ArchiveEntries: append([]ArchiveEntry(nil), archiveEntries...), ViewerMatrix: viewerMatrix, Licenses: licenseSet,
 		OmissionRefs: append([]string(nil), request.OmissionRefs...), ReceiptRef: receiptRef, CreatedAt: createdAt.UTC(),
 	}
 	if err := ValidateManifest(manifest, request); err != nil {
