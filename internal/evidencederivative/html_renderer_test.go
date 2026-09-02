@@ -1,0 +1,102 @@
+package evidencederivative
+
+import (
+	"errors"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
+)
+
+func TestRenderProjectionHTMLIncludesOnlySelectedEvidence(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	request.DerivativeType = DerivativeHTML
+	if len(projection.Claims) > 1 {
+		request.ClaimRefs = request.ClaimRefs[:1]
+	}
+	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
+	rendered, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:html", manifest.CreatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(rendered.Output)
+	if !strings.HasPrefix(body, "<!doctype html>\n") || !strings.Contains(body, htmlText(projection.Title)) || !strings.Contains(body, htmlText(projection.Claims[0].Statement)) {
+		t.Fatalf("selected evidence missing from HTML:\n%s", body)
+	}
+	if len(projection.Claims) > 1 && strings.Contains(body, htmlText(projection.Claims[1].Statement)) {
+		t.Fatalf("unselected claim leaked into HTML:\n%s", body)
+	}
+	if rendered.Manifest.OutputMIME != "text/html; charset=utf-8" || !strings.HasSuffix(rendered.Manifest.OutputRef, ".html") {
+		t.Fatalf("HTML manifest = %#v", rendered.Manifest)
+	}
+	if err := ValidateManifest(rendered.Manifest, request); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRenderProjectionHTMLEscapesHostileContentAndNeverFetches(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	request.DerivativeType = DerivativeHTML
+	projection.Title = `<script>alert("title")</script>`
+	projection.Claims[0].Statement = `<img src="https://attacker.invalid/x" onerror="alert(1)">`
+	bindHTMLProjection(t, &request, projection)
+	rendered, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:hostile-html", manifest.CreatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(rendered.Output)
+	for _, activeTag := range []string{"<script", "<img ", "<a ", "<link ", "<iframe", "<form"} {
+		if strings.Contains(body, activeTag) {
+			t.Fatalf("active HTML tag %q escaped containment:\n%s", activeTag, body)
+		}
+	}
+	if !strings.Contains(body, "&lt;script&gt;") || !strings.Contains(body, "&lt;img src=&#34;https://attacker.invalid/x&#34;") {
+		t.Fatalf("hostile text was not visibly escaped:\n%s", body)
+	}
+	if !strings.Contains(body, "Content-Security-Policy") || !strings.Contains(body, "default-src 'none'") {
+		t.Fatalf("fail-closed content policy missing:\n%s", body)
+	}
+}
+
+func TestRenderProjectionHTMLIsDeterministicForWebAndEmail(t *testing.T) {
+	for _, derivativeType := range []DerivativeType{DerivativeHTML, DerivativeEmailHTML} {
+		t.Run(string(derivativeType), func(t *testing.T) {
+			request, projection, manifest := portableFixture(t)
+			request.DerivativeType = derivativeType
+			first, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:html-deterministic", manifest.CreatedAt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			second, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:html-deterministic", manifest.CreatedAt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(first, second) {
+				t.Fatalf("%s render is not deterministic", derivativeType)
+			}
+		})
+	}
+}
+
+func TestRenderProjectionHTMLFailsClosedOnUnsupportedTypeAndBindingDrift(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	request.DerivativeType = DerivativePDF
+	if _, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:html", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+		t.Fatalf("unsupported type error = %v", err)
+	}
+	request.DerivativeType = DerivativeHTML
+	request.ArtifactRevision++
+	if _, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:html", manifest.CreatedAt); !errors.Is(err, ErrProjectionMismatch) {
+		t.Fatalf("binding drift error = %v", err)
+	}
+}
+
+func bindHTMLProjection(t *testing.T, request *DerivativeRequest, projection evidencepwa.Projection) {
+	t.Helper()
+	digest, err := evidencepwa.DigestProjection(projection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.ProjectionSHA256 = digest
+}
