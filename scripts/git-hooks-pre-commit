@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# UIAI SAFE PRE-COMMIT — flush Beads without silently expanding the index.
+set -euo pipefail
+
+if ! command -v bd >/dev/null 2>&1; then
+  echo "pre-commit: bd is unavailable; skipping Beads flush without changing the index" >&2
+  exit 0
+fi
+
+root="$(git rev-parse --show-toplevel)"
+git_dir="$(git rev-parse --git-dir)"
+common_dir="$(git rev-parse --git-common-dir)"
+
+# Linked worktrees share the main repository's Beads directory. Mutating that
+# shared ledger from a worktree would cross agent/worktree ownership.
+if [[ "$git_dir" != "$common_dir" ]]; then
+  echo "pre-commit: linked worktree detected; shared Beads ledger left untouched" >&2
+  exit 0
+fi
+
+ledger="$root/.beads/issues.jsonl"
+metadata="$root/.beads/metadata.json"
+if [[ ! -d "$root/.beads" ]]; then
+  exit 0
+fi
+if [[ ! -f "$ledger" ]] || ! git ls-files --error-unmatch -- .beads/issues.jsonl >/dev/null 2>&1; then
+  echo "pre-commit: blocked — tracked .beads/issues.jsonl is unavailable; run Beads setup explicitly" >&2
+  exit 1
+fi
+if [[ -f "$metadata" ]] && grep -q '"backend"[[:space:]]*:[[:space:]]*"dolt"' "$metadata"; then
+  exit 0
+fi
+
+index_before="$(git ls-files --stage -z | sha256sum | awk '{print $1}')"
+ledger_staged=false
+ledger_unstaged=false
+if ! git diff --cached --quiet -- .beads/issues.jsonl; then
+  ledger_staged=true
+fi
+if ! git diff --quiet -- .beads/issues.jsonl; then
+  ledger_unstaged=true
+fi
+
+if [[ "$ledger_unstaged" == true ]]; then
+  if [[ "$ledger_staged" == true ]]; then
+    echo "pre-commit: blocked — .beads/issues.jsonl is partially staged; the hook did not flush or change the index" >&2
+  else
+    echo "pre-commit: blocked — .beads/issues.jsonl has unstaged changes; the hook did not flush or stage them" >&2
+  fi
+  echo "Inspect: git diff -- .beads/issues.jsonl" >&2
+  echo "To include intentionally: bd sync --flush-only && git add -- .beads/issues.jsonl" >&2
+  exit 1
+fi
+
+if ! bd sync --flush-only; then
+  echo "pre-commit: blocked — bd sync --flush-only failed; the index was not changed" >&2
+  exit 1
+fi
+
+index_after="$(git ls-files --stage -z | sha256sum | awk '{print $1}')"
+if [[ "$index_after" != "$index_before" ]]; then
+  echo "pre-commit: internal safety error — bd changed the Git index" >&2
+  exit 1
+fi
+
+if ! git diff --quiet -- .beads/issues.jsonl; then
+  echo "pre-commit: blocked — Beads flush updated .beads/issues.jsonl but the hook did not stage it" >&2
+  echo "Review: git diff -- .beads/issues.jsonl" >&2
+  echo "To include intentionally: git add -- .beads/issues.jsonl && git commit" >&2
+  exit 1
+fi
+
+exit 0
