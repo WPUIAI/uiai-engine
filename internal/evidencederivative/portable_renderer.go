@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 )
@@ -138,25 +139,25 @@ func RenderProjectionCSV(request DerivativeRequest, projection evidencepwa.Proje
 	}
 	var body bytes.Buffer
 	writer := csv.NewWriter(&body)
-	_ = writer.Write([]string{"record_type", "id", "content", "posture_or_mime", "citation_or_locator", "sha256"})
+	writeCSVRow(writer, []string{"record_type", "id", "content", "posture_or_mime", "citation_or_locator", "sha256"})
 	for _, claim := range selection.claims {
-		_ = writer.Write([]string{"claim", claim.ClaimID, claim.Statement, claim.Posture, strings.Join(intersection(claim.CitationIDs, selection.citationIDs), " "), ""})
+		writeCSVRow(writer, []string{"claim", claim.ClaimID, claim.Statement, claim.Posture, strings.Join(intersection(claim.CitationIDs, selection.citationIDs), " "), ""})
 	}
 	for _, asset := range selection.assets {
-		_ = writer.Write([]string{"asset", asset.AssetID, asset.Ref, asset.MIME, "", asset.SHA256})
+		writeCSVRow(writer, []string{"asset", asset.AssetID, asset.Ref, asset.MIME, "", asset.SHA256})
 	}
 	for _, citation := range selection.citations {
-		_ = writer.Write([]string{"citation", citation.CitationID, citation.SourceRef, "", citation.Locator, citation.SHA256})
+		writeCSVRow(writer, []string{"citation", citation.CitationID, citation.SourceRef, "", citation.Locator, citation.SHA256})
 	}
 	for _, license := range licenseSet {
 		attribution := ""
 		if license.AttributionRequired {
 			attribution = license.AttributionRef
 		}
-		_ = writer.Write([]string{"license", license.AssetRef, license.LicenseRef, attribution, license.EvidenceRef, license.LicenseSHA256})
+		writeCSVRow(writer, []string{"license", license.AssetRef, license.LicenseRef, attribution, license.EvidenceRef, license.LicenseSHA256})
 	}
 	for _, ref := range request.OmissionRefs {
-		_ = writer.Write([]string{"omission", ref, "explicitly omitted", "", "", ""})
+		writeCSVRow(writer, []string{"omission", ref, "explicitly omitted", "", "", ""})
 	}
 	writer.Flush()
 	if err := writer.Error(); err != nil {
@@ -276,7 +277,27 @@ func intersection(values []string, allowed map[string]struct{}) []string {
 	return selected
 }
 
+func writeCSVRow(writer *csv.Writer, values []string) {
+	for index, value := range values {
+		value = plainText(value)
+		if strings.HasPrefix(value, "=") || strings.HasPrefix(value, "+") || strings.HasPrefix(value, "-") || strings.HasPrefix(value, "@") {
+			value = "'" + value
+		}
+		values[index] = value
+	}
+	_ = writer.Write(values)
+}
+
 func plainText(value string) string {
+	value = strings.Map(func(character rune) rune {
+		if unicode.IsSpace(character) {
+			return ' '
+		}
+		if unicode.IsControl(character) || unicode.In(character, unicode.Cf) {
+			return -1
+		}
+		return character
+	}, value)
 	return strings.Join(strings.Fields(value), " ")
 }
 

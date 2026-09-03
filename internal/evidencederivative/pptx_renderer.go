@@ -136,8 +136,16 @@ func pptxSlide(text, locale string) string {
 	if len(parts) > 1 {
 		body = parts[1]
 	}
-	language := html.EscapeString(locale)
-	return `<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Evidence"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="` + language + `" sz="2800" b="1"><a:latin typeface="Arial"/></a:rPr><a:t>` + html.EscapeString(title) + `</a:t></a:r></a:p><a:p><a:r><a:rPr lang="` + language + `" sz="1800"><a:latin typeface="Arial"/></a:rPr><a:t>` + html.EscapeString(body) + `</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
+	language := html.EscapeString(plainText(locale))
+	return `<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Evidence"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="` + language + `" sz="2800" b="1"><a:latin typeface="Arial"/></a:rPr><a:t>` + pptxText(title) + `</a:t></a:r></a:p><a:p><a:r><a:rPr lang="` + language + `" sz="1800"><a:latin typeface="Arial"/></a:rPr><a:t>` + pptxText(body) + `</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
+}
+
+func pptxText(value string) string {
+	lines := strings.Split(value, "\n")
+	for index, line := range lines {
+		lines[index] = plainText(line)
+	}
+	return html.EscapeString(strings.Join(lines, "\n"))
 }
 
 const pptxRootRelationships = `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>`

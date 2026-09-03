@@ -166,6 +166,35 @@ func TestPortableRenderersFailClosedOnBindingAndSelectionDrift(t *testing.T) {
 	}
 }
 
+func TestCSVNeutralizesFormulasAndDisplayControls(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	request.DerivativeType = DerivativeCSV
+	projection.Claims[0].Statement = "=HYPERLINK(\"https://attacker.invalid\")\x1b\u202e"
+	digest, err := evidencepwa.DigestProjection(projection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.ProjectionSHA256 = digest
+	rendered, err := RenderProjectionCSV(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:hostile-csv", manifest.CreatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := csv.NewReader(strings.NewReader(string(rendered.Output))).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		for _, cell := range row {
+			if strings.HasPrefix(cell, "=") || strings.HasPrefix(cell, "+") || strings.HasPrefix(cell, "-") || strings.HasPrefix(cell, "@") || strings.ContainsAny(cell, "\x1b\u202e") {
+				t.Fatalf("unsafe CSV cell %q", cell)
+			}
+		}
+	}
+	if len(rows) < 2 || rows[1][2] != "'=HYPERLINK(\"https://attacker.invalid\")" {
+		t.Fatalf("formula was not visibly neutralized: %#v", rows)
+	}
+}
+
 func TestMarkdownEscapesInjectedStructureAndUnselectedCitations(t *testing.T) {
 	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativeMarkdown

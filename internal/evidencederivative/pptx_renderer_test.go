@@ -127,6 +127,13 @@ func assertPPTXRelationshipsResolve(t *testing.T, relationshipPath string, body 
 	}
 }
 
+func TestPPTXTextRemovesInvalidDisplayControls(t *testing.T) {
+	got := pptxText("safe\n<script>\x1b\u202ebad")
+	if strings.ContainsAny(got, "\x1b\u202e") || !strings.Contains(got, "&lt;script&gt;") || !strings.Contains(got, "\n") {
+		t.Fatalf("unsafe PPTX text %q", got)
+	}
+}
+
 func TestRenderProjectionPPTXRejectsFalseFontProfile(t *testing.T) {
 	r, p, m := portableFixture(t)
 	r.DerivativeType = DerivativePPTX
