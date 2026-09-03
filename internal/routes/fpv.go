@@ -23,17 +23,17 @@ import (
 
 type fpvShare struct {
 	PolicyVersion string        `json:"policy_version"`
-	Token         string        `json:"token"`
-	SessionID     string        `json:"session_id"`
+	Token     string        `json:"token"`
+	SessionID string        `json:"session_id"`
 	Origin        string        `json:"origin"`
-	CreatedAt     time.Time     `json:"created_at"`
-	ExpiresAt     time.Time     `json:"expires_at"`
-	Views         int           `json:"views"`
-	Controls      bool          `json:"controls"`
-	OneTime       bool          `json:"one_time"`
-	MaxViews      int           `json:"max_views"`
-	Revoked       bool          `json:"revoked"`
-	Audit         []fpvAuditLog `json:"audit,omitempty"`
+	CreatedAt time.Time     `json:"created_at"`
+	ExpiresAt time.Time     `json:"expires_at"`
+	Views     int           `json:"views"`
+	Controls  bool          `json:"controls"`
+	OneTime   bool          `json:"one_time"`
+	MaxViews  int           `json:"max_views"`
+	Revoked   bool          `json:"revoked"`
+	Audit     []fpvAuditLog `json:"audit,omitempty"`
 }
 
 type fpvAuditLog struct {
@@ -154,7 +154,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			status := http.StatusGone
 			if errors.Is(err, errFPVShareUnavailable) {
 				status = http.StatusNotFound
-			}
+		}
 			writeJSON(w, status, map[string]string{"error": err.Error()})
 			return
 		}
