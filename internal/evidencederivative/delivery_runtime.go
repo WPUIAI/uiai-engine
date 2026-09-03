@@ -51,7 +51,11 @@ func (r *DeliveryRuntime) Deliver(ctx context.Context, c DeliveryCommand, t Deli
 		if !sameCommand(prior.command, c) {
 			return DeliveryReceipt{}, ErrDeliveryConflict
 		}
-		return cloneReceipt(prior.receipt), nil
+		cached := cloneReceipt(prior.receipt)
+		if cached.State == DeliveryOutcomeUnknown {
+			return cached, ErrDeliveryRetryBlocked
+		}
+		return cached, nil
 	}
 	result, err := t.Send(ctx, c)
 	if result.ObservedAt.IsZero() {
@@ -64,7 +68,7 @@ func (r *DeliveryRuntime) Deliver(ctx context.Context, c DeliveryCommand, t Deli
 	if state != DeliveryAccepted && state != DeliveryRejected && state != DeliveryBlocked && state != DeliveryOutcomeUnknown {
 		return DeliveryReceipt{}, ErrDerivativeContractInvalid
 	}
-	receipt := DeliveryReceipt{Schema: DeliverySchema, DeliveryID: "delivery:" + hex.EncodeToString(sum[:16]), DerivativeRef: c.DerivativeRef, DerivativeSHA256: c.DerivativeSHA256, DestinationRef: c.DestinationRef, IdempotencyKey: c.IdempotencyKey, State: state, ProviderReceiptRef: result.ProviderReceiptRef, EvidenceRefs: append([]string(nil), result.EvidenceRefs...), ObservedAt: result.ObservedAt.UTC()}
+	receipt := DeliveryReceipt{Schema: DeliverySchema, DeliveryID: deliveryID(c), DerivativeRef: c.DerivativeRef, DerivativeSHA256: c.DerivativeSHA256, DestinationRef: c.DestinationRef, IdempotencyKey: c.IdempotencyKey, State: state, ProviderReceiptRef: result.ProviderReceiptRef, EvidenceRefs: append([]string(nil), result.EvidenceRefs...), ObservedAt: result.ObservedAt.UTC()}
 	if state == DeliveryAccepted {
 		v := receipt.ObservedAt
 		receipt.AcceptedAt = &v
@@ -111,6 +115,15 @@ func (r *DeliveryRuntime) Reconcile(key string, state DeliveryState, providerRef
 	r.records[key] = record
 	return cloneReceipt(receipt), nil
 }
+func deliveryID(command DeliveryCommand) string {
+	digest := sha256.New()
+	for _, value := range []string{command.DerivativeRef, command.DerivativeSHA256, command.DestinationRef, command.IdempotencyKey} {
+		digest.Write([]byte(value))
+		digest.Write([]byte{0})
+	}
+	return "delivery:" + hex.EncodeToString(digest.Sum(nil)[:16])
+}
+
 func sameCommand(a, b DeliveryCommand) bool {
 	return a.DerivativeRef == b.DerivativeRef && a.DerivativeSHA256 == b.DerivativeSHA256 && a.DestinationRef == b.DestinationRef && a.IdempotencyKey == b.IdempotencyKey && string(a.Payload) == string(b.Payload)
 }

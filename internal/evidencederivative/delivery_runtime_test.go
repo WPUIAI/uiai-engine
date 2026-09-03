@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
@@ -43,7 +44,53 @@ func TestDeliveryRuntimeIdempotencyAndConflict(t *testing.T) {
 	if _, e = r.Deliver(context.Background(), bad, tr); !errors.Is(e, ErrDeliveryConflict) {
 		t.Fatalf("error=%v", e)
 	}
+	other := c
+	other.DestinationRef = "mailbox:2"
+	other.IdempotencyKey = "key:2"
+	otherReceipt, e := r.Deliver(context.Background(), other, tr)
+	if e != nil || otherReceipt.DeliveryID == b.DeliveryID {
+		t.Fatalf("delivery identity did not bind destination: %#v %v", otherReceipt, e)
+	}
 }
+func TestDeliveryRuntimeConcurrentIdempotency(t *testing.T) {
+	now := time.Unix(10, 0).UTC()
+	transport := &fakeDeliveryTransport{result: ProviderDeliveryResult{State: DeliveryAccepted, ProviderReceiptRef: "smtp:1", EvidenceRefs: []string{"evidence:smtp"}, ObservedAt: now}}
+	runtime := NewDeliveryRuntime()
+	command := deliveryCommand()
+	var wait sync.WaitGroup
+	ids := make(chan string, 32)
+	errorsSeen := make(chan error, 32)
+	for range 32 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			receipt, err := runtime.Deliver(context.Background(), command, transport)
+			if err != nil {
+				errorsSeen <- err
+				return
+			}
+			ids <- receipt.DeliveryID
+		}()
+	}
+	wait.Wait()
+	close(ids)
+	close(errorsSeen)
+	for err := range errorsSeen {
+		t.Fatal(err)
+	}
+	var expected string
+	for id := range ids {
+		if expected == "" {
+			expected = id
+		} else if id != expected {
+			t.Fatalf("delivery IDs differ: %s != %s", id, expected)
+		}
+	}
+	if transport.calls != 1 {
+		t.Fatalf("transport calls = %d", transport.calls)
+	}
+}
+
 func TestDeliveryRuntimeUnknownRequiresReconciliation(t *testing.T) {
 	tr := &fakeDeliveryTransport{err: errors.New("timeout")}
 	r := NewDeliveryRuntime()
@@ -53,8 +100,8 @@ func TestDeliveryRuntimeUnknownRequiresReconciliation(t *testing.T) {
 		t.Fatalf("receipt=%#v err=%v", receipt, e)
 	}
 	again, e := r.Deliver(context.Background(), c, tr)
-	if e != nil || again.State != DeliveryOutcomeUnknown || tr.calls != 1 {
-		t.Fatalf("blind retry occurred: %#v %v calls=%d", again, e, tr.calls)
+	if !errors.Is(e, ErrDeliveryRetryBlocked) || again.State != DeliveryOutcomeUnknown || tr.calls != 1 {
+		t.Fatalf("unknown replay lost warning or retried: %#v %v calls=%d", again, e, tr.calls)
 	}
 	done, e := r.Reconcile(c.IdempotencyKey, DeliveryDelivered, "imap:1", []string{"evidence:imap"}, time.Unix(20, 0).UTC())
 	if e != nil || done.State != DeliveryDelivered || done.RetryPermitted {
