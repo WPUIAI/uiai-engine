@@ -7,6 +7,7 @@ import (
 
 func TestRenderProjectionHTMLLayoutModesAreSelfContained(t *testing.T) {
 	request, projection, manifest := portableFixture(t)
+	request.Rendering = HTMLSystemUIRenderingProfile()
 	for _, kind := range []DerivativeType{DerivativePrint, DerivativeHTMLSlides} {
 		request.DerivativeType = kind
 		rendered, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:layout", manifest.CreatedAt)

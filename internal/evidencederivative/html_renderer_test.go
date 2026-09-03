@@ -1,7 +1,9 @@
 package evidencederivative
 
 import (
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -9,9 +11,17 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 )
 
+func TestHTMLSystemUIProfileDigestIsFrozen(t *testing.T) {
+	digest := sha256.Sum256([]byte("uiai.evidence.html-system-ui-srgb.v1\n"))
+	if got := fmt.Sprintf("%x", digest); got != HTMLSystemUIProfileSHA256 {
+		t.Fatalf("profile digest = %s", got)
+	}
+}
+
 func TestRenderProjectionHTMLIncludesOnlySelectedEvidence(t *testing.T) {
 	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativeHTML
+	request.Rendering = HTMLSystemUIRenderingProfile()
 	if len(projection.Claims) > 1 {
 		request.ClaimRefs = request.ClaimRefs[:1]
 	}
@@ -38,6 +48,7 @@ func TestRenderProjectionHTMLIncludesOnlySelectedEvidence(t *testing.T) {
 func TestRenderProjectionHTMLEscapesHostileContentAndNeverFetches(t *testing.T) {
 	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativeHTML
+	request.Rendering = HTMLSystemUIRenderingProfile()
 	projection.Title = `<script>alert("title")</script>`
 	projection.Claims[0].Statement = `<img src="https://attacker.invalid/x" onerror="alert(1)">`
 	bindHTMLProjection(t, &request, projection)
@@ -64,6 +75,7 @@ func TestRenderProjectionHTMLIsDeterministicForWebAndEmail(t *testing.T) {
 		t.Run(string(derivativeType), func(t *testing.T) {
 			request, projection, manifest := portableFixture(t)
 			request.DerivativeType = derivativeType
+			request.Rendering = HTMLSystemUIRenderingProfile()
 			first, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:html-deterministic", manifest.CreatedAt)
 			if err != nil {
 				t.Fatal(err)
@@ -79,6 +91,14 @@ func TestRenderProjectionHTMLIsDeterministicForWebAndEmail(t *testing.T) {
 	}
 }
 
+func TestRenderProjectionHTMLRejectsFalseFontProfile(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	request.DerivativeType = DerivativeHTML
+	if _, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:html", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+		t.Fatalf("unimplemented requested font profile accepted: %v", err)
+	}
+}
+
 func TestRenderProjectionHTMLFailsClosedOnUnsupportedTypeAndBindingDrift(t *testing.T) {
 	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativePDF
@@ -86,6 +106,7 @@ func TestRenderProjectionHTMLFailsClosedOnUnsupportedTypeAndBindingDrift(t *test
 		t.Fatalf("unsupported type error = %v", err)
 	}
 	request.DerivativeType = DerivativeHTML
+	request.Rendering = HTMLSystemUIRenderingProfile()
 	request.ArtifactRevision++
 	if _, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:html", manifest.CreatedAt); !errors.Is(err, ErrProjectionMismatch) {
 		t.Fatalf("binding drift error = %v", err)
