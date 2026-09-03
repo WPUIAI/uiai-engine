@@ -8,14 +8,14 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 )
 
-const HTMLSystemUIProfileRef = "rendering:html-system-ui-srgb-v1"
-const HTMLSystemUIProfileSHA256 = "3d7990731013c334923fd6ac668735af471bfd9c8550149ec5a8bc62c8ec5e4b"
+const HTMLSystemUIProfileRef = "rendering:html-viewer-system-ui-srgb-v2"
+const HTMLSystemUIProfileSHA256 = "d678ddbc4b63fcb4665374b6eef7bc620303571608866a53174b96c65bc19dd0"
 
 func HTMLSystemUIRenderingProfile() RenderingProfile {
 	return RenderingProfile{
 		ProfileRef:      HTMLSystemUIProfileRef,
 		ProfileSHA256:   HTMLSystemUIProfileSHA256,
-		FontRefs:        []string{"builtin:system-ui"},
+		FontRefs:        []string{"viewer:system-ui"},
 		ColorProfileRef: "css-srgb",
 	}
 }
@@ -25,7 +25,7 @@ func RenderProjectionHTML(request DerivativeRequest, projection evidencepwa.Proj
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	if request.Rendering.ProfileRef != HTMLSystemUIProfileRef || request.Rendering.ProfileSHA256 != HTMLSystemUIProfileSHA256 ||
-		len(request.Rendering.FontRefs) != 1 || request.Rendering.FontRefs[0] != "builtin:system-ui" ||
+		len(request.Rendering.FontRefs) != 1 || request.Rendering.FontRefs[0] != "viewer:system-ui" ||
 		request.Rendering.ColorProfileRef != "css-srgb" || len(request.Rendering.DependencyRefs) != 0 {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}

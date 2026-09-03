@@ -12,7 +12,7 @@ import (
 )
 
 func TestHTMLSystemUIProfileDigestIsFrozen(t *testing.T) {
-	digest := sha256.Sum256([]byte("uiai.evidence.html-system-ui-srgb.v1\n"))
+	digest := sha256.Sum256([]byte("uiai.evidence.html-viewer-system-ui-srgb-v2\n"))
 	if got := fmt.Sprintf("%x", digest); got != HTMLSystemUIProfileSHA256 {
 		t.Fatalf("profile digest = %s", got)
 	}
