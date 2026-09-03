@@ -1,16 +1,16 @@
 # UIAI Agent FPV — PWA Variant (2026-06-09)
 
-> **Vision**: At the start of every UIAI session, the agent announces a
-> **share link**. The operator opens the link in any mobile browser,
-> gets a live view of what the agent sees, and can steer the agent
-> back to the right path. No app install, no app store, no native
-> distribution. Just a URL.
+> **Security-corrected vision**: Every UIAI session starts private. When an
+> authorized operator explicitly requests a read-only share for a non-sensitive
+> origin, UIAI may issue one bounded capability URL. Session creation never
+> creates or announces a share implicitly. Public control remains disabled until
+> a separate governed-confirmation contract exists.
 
 > This is the **fast-path MVP** of the full FPV Co-Pilot spec
 > (`UIAI_AGENT_FPV_COPILOT_SPEC_2026-06-09.md`). The Mac app /
 > Tauri / IDE-embedded versions come in Phase 2.
 
-**Implementation status (2026-06-12)**: MVP implemented. Agents create a share with `POST /api/fpv/share` / Pi `uiai_fpv_share`; operators open `/m/{token}` for a public tokenized PWA that polls session status, diagnostics summary, and screenshot frames. Shares default to read-only; `controls=true` enables the audited co-pilot control endpoint.
+**Implementation status (2026-09-03)**: Security correction is a source candidate, not installed acceptance. Explicit `POST /api/fpv/share` may create a bounded read-only `/m/{token}` capability for an exact non-sensitive session origin. `browser_open` returns no share. Auth, privacy, payment, and health origins are denied. `controls=true` is denied until governed confirmation exists. Older automatic-share and public-control prose below is historical design context and does not describe authorized current behavior.
 
 ---
 
@@ -52,11 +52,11 @@ uiai_browser_open({
 
 Response: {
   "session_id": "LgwqFy4b",
-  "mirror_url": "https://uiai.example.com/m/LgwqFy4b?tk=signed_token_xyz",
-  "mirror_url_expires_at": "2026-06-09T23:00:00Z"
+  "screenshot": "...",
+  "size": {"width": 390, "height": 844}
 }
 
-Agent: "Started session LgwqFy4b. Watch live: https://uiai.example.com/m/LgwqFy4b?tk=signed_token_xyz"
+Agent: "Started private session LgwqFy4b. No public share was created."
 ```
 
 ### 2.2 Operator opens link on phone
@@ -83,7 +83,9 @@ The phone shows:
 └─────────────────────────────────┘
 ```
 
-### 2.3 Operator steers
+### 2.3 Future governed steering — not implemented
+
+The following interaction sketch is historical design input only. The current public route is read-only and rejects control capability creation.
 
 Operator types "the Unsplash field is the FIRST one on the page,
 not the second". Agent's next LLM call sees this as developer
@@ -99,39 +101,25 @@ developer's actions baked into its context.
 
 ### 3.1 URL structure
 
-Three forms, all equivalent:
+The supported public form is `https://fpv.wpuiai.com/m/<capability>`.
 
-- `https://uiai.example.com/m/<session-id>?tk=<signed-token>`
-- `https://uiai.example.com/mirror/?s=<session-id>&t=<token>`
-- `https://mirror.uiai.example.com/v1/sessions/<id>?token=<token>`
-
-The token is a JWT-style signed value with:
-- `session_id` claim
-- `operator_role` claim (read-only / steer / full-takeover)
-- `exp` claim (default 1 hour)
-- `iss` claim (UIAI server identity)
+The capability is a 192-bit URL-safe random value stored only in the protected registry and returned by the explicit share operation. The registry separately binds policy version, session ID, exact origin, expiry, read-only mode, and maximum views. Diagnostics, audit events, revocation receipts, and notifications use only a SHA-256 share reference; they never echo the capability.
 
 ### 3.2 URL generation
 
-**When**: At `uiai_browser_open` time. The agent's response includes
-`mirror_url` automatically.
+**When**: Only after a separate explicit share request passes policy. Never during `uiai_browser_open`.
 
-**Operator UX**: The agent can read it out:
-> "Started session. Watch live at https://uiai.example.com/m/LgwqFy4b"
+**Operator UX**: Treat the returned URL as a sensitive capability. Do not place it in model-visible logs, diagnostics, receipts, or notifications.
 
-Or the Focusa workpoint can capture it as evidence:
-> `evidence_handle: "uiai:session=LgwqFy4b:mirror_url"`
-
-**TTL**: Default 1 hour; operator can request extension via the
-PWA itself.
+**TTL and use bounds**: Default 15 minutes, maximum 60 minutes; default 25 views, maximum 100, with one-time mode fixed to one view. Extension requires a new explicit share after policy reevaluation.
 
 ### 3.3 Operator authentication
 
 Three modes, decided by Focusa policy:
 
-- **Anonymous read-only**: anyone with the link can view
-- **Focusa-authenticated**: link requires Focusa auth
-- **Token-authenticated**: link contains a signed token (default)
+- **Bounded read-only capability**: current source candidate; exact session/origin, expiry, and view bounds apply.
+- **Focusa-authenticated**: future; not implemented by this candidate.
+- **Governed control**: future; fail closed until a stronger confirmation/approval contract is implemented.
 
 For P4 (customer-support) persona, the link can be **scoped to
 a specific customer session** with **PII redaction** in the
@@ -228,10 +216,7 @@ If the PWA loses connection:
 
 ### 6.2 Multi-tab handling
 
-If the operator has the PWA open in two tabs, both can view
-(broadcast). Only one can be in takeover mode at a time.
-A tab in takeover is marked with a "Steering" badge; the other
-tab shows a "Another device is steering" notice.
+Multiple tabs may consume separate bounded views of the same read-only capability. Concurrent view counting is atomic. Takeover mode is not implemented; a future governed-control design must add non-replayable operator binding and stronger confirmation before enabling it.
 
 ### 6.3 Background behavior
 
@@ -281,7 +266,7 @@ When the phone is locked or PWA is backgrounded:
 └─────────────────────────────────┘
 ```
 
-### 7.3 Takeover mode
+### 7.3 Future takeover mode — not implemented
 
 ```
 ┌─────────────────────────────────┐
@@ -302,14 +287,9 @@ When the phone is locked or PWA is backgrounded:
 
 ## 8. Integration with Focusa
 
-### 8.1 Mirror URL in workpoint evidence
+### 8.1 Share reference in Workpoint evidence
 
-When the agent reports its mirror URL, Focusa can:
-- Auto-link the URL to the active workpoint
-- Show a "Live" badge in the workpoint UI
-- One-click open in the operator's default mobile browser
-- Auto-evidence: every minute, capture a screenshot via the
-  PWA-shared connection
+Focusa evidence may store only the token-redacted SHA-256 `share_ref`, policy decision, session/origin binding, expiry, and revocation outcome. It must not store or narrate the public capability URL. Capability transport to the explicitly authorized operator is a separate sensitive channel.
 
 ### 8.2 Operator-driven workpoint advancement
 
@@ -327,8 +307,8 @@ A Focusa workpoint can declare:
   "workpoint": "019eae3c-...",
   "binding": {
     "uiai_session_id": "LgwqFy4b",
-    "mirror_url": "https://uiai.example.com/m/LgwqFy4b",
-    "operator_steering": "allowed" | "read_only" | "denied"
+    "share_ref": "fpv-share:sha256:<digest>",
+    "operator_steering": "read_only" | "denied"
   }
 }
 ```

@@ -68,14 +68,8 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		}
 		sess.SetFocusaScope(resolveFocusaScope(body.FocusaScope, body.WorkpointID, body.ContinuityID, body.ProjectRoot, body.EvidenceRef))
 
-		fpvShare, fpvErr := fpvCreateShare(sess.ID, 60, true, false, 0)
-		if fpvErr != nil {
-			writeSessionError(w, 500, "fpv_share_failed", fpvErr, sess)
-			return
-		}
 		writeJSON(w, 201, map[string]any{
 			"session":     sessionInfoPayload(sess),
-			"fpv_share":   fpvShare,
 			"screenshot":  snap.Screenshot,
 			"size":        snap.Size,
 			"duration_ms": snap.Duration,
@@ -101,10 +95,18 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			id := chi.URLParam(req, "sessionID")
 			if err := sm.Close(id); err != nil {
 				if errors.Is(err, vision.ErrSessionNotFound) {
+					if _, revokeErr := fpvRevokeSessionShares(id); revokeErr != nil {
+						writeJSON(w, 500, map[string]string{"error": "session closed but share revocation persistence failed"})
+						return
+					}
 					writeJSON(w, 200, map[string]string{"status": "already_closed", "id": id})
 					return
 				}
 				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			if _, revokeErr := fpvRevokeSessionShares(id); revokeErr != nil {
+				writeJSON(w, 500, map[string]string{"error": "session closed but share revocation persistence failed"})
 				return
 			}
 			writeJSON(w, 200, map[string]string{"status": "closed", "id": id})

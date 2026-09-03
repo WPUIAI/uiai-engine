@@ -2,6 +2,7 @@ package routes
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -24,6 +25,7 @@ func TestFPVShareRequiresSessionID(t *testing.T) {
 }
 
 func TestFPVEntryExpires(t *testing.T) {
+	isolatedFPVRegistry(t)
 	fpvShares.Store("expired", &fpvShare{Token: "expired", SessionID: "sid", ExpiresAt: time.Now().UTC().Add(-time.Second)})
 	if _, ok := fpvEntry("expired"); ok {
 		t.Fatal("expected expired FPV share to be rejected")
@@ -35,8 +37,8 @@ func TestFPVToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fpvToken returned error: %v", err)
 	}
-	if !regexp.MustCompile(`^[a-z]+-[a-z]+-[0-9a-f]{4}$`).MatchString(token) {
-		t.Fatalf("token %q is not human-friendly slug format", token)
+	if !regexp.MustCompile(`^[A-Za-z0-9_-]{32}$`).MatchString(token) {
+		t.Fatalf("token %q is not a 192-bit URL-safe capability", token)
 	}
 }
 
@@ -91,16 +93,29 @@ func TestFPVLiveFocusaContextUsesDaemon(t *testing.T) {
 	}
 }
 
-func TestFPVCreateSharePayloadIncludesPublicURLAndControls(t *testing.T) {
-	share, err := fpvCreateShare("sid-auto", 5, true, false, 0)
+func TestFPVCreateShareIsBoundedReadOnlyAndRejectsControl(t *testing.T) {
+	isolatedFPVRegistry(t)
+	if _, err := fpvCreateShare("sid-auto", "https://example.com", "", 5, false, false, 1); !errors.Is(err, errFPVPolicyInvalid) {
+		t.Fatalf("consent-free share error = %v", err)
+	}
+	if _, err := fpvCreateShare("sid-auto", "https://example.com", "consent:test", 5, true, false, 1); !errors.Is(err, errFPVControlsDenied) {
+		t.Fatalf("control share error = %v", err)
+	}
+	share, err := fpvCreateShare("sid-auto", "https://example.com", "consent:test", 5, false, false, 0)
 	if err != nil {
 		t.Fatalf("fpvCreateShare returned error: %v", err)
 	}
-	if share["controls"] != true || share["mode"] != "control" || share["public_url"] == "" {
+	if share["controls"] != false || share["mode"] != "read_only" || share["public_url"] == "" || share["max_views"] != fpvDefaultMaxViews {
 		t.Fatalf("unexpected share payload: %#v", share)
 	}
 	if _, ok := fpvEntry(share["token"].(string)); !ok {
 		t.Fatalf("expected share token to resolve: %#v", share)
+	}
+	if _, err := fpvCreateShare("sid-auto", "https://example.com", "consent:test", fpvMaximumTTLMinutes+1, false, false, 1); !errors.Is(err, errFPVPolicyInvalid) {
+		t.Fatalf("unbounded TTL error = %v", err)
+	}
+	if _, err := fpvCreateShare("sid-auto", "https://example.com", "consent:test", 1, false, false, fpvMaximumMaxViews+1); !errors.Is(err, errFPVPolicyInvalid) {
+		t.Fatalf("unbounded views error = %v", err)
 	}
 }
 
@@ -115,7 +130,7 @@ func TestFPVAuditEventsSince(t *testing.T) {
 		t.Fatalf("expected audit event, latest=%d events=%#v", latest, events)
 	}
 	meta := events[len(events)-1].Meta
-	if meta["token"] != "tok1" || meta["session_id"] != "sid1" {
-		t.Fatalf("expected token/session metadata, got %#v", meta)
+	if meta["token"] != nil || meta["share_ref"] != fpvTokenRef("tok1") || meta["session_id"] != "sid1" {
+		t.Fatalf("expected redacted share/session metadata, got %#v", meta)
 	}
 }

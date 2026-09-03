@@ -49,6 +49,29 @@ export interface BrowserExecutionCapsule {
   execution: Record<string, unknown>; proof: string[]; cleanup?: Record<string, unknown>; integrity?: Record<string, unknown>;
 }
 
+export interface PublicFPVShareRequest {
+  schema: "uiai.public_fpv_share_request.v2";
+  session_id: string;
+  expected_origin: string;
+  mode: "read_only";
+  expires_minutes: number;
+  max_views: number;
+  one_time: boolean;
+  explicit_consent_ref: string;
+}
+
+export interface PublicFPVShareDecision {
+  schema: "uiai.public_fpv_share_decision.v2";
+  decision: "allowed" | "blocked";
+  share_ref?: string;
+  session_id: string;
+  origin: string;
+  expires_at?: string;
+  max_views?: number;
+  reason_code?: "explicit_consent_required" | "origin_mismatch" | "sensitive_origin" | "control_requires_governed_confirmation" | "policy_invalid" | "persistence_failed";
+  evidence_refs: string[];
+}
+
 export interface OriginToolCandidate {
   schema: "uiai.origin_tool_candidate.v1";
   candidate_id: string; runtime: RuntimeRef;
