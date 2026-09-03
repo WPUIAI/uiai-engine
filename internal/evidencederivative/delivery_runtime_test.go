@@ -23,7 +23,13 @@ func (f *fakeDeliveryTransport) Send(_ context.Context, _ DeliveryCommand) (Prov
 func deliveryCommand() DeliveryCommand {
 	body := []byte("mail body")
 	sum := sha256.Sum256(body)
-	return DeliveryCommand{DerivativeRef: "derivative:1", DerivativeSHA256: hex.EncodeToString(sum[:]), DestinationRef: "mailbox:1", IdempotencyKey: "key:1", Payload: body}
+	policy := EmailDeliveryPolicy{
+		Schema: EmailDeliveryPolicySchema, PolicyRef: "email-policy:1", Transport: EmailTransportSMTP,
+		TLSRequired: true, RecipientConsentRef: "consent:1", SuppressionEvidenceRef: "suppression:1",
+		DKIMEvidenceRef: "dkim:1", SPFEvidenceRef: "spf:1", DMARCEvidenceRef: "dmarc:1", NoTracking: true,
+		MaxMessageBytes: 1024, BounceReconciliationRef: "bounce-policy:1",
+	}
+	return DeliveryCommand{DerivativeRef: "derivative:1", DerivativeSHA256: hex.EncodeToString(sum[:]), DestinationRef: "mailbox:1", IdempotencyKey: "key:1", Payload: body, EmailPolicy: &policy}
 }
 func TestDeliveryRuntimeIdempotencyAndConflict(t *testing.T) {
 	now := time.Unix(10, 0).UTC()
@@ -33,6 +39,9 @@ func TestDeliveryRuntimeIdempotencyAndConflict(t *testing.T) {
 	a, e := r.Deliver(context.Background(), c, tr)
 	if e != nil {
 		t.Fatal(e)
+	}
+	if err := ValidateEmailDeliveryReceipt(a, *c.EmailPolicy); err != nil {
+		t.Fatal(err)
 	}
 	*a.AcceptedAt = time.Unix(99, 0).UTC()
 	b, e := r.Deliver(context.Background(), c, tr)

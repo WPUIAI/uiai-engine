@@ -15,6 +15,7 @@ var ErrDeliveryRetryBlocked = errors.New("evidence derivative delivery retry blo
 type DeliveryCommand struct {
 	DerivativeRef, DerivativeSHA256, DestinationRef, IdempotencyKey string
 	Payload                                                         []byte
+	EmailPolicy                                                     *EmailDeliveryPolicy
 }
 type ProviderDeliveryResult struct {
 	State              DeliveryState
@@ -38,8 +39,15 @@ func NewDeliveryRuntime() *DeliveryRuntime {
 	return &DeliveryRuntime{records: map[string]deliveryRecord{}}
 }
 func (r *DeliveryRuntime) Deliver(ctx context.Context, c DeliveryCommand, t DeliveryTransport) (DeliveryReceipt, error) {
-	if t == nil || c.DerivativeRef == "" || c.DestinationRef == "" || c.IdempotencyKey == "" || len(c.Payload) == 0 {
+	if t == nil || c.DerivativeRef == "" || c.DestinationRef == "" || c.IdempotencyKey == "" || len(c.Payload) == 0 || c.EmailPolicy == nil {
 		return DeliveryReceipt{}, ErrDerivativeContractInvalid
+	}
+	if err := ValidateEmailDeliveryPolicy(*c.EmailPolicy); err != nil || uint64(len(c.Payload)) > c.EmailPolicy.MaxMessageBytes {
+		return DeliveryReceipt{}, ErrDerivativeContractInvalid
+	}
+	policyDigest, err := DigestEmailDeliveryPolicy(*c.EmailPolicy)
+	if err != nil {
+		return DeliveryReceipt{}, err
 	}
 	sum := sha256.Sum256(c.Payload)
 	if hex.EncodeToString(sum[:]) != c.DerivativeSHA256 {
@@ -58,6 +66,9 @@ func (r *DeliveryRuntime) Deliver(ctx context.Context, c DeliveryCommand, t Deli
 		return cached, nil
 	}
 	result, err := t.Send(ctx, c)
+	if err == nil && result.State == DeliveryAccepted && (result.ProviderReceiptRef == "" || len(result.EvidenceRefs) == 0) {
+		return DeliveryReceipt{}, ErrDerivativeContractInvalid
+	}
 	if result.ObservedAt.IsZero() {
 		result.ObservedAt = time.Now().UTC()
 	}
@@ -68,7 +79,7 @@ func (r *DeliveryRuntime) Deliver(ctx context.Context, c DeliveryCommand, t Deli
 	if state != DeliveryAccepted && state != DeliveryRejected && state != DeliveryBlocked && state != DeliveryOutcomeUnknown {
 		return DeliveryReceipt{}, ErrDerivativeContractInvalid
 	}
-	receipt := DeliveryReceipt{Schema: DeliverySchema, DeliveryID: deliveryID(c), DerivativeRef: c.DerivativeRef, DerivativeSHA256: c.DerivativeSHA256, DestinationRef: c.DestinationRef, IdempotencyKey: c.IdempotencyKey, State: state, ProviderReceiptRef: result.ProviderReceiptRef, EvidenceRefs: append([]string(nil), result.EvidenceRefs...), ObservedAt: result.ObservedAt.UTC()}
+	receipt := DeliveryReceipt{Schema: DeliverySchema, DeliveryID: deliveryID(c), DerivativeRef: c.DerivativeRef, DerivativeSHA256: c.DerivativeSHA256, DestinationRef: c.DestinationRef, IdempotencyKey: c.IdempotencyKey, PolicyRef: c.EmailPolicy.PolicyRef, PolicySHA256: policyDigest, State: state, ProviderReceiptRef: result.ProviderReceiptRef, EvidenceRefs: append([]string(nil), result.EvidenceRefs...), ObservedAt: result.ObservedAt.UTC()}
 	if state == DeliveryAccepted {
 		v := receipt.ObservedAt
 		receipt.AcceptedAt = &v
@@ -117,7 +128,8 @@ func (r *DeliveryRuntime) Reconcile(key string, state DeliveryState, providerRef
 }
 func deliveryID(command DeliveryCommand) string {
 	digest := sha256.New()
-	for _, value := range []string{command.DerivativeRef, command.DerivativeSHA256, command.DestinationRef, command.IdempotencyKey} {
+	policyDigest, _ := emailPolicyDigest(command.EmailPolicy)
+	for _, value := range []string{command.DerivativeRef, command.DerivativeSHA256, command.DestinationRef, command.IdempotencyKey, policyDigest} {
 		digest.Write([]byte(value))
 		digest.Write([]byte{0})
 	}
@@ -125,10 +137,22 @@ func deliveryID(command DeliveryCommand) string {
 }
 
 func sameCommand(a, b DeliveryCommand) bool {
-	return a.DerivativeRef == b.DerivativeRef && a.DerivativeSHA256 == b.DerivativeSHA256 && a.DestinationRef == b.DestinationRef && a.IdempotencyKey == b.IdempotencyKey && string(a.Payload) == string(b.Payload)
+	aPolicy, aErr := emailPolicyDigest(a.EmailPolicy)
+	bPolicy, bErr := emailPolicyDigest(b.EmailPolicy)
+	return aErr == nil && bErr == nil && aPolicy == bPolicy && a.DerivativeRef == b.DerivativeRef && a.DerivativeSHA256 == b.DerivativeSHA256 && a.DestinationRef == b.DestinationRef && a.IdempotencyKey == b.IdempotencyKey && string(a.Payload) == string(b.Payload)
+}
+func emailPolicyDigest(policy *EmailDeliveryPolicy) (string, error) {
+	if policy == nil {
+		return "", ErrDerivativeContractInvalid
+	}
+	return DigestEmailDeliveryPolicy(*policy)
 }
 func cloneCommand(c DeliveryCommand) DeliveryCommand {
 	c.Payload = append([]byte(nil), c.Payload...)
+	if c.EmailPolicy != nil {
+		policy := *c.EmailPolicy
+		c.EmailPolicy = &policy
+	}
 	return c
 }
 func cloneReceipt(v DeliveryReceipt) DeliveryReceipt {

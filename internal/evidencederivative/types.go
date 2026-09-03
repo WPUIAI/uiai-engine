@@ -201,6 +201,8 @@ type DeliveryReceipt struct {
 	DerivativeSHA256   string        `json:"derivative_sha256"`
 	DestinationRef     string        `json:"destination_ref"`
 	IdempotencyKey     string        `json:"idempotency_key"`
+	PolicyRef          string        `json:"policy_ref,omitempty"`
+	PolicySHA256       string        `json:"policy_sha256,omitempty"`
 	State              DeliveryState `json:"state"`
 	ProviderReceiptRef string        `json:"provider_receipt_ref,omitempty"`
 	AcceptedAt         *time.Time    `json:"accepted_at,omitempty"`

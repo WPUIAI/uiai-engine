@@ -127,6 +127,7 @@ func ValidateManifest(manifest DerivativeManifest, request DerivativeRequest) er
 func ValidateDelivery(receipt DeliveryReceipt) error {
 	if receipt.Schema != DeliverySchema || blank(receipt.DeliveryID) || blank(receipt.DerivativeRef) ||
 		!validSHA256(receipt.DerivativeSHA256) || blank(receipt.DestinationRef) || blank(receipt.IdempotencyKey) ||
+		(blank(receipt.PolicyRef) != blank(receipt.PolicySHA256)) || (!blank(receipt.PolicySHA256) && !validSHA256(receipt.PolicySHA256)) ||
 		!validDelivery(receipt.State) || len(receipt.EvidenceRefs) > MaxRefs || hasBlankOrDuplicate(receipt.EvidenceRefs) ||
 		len(receipt.ReconciliationRefs) > MaxRefs || hasBlankOrDuplicate(receipt.ReconciliationRefs) || receipt.ObservedAt.IsZero() {
 		return ErrDerivativeContractInvalid
