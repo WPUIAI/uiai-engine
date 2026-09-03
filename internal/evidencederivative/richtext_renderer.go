@@ -9,8 +9,23 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 )
 
+const RTFArialProfileRef = "rendering:rtf-arial-v1"
+const RTFArialProfileSHA256 = "26c4fe4dd749ccaf47d5d50e77ac207f340d705c34272c13abd9402af96bc12d"
+
+func RTFArialRenderingProfile() RenderingProfile {
+	return RenderingProfile{
+		ProfileRef:      RTFArialProfileRef,
+		ProfileSHA256:   RTFArialProfileSHA256,
+		FontRefs:        []string{"builtin:arial"},
+		ColorProfileRef: "rtf-default",
+	}
+}
+
 func RenderProjectionRichText(request DerivativeRequest, projection evidencepwa.Projection, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
-	if request.DerivativeType != DerivativeRichText {
+	if request.DerivativeType != DerivativeRichText || request.Direction != DirectionLTR ||
+		request.Rendering.ProfileRef != RTFArialProfileRef || request.Rendering.ProfileSHA256 != RTFArialProfileSHA256 ||
+		len(request.Rendering.FontRefs) != 1 || request.Rendering.FontRefs[0] != "builtin:arial" ||
+		request.Rendering.ColorProfileRef != "rtf-default" || len(request.Rendering.DependencyRefs) != 0 {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	selection, err := selectProjection(request, projection)

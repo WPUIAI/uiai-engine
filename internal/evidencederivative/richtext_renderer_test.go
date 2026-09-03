@@ -2,12 +2,23 @@ package evidencederivative
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"errors"
+	"fmt"
 	"testing"
 )
+
+func TestRTFArialProfileDigestIsFrozen(t *testing.T) {
+	digest := sha256.Sum256([]byte("uiai.evidence.rtf-arial-v1\n"))
+	if got := fmt.Sprintf("%x", digest); got != RTFArialProfileSHA256 {
+		t.Fatalf("profile digest = %s", got)
+	}
+}
 
 func TestRenderProjectionRichTextDeterministicSafe(t *testing.T) {
 	r, p, m := portableFixture(t)
 	r.DerivativeType = DerivativeRichText
+	r.Rendering = RTFArialRenderingProfile()
 	a, e := RenderProjectionRichText(r, p, m.Renderer, m.ViewerMatrix, m.Licenses, "receipt:rtf", m.CreatedAt)
 	if e != nil {
 		t.Fatal(e)
@@ -21,5 +32,13 @@ func TestRenderProjectionRichTextDeterministicSafe(t *testing.T) {
 	}
 	if e := ValidateManifest(a.Manifest, r); e != nil {
 		t.Fatal(e)
+	}
+}
+
+func TestRenderProjectionRichTextRejectsFalseFontProfile(t *testing.T) {
+	r, p, m := portableFixture(t)
+	r.DerivativeType = DerivativeRichText
+	if _, err := RenderProjectionRichText(r, p, m.Renderer, m.ViewerMatrix, m.Licenses, "receipt:rtf", m.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+		t.Fatalf("unimplemented requested font profile accepted: %v", err)
 	}
 }
