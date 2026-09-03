@@ -176,7 +176,7 @@ func fpvRevokeSessionShares(sessionID string) (int, error) {
 }
 
 func fpvShareUsable(entry *fpvShare, now time.Time) bool {
-	return entry != nil && entry.PolicyVersion == fpvSharePolicyVersion && entry.Origin != "" && !entry.Controls &&
+	return entry != nil && entry.PolicyVersion == fpvSharePolicyVersion && entry.Origin != "" && entry.ConsentRef != "" && !entry.Controls &&
 		entry.MaxViews > 0 && entry.MaxViews <= fpvMaximumMaxViews && now.Before(entry.ExpiresAt) && !entry.Revoked
 }
 

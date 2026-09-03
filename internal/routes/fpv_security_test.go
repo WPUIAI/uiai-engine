@@ -34,9 +34,9 @@ func TestFPVEntryRejectsLegacyAndUnboundedCapabilities(t *testing.T) {
 	now := time.Now().UTC()
 	for _, entry := range []*fpvShare{
 		{Token: "legacy", SessionID: "session:1", Origin: "https://example.com", MaxViews: 1, ExpiresAt: now.Add(time.Minute)},
-		{PolicyVersion: fpvSharePolicyVersion, Token: "unbounded", SessionID: "session:1", Origin: "https://example.com", MaxViews: 0, ExpiresAt: now.Add(time.Minute)},
-		{PolicyVersion: fpvSharePolicyVersion, Token: "too-many", SessionID: "session:1", Origin: "https://example.com", MaxViews: fpvMaximumMaxViews + 1, ExpiresAt: now.Add(time.Minute)},
-		{PolicyVersion: fpvSharePolicyVersion, Token: "control", SessionID: "session:1", Origin: "https://example.com", Controls: true, MaxViews: 1, ExpiresAt: now.Add(time.Minute)},
+		{PolicyVersion: fpvSharePolicyVersion, Token: "unbounded", SessionID: "session:1", Origin: "https://example.com", ConsentRef: "consent:test", MaxViews: 0, ExpiresAt: now.Add(time.Minute)},
+		{PolicyVersion: fpvSharePolicyVersion, Token: "too-many", SessionID: "session:1", Origin: "https://example.com", ConsentRef: "consent:test", MaxViews: fpvMaximumMaxViews + 1, ExpiresAt: now.Add(time.Minute)},
+		{PolicyVersion: fpvSharePolicyVersion, Token: "control", SessionID: "session:1", Origin: "https://example.com", ConsentRef: "consent:test", Controls: true, MaxViews: 1, ExpiresAt: now.Add(time.Minute)},
 	} {
 		fpvShares.Store(entry.Token, entry)
 		if _, ok := fpvEntry(entry.Token); ok {
@@ -48,10 +48,10 @@ func TestFPVEntryRejectsLegacyAndUnboundedCapabilities(t *testing.T) {
 func TestFPVRegistryPersistenceFailuresFailClosed(t *testing.T) {
 	registryDirectory := t.TempDir()
 	t.Setenv("UIAI_FPV_REGISTRY_PATH", registryDirectory)
-	if share, err := fpvCreateShare("session:persist", "https://example.com", 1, false, false, 1); !errors.Is(err, errFPVRegistryPersistence) || share != nil {
+	if share, err := fpvCreateShare("session:persist", "https://example.com", "consent:test", 1, false, false, 1); !errors.Is(err, errFPVRegistryPersistence) || share != nil {
 		t.Fatalf("creation persistence failure = %#v, %v", share, err)
 	}
-	entry := &fpvShare{PolicyVersion: fpvSharePolicyVersion, Token: "revoke-persistence", SessionID: "session:persist", Origin: "https://example.com", MaxViews: 1, ExpiresAt: time.Now().UTC().Add(time.Minute)}
+	entry := &fpvShare{PolicyVersion: fpvSharePolicyVersion, Token: "revoke-persistence", SessionID: "session:persist", Origin: "https://example.com", ConsentRef: "consent:test", MaxViews: 1, ExpiresAt: time.Now().UTC().Add(time.Minute)}
 	fpvShares.Store(entry.Token, entry)
 	_, found, err := fpvRevokeToken(entry.Token)
 	if !found || !errors.Is(err, errFPVRegistryPersistence) {
@@ -64,7 +64,7 @@ func TestFPVRegistryPersistenceFailuresFailClosed(t *testing.T) {
 
 func TestFPVViewLimitIsAtomicUnderConcurrency(t *testing.T) {
 	isolatedFPVRegistry(t)
-	entry := &fpvShare{PolicyVersion: fpvSharePolicyVersion, Token: "one-view", SessionID: "session:view", Origin: "https://example.com", OneTime: true, MaxViews: 1, ExpiresAt: time.Now().UTC().Add(time.Minute)}
+	entry := &fpvShare{PolicyVersion: fpvSharePolicyVersion, Token: "one-view", SessionID: "session:view", Origin: "https://example.com", ConsentRef: "consent:test", OneTime: true, MaxViews: 1, ExpiresAt: time.Now().UTC().Add(time.Minute)}
 	fpvShares.Store(entry.Token, entry)
 	var wait sync.WaitGroup
 	results := make(chan error, 64)
@@ -96,7 +96,7 @@ func TestFPVViewLimitIsAtomicUnderConcurrency(t *testing.T) {
 
 func TestFPVSessionRevocationIsImmediateAndIdempotent(t *testing.T) {
 	isolatedFPVRegistry(t)
-	entry := &fpvShare{PolicyVersion: fpvSharePolicyVersion, Token: "revoke-me", SessionID: "session:revoke", Origin: "https://example.com", MaxViews: 1, ExpiresAt: time.Now().UTC().Add(time.Minute)}
+	entry := &fpvShare{PolicyVersion: fpvSharePolicyVersion, Token: "revoke-me", SessionID: "session:revoke", Origin: "https://example.com", ConsentRef: "consent:test", MaxViews: 1, ExpiresAt: time.Now().UTC().Add(time.Minute)}
 	fpvShares.Store(entry.Token, entry)
 	if got, err := fpvRevokeSessionShares(entry.SessionID); err != nil || got != 1 {
 		t.Fatalf("revoked = %d, error = %v", got, err)

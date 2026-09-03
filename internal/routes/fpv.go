@@ -26,6 +26,7 @@ type fpvShare struct {
 	Token     string        `json:"token"`
 	SessionID string        `json:"session_id"`
 	Origin        string        `json:"origin"`
+	ConsentRef    string        `json:"consent_ref"`
 	CreatedAt time.Time     `json:"created_at"`
 	ExpiresAt time.Time     `json:"expires_at"`
 	Views     int           `json:"views"`
@@ -72,7 +73,9 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			ExpiresMinutes int    `json:"expires_minutes"`
 			Controls       bool   `json:"controls"`
 			OneTime        bool   `json:"one_time"`
-			MaxViews       int    `json:"max_views"`
+			MaxViews          int    `json:"max_views"`
+			ExpectedOrigin     string `json:"expected_origin"`
+			ExplicitConsentRef string `json:"explicit_consent_ref"`
 		}
 		_ = json.NewDecoder(req.Body).Decode(&body)
 		if body.SessionID == "" {
@@ -89,7 +92,11 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "sensitive_origin_share_denied"})
 			return
 		}
-		share, err := fpvCreateShare(body.SessionID, origin, body.ExpiresMinutes, body.Controls, body.OneTime, body.MaxViews)
+		if body.ExplicitConsentRef == "" || body.ExpectedOrigin != origin {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "explicit consent and exact expected_origin required"})
+			return
+		}
+		share, err := fpvCreateShare(body.SessionID, origin, body.ExplicitConsentRef, body.ExpiresMinutes, body.Controls, body.OneTime, body.MaxViews)
 		if err != nil {
 			status := http.StatusBadRequest
 			if errors.Is(err, errFPVControlsDenied) || errors.Is(err, errFPVSensitiveOrigin) {
@@ -415,7 +422,7 @@ func fpvAssetPath(file string) (string, bool) {
 	return "", false
 }
 
-func fpvCreateShare(sessionID, origin string, expiresMinutes int, controls, oneTime bool, maxViews int) (map[string]any, error) {
+func fpvCreateShare(sessionID, origin, consentRef string, expiresMinutes int, controls, oneTime bool, maxViews int) (map[string]any, error) {
 	if controls {
 		return nil, errFPVControlsDenied
 	}
@@ -430,7 +437,7 @@ func fpvCreateShare(sessionID, origin string, expiresMinutes int, controls, oneT
 	if minutes <= 0 {
 		minutes = fpvDefaultTTLMinutes
 	}
-	if minutes > fpvMaximumTTLMinutes || sessionID == "" || origin == "" {
+	if minutes > fpvMaximumTTLMinutes || sessionID == "" || origin == "" || consentRef == "" {
 		return nil, errFPVPolicyInvalid
 	}
 	if oneTime {
@@ -446,7 +453,7 @@ func fpvCreateShare(sessionID, origin string, expiresMinutes int, controls, oneT
 		return nil, err
 	}
 	now := time.Now().UTC()
-	entry := &fpvShare{PolicyVersion: fpvSharePolicyVersion, Token: token, SessionID: sessionID, Origin: origin, CreatedAt: now, ExpiresAt: now.Add(time.Duration(minutes) * time.Minute), Controls: false, OneTime: oneTime, MaxViews: maxViews}
+	entry := &fpvShare{PolicyVersion: fpvSharePolicyVersion, Token: token, SessionID: sessionID, Origin: origin, ConsentRef: consentRef, CreatedAt: now, ExpiresAt: now.Add(time.Duration(minutes) * time.Minute), Controls: false, OneTime: oneTime, MaxViews: maxViews}
 	fpvShareMu.Lock()
 	fpvShares.Store(token, entry)
 	fpvShareMu.Unlock()

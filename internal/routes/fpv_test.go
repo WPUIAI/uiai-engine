@@ -95,10 +95,13 @@ func TestFPVLiveFocusaContextUsesDaemon(t *testing.T) {
 
 func TestFPVCreateShareIsBoundedReadOnlyAndRejectsControl(t *testing.T) {
 	isolatedFPVRegistry(t)
-	if _, err := fpvCreateShare("sid-auto", "https://example.com", 5, true, false, 1); !errors.Is(err, errFPVControlsDenied) {
+	if _, err := fpvCreateShare("sid-auto", "https://example.com", "", 5, false, false, 1); !errors.Is(err, errFPVPolicyInvalid) {
+		t.Fatalf("consent-free share error = %v", err)
+	}
+	if _, err := fpvCreateShare("sid-auto", "https://example.com", "consent:test", 5, true, false, 1); !errors.Is(err, errFPVControlsDenied) {
 		t.Fatalf("control share error = %v", err)
 	}
-	share, err := fpvCreateShare("sid-auto", "https://example.com", 5, false, false, 0)
+	share, err := fpvCreateShare("sid-auto", "https://example.com", "consent:test", 5, false, false, 0)
 	if err != nil {
 		t.Fatalf("fpvCreateShare returned error: %v", err)
 	}
@@ -108,10 +111,10 @@ func TestFPVCreateShareIsBoundedReadOnlyAndRejectsControl(t *testing.T) {
 	if _, ok := fpvEntry(share["token"].(string)); !ok {
 		t.Fatalf("expected share token to resolve: %#v", share)
 	}
-	if _, err := fpvCreateShare("sid-auto", "https://example.com", fpvMaximumTTLMinutes+1, false, false, 1); !errors.Is(err, errFPVPolicyInvalid) {
+	if _, err := fpvCreateShare("sid-auto", "https://example.com", "consent:test", fpvMaximumTTLMinutes+1, false, false, 1); !errors.Is(err, errFPVPolicyInvalid) {
 		t.Fatalf("unbounded TTL error = %v", err)
 	}
-	if _, err := fpvCreateShare("sid-auto", "https://example.com", 1, false, false, fpvMaximumMaxViews+1); !errors.Is(err, errFPVPolicyInvalid) {
+	if _, err := fpvCreateShare("sid-auto", "https://example.com", "consent:test", 1, false, false, fpvMaximumMaxViews+1); !errors.Is(err, errFPVPolicyInvalid) {
 		t.Fatalf("unbounded views error = %v", err)
 	}
 }
