@@ -14,7 +14,7 @@ import (
 )
 
 func TestPPTXMinimalProfileDigestIsFrozen(t *testing.T) {
-	digest := sha256.Sum256([]byte("uiai.evidence.pptx-minimal-arial-v1\n"))
+	digest := sha256.Sum256([]byte("uiai.evidence.pptx-viewer-arial-v2\n"))
 	if got := fmt.Sprintf("%x", digest); got != PPTXMinimalProfileSHA256 {
 		t.Fatalf("profile digest = %s", got)
 	}

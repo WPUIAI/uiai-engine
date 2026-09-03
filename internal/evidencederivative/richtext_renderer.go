@@ -9,14 +9,14 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 )
 
-const RTFArialProfileRef = "rendering:rtf-arial-v1"
-const RTFArialProfileSHA256 = "26c4fe4dd749ccaf47d5d50e77ac207f340d705c34272c13abd9402af96bc12d"
+const RTFArialProfileRef = "rendering:rtf-viewer-arial-v2"
+const RTFArialProfileSHA256 = "bba4549134f4c69a8c0f50f29ba46a2c99a9d25493013cf0109bc4547a3f2a75"
 
 func RTFArialRenderingProfile() RenderingProfile {
 	return RenderingProfile{
 		ProfileRef:      RTFArialProfileRef,
 		ProfileSHA256:   RTFArialProfileSHA256,
-		FontRefs:        []string{"builtin:arial"},
+		FontRefs:        []string{"viewer:arial"},
 		ColorProfileRef: "rtf-default",
 	}
 }
@@ -24,7 +24,7 @@ func RTFArialRenderingProfile() RenderingProfile {
 func RenderProjectionRichText(request DerivativeRequest, projection evidencepwa.Projection, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
 	if request.DerivativeType != DerivativeRichText || request.Direction != DirectionLTR ||
 		request.Rendering.ProfileRef != RTFArialProfileRef || request.Rendering.ProfileSHA256 != RTFArialProfileSHA256 ||
-		len(request.Rendering.FontRefs) != 1 || request.Rendering.FontRefs[0] != "builtin:arial" ||
+		len(request.Rendering.FontRefs) != 1 || request.Rendering.FontRefs[0] != "viewer:arial" ||
 		request.Rendering.ColorProfileRef != "rtf-default" || len(request.Rendering.DependencyRefs) != 0 {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}

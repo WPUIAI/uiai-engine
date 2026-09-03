@@ -9,7 +9,7 @@ import (
 )
 
 func TestRTFArialProfileDigestIsFrozen(t *testing.T) {
-	digest := sha256.Sum256([]byte("uiai.evidence.rtf-arial-v1\n"))
+	digest := sha256.Sum256([]byte("uiai.evidence.rtf-viewer-arial-v2\n"))
 	if got := fmt.Sprintf("%x", digest); got != RTFArialProfileSHA256 {
 		t.Fatalf("profile digest = %s", got)
 	}

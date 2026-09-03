@@ -16,18 +16,18 @@ import (
 
 type pptxFile struct{ path, mime, body string }
 
-const PPTXMinimalProfileRef = "rendering:pptx-minimal-arial-v1"
-const PPTXMinimalProfileSHA256 = "0ca5e6ee3a268b838e077a474bbdd68756199ed5f75ce65b73b8a0a99cc51924"
+const PPTXMinimalProfileRef = "rendering:pptx-viewer-arial-v2"
+const PPTXMinimalProfileSHA256 = "402f828cbdccf49ef5bed288c1c9f3d5f619ad38a23d4409a977a029be836782"
 
 func PPTXMinimalRenderingProfile() RenderingProfile {
-	return RenderingProfile{ProfileRef: PPTXMinimalProfileRef, ProfileSHA256: PPTXMinimalProfileSHA256, FontRefs: []string{"builtin:arial"}, ColorProfileRef: "ooxml-default"}
+	return RenderingProfile{ProfileRef: PPTXMinimalProfileRef, ProfileSHA256: PPTXMinimalProfileSHA256, FontRefs: []string{"viewer:arial"}, ColorProfileRef: "ooxml-default"}
 }
 
 func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Projection, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
 	if request.DerivativeType != DerivativePPTX || request.AccessibilityTarget != AccessibilityNotApplicable ||
 		request.Direction != DirectionLTR || request.Rendering.ProfileRef != PPTXMinimalProfileRef ||
 		request.Rendering.ProfileSHA256 != PPTXMinimalProfileSHA256 || len(request.Rendering.FontRefs) != 1 ||
-		request.Rendering.FontRefs[0] != "builtin:arial" || request.Rendering.ColorProfileRef != "ooxml-default" || len(request.Rendering.DependencyRefs) != 0 {
+		request.Rendering.FontRefs[0] != "viewer:arial" || request.Rendering.ColorProfileRef != "ooxml-default" || len(request.Rendering.DependencyRefs) != 0 {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	selection, err := selectProjection(request, projection)
