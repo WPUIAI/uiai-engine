@@ -57,7 +57,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		json.NewDecoder(req.Body).Decode(&body)
 
 		if body.URL == "" {
-			writeJSON(w, 400, map[string]string{"error": "url required"})
+			writeSessionContractError(w, 400, "invalid_request", "url required")
 			return
 		}
 
@@ -89,7 +89,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			writeJSON(w, 200, sessionInfoPayload(sess))
@@ -101,10 +101,17 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			id := chi.URLParam(req, "sessionID")
 			if err := sm.Close(id); err != nil {
 				if errors.Is(err, vision.ErrSessionNotFound) {
-					writeJSON(w, 200, map[string]string{"status": "already_closed", "id": id})
+					writeJSON(w, 200, map[string]any{
+						"status":     "already_closed",
+						"code":       "already_closed",
+						"id":         id,
+						"retryable":  false,
+						"recover":    []string{},
+						"state_lost": []string{},
+					})
 					return
 				}
-				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				writeSessionContractError(w, 500, classifySessionError(err), err.Error())
 				return
 			}
 			writeJSON(w, 200, map[string]string{"status": "closed", "id": id})
@@ -115,7 +122,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			sessionID := chi.URLParam(req, "sessionID")
 			sess, ok := sm.Get(sessionID)
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -143,7 +150,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Get("/screenshot/artifacts/{name}", func(w http.ResponseWriter, req *http.Request) {
 			path, ok := screenshotArtifactPath(cfg, chi.URLParam(req, "name"))
 			if !ok {
-				writeJSON(w, 400, map[string]string{"error": "invalid artifact name"})
+				writeSessionContractError(w, 400, "invalid_request", "invalid artifact name")
 				return
 			}
 			http.ServeFile(w, req, path)
@@ -153,7 +160,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/navigate", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -162,7 +169,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.URL == "" {
-				writeJSON(w, 400, map[string]string{"error": "url required"})
+				writeSessionContractError(w, 400, "invalid_request", "url required")
 				return
 			}
 
@@ -182,7 +189,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/scroll", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -214,7 +221,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/click", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -223,7 +230,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector required (CSS or @ref)"})
+				writeSessionContractError(w, 400, "invalid_request", "selector required (CSS or @ref)")
 				return
 			}
 
@@ -248,7 +255,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/hover", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -257,7 +264,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector required (CSS or @ref)"})
+				writeSessionContractError(w, 400, "invalid_request", "selector required (CSS or @ref)")
 				return
 			}
 
@@ -282,7 +289,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/type", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -292,7 +299,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" || body.Text == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) and text required"})
+				writeSessionContractError(w, 400, "invalid_request", "selector (CSS or @ref) and text required")
 				return
 			}
 			originalSelector := body.Selector
@@ -315,7 +322,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/eval", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -323,7 +330,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.JS == "" {
-				writeJSON(w, 400, map[string]string{"error": "js required"})
+				writeSessionContractError(w, 400, "invalid_request", "js required")
 				return
 			}
 
@@ -346,7 +353,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/eval_async", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -355,7 +362,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.JS == "" {
-				writeJSON(w, 400, map[string]string{"error": "js required"})
+				writeSessionContractError(w, 400, "invalid_request", "js required")
 				return
 			}
 
@@ -381,7 +388,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/resize", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -390,7 +397,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Width <= 0 || body.Height <= 0 {
-				writeJSON(w, 400, map[string]string{"error": "width and height required"})
+				writeSessionContractError(w, 400, "invalid_request", "width and height required")
 				return
 			}
 
@@ -406,7 +413,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/css", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -414,7 +421,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.CSS == "" {
-				writeJSON(w, 400, map[string]string{"error": "css required"})
+				writeSessionContractError(w, 400, "invalid_request", "css required")
 				return
 			}
 
@@ -430,7 +437,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/fill", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -440,7 +447,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" || body.Text == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) and text required"})
+				writeSessionContractError(w, 400, "invalid_request", "selector (CSS or @ref) and text required")
 				return
 			}
 			resolved, resolveErr := sess.ResolveSelector(body.Selector)
@@ -464,7 +471,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/select", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -474,7 +481,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" || len(body.Values) == 0 {
-				writeJSON(w, 400, map[string]string{"error": "selector and values required"})
+				writeSessionContractError(w, 400, "invalid_request", "selector and values required")
 				return
 			}
 			resolved, resolveErr := sess.ResolveSelector(body.Selector)
@@ -494,7 +501,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/press", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -502,7 +509,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Key == "" {
-				writeJSON(w, 400, map[string]string{"error": "key required (Enter, Tab, Escape, ArrowDown, etc)"})
+				writeSessionContractError(w, 400, "invalid_request", "key required (Enter, Tab, Escape, ArrowDown, etc)")
 				return
 			}
 			snap, err := sess.Press(body.Key)
@@ -517,7 +524,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/back", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			snap, err := sess.Back()
@@ -532,7 +539,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/forward", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			snap, err := sess.Forward()
@@ -547,7 +554,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/text", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -555,7 +562,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) required"})
+				writeSessionContractError(w, 400, "invalid_request", "selector (CSS or @ref) required")
 				return
 			}
 			resolved, resolveErr := sess.ResolveSelector(body.Selector)
@@ -571,36 +578,21 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			writeJSON(w, 200, map[string]any{"text": text, "selector": body.Selector})
 		})
 
-		// Read — compact whole-page/region text extraction for agent web surfing (no screenshot)
+		// Read — GET is canonical for bounded, side-effect-free page extraction.
+		// POST remains temporarily compatible for existing clients.
+		readHandler := sessionReadHandler(sm)
+		r.Get("/read", readHandler)
 		r.Post("/read", func(w http.ResponseWriter, req *http.Request) {
-			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
-			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
-				return
-			}
-			var body vision.ReadOptions
-			json.NewDecoder(req.Body).Decode(&body)
-			if body.Selector != "" {
-				if resolved, resolveErr := sess.ResolveSelector(body.Selector); resolveErr == nil {
-					body.Selector = resolved
-				} else {
-					writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "read", "selector": body.Selector})
-					return
-				}
-			}
-			result, err := sess.ReadPage(body)
-			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "read", "selector": body.Selector})
-				return
-			}
-			writeJSON(w, 200, result)
+			w.Header().Set("Deprecation", "true")
+			w.Header().Set("Warning", `299 UIAI "POST /read is deprecated; use GET with query parameters"`)
+			readHandler(w, req)
 		})
 
 		// Cookies — get/set/clear
 		r.Post("/cookies", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body vision.CookieAction
@@ -620,7 +612,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/auth/save", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			state, err := sess.SaveAuth()
@@ -636,12 +628,12 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/auth/load", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var state json.RawMessage
 			if err := json.NewDecoder(req.Body).Decode(&state); err != nil {
-				writeJSON(w, 400, map[string]string{"error": "invalid JSON body"})
+				writeSessionContractError(w, 400, "invalid_request", "invalid JSON body")
 				return
 			}
 			if err := sess.LoadAuth(state); err != nil {
@@ -657,7 +649,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/snapshot", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body vision.SnapshotOptions
@@ -679,7 +671,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Get("/snapshot", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 
@@ -698,7 +690,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/selector/resolve", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -706,7 +698,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if strings.TrimSpace(body.Selector) == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector required"})
+				writeSessionContractError(w, 400, "invalid_request", "selector required")
 				return
 			}
 			resolved, err := sess.ResolveSelector(body.Selector)
@@ -721,7 +713,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Get("/diagnostics", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
@@ -742,7 +734,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/diagnostics/clear", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			sess.ClearDiagnostics()
@@ -753,7 +745,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Get("/dom", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 
@@ -769,7 +761,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Post("/wait", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeSessionContractError(w, 404, "session_not_found", "session not found")
 				return
 			}
 			var body struct {
@@ -778,7 +770,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			json.NewDecoder(req.Body).Decode(&body)
 			if body.Selector == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector required"})
+				writeSessionContractError(w, 400, "invalid_request", "selector required")
 				return
 			}
 
@@ -823,6 +815,17 @@ func resolveFocusaScope(scope *vision.FocusaScope, workpointID, continuityID, pr
 		return nil
 	}
 	return &vision.FocusaScope{WorkpointID: workpointID, ContinuityID: continuityID, ProjectRoot: projectRoot, EvidenceRef: evidenceRef}
+}
+
+func writeSessionContractError(w http.ResponseWriter, status int, code, message string) {
+	event := observability.Record(observability.ErrorEvent{
+		Source:              "browser_session",
+		Class:               code,
+		Status:              status,
+		Message:             message,
+		SuggestedNextAction: suggestedNextSessionAction(code),
+	})
+	writeJSON(w, status, observability.NewErrorEnvelope(event, message, nil))
 }
 
 func writeSessionError(w http.ResponseWriter, status int, class string, err error, sess *vision.Session, context ...map[string]any) {
@@ -946,12 +949,12 @@ func writeScreenshotOutput(w http.ResponseWriter, req *http.Request, cfg *config
 		return
 	}
 	if mode != "file" && mode != "url" {
-		writeJSON(w, 400, map[string]string{"error": "output must be json, file, or url"})
+		writeSessionContractError(w, 400, "invalid_request", "output must be json, file, or url")
 		return
 	}
 	name, path, err := saveScreenshotArtifact(cfg, sessionID, snap)
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		writeSessionContractError(w, 500, classifySessionError(err), err.Error())
 		return
 	}
 	artifactURL := fmt.Sprintf("/api/session/%s/screenshot/artifacts/%s", sessionID, name)

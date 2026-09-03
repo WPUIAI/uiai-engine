@@ -57,6 +57,8 @@ Exact grants/limits come from the signed authority policy.
 | `POST` | `/api/session/{id}/css` | inject CSS | sensitive action scope |
 | `GET/POST` | session cookie/auth routes | save/load state | explicit sensitive feature, encrypted storage, no logs |
 
+`GET /api/session/{id}/read` is the canonical read transport. Query parameters are `selector`, `max_chars`, `include_links`, `format`, `mode`, and `include_images`. The legacy JSON-body `POST` route remains temporarily compatible and returns deprecation headers; new clients must use `GET`.
+
 The exact current route list remains in code/tool discovery and must be generated into the endpoint-feature coverage ledger before release.
 
 ## Authorized-development example
