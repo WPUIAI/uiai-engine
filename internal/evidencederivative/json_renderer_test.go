@@ -1,34 +1,43 @@
 package evidencederivative
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"bytes"
+	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 )
 
-func TestRenderCanonicalJSONBindsProjectionAndTruthInputs(t *testing.T) {
-	request, manifest, _ := contracts()
-	projection := []byte(" {\"b\":2,\"a\":1} \n")
+func TestRenderProjectionJSONIncludesOnlySelectedEvidence(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativeJSON
-	request.Rendering = PortableDataRenderingProfile()
-	request.AccessibilityTarget = AccessibilityNotApplicable
-	request.ProjectionSHA256 = hashJSONTest(projection)
+	if len(request.ClaimRefs) > 1 {
+		request.ClaimRefs = request.ClaimRefs[:1]
+	}
+	request.OmissionRefs = DerivativeOmissionRefs(request, projection)
+	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
 	matrixBefore := cloneViewerMatrix(manifest.ViewerMatrix)
 	licensesBefore := append([]LicenseAttestation(nil), manifest.Licenses...)
-	rendered, err := RenderCanonicalJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json-render", manifest.CreatedAt)
+	rendered, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(rendered.Output), "{\"a\":1,\"b\":2}\n"; got != want {
-		t.Fatalf("output = %q, want %q", got, want)
+	var output struct {
+		Schema       string              `json:"schema"`
+		Claims       []evidencepwa.Claim `json:"claims"`
+		OmissionRefs []string            `json:"omission_refs"`
 	}
-	if rendered.Manifest.OutputSHA256 != hashJSONTest(rendered.Output) || rendered.Manifest.OutputBytes != uint64(len(rendered.Output)) || rendered.Manifest.OutputMIME != "application/json" {
-		t.Fatalf("output manifest = %#v", rendered.Manifest)
+	if err := json.Unmarshal(rendered.Output, &output); err != nil {
+		t.Fatal(err)
 	}
-	if rendered.Manifest.ProjectionSHA256 != request.ProjectionSHA256 || rendered.Manifest.RequestRef != request.RequestID || rendered.Manifest.ReceiptRef != "receipt:json-render" {
-		t.Fatalf("truth bindings = %#v", rendered.Manifest)
+	if output.Schema != "uiai.evidence_derivative_json.v1" || len(output.Claims) != len(request.ClaimRefs) || !reflect.DeepEqual(output.OmissionRefs, request.OmissionRefs) {
+		t.Fatalf("selected output = %#v", output)
+	}
+	if len(projection.Claims) > len(request.ClaimRefs) && bytes.Contains(rendered.Output, []byte(projection.Claims[1].Statement)) {
+		t.Fatal("unselected claim leaked into JSON")
 	}
 	if err := ValidateManifest(rendered.Manifest, request); err != nil {
 		t.Fatal(err)
@@ -38,49 +47,67 @@ func TestRenderCanonicalJSONBindsProjectionAndTruthInputs(t *testing.T) {
 	}
 }
 
-func TestRenderCanonicalJSONIsDeterministic(t *testing.T) {
-	request, manifest, _ := contracts()
-	projection := []byte("{\"n\":9007199254740993,\"nested\":{\"z\":0,\"a\":true}}")
+func TestRenderCanonicalJSONStrictlyDecodesPWAProjection(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativeJSON
-	request.Rendering = PortableDataRenderingProfile()
-	request.AccessibilityTarget = AccessibilityNotApplicable
-	request.ProjectionSHA256 = hashJSONTest(projection)
-	first, err := RenderCanonicalJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt)
+	body, err := json.Marshal(projection)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := RenderCanonicalJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt)
+	wrapped, err := RenderCanonicalJSON(request, body, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(first, second) || string(first.Output) != "{\"n\":9007199254740993,\"nested\":{\"a\":true,\"z\":0}}\n" {
-		t.Fatalf("nondeterministic render: first=%#v second=%#v", first, second)
+	typed, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt)
+	if err != nil || !reflect.DeepEqual(wrapped, typed) {
+		t.Fatalf("wrapper mismatch: %v", err)
+	}
+	unknown := append(append([]byte(nil), body[:len(body)-1]...), []byte(`,"unknown":true}`)...)
+	if _, err := RenderCanonicalJSON(request, unknown, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+		t.Fatalf("unknown field error = %v", err)
+	}
+	multiple := append(append([]byte(nil), body...), body...)
+	if _, err := RenderCanonicalJSON(request, multiple, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+		t.Fatalf("multiple values error = %v", err)
 	}
 }
 
-func TestRenderCanonicalJSONFailsClosed(t *testing.T) {
-	request, manifest, _ := contracts()
-	projection := []byte("{\"ok\":true}")
+func TestRenderProjectionJSONPreservesLargeIntegersDeterministically(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativeJSON
-	request.Rendering = PortableDataRenderingProfile()
-	request.AccessibilityTarget = AccessibilityNotApplicable
-	request.ProjectionSHA256 = hashJSONTest(projection)
-	request.ProjectionSHA256 = hashJSONTest([]byte("different"))
-	if _, err := RenderCanonicalJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt); !errors.Is(err, ErrProjectionMismatch) {
+	projection.Assets[0].Bytes = 9007199254740993
+	digest, err := evidencepwa.DigestProjection(projection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.ProjectionSHA256 = digest
+	first, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt)
+	if err != nil || !reflect.DeepEqual(first, second) || !strings.Contains(string(first.Output), "9007199254740993") {
+		t.Fatalf("large integer render mismatch: %v", err)
+	}
+}
+
+func TestRenderProjectionJSONFailsClosedOnBindingTypeAndOmissions(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	request.DerivativeType = DerivativeJSON
+	request.ProjectionSHA256 = strings.Repeat("f", 64)
+	if _, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt); !errors.Is(err, ErrProjectionMismatch) {
 		t.Fatalf("projection mismatch error = %v", err)
 	}
-	request.ProjectionSHA256 = hashJSONTest([]byte("{} {}"))
-	if _, err := RenderCanonicalJSON(request, []byte("{} {}"), manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
-		t.Fatalf("multiple JSON values error = %v", err)
+	request, projection, manifest = portableFixture(t)
+	request.DerivativeType = DerivativeJSON
+	request.OmissionRefs = request.OmissionRefs[1:]
+	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
+	if _, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt); !errors.Is(err, ErrDerivativeSelectionIncomplete) {
+		t.Fatalf("omission error = %v", err)
 	}
+	request, projection, manifest = portableFixture(t)
 	request.DerivativeType = DerivativePDF
-	request.ProjectionSHA256 = hashJSONTest(projection)
-	if _, err := RenderCanonicalJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
-		t.Fatalf("wrong derivative type error = %v", err)
+	if _, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+		t.Fatalf("wrong type error = %v", err)
 	}
-}
-
-func hashJSONTest(body []byte) string {
-	sum := sha256.Sum256(body)
-	return hex.EncodeToString(sum[:])
 }

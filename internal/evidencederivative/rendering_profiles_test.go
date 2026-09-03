@@ -34,12 +34,10 @@ func TestDataRequestAllowsTruthfulNoFontProfile(t *testing.T) {
 }
 
 func TestCanonicalJSONRejectsFalseRenderingProfile(t *testing.T) {
-	request, manifest, _ := contracts()
-	projection := []byte(`{"ok":true}`)
+	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativeJSON
-	request.AccessibilityTarget = AccessibilityNotApplicable
-	request.ProjectionSHA256 = hashJSONTest(projection)
-	if _, err := RenderCanonicalJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:false-profile", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+	request.Rendering.ProfileRef = "rendering:unimplemented"
+	if _, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:false-profile", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
 		t.Fatalf("unimplemented requested profile accepted: %v", err)
 	}
 }
