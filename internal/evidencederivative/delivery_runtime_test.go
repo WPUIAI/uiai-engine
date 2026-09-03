@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -123,7 +124,7 @@ func TestDeliveryRuntimeCachesEveryPostExecutionUncertainty(t *testing.T) {
 }
 
 func TestDeliveryRuntimeUnknownRequiresReconciliation(t *testing.T) {
-	tr := &fakeDeliveryTransport{err: errors.New("timeout")}
+	tr := &fakeDeliveryTransport{result: ProviderDeliveryResult{ObservedAt: time.Unix(10, 0).UTC()}, err: errors.New("timeout")}
 	r := NewDeliveryRuntime()
 	c := deliveryCommand()
 	receipt, e := r.Deliver(context.Background(), c, tr)
@@ -134,8 +135,17 @@ func TestDeliveryRuntimeUnknownRequiresReconciliation(t *testing.T) {
 	if !errors.Is(e, ErrDeliveryRetryBlocked) || again.State != DeliveryOutcomeUnknown || tr.calls != 1 {
 		t.Fatalf("unknown replay lost warning or retried: %#v %v calls=%d", again, e, tr.calls)
 	}
-	done, e := r.Reconcile(c.IdempotencyKey, DeliveryDelivered, "imap:1", []string{"evidence:imap"}, time.Unix(20, 0).UTC())
+	reconcileAt := time.Unix(20, 0).UTC()
+	reconcileEvidence := []string{"evidence:imap"}
+	done, e := r.Reconcile(c.IdempotencyKey, DeliveryDelivered, "imap:1", reconcileEvidence, reconcileAt)
 	if e != nil || done.State != DeliveryDelivered || done.RetryPermitted {
 		t.Fatalf("reconcile=%#v err=%v", done, e)
+	}
+	replayed, e := r.Reconcile(c.IdempotencyKey, DeliveryDelivered, "imap:1", reconcileEvidence, reconcileAt)
+	if e != nil || replayed.DeliveryID != done.DeliveryID || !reflect.DeepEqual(replayed, done) {
+		t.Fatalf("reconciliation replay = %#v err=%v", replayed, e)
+	}
+	if _, e = r.Reconcile(c.IdempotencyKey, DeliveryRejected, "imap:2", []string{"evidence:changed"}, time.Unix(30, 0).UTC()); !errors.Is(e, ErrDeliveryConflict) {
+		t.Fatalf("terminal reconciliation mutation error = %v", e)
 	}
 }

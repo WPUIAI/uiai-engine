@@ -106,11 +106,18 @@ func (r *DeliveryRuntime) Reconcile(key string, state DeliveryState, providerRef
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	record, ok := r.records[key]
-	if !ok || at.IsZero() || len(evidence) == 0 {
+	if !ok || at.IsZero() || len(evidence) == 0 || blank(providerRef) {
 		return DeliveryReceipt{}, ErrDerivativeContractInvalid
 	}
 	if state != DeliveryDelivered && state != DeliveryBounced && state != DeliveryRejected {
 		return DeliveryReceipt{}, ErrDerivativeContractInvalid
+	}
+	if record.receipt.State == state && record.receipt.ProviderReceiptRef == providerRef &&
+		record.receipt.ObservedAt.Equal(at.UTC()) && equalStrings(record.receipt.ReconciliationRefs, evidence) {
+		return cloneReceipt(record.receipt), nil
+	}
+	if (record.receipt.State != DeliveryAccepted && record.receipt.State != DeliveryOutcomeUnknown) || at.UTC().Before(record.receipt.ObservedAt) {
+		return DeliveryReceipt{}, ErrDeliveryConflict
 	}
 	receipt := record.receipt
 	receipt.State = state
@@ -118,7 +125,7 @@ func (r *DeliveryRuntime) Reconcile(key string, state DeliveryState, providerRef
 	receipt.ReconciliationRefs = append([]string(nil), evidence...)
 	receipt.EvidenceRefs = append(receipt.EvidenceRefs, evidence...)
 	receipt.ObservedAt = at.UTC()
-	receipt.RetryPermitted = state == DeliveryBounced || state == DeliveryRejected
+	receipt.RetryPermitted = false
 	if state == DeliveryDelivered {
 		v := receipt.ObservedAt
 		if receipt.AcceptedAt == nil {
@@ -134,6 +141,18 @@ func (r *DeliveryRuntime) Reconcile(key string, state DeliveryState, providerRef
 	r.records[key] = record
 	return cloneReceipt(receipt), nil
 }
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
 func deliveryOutcomeUnknownEvidence(result ProviderDeliveryResult, err error) string {
 	digest := sha256.New()
 	for _, value := range []string{string(result.State), result.ProviderReceiptRef, result.ObservedAt.UTC().Format(time.RFC3339Nano)} {
