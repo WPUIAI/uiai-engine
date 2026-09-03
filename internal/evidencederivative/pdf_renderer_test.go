@@ -33,6 +33,11 @@ func TestRenderProjectionPDFIsDeterministicAndStructurallyBound(t *testing.T) {
 			t.Fatalf("missing %q", marker)
 		}
 	}
+	for _, value := range []string{m.Licenses[0].LicenseRef, m.Licenses[0].AttributionRef, m.Licenses[0].EvidenceRef} {
+		if !bytes.Contains(a.Output, []byte(value)) {
+			t.Fatalf("license or attribution %s missing from PDF", value)
+		}
+	}
 	if a.Manifest.OutputMIME != "application/pdf" || a.Manifest.AccessibilityPosture != ConformanceNotClaimed {
 		t.Fatalf("manifest=%#v", a.Manifest)
 	}

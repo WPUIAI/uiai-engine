@@ -34,6 +34,10 @@ func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Proj
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
+	licenseSet, err := normalizedLicenses(licenses, request.AssetRefs)
+	if err != nil {
+		return RenderedDerivative{}, err
+	}
 	slides := []string{projection.Title + "\n" + projection.Summary}
 	for _, claim := range selection.claims {
 		slides = append(slides, claim.ClaimID+"\n"+claim.Statement+"\nPosture: "+claim.Posture)
@@ -43,6 +47,13 @@ func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Proj
 	}
 	for _, citation := range selection.citations {
 		slides = append(slides, citation.CitationID+"\nSource: "+citation.SourceRef+"\nLocator: "+citation.Locator+"\nSHA-256: "+citation.SHA256)
+	}
+	for _, license := range licenseSet {
+		body := "License: " + license.LicenseRef + "\nEvidence: " + license.EvidenceRef
+		if license.AttributionRequired {
+			body += "\nAttribution: " + license.AttributionRef
+		}
+		slides = append(slides, license.AssetRef+" license and attribution\n"+body)
 	}
 	if len(request.OmissionRefs) > 0 {
 		slides = append(slides, "Explicit omissions\n"+strings.Join(request.OmissionRefs, "\n"))
@@ -69,7 +80,7 @@ func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Proj
 	if err := writer.Close(); err != nil {
 		return RenderedDerivative{}, ErrDerivativeUnsafeArchive
 	}
-	return buildRenderedDerivativeWithArchive(request, output.Bytes(), "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation", renderer, matrix, licenses, receiptRef, createdAt, ArchiveSafe, entries)
+	return buildRenderedDerivativeWithArchive(request, output.Bytes(), "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation", renderer, matrix, licenseSet, receiptRef, createdAt, ArchiveSafe, entries)
 }
 
 func pptxFiles(slides []string, locale string) []pptxFile {

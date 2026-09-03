@@ -40,7 +40,11 @@ func RenderProjectionPDF(request DerivativeRequest, projection evidencepwa.Proje
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
-	lines, err := pdfTextLines(renderProjectionPlainText(projection, selection, request.OmissionRefs))
+	licenseSet, err := normalizedLicenses(licenses, request.AssetRefs)
+	if err != nil {
+		return RenderedDerivative{}, err
+	}
+	lines, err := pdfTextLines(renderProjectionPlainText(projection, selection, request.OmissionRefs, licenseSet))
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
@@ -51,7 +55,7 @@ func RenderProjectionPDF(request DerivativeRequest, projection evidencepwa.Proje
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
-	return buildRenderedDerivative(request, output, "pdf", "application/pdf", renderer, matrix, licenses, receiptRef, createdAt)
+	return buildRenderedDerivative(request, output, "pdf", "application/pdf", renderer, matrix, licenseSet, receiptRef, createdAt)
 }
 
 func pdfTextLines(input []byte) ([]string, error) {

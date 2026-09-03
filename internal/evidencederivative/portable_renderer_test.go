@@ -57,12 +57,34 @@ func TestRenderProjectionCSVIsDeterministicAndParseable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantRows := 1 + len(request.ClaimRefs) + len(request.AssetRefs) + len(request.CitationRefs) + len(request.OmissionRefs)
+	wantRows := 1 + len(request.ClaimRefs) + len(request.AssetRefs) + len(request.CitationRefs) + len(manifest.Licenses) + len(request.OmissionRefs)
 	if len(rows) != wantRows || rows[0][0] != "record_type" {
 		t.Fatalf("CSV rows = %#v, want %d rows", rows, wantRows)
 	}
 	if first.Manifest.OutputMIME != "text/csv; charset=utf-8" || !strings.HasSuffix(first.Manifest.OutputRef, ".csv") {
 		t.Fatalf("CSV manifest = %#v", first.Manifest)
+	}
+}
+
+func TestPortableOutputsIncludeRequiredAttribution(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	for _, derivativeType := range []DerivativeType{DerivativeMarkdown, DerivativeEmailText, DerivativeCSV} {
+		request.DerivativeType = derivativeType
+		var output RenderedDerivative
+		var err error
+		if derivativeType == DerivativeCSV {
+			output, err = RenderProjectionCSV(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:license", manifest.CreatedAt)
+		} else {
+			output, err = RenderProjectionMarkdown(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:license", manifest.CreatedAt)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, value := range []string{manifest.Licenses[0].LicenseRef, manifest.Licenses[0].AttributionRef, manifest.Licenses[0].EvidenceRef} {
+			if !strings.Contains(string(output.Output), value) {
+				t.Fatalf("%s omitted licensing value %s", derivativeType, value)
+			}
+		}
 	}
 }
 

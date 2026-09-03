@@ -32,7 +32,11 @@ func RenderProjectionRichText(request DerivativeRequest, projection evidencepwa.
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
-	plain := renderProjectionPlainText(projection, selection, request.OmissionRefs)
+	licenseSet, err := normalizedLicenses(licenses, request.AssetRefs)
+	if err != nil {
+		return RenderedDerivative{}, err
+	}
+	plain := renderProjectionPlainText(projection, selection, request.OmissionRefs, licenseSet)
 	var out strings.Builder
 	out.WriteString("{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Arial;}}\\f0\\fs22 ")
 	for len(plain) > 0 {
@@ -57,5 +61,5 @@ func RenderProjectionRichText(request DerivativeRequest, projection evidencepwa.
 		}
 	}
 	out.WriteString("}")
-	return buildRenderedDerivative(request, []byte(out.String()), "rtf", "application/rtf", renderer, matrix, licenses, receiptRef, createdAt)
+	return buildRenderedDerivative(request, []byte(out.String()), "rtf", "application/rtf", renderer, matrix, licenseSet, receiptRef, createdAt)
 }

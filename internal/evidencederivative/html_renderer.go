@@ -33,6 +33,10 @@ func RenderProjectionHTML(request DerivativeRequest, projection evidencepwa.Proj
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
+	licenseSet, err := normalizedLicenses(licenses, request.AssetRefs)
+	if err != nil {
+		return RenderedDerivative{}, err
+	}
 	var body strings.Builder
 	body.WriteString("<!doctype html>\n<html lang=\"")
 	body.WriteString(htmlText(request.Locale))
@@ -107,6 +111,25 @@ func RenderProjectionHTML(request DerivativeRequest, projection evidencepwa.Proj
 		}
 		body.WriteString("</ul></section>\n")
 	}
+	if len(licenseSet) > 0 {
+		body.WriteString("<section aria-labelledby=\"licenses-heading\"><h2 id=\"licenses-heading\">Licenses and attribution</h2><ul>\n")
+		for _, license := range licenseSet {
+			body.WriteString("<li><strong>")
+			body.WriteString(htmlText(license.AssetRef))
+			body.WriteString("</strong><br>License: <code>")
+			body.WriteString(htmlText(license.LicenseRef))
+			body.WriteString("</code><br>Evidence: <code>")
+			body.WriteString(htmlText(license.EvidenceRef))
+			body.WriteString("</code>")
+			if license.AttributionRequired {
+				body.WriteString("<br>Attribution: <code>")
+				body.WriteString(htmlText(license.AttributionRef))
+				body.WriteString("</code>")
+			}
+			body.WriteString("</li>\n")
+		}
+		body.WriteString("</ul></section>\n")
+	}
 	if len(request.OmissionRefs) > 0 {
 		body.WriteString("<section aria-labelledby=\"omissions-heading\"><h2 id=\"omissions-heading\">Explicit omissions</h2><ul>")
 		for _, ref := range request.OmissionRefs {
@@ -117,7 +140,7 @@ func RenderProjectionHTML(request DerivativeRequest, projection evidencepwa.Proj
 		body.WriteString("</ul></section>\n")
 	}
 	body.WriteString("</main>\n</body>\n</html>\n")
-	return buildRenderedDerivative(request, []byte(body.String()), "html", "text/html; charset=utf-8", renderer, matrix, licenses, receiptRef, createdAt)
+	return buildRenderedDerivative(request, []byte(body.String()), "html", "text/html; charset=utf-8", renderer, matrix, licenseSet, receiptRef, createdAt)
 }
 
 func htmlDefinition(body *strings.Builder, term, value string) {

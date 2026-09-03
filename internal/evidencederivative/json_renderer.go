@@ -48,6 +48,10 @@ func RenderProjectionJSON(request DerivativeRequest, projection evidencepwa.Proj
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
+	licenseSet, err := normalizedLicenses(licenses, request.AssetRefs)
+	if err != nil {
+		return RenderedDerivative{}, err
+	}
 	output := struct {
 		Schema              string                        `json:"schema"`
 		ProjectionRef       string                        `json:"projection_ref"`
@@ -62,6 +66,7 @@ func RenderProjectionJSON(request DerivativeRequest, projection evidencepwa.Proj
 		Claims              []evidencepwa.Claim           `json:"claims"`
 		Assets              []evidencepwa.Asset           `json:"assets"`
 		Citations           []evidencepwa.Citation        `json:"citations"`
+		Licenses            []LicenseAttestation          `json:"licenses"`
 		OmissionRefs        []string                      `json:"omission_refs"`
 	}{
 		Schema: "uiai.evidence_derivative_json.v1", ProjectionRef: request.ProjectionRef,
@@ -69,14 +74,14 @@ func RenderProjectionJSON(request DerivativeRequest, projection evidencepwa.Proj
 		Title: projection.Title, Summary: projection.Summary, Availability: projection.Availability,
 		Access: projection.Access, Redaction: projection.Redaction, FreshnessObservedAt: projection.FreshnessObservedAt,
 		Claims: selection.claims, Assets: selection.assets, Citations: selection.citations,
-		OmissionRefs: append([]string(nil), request.OmissionRefs...),
+		Licenses: licenseSet, OmissionRefs: append([]string(nil), request.OmissionRefs...),
 	}
 	canonical, err := json.Marshal(output)
 	if err != nil {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	canonical = append(canonical, '\n')
-	return buildRenderedDerivative(request, canonical, "json", "application/json", renderer, matrix, licenses, receiptRef, createdAt)
+	return buildRenderedDerivative(request, canonical, "json", "application/json", renderer, matrix, licenseSet, receiptRef, createdAt)
 }
 
 func buildRenderedDerivative(request DerivativeRequest, output []byte, extension, mime string, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
@@ -88,13 +93,10 @@ func buildRenderedDerivativeWithArchive(request DerivativeRequest, output []byte
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	viewerMatrix := cloneViewerMatrix(matrix)
-	licenseSet := append([]LicenseAttestation(nil), licenses...)
-	sort.Slice(licenseSet, func(i, j int) bool {
-		if licenseSet[i].AssetRef == licenseSet[j].AssetRef {
-			return licenseSet[i].LicenseRef < licenseSet[j].LicenseRef
-		}
-		return licenseSet[i].AssetRef < licenseSet[j].AssetRef
-	})
+	licenseSet, err := normalizedLicenses(licenses, request.AssetRefs)
+	if err != nil {
+		return RenderedDerivative{}, err
+	}
 	derivativeID, err := DerivativeID(request, renderer, viewerMatrix, licenseSet)
 	if err != nil {
 		return RenderedDerivative{}, err

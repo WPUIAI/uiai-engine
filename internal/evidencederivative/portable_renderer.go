@@ -21,8 +21,12 @@ func RenderProjectionMarkdown(request DerivativeRequest, projection evidencepwa.
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
+	licenseSet, err := normalizedLicenses(licenses, request.AssetRefs)
+	if err != nil {
+		return RenderedDerivative{}, err
+	}
 	if request.DerivativeType == DerivativeEmailText {
-		return buildRenderedDerivative(request, renderProjectionPlainText(projection, selection, request.OmissionRefs), "txt", "text/plain; charset=utf-8", renderer, matrix, licenses, receiptRef, createdAt)
+		return buildRenderedDerivative(request, renderProjectionPlainText(projection, selection, request.OmissionRefs, licenseSet), "txt", "text/plain; charset=utf-8", renderer, matrix, licenses, receiptRef, createdAt)
 	}
 	var body strings.Builder
 	body.WriteString("# ")
@@ -54,6 +58,16 @@ func RenderProjectionMarkdown(request DerivativeRequest, projection evidencepwa.
 			fmt.Fprintf(&body, "\n- **%s** — `%s`; locator `%s`; SHA-256 `%s`\n", markdownText(citation.CitationID), markdownText(citation.SourceRef), markdownText(citation.Locator), citation.SHA256)
 		}
 	}
+	if len(licenseSet) > 0 {
+		body.WriteString("\n## Licenses and attribution\n")
+		for _, license := range licenseSet {
+			fmt.Fprintf(&body, "\n- **%s** — license `%s`; evidence `%s`", markdownText(license.AssetRef), markdownText(license.LicenseRef), markdownText(license.EvidenceRef))
+			if license.AttributionRequired {
+				fmt.Fprintf(&body, "; attribution `%s`", markdownText(license.AttributionRef))
+			}
+			body.WriteString("\n")
+		}
+	}
 	if len(request.OmissionRefs) > 0 {
 		body.WriteString("\n## Explicit omissions\n")
 		for _, ref := range request.OmissionRefs {
@@ -63,7 +77,7 @@ func RenderProjectionMarkdown(request DerivativeRequest, projection evidencepwa.
 	return buildRenderedDerivative(request, []byte(body.String()), "md", "text/markdown; charset=utf-8", renderer, matrix, licenses, receiptRef, createdAt)
 }
 
-func renderProjectionPlainText(projection evidencepwa.Projection, selection projectionSelection, omissionRefs []string) []byte {
+func renderProjectionPlainText(projection evidencepwa.Projection, selection projectionSelection, omissionRefs []string, licenses []LicenseAttestation) []byte {
 	var body strings.Builder
 	body.WriteString(plainText(projection.Title))
 	body.WriteString("\n\n")
@@ -92,6 +106,15 @@ func renderProjectionPlainText(projection evidencepwa.Projection, selection proj
 			fmt.Fprintf(&body, "\n%s\nSource: %s\nLocator: %s\nSHA-256: %s\n", plainText(citation.CitationID), plainText(citation.SourceRef), plainText(citation.Locator), citation.SHA256)
 		}
 	}
+	if len(licenses) > 0 {
+		body.WriteString("\nLICENSES AND ATTRIBUTION\n")
+		for _, license := range licenses {
+			fmt.Fprintf(&body, "%s\nLicense: %s\nEvidence: %s\n", plainText(license.AssetRef), plainText(license.LicenseRef), plainText(license.EvidenceRef))
+			if license.AttributionRequired {
+				fmt.Fprintf(&body, "Attribution: %s\n", plainText(license.AttributionRef))
+			}
+		}
+	}
 	if len(omissionRefs) > 0 {
 		body.WriteString("\nEXPLICIT OMISSIONS\n")
 		for _, ref := range omissionRefs {
@@ -109,6 +132,10 @@ func RenderProjectionCSV(request DerivativeRequest, projection evidencepwa.Proje
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
+	licenseSet, err := normalizedLicenses(licenses, request.AssetRefs)
+	if err != nil {
+		return RenderedDerivative{}, err
+	}
 	var body bytes.Buffer
 	writer := csv.NewWriter(&body)
 	_ = writer.Write([]string{"record_type", "id", "content", "posture_or_mime", "citation_or_locator", "sha256"})
@@ -120,6 +147,13 @@ func RenderProjectionCSV(request DerivativeRequest, projection evidencepwa.Proje
 	}
 	for _, citation := range selection.citations {
 		_ = writer.Write([]string{"citation", citation.CitationID, citation.SourceRef, "", citation.Locator, citation.SHA256})
+	}
+	for _, license := range licenseSet {
+		attribution := ""
+		if license.AttributionRequired {
+			attribution = license.AttributionRef
+		}
+		_ = writer.Write([]string{"license", license.AssetRef, license.LicenseRef, attribution, license.EvidenceRef, license.LicenseSHA256})
 	}
 	for _, ref := range request.OmissionRefs {
 		_ = writer.Write([]string{"omission", ref, "explicitly omitted", "", "", ""})

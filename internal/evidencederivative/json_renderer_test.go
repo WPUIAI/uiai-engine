@@ -26,14 +26,15 @@ func TestRenderProjectionJSONIncludesOnlySelectedEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	var output struct {
-		Schema       string              `json:"schema"`
-		Claims       []evidencepwa.Claim `json:"claims"`
-		OmissionRefs []string            `json:"omission_refs"`
+		Schema       string               `json:"schema"`
+		Claims       []evidencepwa.Claim  `json:"claims"`
+		Licenses     []LicenseAttestation `json:"licenses"`
+		OmissionRefs []string             `json:"omission_refs"`
 	}
 	if err := json.Unmarshal(rendered.Output, &output); err != nil {
 		t.Fatal(err)
 	}
-	if output.Schema != "uiai.evidence_derivative_json.v1" || len(output.Claims) != len(request.ClaimRefs) || !reflect.DeepEqual(output.OmissionRefs, request.OmissionRefs) {
+	if output.Schema != "uiai.evidence_derivative_json.v1" || len(output.Claims) != len(request.ClaimRefs) || !reflect.DeepEqual(output.Licenses, manifest.Licenses) || !reflect.DeepEqual(output.OmissionRefs, request.OmissionRefs) {
 		t.Fatalf("selected output = %#v", output)
 	}
 	if len(projection.Claims) > len(request.ClaimRefs) && bytes.Contains(rendered.Output, []byte(projection.Claims[1].Statement)) {

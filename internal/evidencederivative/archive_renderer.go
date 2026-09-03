@@ -135,7 +135,7 @@ func RenderProjectionArchive(request DerivativeRequest, projection evidencepwa.P
 	if err := writer.Close(); err != nil {
 		return RenderedDerivative{}, ErrDerivativeUnsafeArchive
 	}
-	return buildRenderedDerivativeWithArchive(request, archive.Bytes(), "zip", "application/zip", renderer, matrix, licenses, receiptRef, createdAt, ArchiveSafe, entries)
+	return buildRenderedDerivativeWithArchive(request, archive.Bytes(), "zip", "application/zip", renderer, matrix, licenseSet, receiptRef, createdAt, ArchiveSafe, entries)
 }
 
 func safeArchivePath(value string) bool {

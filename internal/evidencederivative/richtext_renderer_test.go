@@ -30,6 +30,11 @@ func TestRenderProjectionRichTextDeterministicSafe(t *testing.T) {
 	if !bytes.HasPrefix(a.Output, []byte(`{\rtf1`)) {
 		t.Fatalf("unsafe RTF %q", a.Output)
 	}
+	for _, value := range []string{m.Licenses[0].LicenseRef, m.Licenses[0].AttributionRef, m.Licenses[0].EvidenceRef} {
+		if !bytes.Contains(a.Output, []byte(value)) {
+			t.Fatalf("license or attribution %s missing from RTF", value)
+		}
+	}
 	if e := ValidateManifest(a.Manifest, r); e != nil {
 		t.Fatal(e)
 	}
