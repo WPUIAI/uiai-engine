@@ -100,6 +100,28 @@ func TestDeliveryRuntimeConcurrentIdempotency(t *testing.T) {
 	}
 }
 
+func TestDeliveryRuntimeCachesEveryPostExecutionUncertainty(t *testing.T) {
+	for name, result := range map[string]ProviderDeliveryResult{
+		"explicit unknown":  {State: DeliveryOutcomeUnknown, ProviderReceiptRef: "provider:maybe", EvidenceRefs: []string{"evidence:maybe"}, ObservedAt: time.Unix(10, 0).UTC()},
+		"invalid accepted":  {State: DeliveryAccepted, ObservedAt: time.Unix(10, 0).UTC()},
+		"unsupported state": {State: DeliveryDelivered, ProviderReceiptRef: "provider:too-soon", EvidenceRefs: []string{"evidence:too-soon"}, ObservedAt: time.Unix(10, 0).UTC()},
+	} {
+		t.Run(name, func(t *testing.T) {
+			transport := &fakeDeliveryTransport{result: result}
+			runtime := NewDeliveryRuntime()
+			command := deliveryCommand()
+			receipt, err := runtime.Deliver(context.Background(), command, transport)
+			if !errors.Is(err, ErrDeliveryRetryBlocked) || receipt.State != DeliveryOutcomeUnknown || receipt.ProviderReceiptRef != "" || len(receipt.EvidenceRefs) != 1 {
+				t.Fatalf("receipt=%#v err=%v", receipt, err)
+			}
+			again, err := runtime.Deliver(context.Background(), command, transport)
+			if !errors.Is(err, ErrDeliveryRetryBlocked) || again.DeliveryID != receipt.DeliveryID || transport.calls != 1 {
+				t.Fatalf("uncertain result retried: receipt=%#v err=%v calls=%d", again, err, transport.calls)
+			}
+		})
+	}
+}
+
 func TestDeliveryRuntimeUnknownRequiresReconciliation(t *testing.T) {
 	tr := &fakeDeliveryTransport{err: errors.New("timeout")}
 	r := NewDeliveryRuntime()

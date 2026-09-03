@@ -65,31 +65,39 @@ func (r *DeliveryRuntime) Deliver(ctx context.Context, c DeliveryCommand, t Deli
 		}
 		return cached, nil
 	}
-	result, err := t.Send(ctx, c)
-	if err == nil && result.State == DeliveryAccepted && (result.ProviderReceiptRef == "" || len(result.EvidenceRefs) == 0) {
-		return DeliveryReceipt{}, ErrDerivativeContractInvalid
-	}
+	result, sendErr := t.Send(ctx, c)
 	if result.ObservedAt.IsZero() {
 		result.ObservedAt = time.Now().UTC()
 	}
+	validProviderState := result.State == DeliveryAccepted || result.State == DeliveryRejected || result.State == DeliveryBlocked
+	validAccepted := result.State != DeliveryAccepted || (result.ProviderReceiptRef != "" && len(result.EvidenceRefs) > 0)
+	uncertain := sendErr != nil || result.State == DeliveryOutcomeUnknown || !validProviderState || !validAccepted
 	state := result.State
-	if err != nil {
+	if uncertain {
 		state = DeliveryOutcomeUnknown
 	}
-	if state != DeliveryAccepted && state != DeliveryRejected && state != DeliveryBlocked && state != DeliveryOutcomeUnknown {
-		return DeliveryReceipt{}, ErrDerivativeContractInvalid
-	}
 	receipt := DeliveryReceipt{Schema: DeliverySchema, DeliveryID: deliveryID(c), DerivativeRef: c.DerivativeRef, DerivativeSHA256: c.DerivativeSHA256, DestinationRef: c.DestinationRef, IdempotencyKey: c.IdempotencyKey, PolicyRef: c.EmailPolicy.PolicyRef, PolicySHA256: policyDigest, State: state, ProviderReceiptRef: result.ProviderReceiptRef, EvidenceRefs: append([]string(nil), result.EvidenceRefs...), ObservedAt: result.ObservedAt.UTC()}
-	if state == DeliveryAccepted {
+	if uncertain {
+		receipt.ProviderReceiptRef = ""
+		receipt.EvidenceRefs = []string{deliveryOutcomeUnknownEvidence(result, sendErr)}
+	} else if state == DeliveryAccepted {
 		v := receipt.ObservedAt
 		receipt.AcceptedAt = &v
 	}
 	receipt.RetryPermitted = false
-	if e := ValidateDelivery(receipt); e != nil && !(state == DeliveryOutcomeUnknown && errors.Is(e, ErrDeliveryOutcomeUnknown)) {
-		return DeliveryReceipt{}, e
+	validationErr := ValidateDelivery(receipt)
+	if validationErr != nil && !errors.Is(validationErr, ErrDeliveryOutcomeUnknown) {
+		receipt.State = DeliveryOutcomeUnknown
+		receipt.ProviderReceiptRef = ""
+		receipt.AcceptedAt = nil
+		receipt.DeliveredAt = nil
+		receipt.EvidenceRefs = []string{deliveryOutcomeUnknownEvidence(result, validationErr)}
+		receipt.ReconciliationRefs = nil
+		receipt.RetryPermitted = false
+		uncertain = true
 	}
 	r.records[c.IdempotencyKey] = deliveryRecord{cloneCommand(c), cloneReceipt(receipt)}
-	if err != nil {
+	if uncertain {
 		return cloneReceipt(receipt), ErrDeliveryRetryBlocked
 	}
 	return cloneReceipt(receipt), nil
@@ -126,6 +134,22 @@ func (r *DeliveryRuntime) Reconcile(key string, state DeliveryState, providerRef
 	r.records[key] = record
 	return cloneReceipt(receipt), nil
 }
+func deliveryOutcomeUnknownEvidence(result ProviderDeliveryResult, err error) string {
+	digest := sha256.New()
+	for _, value := range []string{string(result.State), result.ProviderReceiptRef, result.ObservedAt.UTC().Format(time.RFC3339Nano)} {
+		digest.Write([]byte(value))
+		digest.Write([]byte{0})
+	}
+	for _, value := range result.EvidenceRefs {
+		digest.Write([]byte(value))
+		digest.Write([]byte{0})
+	}
+	if err != nil {
+		digest.Write([]byte(err.Error()))
+	}
+	return "evidence:delivery-outcome-unknown:sha256:" + hex.EncodeToString(digest.Sum(nil))
+}
+
 func deliveryID(command DeliveryCommand) string {
 	digest := sha256.New()
 	policyDigest, _ := emailPolicyDigest(command.EmailPolicy)

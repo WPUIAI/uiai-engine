@@ -37,8 +37,13 @@ func TestDeliveryRuntimeRequiresProviderAcceptanceEvidence(t *testing.T) {
 	transport := &fakeDeliveryTransport{result: ProviderDeliveryResult{
 		State: DeliveryAccepted, ProviderReceiptRef: "smtp:1", ObservedAt: time.Unix(10, 0).UTC(),
 	}}
-	if _, err := NewDeliveryRuntime().Deliver(context.Background(), command, transport); !errors.Is(err, ErrDerivativeContractInvalid) {
-		t.Fatalf("evidence-free acceptance error = %v", err)
+	runtime := NewDeliveryRuntime()
+	receipt, err := runtime.Deliver(context.Background(), command, transport)
+	if !errors.Is(err, ErrDeliveryRetryBlocked) || receipt.State != DeliveryOutcomeUnknown || transport.calls != 1 {
+		t.Fatalf("evidence-free acceptance receipt = %#v error = %v calls = %d", receipt, err, transport.calls)
+	}
+	if _, err = runtime.Deliver(context.Background(), command, transport); !errors.Is(err, ErrDeliveryRetryBlocked) || transport.calls != 1 {
+		t.Fatalf("evidence-free acceptance retried: error = %v calls = %d", err, transport.calls)
 	}
 }
 
