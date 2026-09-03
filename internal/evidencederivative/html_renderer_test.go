@@ -38,7 +38,7 @@ func TestRenderProjectionHTMLIncludesOnlySelectedEvidence(t *testing.T) {
 	if len(projection.Claims) > 1 && strings.Contains(body, htmlText(projection.Claims[1].Statement)) {
 		t.Fatalf("unselected claim leaked into HTML:\n%s", body)
 	}
-	for _, value := range []string{manifest.Licenses[0].LicenseRef, manifest.Licenses[0].AttributionRef, manifest.Licenses[0].EvidenceRef} {
+	for _, value := range []string{manifest.Licenses[0].LicenseRef, manifest.Licenses[0].LicenseSHA256, manifest.Licenses[0].AttributionRef, manifest.Licenses[0].EvidenceRef, "Derivative permitted: true"} {
 		if !strings.Contains(body, htmlText(value)) {
 			t.Fatalf("license or attribution %s missing from HTML", value)
 		}

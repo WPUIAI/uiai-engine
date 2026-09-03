@@ -33,7 +33,7 @@ func TestRenderProjectionPDFIsDeterministicAndStructurallyBound(t *testing.T) {
 			t.Fatalf("missing %q", marker)
 		}
 	}
-	for _, value := range []string{m.Licenses[0].LicenseRef, m.Licenses[0].AttributionRef, m.Licenses[0].EvidenceRef} {
+	for _, value := range []string{m.Licenses[0].LicenseRef, m.Licenses[0].LicenseSHA256, m.Licenses[0].AttributionRef, m.Licenses[0].EvidenceRef, "Derivative permitted: true"} {
 		if !bytes.Contains(a.Output, []byte(value)) {
 			t.Fatalf("license or attribution %s missing from PDF", value)
 		}

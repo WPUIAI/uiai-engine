@@ -49,7 +49,7 @@ func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Proj
 		slides = append(slides, citation.CitationID+"\nSource: "+citation.SourceRef+"\nLocator: "+citation.Locator+"\nSHA-256: "+citation.SHA256)
 	}
 	for _, license := range licenseSet {
-		body := "License: " + license.LicenseRef + "\nEvidence: " + license.EvidenceRef
+		body := "License: " + license.LicenseRef + "\nLicense SHA-256: " + license.LicenseSHA256 + "\nEvidence: " + license.EvidenceRef + "\nDerivative permitted: true"
 		if license.AttributionRequired {
 			body += "\nAttribution: " + license.AttributionRef
 		}

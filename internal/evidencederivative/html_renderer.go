@@ -118,9 +118,11 @@ func RenderProjectionHTML(request DerivativeRequest, projection evidencepwa.Proj
 			body.WriteString(htmlText(license.AssetRef))
 			body.WriteString("</strong><br>License: <code>")
 			body.WriteString(htmlText(license.LicenseRef))
+			body.WriteString("</code><br>License SHA-256: <code>")
+			body.WriteString(htmlText(license.LicenseSHA256))
 			body.WriteString("</code><br>Evidence: <code>")
 			body.WriteString(htmlText(license.EvidenceRef))
-			body.WriteString("</code>")
+			body.WriteString("</code><br>Derivative permitted: true")
 			if license.AttributionRequired {
 				body.WriteString("<br>Attribution: <code>")
 				body.WriteString(htmlText(license.AttributionRef))

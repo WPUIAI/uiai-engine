@@ -62,7 +62,7 @@ func RenderProjectionMarkdown(request DerivativeRequest, projection evidencepwa.
 	if len(licenseSet) > 0 {
 		body.WriteString("\n## Licenses and attribution\n")
 		for _, license := range licenseSet {
-			fmt.Fprintf(&body, "\n- **%s** — license `%s`; evidence `%s`", markdownText(license.AssetRef), markdownText(license.LicenseRef), markdownText(license.EvidenceRef))
+			fmt.Fprintf(&body, "\n- **%s** — license `%s`; SHA-256 `%s`; evidence `%s`; derivative permitted: true", markdownText(license.AssetRef), markdownText(license.LicenseRef), license.LicenseSHA256, markdownText(license.EvidenceRef))
 			if license.AttributionRequired {
 				fmt.Fprintf(&body, "; attribution `%s`", markdownText(license.AttributionRef))
 			}
@@ -110,7 +110,7 @@ func renderProjectionPlainText(projection evidencepwa.Projection, selection proj
 	if len(licenses) > 0 {
 		body.WriteString("\nLICENSES AND ATTRIBUTION\n")
 		for _, license := range licenses {
-			fmt.Fprintf(&body, "%s\nLicense: %s\nEvidence: %s\n", plainText(license.AssetRef), plainText(license.LicenseRef), plainText(license.EvidenceRef))
+			fmt.Fprintf(&body, "%s\nLicense: %s\nLicense SHA-256: %s\nEvidence: %s\nDerivative permitted: true\n", plainText(license.AssetRef), plainText(license.LicenseRef), license.LicenseSHA256, plainText(license.EvidenceRef))
 			if license.AttributionRequired {
 				fmt.Fprintf(&body, "Attribution: %s\n", plainText(license.AttributionRef))
 			}
@@ -154,7 +154,7 @@ func RenderProjectionCSV(request DerivativeRequest, projection evidencepwa.Proje
 		if license.AttributionRequired {
 			attribution = license.AttributionRef
 		}
-		writeCSVRow(writer, []string{"license", license.AssetRef, license.LicenseRef, attribution, license.EvidenceRef, license.LicenseSHA256})
+		writeCSVRow(writer, []string{"license", license.AssetRef, license.LicenseRef, "derivative permitted: true; attribution: " + attribution, license.EvidenceRef, license.LicenseSHA256})
 	}
 	for _, ref := range request.OmissionRefs {
 		writeCSVRow(writer, []string{"omission", ref, "explicitly omitted", "", "", ""})

@@ -85,7 +85,7 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 	for relationshipPath, body := range relationshipBodies {
 		assertPPTXRelationshipsResolve(t, relationshipPath, body, names)
 	}
-	for _, ref := range []string{r.AssetRefs[0], r.CitationRefs[0], r.OmissionRefs[0], m.Licenses[0].LicenseRef, m.Licenses[0].AttributionRef, m.Licenses[0].EvidenceRef} {
+	for _, ref := range []string{r.AssetRefs[0], r.CitationRefs[0], r.OmissionRefs[0], m.Licenses[0].LicenseRef, m.Licenses[0].LicenseSHA256, m.Licenses[0].AttributionRef, m.Licenses[0].EvidenceRef, "Derivative permitted: true"} {
 		if !bytes.Contains(xmlPayload.Bytes(), []byte(ref)) {
 			t.Fatalf("selected or omitted evidence %s missing from slides", ref)
 		}

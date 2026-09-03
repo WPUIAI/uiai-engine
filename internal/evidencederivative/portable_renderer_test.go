@@ -80,10 +80,13 @@ func TestPortableOutputsIncludeRequiredAttribution(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, value := range []string{manifest.Licenses[0].LicenseRef, manifest.Licenses[0].AttributionRef, manifest.Licenses[0].EvidenceRef} {
+		for _, value := range []string{manifest.Licenses[0].LicenseRef, manifest.Licenses[0].LicenseSHA256, manifest.Licenses[0].AttributionRef, manifest.Licenses[0].EvidenceRef} {
 			if !strings.Contains(string(output.Output), value) {
 				t.Fatalf("%s omitted licensing value %s", derivativeType, value)
 			}
+		}
+		if !strings.Contains(strings.ToLower(string(output.Output)), "derivative permitted: true") {
+			t.Fatalf("%s omitted derivative permission", derivativeType)
 		}
 	}
 }
