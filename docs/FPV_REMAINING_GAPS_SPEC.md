@@ -67,24 +67,29 @@ Acceptance:
 
 ## Gap 5 — Share security controls
 
-Public bearer URLs need stronger lifecycle controls.
+Status: source candidate; not installed or independently accepted. Session creation is private by default. Explicit read-only share creation uses a 192-bit URL-safe capability, exact session/origin binding, a maximum 60-minute TTL, atomic bounded-view consumption, immediate session-close revocation, sensitive-origin denial, and token-redacted status/audit payloads. Public control issuance fails closed until a separate governed-confirmation contract exists.
 
 Acceptance:
 
-- Revoke share endpoint.
-- Optional one-time share flag or max-view count.
-- Short TTL presets.
-- UI shows revoked/expired state clearly.
+- Installed `browser_open` returns no share or capability.
+- Auth, privacy, payment, and health origins cannot mint public shares.
+- Read-only and control capabilities are separate; control issuance remains blocked without governed confirmation.
+- TTL and max-view enforcement are bounded and concurrency-safe.
+- Closing a session immediately revokes all derived capabilities.
+- Tokens are absent from diagnostics, audit events, revocation receipts, and notifications.
+- Existing legacy, unbounded, or control-enabled registry entries are rejected on load and lookup.
+- Real public/mobile browser proof remains required.
 
 ## Gap 6 — Persistent share registry
 
-Shares are currently in-memory. Restart loses active links.
+Status: source candidate; not installed or independently accepted. The registry persists only current-policy, unexpired, bounded, read-only entries through an atomic `0600` temporary-file rename. Creation, view consumption, explicit revocation, and session-close revocation report persistence failure instead of claiming durable success.
 
 Acceptance:
 
-- Durable share registry with expiry cleanup.
-- Restart preserves unexpired shares when safe.
-- Registry excludes secrets from logs.
+- Restart preserves only current-policy unexpired shares.
+- Legacy, unbounded, control-enabled, expired, and revoked entries never load.
+- Registry-update failure injection proves fail-closed behavior.
+- Registry and logs expose no capability values outside the protected storage/explicit share response boundary.
 
 ## Gap 7 — Live Focusa integration
 
