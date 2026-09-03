@@ -82,6 +82,35 @@ func TestSelectionArchiveLicenseAndDeliveryFailClosed(t *testing.T) {
 		t.Fatal("ambiguous retry accepted")
 	}
 }
+func TestPDFConformanceVocabularyAndTargetMatch(t *testing.T) {
+	for name, mutate := range map[string]func(*DerivativeRequest, *DerivativeManifest){
+		"unknown PDF/UA profile":   func(_ *DerivativeRequest, manifest *DerivativeManifest) { manifest.PDFUAProfile = "PDF/UA-future" },
+		"mismatched PDF/UA target": func(_ *DerivativeRequest, manifest *DerivativeManifest) { manifest.PDFUAProfile = PDFUAProfile2 },
+		"unknown PDF/A profile":    func(_ *DerivativeRequest, manifest *DerivativeManifest) { manifest.PDFAProfile = "PDF/A-9z" },
+		"unclaimed profile": func(_ *DerivativeRequest, manifest *DerivativeManifest) {
+			manifest.AccessibilityPosture = ConformanceNotClaimed
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			request, manifest, _ := contracts()
+			mutate(&request, &manifest)
+			if !errors.Is(ValidateManifest(manifest, request), ErrDerivativeContractInvalid) {
+				t.Fatalf("invalid conformance accepted: %#v", manifest)
+			}
+		})
+	}
+	request, manifest, _ := contracts()
+	request.AccessibilityTarget = AccessibilityPDFUA2
+	manifest.AccessibilityTarget = AccessibilityPDFUA2
+	manifest.PDFUAProfile = PDFUAProfile2
+	requestDigest, _ := DigestRequest(request)
+	manifest.RequestSHA256 = requestDigest
+	manifest.DerivativeID, _ = DerivativeID(request, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses)
+	if err := ValidateManifest(manifest, request); err != nil {
+		t.Fatalf("matching PDF/UA-2 rejected: %v", err)
+	}
+}
+
 func TestUnknownVocabularyAndScope(t *testing.T) {
 	r, m, d := contracts()
 	r.DerivativeType = "video"

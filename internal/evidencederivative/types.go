@@ -47,6 +47,12 @@ const (
 	AccessibilityNotApplicable AccessibilityTarget = "not_applicable"
 )
 
+const (
+	PDFAProfile2B = "PDF/A-2b"
+	PDFUAProfile1 = "PDF/UA-1"
+	PDFUAProfile2 = "PDF/UA-2"
+)
+
 type ConformancePosture string
 
 const (

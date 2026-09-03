@@ -106,11 +106,8 @@ func ValidateManifest(manifest DerivativeManifest, request DerivativeRequest) er
 		return ErrDerivativeContractInvalid
 	}
 	if request.DerivativeType == DerivativePDF || request.DerivativeType == DerivativePresentationPDF {
-		if blank(manifest.PDFAProfile) && blank(manifest.PDFUAProfile) && manifest.AccessibilityPosture == ConformanceVerified {
-			return ErrDerivativeContractInvalid
-		}
-		if (request.AccessibilityTarget == AccessibilityPDFUA1 || request.AccessibilityTarget == AccessibilityPDFUA2) && blank(manifest.PDFUAProfile) {
-			return ErrDerivativeContractInvalid
+		if err := validatePDFConformance(manifest, request); err != nil {
+			return err
 		}
 	} else if !blank(manifest.PDFAProfile) || !blank(manifest.PDFUAProfile) {
 		return ErrDerivativeContractInvalid
@@ -122,6 +119,29 @@ func ValidateManifest(manifest DerivativeManifest, request DerivativeRequest) er
 		return ErrDerivativeContractInvalid
 	}
 	return sizeOK(manifest)
+}
+
+func validatePDFConformance(manifest DerivativeManifest, request DerivativeRequest) error {
+	if !blank(manifest.PDFAProfile) && manifest.PDFAProfile != PDFAProfile2B {
+		return ErrDerivativeContractInvalid
+	}
+	expectedUA := ""
+	if request.AccessibilityTarget == AccessibilityPDFUA1 {
+		expectedUA = PDFUAProfile1
+	} else if request.AccessibilityTarget == AccessibilityPDFUA2 {
+		expectedUA = PDFUAProfile2
+	}
+	if manifest.PDFUAProfile != expectedUA {
+		return ErrDerivativeContractInvalid
+	}
+	hasProfile := !blank(manifest.PDFAProfile) || !blank(manifest.PDFUAProfile)
+	if hasProfile && manifest.AccessibilityPosture != ConformanceTargeted && manifest.AccessibilityPosture != ConformanceVerified {
+		return ErrDerivativeContractInvalid
+	}
+	if !hasProfile && manifest.AccessibilityPosture == ConformanceVerified {
+		return ErrDerivativeContractInvalid
+	}
+	return nil
 }
 
 func ValidateDelivery(receipt DeliveryReceipt) error {
