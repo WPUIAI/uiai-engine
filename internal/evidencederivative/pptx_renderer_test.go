@@ -37,6 +37,7 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 		t.Fatal(e)
 	}
 	required := map[string]bool{"[Content_Types].xml": false, "_rels/.rels": false, "ppt/presentation.xml": false, "ppt/_rels/presentation.xml.rels": false}
+	var xmlPayload bytes.Buffer
 	for _, f := range z.File {
 		if strings.Contains(f.Name, "..") || strings.HasPrefix(f.Name, "/") {
 			t.Fatalf("unsafe %q", f.Name)
@@ -57,6 +58,7 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 			t.Fatalf("active content in %s", f.Name)
 		}
 		if strings.HasSuffix(f.Name, ".xml") || strings.HasSuffix(f.Name, ".rels") {
+			xmlPayload.Write(body)
 			var value any
 			if err := xml.Unmarshal(body, &value); err != nil {
 				t.Fatalf("invalid XML %s: %v", f.Name, err)
@@ -66,6 +68,11 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 	for name, ok := range required {
 		if !ok {
 			t.Fatalf("missing %s", name)
+		}
+	}
+	for _, ref := range []string{r.AssetRefs[0], r.CitationRefs[0], r.OmissionRefs[0]} {
+		if !bytes.Contains(xmlPayload.Bytes(), []byte(ref)) {
+			t.Fatalf("selected or omitted evidence %s missing from slides", ref)
 		}
 	}
 	if a.Manifest.ArchivePosture != ArchiveSafe || len(a.Manifest.ArchiveEntries) != len(z.File) {

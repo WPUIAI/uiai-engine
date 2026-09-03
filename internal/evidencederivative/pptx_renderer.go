@@ -44,6 +44,15 @@ func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Proj
 	for _, c := range selection.claims {
 		slides = append(slides, c.ClaimID+"\n"+c.Statement+"\nPosture: "+c.Posture)
 	}
+	for _, asset := range selection.assets {
+		slides = append(slides, asset.AssetID+"\nReference: "+asset.Ref+"\nMIME: "+asset.MIME+"\nSHA-256: "+asset.SHA256)
+	}
+	for _, citation := range selection.citations {
+		slides = append(slides, citation.CitationID+"\nSource: "+citation.SourceRef+"\nLocator: "+citation.Locator+"\nSHA-256: "+citation.SHA256)
+	}
+	if len(request.OmissionRefs) > 0 {
+		slides = append(slides, "Explicit omissions\n"+strings.Join(request.OmissionRefs, "\n"))
+	}
 	files := pptxFiles(slides, request.Locale)
 	sort.Slice(files, func(i, j int) bool { return files[i].path < files[j].path })
 	var out bytes.Buffer
