@@ -3,16 +3,27 @@ package evidencederivative
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
 	"encoding/xml"
+	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
 )
 
+func TestPPTXMinimalProfileDigestIsFrozen(t *testing.T) {
+	digest := sha256.Sum256([]byte("uiai.evidence.pptx-minimal-arial-v1\n"))
+	if got := fmt.Sprintf("%x", digest); got != PPTXMinimalProfileSHA256 {
+		t.Fatalf("profile digest = %s", got)
+	}
+}
+
 func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 	r, p, m := portableFixture(t)
 	r.DerivativeType = DerivativePPTX
 	r.AccessibilityTarget = AccessibilityNotApplicable
+	r.Rendering = PPTXMinimalRenderingProfile()
 	a, e := RenderProjectionPPTX(r, p, m.Renderer, m.ViewerMatrix, m.Licenses, "receipt:pptx", m.CreatedAt)
 	if e != nil {
 		t.Fatal(e)
@@ -62,5 +73,14 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 	}
 	if e := ValidateManifest(a.Manifest, r); e != nil {
 		t.Fatal(e)
+	}
+}
+
+func TestRenderProjectionPPTXRejectsFalseFontProfile(t *testing.T) {
+	r, p, m := portableFixture(t)
+	r.DerivativeType = DerivativePPTX
+	r.AccessibilityTarget = AccessibilityNotApplicable
+	if _, err := RenderProjectionPPTX(r, p, m.Renderer, m.ViewerMatrix, m.Licenses, "receipt:pptx", m.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+		t.Fatalf("unimplemented requested font profile accepted: %v", err)
 	}
 }

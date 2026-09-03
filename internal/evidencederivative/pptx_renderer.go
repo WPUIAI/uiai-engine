@@ -16,8 +16,24 @@ import (
 
 type pptxFile struct{ path, mime, body string }
 
+const PPTXMinimalProfileRef = "rendering:pptx-minimal-arial-v1"
+const PPTXMinimalProfileSHA256 = "0ca5e6ee3a268b838e077a474bbdd68756199ed5f75ce65b73b8a0a99cc51924"
+
+func PPTXMinimalRenderingProfile() RenderingProfile {
+	return RenderingProfile{
+		ProfileRef:      PPTXMinimalProfileRef,
+		ProfileSHA256:   PPTXMinimalProfileSHA256,
+		FontRefs:        []string{"builtin:arial"},
+		ColorProfileRef: "ooxml-default",
+	}
+}
+
 func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Projection, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
-	if request.DerivativeType != DerivativePPTX || request.AccessibilityTarget != AccessibilityNotApplicable {
+	if request.DerivativeType != DerivativePPTX || request.AccessibilityTarget != AccessibilityNotApplicable ||
+		request.Direction != DirectionLTR || request.Rendering.ProfileRef != PPTXMinimalProfileRef ||
+		request.Rendering.ProfileSHA256 != PPTXMinimalProfileSHA256 || len(request.Rendering.FontRefs) != 1 ||
+		request.Rendering.FontRefs[0] != "builtin:arial" || request.Rendering.ColorProfileRef != "ooxml-default" ||
+		len(request.Rendering.DependencyRefs) != 0 {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	selection, err := selectProjection(request, projection)
@@ -28,7 +44,7 @@ func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Proj
 	for _, c := range selection.claims {
 		slides = append(slides, c.ClaimID+"\n"+c.Statement+"\nPosture: "+c.Posture)
 	}
-	files := pptxFiles(slides)
+	files := pptxFiles(slides, request.Locale)
 	sort.Slice(files, func(i, j int) bool { return files[i].path < files[j].path })
 	var out bytes.Buffer
 	zw := zip.NewWriter(&out)
@@ -53,7 +69,7 @@ func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Proj
 	return buildRenderedDerivativeWithArchive(request, out.Bytes(), "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation", renderer, matrix, licenses, receiptRef, createdAt, ArchiveSafe, entries)
 }
 
-func pptxFiles(slides []string) []pptxFile {
+func pptxFiles(slides []string, locale string) []pptxFile {
 	var overrides strings.Builder
 	var ids strings.Builder
 	var rels strings.Builder
@@ -71,7 +87,7 @@ func pptxFiles(slides []string) []pptxFile {
 		if len(parts) > 1 {
 			body = parts[1]
 		}
-		xml := `<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Evidence"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" sz="2800" b="1"/><a:t>` + html.EscapeString(title) + `</a:t></a:r></a:p><a:p><a:r><a:rPr lang="en-US" sz="1800"/><a:t>` + html.EscapeString(body) + `</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
+		xml := `<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Evidence"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="` + html.EscapeString(locale) + `" sz="2800" b="1"><a:latin typeface="Arial"/></a:rPr><a:t>` + html.EscapeString(title) + `</a:t></a:r></a:p><a:p><a:r><a:rPr lang="` + html.EscapeString(locale) + `" sz="1800"><a:latin typeface="Arial"/></a:rPr><a:t>` + html.EscapeString(body) + `</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
 		files = append(files, pptxFile{fmt.Sprintf("ppt/slides/slide%d.xml", i+1), "application/vnd.openxmlformats-officedocument.presentationml.slide+xml", xml})
 	}
 	return files

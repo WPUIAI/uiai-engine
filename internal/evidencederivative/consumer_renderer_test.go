@@ -42,6 +42,7 @@ func TestUnzipConsumerAcceptsRenderedPPTX(t *testing.T) {
 	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativePPTX
 	request.AccessibilityTarget = AccessibilityNotApplicable
+	request.Rendering = PPTXMinimalRenderingProfile()
 	rendered, err := RenderProjectionPPTX(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:pptx-consumer", manifest.CreatedAt)
 	if err != nil {
 		t.Fatal(err)
