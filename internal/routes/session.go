@@ -95,10 +95,18 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			id := chi.URLParam(req, "sessionID")
 			if err := sm.Close(id); err != nil {
 				if errors.Is(err, vision.ErrSessionNotFound) {
+					if _, revokeErr := fpvRevokeSessionShares(id); revokeErr != nil {
+						writeJSON(w, 500, map[string]string{"error": "session closed but share revocation persistence failed"})
+						return
+					}
 					writeJSON(w, 200, map[string]string{"status": "already_closed", "id": id})
 					return
 				}
 				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
+			if _, revokeErr := fpvRevokeSessionShares(id); revokeErr != nil {
+				writeJSON(w, 500, map[string]string{"error": "session closed but share revocation persistence failed"})
 				return
 			}
 			writeJSON(w, 200, map[string]string{"status": "closed", "id": id})

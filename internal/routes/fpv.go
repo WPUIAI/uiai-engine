@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -21,16 +22,18 @@ import (
 )
 
 type fpvShare struct {
-	Token     string        `json:"token"`
-	SessionID string        `json:"session_id"`
-	CreatedAt time.Time     `json:"created_at"`
-	ExpiresAt time.Time     `json:"expires_at"`
-	Views     int           `json:"views"`
-	Controls  bool          `json:"controls"`
-	OneTime   bool          `json:"one_time"`
-	MaxViews  int           `json:"max_views"`
-	Revoked   bool          `json:"revoked"`
-	Audit     []fpvAuditLog `json:"audit,omitempty"`
+	PolicyVersion string        `json:"policy_version"`
+	Token         string        `json:"token"`
+	SessionID     string        `json:"session_id"`
+	Origin        string        `json:"origin"`
+	CreatedAt     time.Time     `json:"created_at"`
+	ExpiresAt     time.Time     `json:"expires_at"`
+	Views         int           `json:"views"`
+	Controls      bool          `json:"controls"`
+	OneTime       bool          `json:"one_time"`
+	MaxViews      int           `json:"max_views"`
+	Revoked       bool          `json:"revoked"`
+	Audit         []fpvAuditLog `json:"audit,omitempty"`
 }
 
 type fpvAuditLog struct {
@@ -46,6 +49,7 @@ type fpvAuditLog struct {
 }
 
 var fpvShares sync.Map
+var fpvShareMu sync.Mutex
 
 var fpvAuditMu sync.Mutex
 var fpvAuditSeq uint64
@@ -75,13 +79,23 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "session_id required"})
 			return
 		}
-		if _, ok := sm.Get(body.SessionID); !ok {
+		session, ok := sm.Get(body.SessionID)
+		if !ok {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
 			return
 		}
-		share, err := fpvCreateShare(body.SessionID, body.ExpiresMinutes, body.Controls, body.OneTime, body.MaxViews)
+		origin, err := fpvShareOrigin(session.URL)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "sensitive_origin_share_denied"})
+			return
+		}
+		share, err := fpvCreateShare(body.SessionID, origin, body.ExpiresMinutes, body.Controls, body.OneTime, body.MaxViews)
+		if err != nil {
+			status := http.StatusBadRequest
+			if errors.Is(err, errFPVControlsDenied) || errors.Is(err, errFPVSensitiveOrigin) {
+				status = http.StatusForbidden
+			}
+			writeJSON(w, status, map[string]string{"error": err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, share)
@@ -111,15 +125,16 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "token required"})
 			return
 		}
-		entry, ok := fpvEntry(body.Token)
+		entry, ok, revokeErr := fpvRevokeToken(body.Token)
+		if revokeErr != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "share revocation persistence failed"})
+			return
+		}
 		if !ok {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "share not found"})
 			return
 		}
-		entry.Revoked = true
-		fpvShares.Store(entry.Token, entry)
-		fpvSaveRegistry()
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "token": entry.Token, "revoked": true})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "share_ref": fpvTokenRef(entry.Token), "revoked": true})
 	})
 }
 
@@ -134,22 +149,15 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 		http.ServeFile(w, req, assetPath)
 	})
 	r.Get("/{token}", func(w http.ResponseWriter, req *http.Request) {
-		entry, ok := fpvEntry(chi.URLParam(req, "token"))
-		if !ok {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share not found or expired"})
+		entry, err := fpvConsumeView(chi.URLParam(req, "token"), sm)
+		if err != nil {
+			status := http.StatusGone
+			if errors.Is(err, errFPVShareUnavailable) {
+				status = http.StatusNotFound
+			}
+			writeJSON(w, status, map[string]string{"error": err.Error()})
 			return
 		}
-		if entry.Revoked {
-			writeJSON(w, http.StatusGone, map[string]string{"error": "fpv share revoked"})
-			return
-		}
-		if (entry.OneTime || entry.MaxViews > 0) && entry.Views >= fpvAllowedViews(entry) {
-			writeJSON(w, http.StatusGone, map[string]string{"error": "fpv share view limit reached"})
-			return
-		}
-		entry.Views++
-		fpvShares.Store(entry.Token, entry)
-		fpvSaveRegistry()
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		tmpl, err := template.ParseFiles(filepath.Join("web", "fpv", "index.html"))
 		if err != nil {
@@ -164,14 +172,14 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share not found or expired"})
 			return
 		}
-		sess, ok := sm.Get(entry.SessionID)
+		sess, ok := fpvSessionForShare(sm, entry)
 		if !ok {
-			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed or origin changed"})
 			return
 		}
 		diag := sess.DiagnosticsWithOptions(vision.DiagnosticsOptions{Format: "summary", Limit: 1})
 		writeJSON(w, http.StatusOK, map[string]any{
-			"token":       entry.Token,
+			"share_ref":   fpvTokenRef(entry.Token),
 			"session_id":  entry.SessionID,
 			"mode":        fpvMode(entry.Controls),
 			"controls":    entry.Controls,
@@ -191,9 +199,6 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			"diagnostics": diag.Summary,
 			"transport": map[string]any{
 				"primary":       "cdp_screencast",
-				"stream_url":    "/m/" + entry.Token + "/stream.cdp.mjpg",
-				"mjpeg_url":     "/m/" + entry.Token + "/stream.mjpg",
-				"fallback_url":  "/m/" + entry.Token + "/screenshot.jpg",
 				"quality_modes": []string{"smooth", "balanced", "saver"},
 				"max_viewers":   3,
 			},
@@ -211,9 +216,9 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "fpv share is read-only"})
 			return
 		}
-		sess, ok := sm.Get(entry.SessionID)
+		sess, ok := fpvSessionForShare(sm, entry)
 		if !ok {
-			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed or origin changed"})
 			return
 		}
 		var body struct {
@@ -264,12 +269,13 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			log.OK = true
 		}
 		log = fpvRecordAuditEvent(entry.Token, entry.SessionID, log)
-		entry.Audit = append(entry.Audit, log)
-		if len(entry.Audit) > 100 {
-			entry.Audit = entry.Audit[len(entry.Audit)-100:]
+		if updated, ok := fpvAppendShareAudit(entry.Token, log); ok {
+			entry = updated
 		}
-		fpvShares.Store(entry.Token, entry)
-		fpvSaveRegistry()
+		if err := fpvSaveRegistry(); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "share audit persistence failed"})
+			return
+		}
 		status := http.StatusOK
 		if err != nil {
 			status = http.StatusBadRequest
@@ -283,9 +289,9 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share not found or expired"})
 			return
 		}
-		sess, ok := sm.Get(entry.SessionID)
+		sess, ok := fpvSessionForShare(sm, entry)
 		if !ok {
-			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed or origin changed"})
 			return
 		}
 		data, err := fpvScreenshotJPEG(sess)
@@ -304,9 +310,9 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share not found or expired"})
 			return
 		}
-		sess, ok := sm.Get(entry.SessionID)
+		sess, ok := fpvSessionForShare(sm, entry)
 		if !ok {
-			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed or origin changed"})
 			return
 		}
 		if !fpvAcquireViewer(entry.Token) {
@@ -353,9 +359,9 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share not found or expired"})
 			return
 		}
-		sess, ok := sm.Get(entry.SessionID)
+		sess, ok := fpvSessionForShare(sm, entry)
 		if !ok {
-			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed or origin changed"})
 			return
 		}
 		flusher, ok := w.(http.Flusher)
@@ -409,18 +415,47 @@ func fpvAssetPath(file string) (string, bool) {
 	return "", false
 }
 
-func fpvCreateShare(sessionID string, expiresMinutes int, controls, oneTime bool, maxViews int) (map[string]any, error) {
+func fpvCreateShare(sessionID, origin string, expiresMinutes int, controls, oneTime bool, maxViews int) (map[string]any, error) {
+	if controls {
+		return nil, errFPVControlsDenied
+	}
+	canonicalOrigin, err := fpvShareOrigin(origin)
+	if err != nil {
+		return nil, err
+	}
+	if canonicalOrigin != origin {
+		return nil, errFPVPolicyInvalid
+	}
 	minutes := expiresMinutes
-	if minutes <= 0 || minutes > 240 {
-		minutes = 60
+	if minutes <= 0 {
+		minutes = fpvDefaultTTLMinutes
+	}
+	if minutes > fpvMaximumTTLMinutes || sessionID == "" || origin == "" {
+		return nil, errFPVPolicyInvalid
+	}
+	if oneTime {
+		maxViews = 1
+	} else if maxViews <= 0 {
+		maxViews = fpvDefaultMaxViews
+	}
+	if maxViews > fpvMaximumMaxViews {
+		return nil, errFPVPolicyInvalid
 	}
 	token, err := fpvToken()
 	if err != nil {
 		return nil, err
 	}
-	entry := &fpvShare{Token: token, SessionID: sessionID, CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Duration(minutes) * time.Minute), Controls: controls, OneTime: oneTime, MaxViews: maxViews}
+	now := time.Now().UTC()
+	entry := &fpvShare{PolicyVersion: fpvSharePolicyVersion, Token: token, SessionID: sessionID, Origin: origin, CreatedAt: now, ExpiresAt: now.Add(time.Duration(minutes) * time.Minute), Controls: false, OneTime: oneTime, MaxViews: maxViews}
+	fpvShareMu.Lock()
 	fpvShares.Store(token, entry)
-	fpvSaveRegistry()
+	fpvShareMu.Unlock()
+	if err := fpvSaveRegistry(); err != nil {
+		fpvShareMu.Lock()
+		fpvShares.Delete(token)
+		fpvShareMu.Unlock()
+		return nil, errFPVRegistryPersistence
+	}
 	return fpvSharePayload(entry), nil
 }
 
@@ -449,7 +484,7 @@ func fpvRecordAuditEvent(token, sessionID string, log fpvAuditLog) fpvAuditLog {
 	if log.Meta == nil {
 		log.Meta = map[string]any{}
 	}
-	log.Meta["token"] = token
+	log.Meta["share_ref"] = fpvTokenRef(token)
 	log.Meta["session_id"] = sessionID
 	fpvAuditEvents = append(fpvAuditEvents, log)
 	if len(fpvAuditEvents) > 500 {
@@ -520,6 +555,9 @@ func fpvStreamInterval(token string) time.Duration {
 }
 
 func fpvRegistryPath() string {
+	if configured := strings.TrimSpace(os.Getenv("UIAI_FPV_REGISTRY_PATH")); configured != "" {
+		return configured
+	}
 	wd, err := os.Getwd()
 	if err == nil {
 		for dir := wd; dir != "/" && dir != "."; dir = filepath.Dir(dir) {
@@ -542,29 +580,61 @@ func fpvLoadRegistry() {
 			return
 		}
 		now := time.Now().UTC()
+		fpvShareMu.Lock()
 		for _, entry := range entries {
-			if entry != nil && entry.Token != "" && now.Before(entry.ExpiresAt) && !entry.Revoked {
-				fpvShares.Store(entry.Token, entry)
+			if fpvShareUsable(entry, now) && entry.Token != "" {
+				fpvShares.Store(entry.Token, cloneFPVShare(entry))
 			}
 		}
+		fpvShareMu.Unlock()
 	})
 }
 
-func fpvSaveRegistry() {
+func fpvSaveRegistry() error {
 	fpvRegistryMu.Lock()
 	defer fpvRegistryMu.Unlock()
 	entries := []*fpvShare{}
 	now := time.Now().UTC()
+	fpvShareMu.Lock()
 	fpvShares.Range(func(_, v any) bool {
 		entry, ok := v.(*fpvShare)
-		if ok && entry != nil && now.Before(entry.ExpiresAt) && !entry.Revoked {
-			entries = append(entries, entry)
+		if ok && fpvShareUsable(entry, now) {
+			entries = append(entries, cloneFPVShare(entry))
 		}
 		return true
 	})
-	_ = os.MkdirAll(filepath.Dir(fpvRegistryPath()), 0750)
-	data, _ := json.MarshalIndent(entries, "", "  ")
-	_ = os.WriteFile(fpvRegistryPath(), data, 0600)
+	fpvShareMu.Unlock()
+	destination := fpvRegistryPath()
+	directory := filepath.Dir(destination)
+	if err := os.MkdirAll(directory, 0750); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(entries, "", "  ")
+	if err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(directory, ".fpv-shares-*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0600); err != nil {
+		temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, destination)
 }
 
 func fpvScreenshotJPEG(sess *vision.Session) ([]byte, error) {
@@ -760,25 +830,28 @@ func fpvMode(controls bool) string {
 }
 
 func fpvEntry(token string) (*fpvShare, bool) {
-	v, ok := fpvShares.Load(token)
+	fpvShareMu.Lock()
+	value, ok := fpvShares.Load(token)
 	if !ok {
+		fpvShareMu.Unlock()
 		return nil, false
 	}
-	entry := v.(*fpvShare)
-	if time.Now().UTC().After(entry.ExpiresAt) || entry.Revoked {
+	entry := value.(*fpvShare)
+	if !fpvShareUsable(entry, time.Now().UTC()) {
 		fpvShares.Delete(token)
-		fpvSaveRegistry()
+		fpvShareMu.Unlock()
+		_ = fpvSaveRegistry()
 		return nil, false
 	}
-	return entry, true
+	result := cloneFPVShare(entry)
+	fpvShareMu.Unlock()
+	return result, true
 }
 
 func fpvToken() (string, error) {
-	adjectives := []string{"bright", "calm", "clear", "cosmic", "gentle", "golden", "nimble", "quiet", "rapid", "steady", "sunny", "vivid"}
-	nouns := []string{"atlas", "beacon", "comet", "harbor", "meadow", "orbit", "river", "signal", "summit", "trail", "voyage", "window"}
-	buf := make([]byte, 4)
-	if _, err := rand.Read(buf); err != nil {
+	buffer := make([]byte, 24)
+	if _, err := rand.Read(buffer); err != nil {
 		return "", fmt.Errorf("generate fpv token: %w", err)
 	}
-	return fmt.Sprintf("%s-%s-%x", adjectives[int(buf[0])%len(adjectives)], nouns[int(buf[1])%len(nouns)], buf[2:]), nil
+	return base64.RawURLEncoding.EncodeToString(buffer), nil
 }
