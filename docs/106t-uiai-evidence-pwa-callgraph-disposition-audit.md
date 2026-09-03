@@ -54,6 +54,18 @@ This is a disposition audit, not a node acceptance, independent-review, settleme
 | CG-31 — Standards and public claim governance | Specs and truth notices exist; standards mapping and public claim manifest incomplete. | Partial documentation evidence. | No independent legal/claims review or settlement; CG-30 open. | **PARTIAL / BLOCKED** |
 | CG-32 — Final closure join | All downstream prerequisites remain open. | No final evidence bundle. | No independent closure decision or settlement. | **BLOCKED** |
 
+## Cross-cutting BugSquash guard candidates
+
+These defects protect the integrity or safe consumption of EPWA work but do not advance any node past its dependency or independent-acceptance gate.
+
+| Issue | Source candidate and effect | Remaining truth boundary |
+|---|---|---|
+| UIAI issue #107 — legacy share-viewer context injection | `60406d6` adds context-correct escaping for stored values. | Open; no integration, installed consumer proof, independent acceptance, or closure. |
+| UIAI issue #109 — pre-commit silently stages concurrent Beads work | `b930a04` adds a repository-owned hook that never stages the ledger, fails before touching existing unstaged/partial ledger state, skips shared-ledger mutation from linked worktrees, and fails explicitly when a clean flush creates work. The seven-scenario fixture passed ten repeated runs. | Open; canonical hook installation, multi-agent installed proof, and independent acceptance remain absent. |
+| UIAI issue #110 — pre-push format gate mutates or omits source | `b096f61` validates the committed range without mutating source/index. | Open; canonical hook integration and installed proof remain absent. |
+| UIAI issue #146 — documented session `GET /read` returns 405 | `3470b8c` restores the canonical GET route while preserving POST compatibility. | Open; installed engine still returns HTTP 405. |
+| UIAI issue #147 — implicit reusable public FPV control share | `021b4aa..aba2367` removes implicit session-open sharing and adds the bounded private-by-default source policy recorded under CG-12. | Open; race detector, integration/install, public browser proof, independent acceptance, and closure remain absent. |
+
 ## Deterministic frontier decision
 
 CG-01 satisfies only its baseline-recording condition. CG-02 is therefore the earliest dependency-ready incomplete frontier. Its remaining done condition is not another producer-only code claim: the exact candidate ancestry must receive bounded independent verification, any findings must be repaired and re-proved, and settlement must be recorded separately.
