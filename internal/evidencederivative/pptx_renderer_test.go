@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"strings"
 	"testing"
 )
@@ -36,9 +37,17 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	required := map[string]bool{"[Content_Types].xml": false, "_rels/.rels": false, "ppt/presentation.xml": false, "ppt/_rels/presentation.xml.rels": false}
+	required := map[string]bool{
+		"[Content_Types].xml": false, "_rels/.rels": false, "ppt/presentation.xml": false,
+		"ppt/_rels/presentation.xml.rels": false, "ppt/slideMasters/slideMaster1.xml": false,
+		"ppt/slideMasters/_rels/slideMaster1.xml.rels": false, "ppt/slideLayouts/slideLayout1.xml": false,
+		"ppt/slideLayouts/_rels/slideLayout1.xml.rels": false, "ppt/theme/theme1.xml": false,
+	}
+	names := make(map[string]struct{}, len(z.File))
+	relationshipBodies := map[string][]byte{}
 	var xmlPayload bytes.Buffer
 	for _, f := range z.File {
+		names[f.Name] = struct{}{}
 		if strings.Contains(f.Name, "..") || strings.HasPrefix(f.Name, "/") {
 			t.Fatalf("unsafe %q", f.Name)
 		}
@@ -59,6 +68,9 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 		}
 		if strings.HasSuffix(f.Name, ".xml") || strings.HasSuffix(f.Name, ".rels") {
 			xmlPayload.Write(body)
+			if strings.HasSuffix(f.Name, ".rels") {
+				relationshipBodies[f.Name] = body
+			}
 			var value any
 			if err := xml.Unmarshal(body, &value); err != nil {
 				t.Fatalf("invalid XML %s: %v", f.Name, err)
@@ -69,6 +81,9 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 		if !ok {
 			t.Fatalf("missing %s", name)
 		}
+	}
+	for relationshipPath, body := range relationshipBodies {
+		assertPPTXRelationshipsResolve(t, relationshipPath, body, names)
 	}
 	for _, ref := range []string{r.AssetRefs[0], r.CitationRefs[0], r.OmissionRefs[0]} {
 		if !bytes.Contains(xmlPayload.Bytes(), []byte(ref)) {
@@ -83,6 +98,32 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 	}
 	if e := ValidateManifest(a.Manifest, r); e != nil {
 		t.Fatal(e)
+	}
+}
+
+func assertPPTXRelationshipsResolve(t *testing.T, relationshipPath string, body []byte, names map[string]struct{}) {
+	t.Helper()
+	var relationships struct {
+		Items []struct {
+			Target string `xml:"Target,attr"`
+		} `xml:"Relationship"`
+	}
+	if err := xml.Unmarshal(body, &relationships); err != nil {
+		t.Fatal(err)
+	}
+	base := ""
+	if relationshipPath != "_rels/.rels" {
+		prefix, file, found := strings.Cut(relationshipPath, "/_rels/")
+		if !found || !strings.HasSuffix(file, ".rels") {
+			t.Fatalf("invalid relationship path %s", relationshipPath)
+		}
+		base = path.Dir(prefix + "/" + strings.TrimSuffix(file, ".rels"))
+	}
+	for _, relationship := range relationships.Items {
+		resolved := path.Clean(path.Join(base, relationship.Target))
+		if _, found := names[resolved]; !found {
+			t.Fatalf("%s has dangling target %s (%s)", relationshipPath, relationship.Target, resolved)
+		}
 	}
 }
 
