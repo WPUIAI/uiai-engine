@@ -173,7 +173,7 @@ func validateLicenses(licenses []LicenseAttestation, assets []string) error {
 			return ErrDerivativeLicenseMissing
 		}
 	}
-	if !subset(assets, keys(byAsset)) {
+	if len(byAsset) != len(assets) || !subset(assets, keys(byAsset)) || !subset(keys(byAsset), assets) {
 		return ErrDerivativeLicenseMissing
 	}
 	return nil

@@ -31,6 +31,9 @@ func RenderProjectionArchive(request DerivativeRequest, projection evidencepwa.P
 	if err != nil {
 		return RenderedDerivative{}, err
 	}
+	if err := validateLicenses(licenses, request.AssetRefs); err != nil {
+		return RenderedDerivative{}, err
+	}
 	if len(sources) != len(selection.assets) {
 		return RenderedDerivative{}, ErrDerivativeSelectionIncomplete
 	}
@@ -70,16 +73,41 @@ func RenderProjectionArchive(request DerivativeRequest, projection evidencepwa.P
 		}
 		files = append(files, file{path: source.Path, mime: source.MIME, body: append([]byte(nil), source.Body...)})
 	}
+	requestDigest, err := DigestRequest(request)
+	if err != nil {
+		return RenderedDerivative{}, err
+	}
+	licenseSet := append([]LicenseAttestation(nil), licenses...)
+	sort.Slice(licenseSet, func(i, j int) bool {
+		if licenseSet[i].AssetRef == licenseSet[j].AssetRef {
+			return licenseSet[i].LicenseRef < licenseSet[j].LicenseRef
+		}
+		return licenseSet[i].AssetRef < licenseSet[j].AssetRef
+	})
 	selectionBody, err := json.Marshal(struct {
-		ProjectionRef    string                 `json:"projection_ref"`
-		ProjectionSHA256 string                 `json:"projection_sha256"`
+		Schema           string                 `json:"schema"`
+		RequestRef       string                 `json:"request_ref"`
+		RequestSHA256    string                 `json:"request_sha256"`
+		Scope            ScopeBinding           `json:"scope"`
 		ArtifactRef      string                 `json:"artifact_ref"`
 		ArtifactSHA256   string                 `json:"artifact_sha256"`
+		ArtifactRevision uint64                 `json:"artifact_revision"`
+		ProjectionRef    string                 `json:"projection_ref"`
+		ProjectionSHA256 string                 `json:"projection_sha256"`
+		Rendering        RenderingProfile       `json:"rendering"`
 		Claims           []evidencepwa.Claim    `json:"claims"`
 		Assets           []evidencepwa.Asset    `json:"assets"`
 		Citations        []evidencepwa.Citation `json:"citations"`
+		Licenses         []LicenseAttestation   `json:"licenses"`
 		OmissionRefs     []string               `json:"omission_refs,omitempty"`
-	}{request.ProjectionRef, request.ProjectionSHA256, request.ArtifactRef, request.ArtifactSHA256, selection.claims, selection.assets, selection.citations, append([]string(nil), request.OmissionRefs...)})
+	}{
+		Schema: "uiai.evidence_archive_selection.v1", RequestRef: request.RequestID, RequestSHA256: requestDigest,
+		Scope: request.Scope, ArtifactRef: request.ArtifactRef, ArtifactSHA256: request.ArtifactSHA256,
+		ArtifactRevision: request.ArtifactRevision, ProjectionRef: request.ProjectionRef,
+		ProjectionSHA256: request.ProjectionSHA256, Rendering: request.Rendering,
+		Claims: selection.claims, Assets: selection.assets, Citations: selection.citations,
+		Licenses: licenseSet, OmissionRefs: append([]string(nil), request.OmissionRefs...),
+	})
 	if err != nil {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}

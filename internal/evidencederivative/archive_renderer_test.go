@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"reflect"
@@ -48,6 +49,32 @@ func TestRenderProjectionArchiveIsSafeDeterministicAndBound(t *testing.T) {
 	if !bytes.Equal(got, source.Body) {
 		t.Fatal("asset bytes changed")
 	}
+	selectionStream, err := reader.File[1].Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectionBytes, err := io.ReadAll(selectionStream)
+	selectionStream.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var selection struct {
+		Schema           string               `json:"schema"`
+		RequestSHA256    string               `json:"request_sha256"`
+		Scope            ScopeBinding         `json:"scope"`
+		ArtifactRevision uint64               `json:"artifact_revision"`
+		Licenses         []LicenseAttestation `json:"licenses"`
+		OmissionRefs     []string             `json:"omission_refs"`
+	}
+	if err := json.Unmarshal(selectionBytes, &selection); err != nil {
+		t.Fatal(err)
+	}
+	requestDigest, _ := DigestRequest(request)
+	if selection.Schema != "uiai.evidence_archive_selection.v1" || selection.RequestSHA256 != requestDigest ||
+		selection.Scope != request.Scope || selection.ArtifactRevision != request.ArtifactRevision ||
+		!reflect.DeepEqual(selection.Licenses, manifest.Licenses) || !reflect.DeepEqual(selection.OmissionRefs, request.OmissionRefs) {
+		t.Fatalf("embedded selection ledger = %#v", selection)
+	}
 	if err := ValidateManifest(first.Manifest, request); err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +96,14 @@ func TestRenderProjectionArchiveRejectsTraversalTamperAndDuplicates(t *testing.T
 	}
 	if _, err := RenderProjectionArchive(request, projection, []ArchiveAssetSource{source, source}, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:archive", manifest.CreatedAt); err == nil {
 		t.Fatal("duplicate asset accepted")
+	}
+	extraLicenses := append([]LicenseAttestation(nil), manifest.Licenses...)
+	extra := manifest.Licenses[0]
+	extra.AssetRef = "asset:unselected"
+	extra.LicenseRef = "license:unselected"
+	extraLicenses = append(extraLicenses, extra)
+	if _, err := RenderProjectionArchive(request, projection, []ArchiveAssetSource{source}, manifest.Renderer, manifest.ViewerMatrix, extraLicenses, "receipt:archive", manifest.CreatedAt); !errors.Is(err, ErrDerivativeLicenseMissing) {
+		t.Fatalf("unselected license error = %v", err)
 	}
 }
 
