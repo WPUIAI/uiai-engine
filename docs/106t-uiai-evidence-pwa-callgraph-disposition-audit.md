@@ -65,6 +65,7 @@ These defects protect the integrity or safe consumption of EPWA work but do not 
 | UIAI issue #110 — pre-push format gate mutates or omits source | `b096f61` validates the committed range without mutating source/index. | Open; canonical hook integration and installed proof remain absent. |
 | UIAI issue #146 — documented session `GET /read` returns 405 | `3470b8c` restores the canonical GET route while preserving POST compatibility. | Open; installed engine still returns HTTP 405. |
 | UIAI issue #147 — implicit reusable public FPV control share | `021b4aa..aba2367` removes implicit session-open sharing and adds the bounded private-by-default source policy recorded under CG-12. | Open; race detector, integration/install, public browser proof, independent acceptance, and closure remain absent. |
+| Focusa issue #533 — accepted active Workpoints can be evicted and stamped with a foreign session | `f48c2ba97` is a source candidate for per-scope inactive-history retention, active authority pinning, request-local event attribution, durable scope replay, and non-epoch timezone fallback. | Open; formatting/diff checks pass, but canonical tests are denied by recovery-only entitlement; idempotency-window, restart/concurrency, independent, and installed-runtime acceptance remain absent. |
 
 ## Deterministic frontier decision
 
