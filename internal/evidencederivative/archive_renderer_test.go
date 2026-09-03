@@ -96,6 +96,7 @@ func archiveFixture(t *testing.T) (DerivativeRequest, evidencepwa.Projection, De
 	request.DerivativeType = DerivativeArchive
 	request.Rendering = ArchiveStoreRenderingProfile()
 	request.AssetRefs = []string{projection.Assets[0].AssetID}
+	request.OmissionRefs = DerivativeOmissionRefs(request, projection)
 	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
 	digest, err := evidencepwa.DigestProjection(projection)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -150,6 +151,9 @@ func selectProjection(request DerivativeRequest, projection evidencepwa.Projecti
 		request.ArtifactRevision != projection.Artifact.Revision || request.Scope != projection.Artifact.Scope {
 		return projectionSelection{}, ErrProjectionMismatch
 	}
+	if expected := DerivativeOmissionRefs(request, projection); !slices.Equal(request.OmissionRefs, expected) {
+		return projectionSelection{}, ErrDerivativeSelectionIncomplete
+	}
 	claims := make(map[string]evidencepwa.Claim, len(projection.Claims))
 	assets := make(map[string]evidencepwa.Asset, len(projection.Assets))
 	citations := make(map[string]evidencepwa.Citation, len(projection.Citations))
@@ -186,6 +190,45 @@ func selectProjection(request DerivativeRequest, projection evidencepwa.Projecti
 		selection.citationIDs[ref] = struct{}{}
 	}
 	return selection, nil
+}
+
+func DerivativeOmissionRefs(request DerivativeRequest, projection evidencepwa.Projection) []string {
+	selected := make(map[string]struct{}, len(request.ClaimRefs)+len(request.AssetRefs)+len(request.CitationRefs))
+	for _, group := range [][]string{request.ClaimRefs, request.AssetRefs, request.CitationRefs} {
+		for _, ref := range group {
+			selected[ref] = struct{}{}
+		}
+	}
+	all := make(map[string]struct{})
+	for _, claim := range projection.Claims {
+		all[claim.ClaimID] = struct{}{}
+	}
+	for _, asset := range projection.Assets {
+		all[asset.AssetID] = struct{}{}
+	}
+	for _, citation := range projection.Citations {
+		all[citation.CitationID] = struct{}{}
+	}
+	for _, entry := range projection.Timeline {
+		all[entry.EntryID] = struct{}{}
+	}
+	for _, group := range [][]string{projection.InspectionRefs, projection.SecurityRefs, projection.CustodyRefs,
+		projection.AttestationRefs, projection.TrustRefs, projection.OmissionRefs, projection.RelatedArtifactRefs, projection.ReceiptRefs} {
+		for _, ref := range group {
+			all[ref] = struct{}{}
+		}
+	}
+	for _, warning := range projection.Warnings {
+		all["warning:"+warning.Code] = struct{}{}
+	}
+	omissions := make([]string, 0, len(all))
+	for ref := range all {
+		if _, included := selected[ref]; !included {
+			omissions = append(omissions, ref)
+		}
+	}
+	sort.Strings(omissions)
+	return omissions
 }
 
 func intersection(values []string, allowed map[string]struct{}) []string {

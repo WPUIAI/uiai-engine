@@ -25,6 +25,7 @@ func TestRenderProjectionHTMLIncludesOnlySelectedEvidence(t *testing.T) {
 	if len(projection.Claims) > 1 {
 		request.ClaimRefs = request.ClaimRefs[:1]
 	}
+	request.OmissionRefs = DerivativeOmissionRefs(request, projection)
 	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
 	rendered, err := RenderProjectionHTML(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:html", manifest.CreatedAt)
 	if err != nil {

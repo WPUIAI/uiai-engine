@@ -18,6 +18,7 @@ func TestRenderProjectionMarkdownIncludesOnlySelectedEvidence(t *testing.T) {
 	if len(projection.Claims) > 1 {
 		request.ClaimRefs = request.ClaimRefs[:1]
 	}
+	request.OmissionRefs = DerivativeOmissionRefs(request, projection)
 	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
 	rendered, err := RenderProjectionMarkdown(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:markdown", manifest.CreatedAt)
 	if err != nil {
@@ -81,6 +82,37 @@ func TestRenderProjectionEmailTextUsesPlainTextDeliveryShape(t *testing.T) {
 	}
 }
 
+func TestPortableRenderersRequireCompleteCanonicalOmissions(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	request.DerivativeType = DerivativeMarkdown
+	if len(request.OmissionRefs) < 2 {
+		t.Fatal("fixture lacks omitted evidence")
+	}
+	missing := request
+	missing.OmissionRefs = append([]string(nil), request.OmissionRefs[1:]...)
+	missing.RequiredEvidenceRefs = selectedEvidenceRefs(missing)
+	if _, err := RenderProjectionMarkdown(missing, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:missing-omission", manifest.CreatedAt); !errors.Is(err, ErrDerivativeSelectionIncomplete) {
+		t.Fatalf("missing omission error = %v", err)
+	}
+	reordered := request
+	reordered.OmissionRefs = append([]string(nil), request.OmissionRefs...)
+	reordered.OmissionRefs[0], reordered.OmissionRefs[1] = reordered.OmissionRefs[1], reordered.OmissionRefs[0]
+	reordered.RequiredEvidenceRefs = selectedEvidenceRefs(reordered)
+	if _, err := RenderProjectionMarkdown(reordered, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:reordered-omission", manifest.CreatedAt); !errors.Is(err, ErrDerivativeSelectionIncomplete) {
+		t.Fatalf("noncanonical omission order error = %v", err)
+	}
+	rendered, err := RenderProjectionMarkdown(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:complete-omission", manifest.CreatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(rendered.Output)
+	for _, ref := range []string{"event:capture", "inspection:redaction", "security:1", "custody:1", "attestation:1", "trust:1", "receipt:1", "warning:bounded_projection"} {
+		if !strings.Contains(body, markdownText(ref)) {
+			t.Fatalf("omitted evidence %s missing from output", ref)
+		}
+	}
+}
+
 func TestPortableRenderersRejectFalseRenderingProfile(t *testing.T) {
 	request, projection, manifest := portableFixture(t)
 	request.Rendering.ProfileRef = "rendering:unimplemented"
@@ -117,6 +149,7 @@ func TestMarkdownEscapesInjectedStructureAndUnselectedCitations(t *testing.T) {
 	request.DerivativeType = DerivativeMarkdown
 	projection.Claims[0].Statement = "trusted line\n# injected heading *emphasis*"
 	request.CitationRefs = nil
+	request.OmissionRefs = DerivativeOmissionRefs(request, projection)
 	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
 	digest, err := evidencepwa.DigestProjection(projection)
 	if err != nil {
@@ -161,7 +194,7 @@ func portableFixture(t *testing.T) (DerivativeRequest, evidencepwa.Projection, D
 	request.ClaimRefs = projectionClaimRefs(projection)
 	request.AssetRefs = projectionAssetRefs(projection)
 	request.CitationRefs = projectionCitationRefs(projection)
-	request.OmissionRefs = append([]string(nil), projection.OmissionRefs...)
+	request.OmissionRefs = DerivativeOmissionRefs(request, projection)
 	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
 	request.Rendering = PortableDataRenderingProfile()
 	if len(request.ClaimRefs) == 0 || len(request.AssetRefs) == 0 || len(request.CitationRefs) == 0 {
