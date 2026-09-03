@@ -71,6 +71,9 @@ func TestRenderProjectionPPTXIsDeterministicAndSafe(t *testing.T) {
 	if a.Manifest.ArchivePosture != ArchiveSafe || len(a.Manifest.ArchiveEntries) != len(z.File) {
 		t.Fatal("archive manifest mismatch")
 	}
+	if err := VerifyArchive(a.Output, a.Manifest); err != nil {
+		t.Fatal(err)
+	}
 	if e := ValidateManifest(a.Manifest, r); e != nil {
 		t.Fatal(e)
 	}
