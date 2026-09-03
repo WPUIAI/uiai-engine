@@ -6,8 +6,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 )
 
 const da = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -82,6 +85,32 @@ func TestSelectionArchiveLicenseAndDeliveryFailClosed(t *testing.T) {
 		t.Fatal("ambiguous retry accepted")
 	}
 }
+func TestTranscriptAndKeyframeBindingsAreTypedAndIdentityBound(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	request.DerivativeType = DerivativeJSON
+	request.TranscriptRefs = []string{request.AssetRefs[0]}
+	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
+	if _, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:wrong-transcript", manifest.CreatedAt); !errors.Is(err, ErrDerivativeSelectionIncomplete) {
+		t.Fatalf("static asset accepted as transcript: %v", err)
+	}
+	projection.Assets[0].Modality = AssetModalityTranscript
+	digest, err := evidencepwa.DigestProjection(projection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.ProjectionSHA256 = digest
+	request.OmissionRefs = DerivativeOmissionRefs(request, projection)
+	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
+	rendered, err := RenderProjectionJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:transcript", manifest.CreatedAt)
+	if err != nil || !reflect.DeepEqual(rendered.Manifest.TranscriptRefs, request.TranscriptRefs) {
+		t.Fatalf("typed transcript asset rejected or unbound: %#v %v", rendered.Manifest, err)
+	}
+	request.KeyframeRefs = append([]string(nil), request.TranscriptRefs...)
+	if err := ValidateRequest(request); !errors.Is(err, ErrDerivativeSelectionIncomplete) {
+		t.Fatalf("overlapping transcript/keyframe accepted: %v", err)
+	}
+}
+
 func TestPDFConformanceVocabularyAndTargetMatch(t *testing.T) {
 	for name, mutate := range map[string]func(*DerivativeRequest, *DerivativeManifest){
 		"unknown PDF/UA profile":   func(_ *DerivativeRequest, manifest *DerivativeManifest) { manifest.PDFUAProfile = "PDF/UA-future" },

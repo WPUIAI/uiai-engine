@@ -62,6 +62,12 @@ const (
 	ConformanceFailed     ConformancePosture = "failed"
 )
 
+const (
+	AssetModalityTranscript = "transcript"
+	AssetModalityCaptions   = "captions"
+	AssetModalityKeyframe   = "keyframe"
+)
+
 type ArchivePosture string
 
 const (
@@ -97,6 +103,8 @@ type DerivativeRequest struct {
 	DerivativeType       DerivativeType      `json:"derivative_type"`
 	ClaimRefs            []string            `json:"claim_refs"`
 	AssetRefs            []string            `json:"asset_refs"`
+	TranscriptRefs       []string            `json:"transcript_refs,omitempty"`
+	KeyframeRefs         []string            `json:"keyframe_refs,omitempty"`
 	CitationRefs         []string            `json:"citation_refs"`
 	OmissionRefs         []string            `json:"omission_refs,omitempty"`
 	RequiredEvidenceRefs []string            `json:"required_evidence_refs"`

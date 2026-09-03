@@ -50,7 +50,7 @@ func RenderProjectionMarkdown(request DerivativeRequest, projection evidencepwa.
 	if len(selection.assets) > 0 {
 		body.WriteString("\n## Assets\n")
 		for _, asset := range selection.assets {
-			fmt.Fprintf(&body, "\n- **%s** — `%s`; %s; SHA-256 `%s`\n", markdownText(asset.AssetID), markdownText(asset.Ref), markdownText(asset.MIME), asset.SHA256)
+			fmt.Fprintf(&body, "\n- **%s** — `%s`; %s; modality `%s`; SHA-256 `%s`\n", markdownText(asset.AssetID), markdownText(asset.Ref), markdownText(asset.MIME), markdownText(asset.Modality), asset.SHA256)
 		}
 	}
 	if len(selection.citations) > 0 {
@@ -98,7 +98,7 @@ func renderProjectionPlainText(projection evidencepwa.Projection, selection proj
 	if len(selection.assets) > 0 {
 		body.WriteString("\nASSETS\n")
 		for _, asset := range selection.assets {
-			fmt.Fprintf(&body, "\n%s\nReference: %s\nMIME: %s\nSHA-256: %s\n", plainText(asset.AssetID), plainText(asset.Ref), plainText(asset.MIME), asset.SHA256)
+			fmt.Fprintf(&body, "\n%s\nReference: %s\nMIME: %s\nModality: %s\nSHA-256: %s\n", plainText(asset.AssetID), plainText(asset.Ref), plainText(asset.MIME), plainText(asset.Modality), asset.SHA256)
 		}
 	}
 	if len(selection.citations) > 0 {
@@ -144,7 +144,7 @@ func RenderProjectionCSV(request DerivativeRequest, projection evidencepwa.Proje
 		writeCSVRow(writer, []string{"claim", claim.ClaimID, claim.Statement, claim.Posture, strings.Join(intersection(claim.CitationIDs, selection.citationIDs), " "), ""})
 	}
 	for _, asset := range selection.assets {
-		writeCSVRow(writer, []string{"asset", asset.AssetID, asset.Ref, asset.MIME, "", asset.SHA256})
+		writeCSVRow(writer, []string{"asset", asset.AssetID, asset.Ref, asset.MIME, "modality: " + asset.Modality, asset.SHA256})
 	}
 	for _, citation := range selection.citations {
 		writeCSVRow(writer, []string{"citation", citation.CitationID, citation.SourceRef, "", citation.Locator, citation.SHA256})
@@ -201,6 +201,10 @@ func selectProjection(request DerivativeRequest, projection evidencepwa.Projecti
 	for _, citation := range projection.Citations {
 		citations[citation.CitationID] = citation
 	}
+	if !assetsHaveModalities(request.TranscriptRefs, assets, AssetModalityTranscript, AssetModalityCaptions) ||
+		!assetsHaveModalities(request.KeyframeRefs, assets, AssetModalityKeyframe) {
+		return projectionSelection{}, ErrDerivativeSelectionIncomplete
+	}
 	selection := projectionSelection{citationIDs: make(map[string]struct{}, len(request.CitationRefs))}
 	for _, ref := range request.ClaimRefs {
 		claim, found := claims[ref]
@@ -225,6 +229,23 @@ func selectProjection(request DerivativeRequest, projection evidencepwa.Projecti
 		selection.citationIDs[ref] = struct{}{}
 	}
 	return selection, nil
+}
+
+func assetsHaveModalities(refs []string, assets map[string]evidencepwa.Asset, allowed ...string) bool {
+	modalities := make(map[string]struct{}, len(allowed))
+	for _, modality := range allowed {
+		modalities[modality] = struct{}{}
+	}
+	for _, ref := range refs {
+		asset, found := assets[ref]
+		if !found {
+			return false
+		}
+		if _, allowed := modalities[asset.Modality]; !allowed {
+			return false
+		}
+	}
+	return true
 }
 
 func DerivativeOmissionRefs(request DerivativeRequest, projection evidencepwa.Projection) []string {

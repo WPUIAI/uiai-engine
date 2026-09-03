@@ -96,6 +96,8 @@ func RenderProjectionArchive(request DerivativeRequest, projection evidencepwa.P
 		ProjectionSHA256 string                 `json:"projection_sha256"`
 		Rendering        RenderingProfile       `json:"rendering"`
 		Claims           []evidencepwa.Claim    `json:"claims"`
+		TranscriptRefs   []string               `json:"transcript_refs,omitempty"`
+		KeyframeRefs     []string               `json:"keyframe_refs,omitempty"`
 		Assets           []evidencepwa.Asset    `json:"assets"`
 		Citations        []evidencepwa.Citation `json:"citations"`
 		Licenses         []LicenseAttestation   `json:"licenses"`
@@ -105,7 +107,8 @@ func RenderProjectionArchive(request DerivativeRequest, projection evidencepwa.P
 		Scope: request.Scope, ArtifactRef: request.ArtifactRef, ArtifactSHA256: request.ArtifactSHA256,
 		ArtifactRevision: request.ArtifactRevision, ProjectionRef: request.ProjectionRef,
 		ProjectionSHA256: request.ProjectionSHA256, Rendering: request.Rendering,
-		Claims: selection.claims, Assets: selection.assets, Citations: selection.citations,
+		Claims: selection.claims, TranscriptRefs: append([]string(nil), request.TranscriptRefs...),
+		KeyframeRefs: append([]string(nil), request.KeyframeRefs...), Assets: selection.assets, Citations: selection.citations,
 		Licenses: licenseSet, OmissionRefs: append([]string(nil), request.OmissionRefs...),
 	})
 	if err != nil {

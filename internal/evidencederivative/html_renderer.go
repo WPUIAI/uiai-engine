@@ -90,6 +90,8 @@ func RenderProjectionHTML(request DerivativeRequest, projection evidencepwa.Proj
 			body.WriteString(htmlText(asset.Ref))
 			body.WriteString("</code><br>MIME: ")
 			body.WriteString(htmlText(asset.MIME))
+			body.WriteString("<br>Modality: ")
+			body.WriteString(htmlText(asset.Modality))
 			body.WriteString("<br>SHA-256: <code>")
 			body.WriteString(htmlText(asset.SHA256))
 			body.WriteString("</code></li>\n")

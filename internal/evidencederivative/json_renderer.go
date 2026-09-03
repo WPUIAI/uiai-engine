@@ -64,6 +64,8 @@ func RenderProjectionJSON(request DerivativeRequest, projection evidencepwa.Proj
 		Redaction           evidencepwa.Redaction         `json:"redaction"`
 		FreshnessObservedAt time.Time                     `json:"freshness_observed_at"`
 		Claims              []evidencepwa.Claim           `json:"claims"`
+		TranscriptRefs      []string                      `json:"transcript_refs,omitempty"`
+		KeyframeRefs        []string                      `json:"keyframe_refs,omitempty"`
 		Assets              []evidencepwa.Asset           `json:"assets"`
 		Citations           []evidencepwa.Citation        `json:"citations"`
 		Licenses            []LicenseAttestation          `json:"licenses"`
@@ -73,7 +75,8 @@ func RenderProjectionJSON(request DerivativeRequest, projection evidencepwa.Proj
 		ProjectionSHA256: request.ProjectionSHA256, Artifact: projection.Artifact,
 		Title: projection.Title, Summary: projection.Summary, Availability: projection.Availability,
 		Access: projection.Access, Redaction: projection.Redaction, FreshnessObservedAt: projection.FreshnessObservedAt,
-		Claims: selection.claims, Assets: selection.assets, Citations: selection.citations,
+		Claims: selection.claims, TranscriptRefs: append([]string(nil), request.TranscriptRefs...),
+		KeyframeRefs: append([]string(nil), request.KeyframeRefs...), Assets: selection.assets, Citations: selection.citations,
 		Licenses: licenseSet, OmissionRefs: append([]string(nil), request.OmissionRefs...),
 	}
 	canonical, err := json.Marshal(output)
@@ -115,6 +118,7 @@ func buildRenderedDerivativeWithArchive(request DerivativeRequest, output []byte
 		Renderer: renderer, Rendering: request.Rendering,
 		AccessibilityTarget: request.AccessibilityTarget, AccessibilityPosture: ConformanceNotClaimed,
 		ArchivePosture: archivePosture, ArchiveEntries: append([]ArchiveEntry(nil), archiveEntries...), ViewerMatrix: viewerMatrix, Licenses: licenseSet,
+		TranscriptRefs: append([]string(nil), request.TranscriptRefs...), KeyframeRefs: append([]string(nil), request.KeyframeRefs...),
 		OmissionRefs: append([]string(nil), request.OmissionRefs...), ReceiptRef: receiptRef, CreatedAt: createdAt.UTC(),
 	}
 	if err := ValidateManifest(manifest, request); err != nil {

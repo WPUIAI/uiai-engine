@@ -43,7 +43,7 @@ func RenderProjectionPPTX(request DerivativeRequest, projection evidencepwa.Proj
 		slides = append(slides, claim.ClaimID+"\n"+claim.Statement+"\nPosture: "+claim.Posture)
 	}
 	for _, asset := range selection.assets {
-		slides = append(slides, asset.AssetID+"\nReference: "+asset.Ref+"\nMIME: "+asset.MIME+"\nSHA-256: "+asset.SHA256)
+		slides = append(slides, asset.AssetID+"\nReference: "+asset.Ref+"\nMIME: "+asset.MIME+"\nModality: "+asset.Modality+"\nSHA-256: "+asset.SHA256)
 	}
 	for _, citation := range selection.citations {
 		slides = append(slides, citation.CitationID+"\nSource: "+citation.SourceRef+"\nLocator: "+citation.Locator+"\nSHA-256: "+citation.SHA256)
