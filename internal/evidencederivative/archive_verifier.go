@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"io"
 	"os"
@@ -14,7 +15,7 @@ const maxArchiveExpandedBytes = 256 * 1024 * 1024
 const maxArchiveCompressionRatio = 100
 
 func VerifyArchive(output []byte, manifest DerivativeManifest) error {
-	if manifest.ArchivePosture != ArchiveSafe || len(output) == 0 || len(manifest.ArchiveEntries) == 0 || len(manifest.ArchiveEntries) > maxArchiveEntries {
+	if manifest.ArchivePosture != ArchiveSafe || !canonicalZipEnvelope(output) || len(manifest.ArchiveEntries) == 0 || len(manifest.ArchiveEntries) > maxArchiveEntries {
 		return ErrDerivativeUnsafeArchive
 	}
 	if err := validateArchive(manifest.ArchivePosture, manifest.ArchiveEntries); err != nil {
@@ -42,7 +43,7 @@ func VerifyArchive(output []byte, manifest DerivativeManifest) error {
 	var expanded uint64
 	for _, file := range reader.File {
 		entry, found := expected[file.Name]
-		if !found || !safeArchivePath(file.Name) || file.FileInfo().IsDir() || file.Mode()&os.ModeSymlink != 0 ||
+		if !found || !safeArchivePath(file.Name) || !file.Mode().IsRegular() || file.FileInfo().IsDir() || file.Mode()&os.ModeSymlink != 0 ||
 			(file.Method != zip.Store && file.Method != zip.Deflate) || file.Flags&1 != 0 {
 			return ErrDerivativeUnsafeArchive
 		}
@@ -70,4 +71,21 @@ func VerifyArchive(output []byte, manifest DerivativeManifest) error {
 		}
 	}
 	return nil
+}
+
+func canonicalZipEnvelope(output []byte) bool {
+	if len(output) < 22 || !bytes.Equal(output[:4], []byte{'P', 'K', 3, 4}) {
+		return false
+	}
+	minimum := len(output) - 22 - 65535
+	if minimum < 0 {
+		minimum = 0
+	}
+	for offset := len(output) - 22; offset >= minimum; offset-- {
+		if bytes.Equal(output[offset:offset+4], []byte{'P', 'K', 5, 6}) {
+			commentBytes := int(binary.LittleEndian.Uint16(output[offset+20 : offset+22]))
+			return offset+22+commentBytes == len(output)
+		}
+	}
+	return false
 }

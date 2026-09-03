@@ -25,6 +25,18 @@ func TestVerifyArchiveAcceptsBoundRendererOutput(t *testing.T) {
 	if err := VerifyArchive(tampered, rendered.Manifest); !errors.Is(err, ErrDerivativeIdentityMismatch) {
 		t.Fatalf("tampered output error = %v", err)
 	}
+	for _, wrapped := range [][]byte{
+		append([]byte("hidden-prefix"), rendered.Output...),
+		append(append([]byte(nil), rendered.Output...), []byte("hidden-suffix")...),
+	} {
+		wrappedManifest := rendered.Manifest
+		wrappedDigest := sha256.Sum256(wrapped)
+		wrappedManifest.OutputSHA256 = hex.EncodeToString(wrappedDigest[:])
+		wrappedManifest.OutputBytes = uint64(len(wrapped))
+		if err := VerifyArchive(wrapped, wrappedManifest); !errors.Is(err, ErrDerivativeUnsafeArchive) {
+			t.Fatalf("polyglot archive error = %v", err)
+		}
+	}
 	badManifest := rendered.Manifest
 	badManifest.ArchiveEntries = append([]ArchiveEntry(nil), rendered.Manifest.ArchiveEntries...)
 	badManifest.ArchiveEntries[0].SHA256 = string(bytes.Repeat([]byte{'f'}, 64))
