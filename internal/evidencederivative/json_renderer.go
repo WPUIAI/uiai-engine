@@ -25,7 +25,7 @@ func RenderCanonicalJSON(request DerivativeRequest, projection []byte, renderer 
 	if err := ValidateRequest(request); err != nil {
 		return RenderedDerivative{}, err
 	}
-	if request.DerivativeType != DerivativeJSON || len(projection) == 0 || len(projection) > maxJSONProjectionBytes {
+	if request.DerivativeType != DerivativeJSON || !renderingProfileMatches(request.Rendering, PortableDataRenderingProfile()) || len(projection) == 0 || len(projection) > maxJSONProjectionBytes {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	projectionDigest := sha256.Sum256(projection)

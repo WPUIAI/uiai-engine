@@ -24,7 +24,7 @@ type ArchiveAssetSource struct {
 }
 
 func RenderProjectionArchive(request DerivativeRequest, projection evidencepwa.Projection, sources []ArchiveAssetSource, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
-	if request.DerivativeType != DerivativeArchive {
+	if request.DerivativeType != DerivativeArchive || !renderingProfileMatches(request.Rendering, ArchiveStoreRenderingProfile()) {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	selection, err := selectProjection(request, projection)

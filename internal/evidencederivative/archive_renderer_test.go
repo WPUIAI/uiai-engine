@@ -72,6 +72,14 @@ func TestRenderProjectionArchiveRejectsTraversalTamperAndDuplicates(t *testing.T
 	}
 }
 
+func TestRenderProjectionArchiveRejectsFalseRenderingProfile(t *testing.T) {
+	request, projection, manifest, source := archiveFixture(t)
+	request.Rendering.ProfileRef = "rendering:unimplemented"
+	if _, err := RenderProjectionArchive(request, projection, []ArchiveAssetSource{source}, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:archive", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+		t.Fatalf("false archive profile accepted: %v", err)
+	}
+}
+
 func archiveFixture(t *testing.T) (DerivativeRequest, evidencepwa.Projection, DerivativeManifest, ArchiveAssetSource) {
 	t.Helper()
 	request, projection, manifest := portableFixture(t)
@@ -86,6 +94,7 @@ func archiveFixture(t *testing.T) (DerivativeRequest, evidencepwa.Projection, De
 		}
 	}
 	request.DerivativeType = DerivativeArchive
+	request.Rendering = ArchiveStoreRenderingProfile()
 	request.AssetRefs = []string{projection.Assets[0].AssetID}
 	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
 	digest, err := evidencepwa.DigestProjection(projection)

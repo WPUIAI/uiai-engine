@@ -81,6 +81,21 @@ func TestRenderProjectionEmailTextUsesPlainTextDeliveryShape(t *testing.T) {
 	}
 }
 
+func TestPortableRenderersRejectFalseRenderingProfile(t *testing.T) {
+	request, projection, manifest := portableFixture(t)
+	request.Rendering.ProfileRef = "rendering:unimplemented"
+	for _, derivativeType := range []DerivativeType{DerivativeMarkdown, DerivativeEmailText} {
+		request.DerivativeType = derivativeType
+		if _, err := RenderProjectionMarkdown(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:false-profile", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+			t.Fatalf("%s false profile accepted: %v", derivativeType, err)
+		}
+	}
+	request.DerivativeType = DerivativeCSV
+	if _, err := RenderProjectionCSV(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:false-profile", manifest.CreatedAt); !errors.Is(err, ErrDerivativeContractInvalid) {
+		t.Fatalf("CSV false profile accepted: %v", err)
+	}
+}
+
 func TestPortableRenderersFailClosedOnBindingAndSelectionDrift(t *testing.T) {
 	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativeMarkdown
@@ -148,6 +163,7 @@ func portableFixture(t *testing.T) (DerivativeRequest, evidencepwa.Projection, D
 	request.CitationRefs = projectionCitationRefs(projection)
 	request.OmissionRefs = append([]string(nil), projection.OmissionRefs...)
 	request.RequiredEvidenceRefs = selectedEvidenceRefs(request)
+	request.Rendering = PortableDataRenderingProfile()
 	if len(request.ClaimRefs) == 0 || len(request.AssetRefs) == 0 || len(request.CitationRefs) == 0 {
 		t.Fatal("projection fixture lacks portable derivative evidence")
 	}

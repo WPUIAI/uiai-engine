@@ -12,6 +12,7 @@ func TestRenderCanonicalJSONBindsProjectionAndTruthInputs(t *testing.T) {
 	request, manifest, _ := contracts()
 	projection := []byte(" {\"b\":2,\"a\":1} \n")
 	request.DerivativeType = DerivativeJSON
+	request.Rendering = PortableDataRenderingProfile()
 	request.AccessibilityTarget = AccessibilityNotApplicable
 	request.ProjectionSHA256 = hashJSONTest(projection)
 	matrixBefore := cloneViewerMatrix(manifest.ViewerMatrix)
@@ -41,6 +42,7 @@ func TestRenderCanonicalJSONIsDeterministic(t *testing.T) {
 	request, manifest, _ := contracts()
 	projection := []byte("{\"n\":9007199254740993,\"nested\":{\"z\":0,\"a\":true}}")
 	request.DerivativeType = DerivativeJSON
+	request.Rendering = PortableDataRenderingProfile()
 	request.AccessibilityTarget = AccessibilityNotApplicable
 	request.ProjectionSHA256 = hashJSONTest(projection)
 	first, err := RenderCanonicalJSON(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:json", manifest.CreatedAt)
@@ -60,6 +62,7 @@ func TestRenderCanonicalJSONFailsClosed(t *testing.T) {
 	request, manifest, _ := contracts()
 	projection := []byte("{\"ok\":true}")
 	request.DerivativeType = DerivativeJSON
+	request.Rendering = PortableDataRenderingProfile()
 	request.AccessibilityTarget = AccessibilityNotApplicable
 	request.ProjectionSHA256 = hashJSONTest(projection)
 	request.ProjectionSHA256 = hashJSONTest([]byte("different"))

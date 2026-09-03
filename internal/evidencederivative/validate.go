@@ -47,7 +47,7 @@ func ValidateRequest(request DerivativeRequest) error {
 		len(request.RequiredEvidenceRefs) == 0 || len(request.RequiredEvidenceRefs) > MaxRefs ||
 		!validLists(request.ClaimRefs, request.AssetRefs, request.CitationRefs, request.OmissionRefs, request.RequiredEvidenceRefs) ||
 		blank(request.Rendering.ProfileRef) || !validSHA256(request.Rendering.ProfileSHA256) ||
-		len(request.Rendering.FontRefs) == 0 || hasBlankOrDuplicate(request.Rendering.FontRefs) ||
+		hasBlankOrDuplicate(request.Rendering.FontRefs) ||
 		blank(request.Rendering.ColorProfileRef) || hasBlankOrDuplicate(request.Rendering.DependencyRefs) ||
 		blank(request.Locale) || !validDirection(request.Direction) || !validAccessibility(request.AccessibilityTarget) ||
 		blank(request.LicensePolicyRef) || !validSHA256(request.LicensePolicySHA256) || blank(request.IdempotencyKey) {

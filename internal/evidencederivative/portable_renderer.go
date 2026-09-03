@@ -12,7 +12,8 @@ import (
 )
 
 func RenderProjectionMarkdown(request DerivativeRequest, projection evidencepwa.Projection, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
-	if request.DerivativeType != DerivativeMarkdown && request.DerivativeType != DerivativeEmailText {
+	if (request.DerivativeType != DerivativeMarkdown && request.DerivativeType != DerivativeEmailText) ||
+		!renderingProfileMatches(request.Rendering, PortableDataRenderingProfile()) {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	selection, err := selectProjection(request, projection)
@@ -100,7 +101,7 @@ func renderProjectionPlainText(projection evidencepwa.Projection, selection proj
 }
 
 func RenderProjectionCSV(request DerivativeRequest, projection evidencepwa.Projection, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
-	if request.DerivativeType != DerivativeCSV {
+	if request.DerivativeType != DerivativeCSV || !renderingProfileMatches(request.Rendering, PortableDataRenderingProfile()) {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	selection, err := selectProjection(request, projection)
