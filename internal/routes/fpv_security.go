@@ -58,7 +58,11 @@ func fpvShareOrigin(raw string) (string, error) {
 	return strings.ToLower(parsed.Scheme) + "://" + strings.ToLower(parsed.Host), nil
 }
 
-func fpvSessionForShare(sm *vision.SessionManager, entry *fpvShare) (*vision.Session, bool) {
+type fpvSessionStore interface {
+	Get(string) (*vision.Session, bool)
+}
+
+func fpvSessionForShare(sm fpvSessionStore, entry *fpvShare) (*vision.Session, bool) {
 	if sm == nil || entry == nil || entry.Revoked || entry.PolicyVersion != fpvSharePolicyVersion {
 		return nil, false
 	}
@@ -73,7 +77,7 @@ func fpvSessionForShare(sm *vision.SessionManager, entry *fpvShare) (*vision.Ses
 	return session, true
 }
 
-func fpvConsumeView(token string, sm *vision.SessionManager) (*fpvShare, error) {
+func fpvConsumeView(token string, sm fpvSessionStore) (*fpvShare, error) {
 	return fpvConsumeViewIf(token, func(entry *fpvShare) bool {
 		_, ok := fpvSessionForShare(sm, entry)
 		return ok

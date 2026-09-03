@@ -61,7 +61,7 @@ var fpvRegistryOnce sync.Once
 var fpvStreamMu sync.Mutex
 var fpvStreamViewers = map[string]int{}
 
-func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
+func MountFPVRoutes(r chi.Router, sm fpvSessionStore) {
 	fpvLoadRegistry()
 	r.Post("/share", func(w http.ResponseWriter, req *http.Request) {
 		if sm == nil {
@@ -145,7 +145,7 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 	})
 }
 
-func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
+func MountFPVPublicRoutes(r chi.Router, sm fpvSessionStore) {
 	fpvLoadRegistry()
 	r.Get("/assets/{file}", func(w http.ResponseWriter, req *http.Request) {
 		assetPath, ok := fpvAssetPath(filepath.Base(chi.URLParam(req, "file")))

@@ -1,11 +1,18 @@
 package routes
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/vision"
+	"github.com/go-chi/chi/v5"
 )
 
 func isolatedFPVRegistry(t *testing.T) {
@@ -27,6 +34,70 @@ func TestFPVShareOriginDeniesSensitiveSurfaces(t *testing.T) {
 	if err != nil || origin != "https://example.com:443" {
 		t.Fatalf("ordinary origin = %q, %v", origin, err)
 	}
+}
+
+type fakeFPVSessionStore map[string]*vision.Session
+
+func (store fakeFPVSessionStore) Get(id string) (*vision.Session, bool) {
+	session, found := store[id]
+	return session, found
+}
+
+func TestFPVShareRouteDeniesUnsafeRequestsBeforeMinting(t *testing.T) {
+	isolatedFPVRegistry(t)
+	cases := []struct {
+		name, sessionURL, body string
+	}{
+		{"missing consent", "https://example.com/public", `{"session_id":"session:route","expected_origin":"https://example.com"}`},
+		{"origin mismatch", "https://example.com/public", `{"session_id":"session:route","expected_origin":"https://other.example","explicit_consent_ref":"consent:test"}`},
+		{"sensitive origin", "https://accounts.example.com/", `{"session_id":"session:route","expected_origin":"https://accounts.example.com","explicit_consent_ref":"consent:test"}`},
+		{"control", "https://example.com/public", `{"session_id":"session:route","expected_origin":"https://example.com","explicit_consent_ref":"consent:test","controls":true}`},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			router := chi.NewRouter()
+			MountFPVRoutes(router, fakeFPVSessionStore{"session:route": {ID: "session:route", URL: testCase.sessionURL}})
+			request := httptest.NewRequest(http.MethodPost, "/share", bytes.NewBufferString(testCase.body))
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			if response.Code != http.StatusForbidden || bytes.Contains(response.Body.Bytes(), []byte(`"token"`)) || fpvSessionShareCount("session:route") != 0 {
+				t.Fatalf("unsafe request response=%d body=%s shares=%d", response.Code, response.Body.String(), fpvSessionShareCount("session:route"))
+			}
+		})
+	}
+}
+
+func TestFPVShareRouteMintsOnlyExplicitBoundedReadOnlyCapability(t *testing.T) {
+	isolatedFPVRegistry(t)
+	before := fpvSessionShareCount("session:allowed")
+	defer func() { _, _ = fpvRevokeSessionShares("session:allowed") }()
+	router := chi.NewRouter()
+	MountFPVRoutes(router, fakeFPVSessionStore{"session:allowed": {ID: "session:allowed", URL: "https://example.com/public"}})
+	request := httptest.NewRequest(http.MethodPost, "/share", bytes.NewBufferString(`{"session_id":"session:allowed","expected_origin":"https://example.com","explicit_consent_ref":"consent:test","expires_minutes":5,"max_views":1,"one_time":true}`))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusOK || payload["controls"] != false || payload["mode"] != "read_only" || payload["max_views"] != float64(1) || fpvSessionShareCount("session:allowed") != before+1 {
+		t.Fatalf("allowed response=%d payload=%#v shares=%d", response.Code, payload, fpvSessionShareCount("session:allowed"))
+	}
+	if token, ok := payload["token"].(string); !ok || len(token) != 32 {
+		t.Fatalf("missing bounded capability: %#v", payload)
+	}
+}
+
+func fpvSessionShareCount(sessionID string) int {
+	count := 0
+	fpvShares.Range(func(_, value any) bool {
+		entry, ok := value.(*fpvShare)
+		if ok && entry.SessionID == sessionID && !entry.Revoked {
+			count++
+		}
+		return true
+	})
+	return count
 }
 
 func TestFPVEntryRejectsLegacyAndUnboundedCapabilities(t *testing.T) {
