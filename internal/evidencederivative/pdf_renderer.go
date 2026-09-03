@@ -12,11 +12,28 @@ import (
 
 const pdfLinesPerPage = 48
 
+const PDFCore14ProfileRef = "rendering:pdf-core14-ascii-v1"
+const PDFCore14ProfileSHA256 = "9c2918992fb8d78aa1c1f866d5e09bfc7a627bf4e7a664bb6edc0476a79ab4a0"
+
+func PDFCore14RenderingProfile() RenderingProfile {
+	return RenderingProfile{
+		ProfileRef:      PDFCore14ProfileRef,
+		ProfileSHA256:   PDFCore14ProfileSHA256,
+		FontRefs:        []string{"builtin:helvetica"},
+		ColorProfileRef: "pdf-device-gray",
+		DependencyRefs:  nil,
+	}
+}
+
 func RenderProjectionPDF(request DerivativeRequest, projection evidencepwa.Projection, renderer RendererIdentity, matrix ViewerMatrix, licenses []LicenseAttestation, receiptRef string, createdAt time.Time) (RenderedDerivative, error) {
 	if request.DerivativeType != DerivativePDF && request.DerivativeType != DerivativePresentationPDF {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
-	if request.AccessibilityTarget == AccessibilityPDFUA1 || request.AccessibilityTarget == AccessibilityPDFUA2 {
+	if request.AccessibilityTarget == AccessibilityPDFUA1 || request.AccessibilityTarget == AccessibilityPDFUA2 ||
+		request.Direction != DirectionLTR || request.Rendering.ProfileRef != PDFCore14ProfileRef ||
+		request.Rendering.ProfileSHA256 != PDFCore14ProfileSHA256 || len(request.Rendering.FontRefs) != 1 ||
+		request.Rendering.FontRefs[0] != "builtin:helvetica" || request.Rendering.ColorProfileRef != "pdf-device-gray" ||
+		len(request.Rendering.DependencyRefs) != 0 {
 		return RenderedDerivative{}, ErrDerivativeContractInvalid
 	}
 	selection, err := selectProjection(request, projection)

@@ -16,6 +16,7 @@ func TestPDFInfoConsumerAcceptsRenderedPDF(t *testing.T) {
 	request, projection, manifest := portableFixture(t)
 	request.DerivativeType = DerivativePDF
 	request.AccessibilityTarget = AccessibilityNotApplicable
+	request.Rendering = PDFCore14RenderingProfile()
 	rendered, err := RenderProjectionPDF(request, projection, manifest.Renderer, manifest.ViewerMatrix, manifest.Licenses, "receipt:pdf-consumer", manifest.CreatedAt)
 	if err != nil {
 		t.Fatal(err)
