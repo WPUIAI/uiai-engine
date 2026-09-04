@@ -181,7 +181,7 @@ async function showRegistryDetail(kind, record) {
   if (kind === "artifact" && publicPath(record.pwa_path)) {
     const link = document.createElement("a");
     link.href = record.pwa_path;
-    link.textContent = "Open forensic evidence record";
+    link.textContent = tr("open_evidence_record");
     children.push(link);
   }
   if (kind === "work_item") {
