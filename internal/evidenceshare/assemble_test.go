@@ -217,18 +217,18 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		t.Fatal("renderer must not collapse validity layers into a success badge")
 	}
 	app, _ := assets.ReadFile("assets/app.js")
-	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", `tr("offline_snapshot")`, "locale.number", `dd.dir = "auto"`, `code.dir = "ltr"`, `aria-busy", "true"`, "event.preventDefault()", `byId("registry-back").hidden = true`, `focus({ preventScroll: true })`} {
+	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", `tr("offline_snapshot")`, "resource_profile", "media_posture", "snapshot_cursor", "AbortController", "controller.signal", "registryOverscan", "registrySpacer", "uiai.epwa_registry_snapshot.v1", "registrySnapshotLimit", "localStorage", "visibilitychange", "paused_lowmem", "paused_hidden", "paused_offline", "locale.number", `dd.dir = "auto"`, `code.dir = "ltr"`, `aria-busy", "true"`, "event.preventDefault()", `byId("registry-back").hidden = true`, `focus({ preventScroll: true })`} {
 		if !strings.Contains(string(app), required) {
 			t.Fatalf("registry consumer missing %s", required)
 		}
 	}
-	for _, forbidden := range []string{`const registryAPI = "/`, "/api/evidence/registry/closure", "/api/evidence/registry/sync?"} {
+	for _, forbidden := range []string{`const registryAPI = "/`, "/api/evidence/registry/closure", "/api/evidence/registry/sync?", `const tr = document.createElement("tr")`} {
 		if strings.Contains(string(app), forbidden) {
 			t.Fatalf("public consumer references private authority endpoint %s", forbidden)
 		}
 	}
 	css, _ := assets.ReadFile("assets/styles.css")
-	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "forced-colors:active", `[hidden]{display:none!important}`, "overflow-x:hidden", "border-inline-start", "inset-inline-start", "text-align:start", "unicode-bidi:embed", "content:attr(data-label)", `html[dir="rtl"]`, `.registry-table td:nth-child(2){grid-column:1/-1`, ".record-navigation"} {
+	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "forced-colors:active", `[hidden]{display:none!important}`, "overflow-x:hidden", "border-inline-start", "inset-inline-start", "text-align:start", "unicode-bidi:embed", "content:attr(data-label)", `html[dir="rtl"]`, `.registry-table td:nth-child(2){grid-column:1/-1`, ".registry-spacer", `.registry-table tbody tr:not(.registry-spacer)`, ".record-navigation"} {
 		if !strings.Contains(string(css), required) {
 			t.Fatalf("responsive CSS missing %s", required)
 		}
@@ -246,7 +246,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	localeText := string(localeBody)
-	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`} {
+	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`, `resource_profile:`, `media_posture:`, `snapshot_cursor:`} {
 		if !strings.Contains(localeText, required) {
 			t.Fatalf("locale runtime missing %s", required)
 		}

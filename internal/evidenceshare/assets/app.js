@@ -6,11 +6,22 @@ const tr = (key, values) => locale?.t(key, values) ?? key;
 const text = (node, value) => { node.textContent = value ?? "—"; };
 const availabilityStates = new Set(["loading", "ready", "unavailable", "blocked", "corrupt", "stale", "redacted", "degraded"]);
 const expectedSections = ["overview", "evidence", "timeline", "inspect", "developer"];
+const route = new URL(location.href);
 const deploymentBase = new URL("../", document.baseURI);
 const registryAPI = new URL("api/evidence/registry/public", deploymentBase).href.replace(/\/$/, "");
-const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 2;
+const requestedResourceProfile = route.searchParams.get("resource_profile");
+const lowMemory = requestedResourceProfile === "lowmem" || (typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 2);
 const registryPageSize = lowMemory ? 25 : 100;
-const registryState = { project: "", query: "", status: "", type: "", artifactCursor: "", workItemCursor: "", artifacts: [], workItems: [], eventSource: null, reloadTimer: 0 };
+const registryOverscan = lowMemory ? 2 : 8;
+const registryRowHeight = 56;
+const registrySnapshotLimit = lowMemory ? 50 : 200;
+const registryState = {
+  project: "", query: "", status: "", type: "", artifactCursor: "", workItemCursor: "",
+  artifacts: [], workItems: [], eventSource: null, reloadTimer: 0, abortController: null,
+  requestID: 0, scrollFrame: 0, resourceProfile: lowMemory ? "lowmem" : "normal",
+  mediaPosture: lowMemory ? "omitted_nonessential" : "ref_only", indexRevision: 0,
+  offline: false, snapshotAt: "",
+};
 
 const safeRef = (value) => typeof value === "string" && /^\.\/[A-Za-z0-9._/-]+$/.test(value) && !value.includes("../") ? value : null;
 const validSHA256 = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -97,8 +108,8 @@ const validProjection = (value) => value?.schema === "uiai.evidence_pwa_projecti
   availabilityStates.has(value.availability) && value.interaction === "read_only" &&
   expectedSections.every((id, index) => value.sections?.[index]?.id === id);
 
-async function fetchJSON(ref) {
-  const response = await fetch(ref, { cache: "no-store", credentials: "omit" });
+async function fetchJSON(ref, init = {}) {
+  const response = await fetch(ref, { ...init, cache: "no-store", credentials: "omit" });
   if (!response.ok) throw new Error(`${tr("unavailable_value")} (${response.status})`);
   return response.json();
 }
@@ -132,7 +143,7 @@ const queryString = (values) => {
 const publicPath = (value) => typeof value === "string" && /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]+$/.test(value) && !value.includes("..") ? new URL(value.slice(1), deploymentBase).href : null;
 
 function registryRow(kind, record) {
-  const tr = document.createElement("tr");
+  const tableRow = document.createElement("tr");
   const kindCell = document.createElement("td");
   const recordCell = document.createElement("td");
   const statusCell = document.createElement("td");
@@ -155,12 +166,12 @@ function registryRow(kind, record) {
   text(statusCell, kind === "artifact" ? record.verification : record.status);
   text(bindingCell, kind === "artifact" ? record.closure : record.binding_state);
   text(revisionCell, kind === "artifact" ? record.revision : record.revision);
-  tr.append(kindCell, recordCell, statusCell, bindingCell, revisionCell);
+  tableRow.append(kindCell, recordCell, statusCell, bindingCell, revisionCell);
   button.addEventListener("click", () => {
     if (kind === "artifact") location.assign(artifactViewURL(record));
     else showRegistryDetail(kind, record);
   });
-  return tr;
+  return tableRow;
 }
 
 async function showRegistryDetail(kind, record) {
@@ -215,8 +226,101 @@ function artifactViewURL(record) {
 
 function updateRegistryURL() {
   const url = new URL(location.href);
-  [["project", registryState.project], ["q", registryState.query], ["status", registryState.status], ["type", registryState.type]].forEach(([key, value]) => value ? url.searchParams.set(key, value) : url.searchParams.delete(key));
+  [["project", registryState.project], ["q", registryState.query], ["status", registryState.status], ["type", registryState.type], ["resource_profile", registryState.resourceProfile]].forEach(([key, value]) => value ? url.searchParams.set(key, value) : url.searchParams.delete(key));
   history.replaceState(null, "", url);
+}
+
+const registryTableWrap = () => document.querySelector(".registry-table-wrap");
+const registryRecordCount = () => registryState.artifacts.length + registryState.workItems.length;
+const registryRecordAt = (index) => index < registryState.artifacts.length ? { kind: "artifact", record: registryState.artifacts[index] } : { kind: "work_item", record: registryState.workItems[index - registryState.artifacts.length] };
+const registryStorageKey = (kind) => `uiai.epwa.registry.${kind}.v1:${encodeURIComponent([deploymentBase.pathname, registryState.project, registryState.query, registryState.status, registryState.type, registryState.resourceProfile].join("\u001f"))}`;
+const registryLastProjectKey = () => `uiai.epwa.registry.last_project.v1:${encodeURIComponent(deploymentBase.pathname)}`;
+const registryScrollKey = () => registryStorageKey("scroll");
+
+function registrySpacer(height) {
+  const row = document.createElement("tr");
+  const cell = document.createElement("td");
+  row.className = "registry-spacer";
+  row.setAttribute("aria-hidden", "true");
+  cell.colSpan = 5;
+  cell.style.height = `${height}px`;
+  row.append(cell);
+  return row;
+}
+
+function renderRegistryRows() {
+  const total = registryRecordCount();
+  const wrap = registryTableWrap();
+  const virtualized = matchMedia("(min-width: 769px)").matches;
+  const visible = Math.max(1, Math.ceil((wrap?.clientHeight || 680) / registryRowHeight));
+  const start = virtualized ? Math.max(0, Math.floor((wrap?.scrollTop || 0) / registryRowHeight) - registryOverscan) : 0;
+  const end = virtualized ? Math.min(total, start + visible + (registryOverscan * 2)) : total;
+  const rows = [];
+  if (start > 0) rows.push(registrySpacer(start * registryRowHeight));
+  for (let index = start; index < end; index += 1) {
+    const entry = registryRecordAt(index);
+    rows.push(registryRow(entry.kind, entry.record));
+  }
+  if (end < total) rows.push(registrySpacer((total - end) * registryRowHeight));
+  byId("registry-rows").replaceChildren(...rows);
+  byId("registry-empty").hidden = total !== 0;
+  byId("registry-more").hidden = registryState.offline || (!registryState.artifactCursor && !registryState.workItemCursor);
+  text(byId("registry-count"), tr("records_count", { count: locale.number(total) }));
+}
+
+function renderRegistrySummary(freshness, snapshotAt = "") {
+  renderRegistryRows();
+  text(byId("registry-revision"), registryState.indexRevision || "—");
+  const cursor = registryState.artifactCursor || registryState.workItemCursor || "end";
+  text(byId("registry-freshness"), snapshotAt ? `${tr("offline_snapshot")} · ${formatTime(snapshotAt)} · ${tr("snapshot_cursor")} ${cursor}` : freshness || tr("unavailable_value"));
+  byId("registry-facets").replaceChildren(
+    fact(tr("kind_artifact"), locale.number(registryState.artifacts.length)), fact(tr("kind_work_item"), locale.number(registryState.workItems.length)),
+    fact(tr("epic"), locale.number(registryState.workItems.filter((item) => item.item_type === "epic").length)),
+    fact(tr("state_blocked"), locale.number(registryState.workItems.filter((item) => item.status === "blocked").length)),
+    fact(tr("resource_profile"), registryState.resourceProfile), fact(tr("media_posture"), registryState.mediaPosture),
+  );
+  const registry = byId("registry");
+  registry.dataset.registryState = snapshotAt ? "stale" : (freshness || "degraded");
+  registry.dataset.resourceProfile = registryState.resourceProfile;
+  registry.dataset.mediaPosture = registryState.mediaPosture;
+  text(byId("registry-truth"), registryRecordCount() ? tr("registry_has_records") : tr("registry_no_records"));
+}
+
+function saveRegistrySnapshot() {
+  const artifactLimit = Math.min(registryState.artifacts.length, registrySnapshotLimit);
+  const workItemLimit = Math.max(0, registrySnapshotLimit - artifactLimit);
+  const snapshot = {
+    schema: "uiai.epwa_registry_snapshot.v1", project_ref: registryState.project,
+    query: registryState.query, status: registryState.status, type: registryState.type,
+    resource_profile: registryState.resourceProfile, media_posture: registryState.mediaPosture,
+    artifacts: registryState.artifacts.slice(0, artifactLimit), work_items: registryState.workItems.slice(0, workItemLimit),
+    artifact_cursor: registryState.artifactCursor, work_item_cursor: registryState.workItemCursor,
+    index_revision: registryState.indexRevision, snapshot_at: new Date().toISOString(),
+  };
+  try {
+    localStorage.setItem(registryStorageKey("snapshot"), JSON.stringify(snapshot));
+    localStorage.setItem(registryLastProjectKey(), registryState.project);
+  } catch { /* A full or unavailable cache cannot weaken live rendering. */ }
+}
+
+function restoreRegistrySnapshot() {
+  if (!registryState.project) return false;
+  try {
+    const snapshot = JSON.parse(localStorage.getItem(registryStorageKey("snapshot")) || "null");
+    if (snapshot?.schema !== "uiai.epwa_registry_snapshot.v1" || snapshot.project_ref !== registryState.project || snapshot.query !== registryState.query || snapshot.status !== registryState.status || snapshot.type !== registryState.type || snapshot.resource_profile !== registryState.resourceProfile || !Array.isArray(snapshot.artifacts) || !Array.isArray(snapshot.work_items) || !snapshot.snapshot_at) return false;
+    registryState.artifacts = snapshot.artifacts.slice(0, registrySnapshotLimit);
+    registryState.workItems = snapshot.work_items.slice(0, Math.max(0, registrySnapshotLimit - registryState.artifacts.length));
+    registryState.artifactCursor = snapshot.artifact_cursor || "";
+    registryState.workItemCursor = snapshot.work_item_cursor || "";
+    registryState.indexRevision = snapshot.index_revision || 0;
+    registryState.mediaPosture = snapshot.media_posture || registryState.mediaPosture;
+    registryState.snapshotAt = snapshot.snapshot_at;
+    registryState.offline = true;
+    renderRegistrySummary("stale", registryState.snapshotAt);
+    setStatus(byId("status"), "stale", tr("offline_snapshot"));
+    updateRegistryURL();
+    return true;
+  } catch { return false; }
 }
 
 async function loadRegistry({ append = false } = {}) {
@@ -227,37 +331,42 @@ async function loadRegistry({ append = false } = {}) {
     registryState.workItemCursor = "";
     registryState.artifacts = [];
     registryState.workItems = [];
+    registryTableWrap().scrollTop = 0;
   }
+  registryState.abortController?.abort();
+  const controller = new AbortController();
+  const requestID = ++registryState.requestID;
+  registryState.abortController = controller;
   byId("registry").setAttribute("aria-busy", "true");
   setStatus(status, "loading", tr("syncing_registry"));
-  const shared = { project_ref: registryState.project, q: registryState.query };
-  const [artifacts, workItems, syncStatus] = await Promise.all([
-    append && !registryState.artifactCursor ? Promise.resolve({ rows: [] }) : fetchJSON(`${registryAPI}/artifacts?${queryString({ ...shared, page_size: registryPageSize, cursor: registryState.artifactCursor })}`),
-    append && !registryState.workItemCursor ? Promise.resolve({ work_items: [] }) : fetchJSON(`${registryAPI}/work-items?${queryString({ ...shared, status: registryState.status, item_type: registryState.type, limit: registryPageSize, cursor: registryState.workItemCursor })}`),
-    fetchJSON(`${registryAPI}/sync-status`),
-  ]);
-  registryState.artifacts.push(...(artifacts.rows || []));
-  registryState.workItems.push(...(workItems.work_items || []));
-  registryState.artifactCursor = artifacts.next_cursor || "";
-  registryState.workItemCursor = workItems.next_cursor || "";
-  const rows = [...registryState.artifacts.map((row) => registryRow("artifact", row)), ...registryState.workItems.map((row) => registryRow("work_item", row))];
-  byId("registry-rows").replaceChildren(...rows);
-  byId("registry-empty").hidden = rows.length !== 0;
-  byId("registry-more").hidden = !registryState.artifactCursor && !registryState.workItemCursor;
-  text(byId("registry-count"), tr("records_count", { count: locale.number(rows.length) }));
-  text(byId("registry-revision"), Math.max(artifacts.index_revision || 0, workItems.index_revision || 0));
-  text(byId("registry-freshness"), syncStatus.freshness || "unavailable");
-  byId("registry-facets").replaceChildren(
-    fact(tr("kind_artifact"), locale.number(registryState.artifacts.length)), fact(tr("kind_work_item"), locale.number(registryState.workItems.length)),
-    fact(tr("epic"), locale.number(registryState.workItems.filter((item) => item.item_type === "epic").length)),
-    fact(tr("state_blocked"), locale.number(registryState.workItems.filter((item) => item.status === "blocked").length)),
-  );
-  byId("registry").dataset.registryState = syncStatus.freshness || "degraded";
-  text(byId("registry-truth"), rows.length ? tr("registry_has_records") : tr("registry_no_records"));
-  byId("registry").setAttribute("aria-busy", "false");
-  if (syncStatus.freshness === "live") setReadyStatus(status, tr("registry_live"));
-  else setStatus(status, "degraded", tr("registry_degraded", { state: syncStatus.freshness || "degraded" }));
-  updateRegistryURL();
+  const shared = { project_ref: registryState.project, q: registryState.query, resource_profile: registryState.resourceProfile };
+  try {
+    const [artifacts, workItems, syncStatus] = await Promise.all([
+      append && !registryState.artifactCursor ? Promise.resolve({ rows: [] }) : fetchJSON(`${registryAPI}/artifacts?${queryString({ ...shared, page_size: registryPageSize, cursor: registryState.artifactCursor })}`, { signal: controller.signal }),
+      append && !registryState.workItemCursor ? Promise.resolve({ work_items: [] }) : fetchJSON(`${registryAPI}/work-items?${queryString({ ...shared, status: registryState.status, item_type: registryState.type, limit: registryPageSize, cursor: registryState.workItemCursor })}`, { signal: controller.signal }),
+      fetchJSON(`${registryAPI}/sync-status`, { signal: controller.signal }),
+    ]);
+    if (requestID !== registryState.requestID) return;
+    registryState.artifacts.push(...(artifacts.rows || []));
+    registryState.workItems.push(...(workItems.work_items || []));
+    registryState.artifactCursor = artifacts.next_cursor || "";
+    registryState.workItemCursor = workItems.next_cursor || "";
+    registryState.resourceProfile = artifacts.resource_profile || workItems.resource_profile || registryState.resourceProfile;
+    registryState.mediaPosture = artifacts.media_posture || workItems.media_posture || registryState.mediaPosture;
+    registryState.indexRevision = Math.max(artifacts.index_revision || 0, workItems.index_revision || 0);
+    registryState.offline = false;
+    registryState.snapshotAt = "";
+    renderRegistrySummary(syncStatus.freshness || "degraded");
+    if (syncStatus.freshness === "live") setReadyStatus(status, tr("registry_live"));
+    else setStatus(status, "degraded", tr("registry_degraded", { state: syncStatus.freshness || "degraded" }));
+    saveRegistrySnapshot();
+    updateRegistryURL();
+  } finally {
+    if (requestID === registryState.requestID) {
+      registryState.abortController = null;
+      byId("registry").setAttribute("aria-busy", "false");
+    }
+  }
   const selected = new URL(location.href).searchParams.get("selected");
   const selectedArtifact = registryState.artifacts.find((record) => record.artifact_ref === selected);
   const selectedWorkItem = registryState.workItems.find((record) => record.work_item_ref === selected);
@@ -265,17 +374,28 @@ async function loadRegistry({ append = false } = {}) {
   else if (selectedWorkItem) showRegistryDetail("work_item", selectedWorkItem);
 }
 
-function connectRegistryEvents() {
+function disconnectRegistryEvents(reason = "paused") {
   registryState.eventSource?.close();
+  registryState.eventSource = null;
+  clearTimeout(registryState.reloadTimer);
+  byId("registry").dataset.backgroundUpdates = reason;
+}
+
+function connectRegistryEvents() {
+  disconnectRegistryEvents(lowMemory ? "paused_lowmem" : "paused");
+  if (lowMemory || navigator.onLine === false || document.hidden || byId("registry").hidden) return;
   const source = new EventSource(`${registryAPI}/events`);
   registryState.eventSource = source;
+  byId("registry").dataset.backgroundUpdates = "live";
   source.addEventListener("registry_revision", (message) => {
     try {
       const event = JSON.parse(message.data);
       const relevant = !event.results?.length || event.results.some((result) => result.project_ref === registryState.project);
       if (relevant) {
         clearTimeout(registryState.reloadTimer);
-        registryState.reloadTimer = setTimeout(() => loadRegistry().catch(showRegistryUnavailable), 150);
+        registryState.reloadTimer = setTimeout(() => {
+          if (!document.hidden && navigator.onLine !== false) loadRegistry().catch(showRegistryUnavailable);
+        }, 150);
       }
     } catch { showRegistryUnavailable(new Error(tr("registry_unavailable"))); }
   });
@@ -286,6 +406,9 @@ function connectRegistryEvents() {
 }
 
 function showRegistryUnavailable(error) {
+  if (error?.name === "AbortError") return;
+  disconnectRegistryEvents(navigator.onLine === false || error?.offline === true ? "paused_offline" : "paused_error");
+  if (restoreRegistrySnapshot()) return;
   byId("registry").dataset.registryState = "unavailable";
   byId("registry").setAttribute("aria-busy", "false");
   text(byId("registry-truth"), error instanceof Error ? error.message : tr("registry_unavailable"));
@@ -303,21 +426,37 @@ async function renderRegistry() {
   byId("registry-query").value = registryState.query;
   byId("registry-status").value = registryState.status;
   byId("registry-type").value = registryState.type;
+  try { registryState.project = url.searchParams.get("project") || localStorage.getItem(registryLastProjectKey()) || ""; } catch { registryState.project = url.searchParams.get("project") || ""; }
+  const select = byId("registry-project");
+  if (navigator.onLine === false) {
+    if (registryState.project) {
+      const option = document.createElement("option");
+      option.value = registryState.project;
+      option.textContent = registryState.project;
+      select.replaceChildren(option);
+      select.value = registryState.project;
+    }
+    if (restoreRegistrySnapshot()) return;
+    throw new Error(tr("registry_unavailable"));
+  }
   const response = await fetchJSON(`${registryAPI}/projects`);
   const projects = response.projects || [];
-  const select = byId("registry-project");
   select.replaceChildren(...projects.map((project) => {
     const option = document.createElement("option");
     option.value = project.project_ref;
     option.textContent = project.display_name;
     return option;
   }));
-  registryState.project = projects.some((project) => project.project_ref === url.searchParams.get("project")) ? url.searchParams.get("project") : (projects[0]?.project_ref || "");
+  registryState.project = projects.some((project) => project.project_ref === registryState.project) ? registryState.project : (projects[0]?.project_ref || "");
   select.value = registryState.project;
   if (!registryState.project) throw new Error(tr("no_public_project"));
   await loadRegistry();
   connectRegistryEvents();
-  requestAnimationFrame(() => scrollTo(0, Number(sessionStorage.getItem("epwa-registry-scroll") || 0)));
+  requestAnimationFrame(() => {
+    const wrap = registryTableWrap();
+    wrap.scrollTop = Number(sessionStorage.getItem(registryScrollKey()) || 0);
+    renderRegistryRows();
+  });
 }
 
 function wireRegistryControls() {
@@ -328,15 +467,57 @@ function wireRegistryControls() {
   byId("registry-status").addEventListener("change", (event) => { registryState.status = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
   byId("registry-type").addEventListener("change", (event) => { registryState.type = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
   byId("registry-more").addEventListener("click", () => loadRegistry({ append: true }).catch(showRegistryUnavailable));
+  registryTableWrap().addEventListener("scroll", () => {
+    sessionStorage.setItem(registryScrollKey(), String(registryTableWrap().scrollTop));
+    if (registryState.scrollFrame) return;
+    registryState.scrollFrame = requestAnimationFrame(() => {
+      registryState.scrollFrame = 0;
+      renderRegistryRows();
+    });
+  }, { passive: true });
+  addEventListener("resize", () => renderRegistryRows(), { passive: true });
   byId("registry-rows").addEventListener("keydown", (event) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    const controls = [...byId("registry-rows").querySelectorAll("button")];
-    const current = controls.indexOf(document.activeElement);
-    controls[Math.max(0, Math.min(controls.length - 1, current + (event.key === "ArrowDown" ? 1 : -1)))]?.focus();
+    const active = document.activeElement;
+    if (!(active instanceof HTMLButtonElement) || !active.classList.contains("registry-record")) return;
+    const current = active.dataset.kind === "artifact"
+      ? registryState.artifacts.findIndex((record) => record.artifact_ref === active.dataset.ref)
+      : registryState.artifacts.length + registryState.workItems.findIndex((record) => record.work_item_ref === active.dataset.ref);
+    const targetIndex = Math.max(0, Math.min(registryRecordCount() - 1, current + (event.key === "ArrowDown" ? 1 : -1)));
+    const target = registryRecordAt(targetIndex);
+    const wrap = registryTableWrap();
+    const targetTop = targetIndex * registryRowHeight;
+    if (targetTop < wrap.scrollTop) wrap.scrollTop = targetTop;
+    else if (targetTop + registryRowHeight > wrap.scrollTop + wrap.clientHeight) wrap.scrollTop = targetTop - wrap.clientHeight + registryRowHeight;
+    renderRegistryRows();
+    [...byId("registry-rows").querySelectorAll("button")].find((button) => button.dataset.kind === target.kind && button.dataset.ref === (target.kind === "artifact" ? target.record.artifact_ref : target.record.work_item_ref))?.focus();
     event.preventDefault();
   });
+  document.addEventListener("visibilitychange", () => {
+    if (byId("registry").hidden) return;
+    if (document.hidden) {
+      registryState.abortController?.abort();
+      disconnectRegistryEvents("paused_hidden");
+    } else if (navigator.onLine !== false) {
+      loadRegistry().then(connectRegistryEvents).catch(showRegistryUnavailable);
+    }
+  });
+  addEventListener("offline", () => {
+    if (byId("registry").hidden) return;
+    registryState.abortController?.abort();
+    disconnectRegistryEvents("paused_offline");
+    const error = new Error(tr("registry_unavailable"));
+    error.offline = true;
+    showRegistryUnavailable(error);
+  });
+  addEventListener("online", () => {
+    if (byId("registry").hidden) return;
+    loadRegistry().then(connectRegistryEvents).catch(showRegistryUnavailable);
+  });
   addEventListener("beforeunload", () => {
-    if (!byId("registry").hidden) sessionStorage.setItem("epwa-registry-scroll", String(scrollY));
+    registryState.abortController?.abort();
+    disconnectRegistryEvents("closed");
+    if (!byId("registry").hidden) sessionStorage.setItem(registryScrollKey(), String(registryTableWrap().scrollTop));
   });
 }
 
@@ -483,7 +664,6 @@ async function renderRecord() {
 }
 
 wireRegistryControls();
-const route = new URL(location.href);
 const defaultView = document.body.dataset.defaultView || "registry";
 if (route.searchParams.get("artifact")) {
   byId("registry").hidden = true;
