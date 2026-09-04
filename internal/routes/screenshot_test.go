@@ -39,7 +39,25 @@ func TestScreenshotAutomaticallyReturnsHumanViewableEvidenceShare(t *testing.T) 
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
 	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil) })
-	request := httptest.NewRequest(http.MethodPost, "https://engine.example/api/screenshot/", bytes.NewBufferString(`{"url":"https://focusa.dev/","width":375,"height":812,"format":"png","focusa_scope":{"workpoint_id":"workpoint:homepage","continuity_id":"focusa-dev-homepage-main"},"evidence_scope":{"project_ref":"project:focusa","workstream_ref":"workstream:epwa","workset_ref":"workset:t08","callgraph_ref":"callgraph:133","workpoint_ref":"workpoint:t08b","work_item_ref":"work-item:screenshot-share","continuity_ref":"epwa-t08b"}}`))
+	requestBody, err := json.Marshal(map[string]any{
+		"url": "https://focusa.dev/", "width": 375, "height": 812, "format": "png",
+		"focusa_scope": map[string]string{"workpoint_id": "workpoint:homepage", "continuity_id": "focusa-dev-homepage-main"},
+		"evidence_scope": evidenceshare.Scope{
+			ProjectRef: "project:focusa", WorkstreamRef: "workstream:epwa", WorksetRef: "workset:t08",
+			CallGraphRef: "callgraph:133", WorkpointRef: "workpoint:t08b", WorkItemRef: "work-item:screenshot-share",
+			WorkItems: []evidencepwa.WorkItemProjection{{
+				ProviderSurface: "github", WorkItemRef: "work-item:screenshot-share", ItemID: "153", ItemType: "task",
+				Title: "Bind screenshot shares", Description: "Project the exact evidence work item.", DescriptionState: evidencepwa.WorkItemDescriptionVisible,
+				Revision: "revision:1", Digest: strings.Repeat("d", 64), RevisionState: evidencepwa.WorkItemRevisionCurrent,
+				StatusAtCapture: "in_progress", ClosurePosture: "evidence_pending",
+			}},
+			ContinuityRef: "epwa-t08b",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "https://engine.example/api/screenshot/", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)

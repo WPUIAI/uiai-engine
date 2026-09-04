@@ -1,22 +1,35 @@
 package evidenceshare
 
-import "time"
+import (
+	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
+)
 
 const Schema = "uiai.screenshot_evidence_share.v1"
 
 type Scope struct {
-	ProjectRef    string `json:"project_ref,omitempty"`
-	WorkstreamRef string `json:"workstream_ref,omitempty"`
-	WorksetRef    string `json:"workset_ref,omitempty"`
-	CallGraphRef  string `json:"callgraph_ref,omitempty"`
-	WorkpointRef  string `json:"workpoint_ref,omitempty"`
-	WorkItemRef   string `json:"work_item_ref,omitempty"`
-	ContinuityRef string `json:"continuity_ref,omitempty"`
+	ProjectRef    string                           `json:"project_ref,omitempty"`
+	WorkstreamRef string                           `json:"workstream_ref,omitempty"`
+	WorksetRef    string                           `json:"workset_ref,omitempty"`
+	CallGraphRef  string                           `json:"callgraph_ref,omitempty"`
+	WorkpointRef  string                           `json:"workpoint_ref,omitempty"`
+	WorkItemRef   string                           `json:"work_item_ref,omitempty"`
+	WorkItems     []evidencepwa.WorkItemProjection `json:"work_items,omitempty"`
+	ContinuityRef string                           `json:"continuity_ref,omitempty"`
 }
 
 func (s Scope) Complete() bool {
-	return s.ProjectRef != "" && s.WorkstreamRef != "" && s.WorksetRef != "" &&
-		s.CallGraphRef != "" && s.WorkpointRef != "" && s.WorkItemRef != ""
+	if s.ProjectRef == "" || s.WorkstreamRef == "" || s.WorksetRef == "" ||
+		s.CallGraphRef == "" || s.WorkpointRef == "" || s.WorkItemRef == "" || len(s.WorkItems) == 0 {
+		return false
+	}
+	for _, item := range s.WorkItems {
+		if item.WorkItemRef == s.WorkItemRef {
+			return true
+		}
+	}
+	return false
 }
 
 type Input struct {

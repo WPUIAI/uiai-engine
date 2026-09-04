@@ -102,17 +102,6 @@ function renderTimeline(entries) {
   events.replaceChildren(...rows);
 }
 
-function renderLineage(scope) {
-  byId("lineage-list").replaceChildren(
-    lineageItem("Project", scope.project_ref),
-    lineageItem("Workstream", scope.workstream_ref),
-    lineageItem("Workset", scope.workset_ref),
-    lineageItem("CallGraph", scope.callgraph_ref),
-    lineageItem("Workpoint", scope.workpoint_ref),
-    lineageItem("Work Item", scope.work_item_ref),
-  );
-}
-
 const queryString = (values) => {
   const params = new URLSearchParams();
   Object.entries(values).forEach(([key, value]) => { if (value) params.set(key, String(value)); });
@@ -338,7 +327,7 @@ async function renderPublicRecord() {
     if (detail.schema !== "uiai.public_evidence_artifact_detail.v1" || detail.artifact_id !== artifactRef || detail.revision !== revision || manifest?.artifact_id !== artifactRef || manifest?.revision !== revision) throw new Error("Artifact detail contract is invalid");
     if (!validSHA256(detail.manifest_sha256) || manifest.integrity?.manifest_sha256 !== detail.manifest_sha256) throw new Error("Artifact integrity binding is corrupt");
     const scope = manifest.scope || {};
-    const flatScope = { project_ref: scope.project?.project_ref, workstream_ref: scope.workstream?.workstream_ref, workset_ref: scope.workset?.workset_ref, callgraph_ref: scope.callgraph?.frame_ref || scope.callgraph?.run_ref, workpoint_ref: scope.workpoint?.workpoint_ref, work_item_ref: scope.work_items?.[0]?.work_item_ref };
+    const flatScope = { project_ref: scope.project?.project_ref, workstream_ref: scope.workstream?.workstream_ref, workset_ref: scope.workset?.workset_ref, callgraph_ref: scope.callgraph?.frame_ref || scope.callgraph?.run_ref, workpoint_ref: scope.workpoint?.workpoint_ref, work_item_ref: scope.work_items?.[0]?.work_item_ref, work_items: scope.work_items };
     text(byId("title"), manifest.title || "Evidence record"); text(byId("truth"), manifest.summary || "Bound immutable evidence artifact.");
     text(byId("record-id"), artifactRef); text(byId("record-revision"), revision); renderLineage(flatScope);
     const assets = Array.isArray(detail.assets) ? detail.assets : [];
@@ -356,7 +345,7 @@ async function renderPublicRecord() {
     setValidity("settlement", "Not asserted by this artifact", "not_determined"); setValidity("legal", "Not determined", "not_determined");
     byId("facts").replaceChildren(fact("Captured", formatTime(manifest.captured_at)), fact("Created", formatTime(manifest.created_at)), fact("Evidence assets", assets.length), fact("Claims", claimCount), fact("Access", manifest.policy?.access_class), fact("Redaction", manifest.policy?.redaction_state), fact("Authority posture", manifest.authority?.posture), fact("Retention", manifest.policy?.retention_class));
     renderTimeline((manifest.provenance?.custody || []).map((event) => ({ event_type: event.action, occurred_at: event.occurred_at, refs: [...(event.input_refs || []), ...(event.output_refs || [])] })));
-    byId("inspect-grid").replaceChildren(datum("Artifact", artifactRef), datum("Revision", revision), datum("Manifest SHA-256", detail.manifest_sha256), datum("Bundle SHA-256", manifest.integrity?.bundle_sha256), datum("Project", flatScope.project_ref), datum("Workstream", flatScope.workstream_ref), datum("Workset", flatScope.workset_ref), datum("CallGraph", flatScope.callgraph_ref), datum("Workpoint", flatScope.workpoint_ref), datum("Work Item", flatScope.work_item_ref), datum("Evidence authority", manifest.authority?.evidence_authority_ref), datum("Completion authority", manifest.authority?.completion_authority_ref), datum("Verification", manifest.verification?.status), datum("Redaction", manifest.policy?.redaction_state));
+    byId("inspect-grid").replaceChildren(datum("Artifact", artifactRef), datum("Revision", revision), datum("Manifest SHA-256", detail.manifest_sha256), datum("Bundle SHA-256", manifest.integrity?.bundle_sha256), datum("Project", flatScope.project_ref), datum("Workstream", flatScope.workstream_ref), datum("Workset", flatScope.workset_ref), datum("CallGraph", flatScope.callgraph_ref), datum("Workpoint", flatScope.workpoint_ref), ...workItemInspectData(flatScope), datum("Evidence authority", manifest.authority?.evidence_authority_ref), datum("Completion authority", manifest.authority?.completion_authority_ref), datum("Verification", manifest.verification?.status), datum("Redaction", manifest.policy?.redaction_state));
     byId("detail-json-link").href = base; byId("manifest-json-link").href = detail.manifest_path || `${base}/manifest`; byId("inspection-json-link").hidden = true;
     text(byId("limitations-copy"), "This immutable artifact is a bounded evidence input. Its existence does not independently establish completeness, review acceptance, task completion, provider closure, settlement, or legal admissibility.");
     setStatus(status, "ready", "Read-only artifact loaded");
@@ -402,7 +391,7 @@ async function renderRecord() {
     text(byId("truth"), projection.summary);
     text(byId("record-id"), projection.artifact.artifact_ref);
     text(byId("record-revision"), projection.artifact.revision);
-    renderLineage(projection.artifact.scope);
+    renderLineage({ ...projection.artifact.scope, work_items: projection.work_items });
 
     const image = byId("screenshot");
     image.src = source;
@@ -436,7 +425,7 @@ async function renderRecord() {
     text(byId("limitations-copy"), "This is one bounded visual observation with digest and inspection bindings. It does not independently establish completeness, absence of contrary evidence, review acceptance, task completion, provider closure, settlement, or legal admissibility. Legal use depends on jurisdiction, authentication, relevance, custody, applicable evidentiary rules, and independent challenge.");
     renderTimeline(projection.timeline);
 
-    const scope = projection.artifact.scope;
+    const scope = { ...projection.artifact.scope, work_items: projection.work_items };
     byId("inspect-grid").replaceChildren(
       datum("Artifact", projection.artifact.artifact_ref),
       datum("Revision", projection.artifact.revision),
@@ -449,7 +438,7 @@ async function renderRecord() {
       datum("Workset", scope.workset_ref),
       datum("CallGraph", scope.callgraph_ref),
       datum("Workpoint", scope.workpoint_ref),
-      datum("Work Item", scope.work_item_ref),
+      ...workItemInspectData(scope),
       datum("Provenance posture", projection.federation_posture),
       datum("Redaction", projection.redaction.state),
     );

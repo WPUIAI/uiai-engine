@@ -51,6 +51,9 @@ func ValidateProjection(projection Projection) error {
 	if err := validateArtifact(projection.Artifact); err != nil {
 		return err
 	}
+	if err := validateWorkItemScope(projection.Artifact.Scope, projection.WorkItems); err != nil {
+		return err
+	}
 	if !validAvailability(projection.Availability) {
 		return ErrAvailabilityInvalid
 	}
