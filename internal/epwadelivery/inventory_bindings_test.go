@@ -55,6 +55,8 @@ func TestConsumerAdaptersRequireReadyEPWA(t *testing.T) {
 		{consumer: "CLI", file: "../../scripts/uiai", tokens: []string{"uiai.epwa_delivery.v1", "artifact delivery is not a ready, identity-bound HTTPS EPWA result"}},
 		{consumer: "CLI selected-result workflow", file: "../../scripts/uiai-open-result.sh", tokens: []string{"require_delivery", "UIAI_EVIDENCE_SCOPE_JSON"}},
 		{consumer: "FPV visual smoke", file: "../../scripts/smoke-fpv-visual-breakpoints.sh", tokens: []string{"require_epwa", "portable_url"}},
+		{consumer: "Focusa packet smoke", file: "../../scripts/smoke-focusa-packet.sh", tokens: []string{"require_delivery", "uiai.epwa_delivery.v1"}},
+		{consumer: "browser diagnostics stress", file: "../../scripts/stress-browser-diagnostics.sh", tokens: []string{"require_delivery", "UIAI_EVIDENCE_SCOPE_JSON", "UIAI_EPWA_PUBLIC_BASE_URL"}},
 		{consumer: "browser soak", file: "../../scripts/soak-browser-flakiness.sh", tokens: []string{"require_delivery", "UIAI_EPWA_PUBLIC_BASE_URL"}},
 		{consumer: "deployment browser smoke", file: "../../scripts/deploy-engine-ovh.sh", tokens: []string{"epwa_delivery_ready", "REMOTE_EVIDENCE_SCOPE_JSON"}},
 	}

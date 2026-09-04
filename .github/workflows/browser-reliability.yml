@@ -21,9 +21,6 @@ jobs:
     timeout-minutes: 15
     env:
       OUT_DIR: /tmp/uiai-browser-reliability
-      # Contract fixture only; customer delivery proof must use its audited public HTTPS origin.
-      UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
-      UIAI_EVIDENCE_SCOPE_JSON: '{"project_ref":"project:uiai-engine-ci","project_root":"/home/wpuiai/uiai-engine","workstream_ref":"workstream:browser-reliability","workset_ref":"workset:browser-reliability","callgraph_ref":"callgraph:browser-reliability","workpoint_id":"workpoint:browser-reliability","work_item_ref":"work-item:browser-reliability","continuity_id":"continuity:browser-reliability","evidence_ref":"uiai-browser-reliability-ci","work_items":[{"work_item_ref":"work-item:browser-reliability","status":"in_progress"}]}'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -50,14 +47,25 @@ jobs:
       - name: Tool parity check
         run: scripts/check-tool-parity.sh
       - name: Focusa packet endpoint smoke
+        env:
+          # Contract fixture only; customer delivery proof must use its audited public HTTPS origin.
+          UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
         run: |
           mkdir -p "$OUT_DIR"
           OUT="$OUT_DIR/focusa-packet-smoke.json" scripts/smoke-focusa-packet-ci.sh
       - name: Diagnostics stress 40/40
+        env:
+          # Contract fixtures are scoped to this isolated source test only.
+          UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
+          UIAI_EVIDENCE_SCOPE_JSON: '{"project_ref":"project:uiai-engine-ci","project_root":"/home/wpuiai/uiai-engine","workstream_ref":"workstream:browser-reliability","workset_ref":"workset:browser-reliability","callgraph_ref":"callgraph:browser-reliability","workpoint_id":"workpoint:browser-reliability","work_item_ref":"work-item:browser-reliability","continuity_id":"continuity:browser-reliability","evidence_ref":"uiai-browser-reliability-ci","work_items":[{"work_item_ref":"work-item:browser-reliability","status":"in_progress"}]}'
         run: |
           mkdir -p "$OUT_DIR"
           SESSIONS=4 ROUNDS=10 OUT="$OUT_DIR/diagnostics-4x10.json" scripts/stress-browser-diagnostics.sh
       - name: Mixed browser soak
+        env:
+          # Contract fixtures are scoped to this isolated source test only.
+          UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
+          UIAI_EVIDENCE_SCOPE_JSON: '{"project_ref":"project:uiai-engine-ci","project_root":"/home/wpuiai/uiai-engine","workstream_ref":"workstream:browser-reliability","workset_ref":"workset:browser-reliability","callgraph_ref":"callgraph:browser-reliability","workpoint_id":"workpoint:browser-reliability","work_item_ref":"work-item:browser-reliability","continuity_id":"continuity:browser-reliability","evidence_ref":"uiai-browser-reliability-ci","work_items":[{"work_item_ref":"work-item:browser-reliability","status":"in_progress"}]}'
         run: |
           mkdir -p "$OUT_DIR"
           SOAK="${{ github.event.inputs.soak_seconds || 30 }}"
