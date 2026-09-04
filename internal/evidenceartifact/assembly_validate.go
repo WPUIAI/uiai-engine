@@ -16,6 +16,9 @@ func validateCaptureManifest(manifest Manifest) error {
 			return ErrRuntimeAmbiguous
 		}
 	}
+	if err := validateCaptureAnnotations(manifest, capture.Annotations, capture.Observations); err != nil {
+		return err
+	}
 	return validateAssemblyCoverage(manifest, capture.Observations, capture.Viewports, capture.Requirements, capture.Omissions, capture.WindowComplete)
 }
 
