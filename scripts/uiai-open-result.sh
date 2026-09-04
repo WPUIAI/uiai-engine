@@ -30,9 +30,17 @@ timeout=float(timeout); index=int(index); read_page=read_page=='1'; max_chars=in
 headers={}
 if api_key: headers['X-API-Key']=api_key
 elif bearer: headers['Authorization']='Bearer '+bearer
+def fail(error_class, message, code=2):
+    print(json.dumps({'ok':False,'error_class':error_class,'message':message}, indent=2))
+    raise SystemExit(code)
 if not scope_json:
-    print(json.dumps({'ok':False,'error_class':'complete_evidence_scope_required','message':'Set UIAI_EVIDENCE_SCOPE_JSON before artifact-producing CLI operations.'}, indent=2)); raise SystemExit(2)
-scope=json.loads(scope_json)
+    fail('complete_evidence_scope_required', 'Set UIAI_EVIDENCE_SCOPE_JSON before artifact-producing CLI operations.')
+try:
+    scope=json.loads(scope_json)
+except json.JSONDecodeError as error:
+    fail('invalid_evidence_scope', f'UIAI_EVIDENCE_SCOPE_JSON must be valid JSON: {error.msg}')
+if not isinstance(scope, dict):
+    fail('invalid_evidence_scope', 'UIAI_EVIDENCE_SCOPE_JSON must encode a JSON object.')
 for header, keys in {
     'X-UIAI-Project-Ref':['project_ref','project_root'], 'X-UIAI-Workstream-Ref':['workstream_ref'],
     'X-UIAI-Workset-Ref':['workset_ref'], 'X-UIAI-CallGraph-Ref':['callgraph_ref'],
@@ -48,12 +56,25 @@ def req(method,path,payload=None):
         data=json.dumps(payload).encode(); h['Content-Type']='application/json'
     r=urllib.request.Request(engine+path, data=data, headers=h, method=method)
     with urllib.request.urlopen(r, timeout=timeout) as res: return json.load(res)
-def require_delivery(body, operation):
+def find_raw_artifact(value, path='$'):
     forbidden={'screenshot','imageBase64','image_base64','artifact_path','result_path','result_url'}
-    leaked=forbidden.intersection(body)
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path=f'{path}.{key}'
+            if key in forbidden and child not in (None, ''): return child_path
+            found=find_raw_artifact(child, child_path)
+            if found: return found
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found=find_raw_artifact(child, f'{path}[{index}]')
+            if found: return found
+    return ''
+def require_delivery(body, operation):
+    if not isinstance(body, dict): raise SystemExit(f'{operation}: response must be a JSON object')
+    leaked=find_raw_artifact(body)
     delivery=body.get('epwa_delivery') or {}
     epwa=delivery.get('epwa') or {}
-    if leaked: raise SystemExit(f'{operation}: forbidden raw artifact fields: {sorted(leaked)}')
+    if leaked: raise SystemExit(f'{operation}: forbidden raw artifact field: {leaked}')
     if delivery.get('schema')!='uiai.epwa_delivery.v1' or delivery.get('state')!=body.get('delivery_state') or (delivery.get('artifact') or {}).get('artifact_ref')!=body.get('artifact_ref'):
         raise SystemExit(f'{operation}: invalid EPWA delivery binding')
     if delivery.get('state')!='ready': raise SystemExit(f"{operation}: EPWA delivery not ready ({delivery.get('recovery_ref') or 'no recovery ref'})")

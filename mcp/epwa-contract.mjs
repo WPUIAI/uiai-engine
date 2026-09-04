@@ -13,6 +13,8 @@ const RAW_ARTIFACT_FIELDS = new Set([
   "imageBase64",
   "image_base64",
   "artifact_path",
+  "result_path",
+  "result_url",
   "screenshot_path",
   "inline_bytes",
 ]);

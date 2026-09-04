@@ -34,5 +34,7 @@ test("findRawArtifactField rejects nested legacy screenshot and path fields", ()
   assert.equal(findRawArtifactField({ delivery_state: "ready", epwa_delivery: {} }), "");
   assert.equal(findRawArtifactField({ session: { screenshot: "base64-data" } }), "$.session.screenshot");
   assert.equal(findRawArtifactField({ results: [{ artifact_path: "/tmp/report.json" }] }), "$.results[0].artifact_path");
+  assert.equal(findRawArtifactField({ results: [{ delivery: { result_path: "/tmp/report.json" } }] }), "$.results[0].delivery.result_path");
+  assert.equal(findRawArtifactField({ result: { result_url: "http://localhost/raw" } }), "$.result.result_url");
   assert.equal(findRawArtifactField({ imageBase64: "bytes" }), "$.imageBase64");
 });

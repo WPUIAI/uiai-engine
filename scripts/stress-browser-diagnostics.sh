@@ -20,6 +20,7 @@ ENGINE_BIN="${ENGINE_BIN:-/tmp/uiai-engine-diag-stress}"
 command -v jq >/dev/null || { echo "jq is required" >&2; exit 2; }
 jq -e 'type == "object"' >/dev/null <<<"$UIAI_EVIDENCE_SCOPE_JSON" || { echo "UIAI_EVIDENCE_SCOPE_JSON must be a JSON object" >&2; exit 2; }
 [[ "$UIAI_EPWA_PUBLIC_BASE_URL" == https://* ]] || { echo "UIAI_EPWA_PUBLIC_BASE_URL must use HTTPS" >&2; exit 2; }
+export UIAI_EVIDENCE_SCOPE_JSON UIAI_EPWA_PUBLIC_BASE_URL
 
 cd "$ROOT_DIR"
 

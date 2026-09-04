@@ -46,6 +46,10 @@ jobs:
         run: scripts/check-docs-completeness.py
       - name: Tool parity check
         run: scripts/check-tool-parity.sh
+      - name: MCP and CLI EPWA contract checks
+        run: |
+          node --test mcp/epwa-contract.test.mjs
+          scripts/test-uiai-open-result-contract.sh
       - name: Focusa packet endpoint smoke
         env:
           # Contract fixture only; customer delivery proof must use its audited public HTTPS origin.
