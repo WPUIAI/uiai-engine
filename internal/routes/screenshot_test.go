@@ -100,7 +100,7 @@ func TestEvidenceShareRouteServesPortablePackage(t *testing.T) {
 	id := filepath.Base(filepath.Clean(share.Directory))
 	router := chi.NewRouter()
 	mountEvidenceShare(router, cfg)
-	for path, mime := range map[string]string{"/share/" + id + "/": "text/html", "/share/" + id + "/styles.css": "text/css", "/share/" + id + "/app.js": "application/javascript", "/share/" + id + "/artifact.json": "application/json", "/share/" + id + "/inspection.json": "application/json", "/share/" + id + "/screenshot.png": "image/png"} {
+	for path, mime := range map[string]string{"/share/" + id + "/": "text/html", "/share/" + id + "/styles.css": "text/css", "/share/" + id + "/work-items.js": "application/javascript", "/share/" + id + "/app.js": "application/javascript", "/share/" + id + "/artifact.json": "application/json", "/share/" + id + "/inspection.json": "application/json", "/share/" + id + "/screenshot.png": "image/png"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, req)
