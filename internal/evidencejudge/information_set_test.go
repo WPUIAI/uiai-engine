@@ -86,6 +86,7 @@ func TestInformationSetOmissionsAndRequiredSources(t *testing.T) {
 			request.Sources = []SourceSelection{{SourceRef: "source:absent", AtomRefs: []string{"atom:types"}}}
 		}, OmissionMissing},
 		{"redacted", func(manifest *evidenceartifact.Manifest, request *InformationSelectionRequest) {
+			manifest.Policy.RedactionState = evidenceartifact.RedactionRedacted
 			manifest.Assets[0].RedactionState = evidenceartifact.RedactionRedacted
 			request.Sources = []SourceSelection{{SourceRef: "asset:proof", AtomRefs: []string{"atom:types"}}}
 		}, OmissionRedacted},
