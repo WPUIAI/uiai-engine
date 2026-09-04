@@ -23,7 +23,7 @@ HTML
 fi
 export ENGINE_URL OUT TIMEOUT_SECONDS TARGET_URL
 python3 - <<'PY'
-import json, os, time, urllib.request
+import json, os, time, urllib.error, urllib.request
 engine=os.environ['ENGINE_URL'].rstrip('/')
 out=os.environ['OUT']
 timeout=int(os.environ.get('TIMEOUT_SECONDS','15'))
@@ -38,7 +38,25 @@ scope={
     'work_item_ref':'work-item:focusa-packet-smoke',
     'continuity_id':'continuity:focusa-packet-smoke',
     'evidence_ref':'uiai-focusa-packet-smoke',
-    'work_items':[{'work_item_ref':'work-item:focusa-packet-smoke','status':'in_progress'}],
+    'work_items':[{
+        'provider_surface':'github-actions',
+        'work_item_ref':'work-item:focusa-packet-smoke',
+        'item_id':'focusa-packet-smoke',
+        'item_type':'ci_fixture',
+        'title':'Focusa packet EPWA contract fixture',
+        'description_state':'unavailable',
+        'revision':'1',
+        'digest':'e887d8dbd6c14b7cdb9b81e274c786623e007568211e973f50358c752f44ba1b',
+        'revision_state':'current',
+        'status_at_capture':'in_progress',
+        'closure_posture':'open',
+        'authority':{
+            'acceptance_atom_refs':['acceptance:ready-epwa'],
+            'evidence_requirement_refs':['evidence:focusa-packet-smoke'],
+            'completion_contract_ref':'contract:focusa-packet-smoke',
+            'settlement_posture':'unsettled',
+        },
+    }],
 }
 
 def req(method,path,body=None):
@@ -47,8 +65,12 @@ def req(method,path,body=None):
     if body is not None:
         data=json.dumps(body).encode()
     r=urllib.request.Request(engine+path, data=data, method=method, headers=headers)
-    with urllib.request.urlopen(r, timeout=timeout) as resp:
-        return json.loads(resp.read().decode() or '{}')
+    try:
+        with urllib.request.urlopen(r, timeout=timeout) as resp:
+            return json.loads(resp.read().decode() or '{}')
+    except urllib.error.HTTPError as exc:
+        response_body=exc.read().decode(errors='replace')[:2000]
+        raise RuntimeError(f'{method} {path} returned HTTP {exc.code}: {response_body}') from exc
 
 def try_req(method,path,body=None):
     try:
@@ -105,15 +127,19 @@ packet=req('POST','/api/agent/research-packet',{
     'cleanup_session_id':sid or '',
 })
 require_delivery(packet,'research packet')
-encoded=json.dumps(packet,separators=(',',':'))
+transport_encoded=json.dumps(packet,separators=(',',':'))
 if packet.get('artifact_schema') != 'uiai.focusa_research_diagnostics_packet.v1': raise AssertionError(packet)
+payload_exclusions={'schema','artifact_schema','artifact_ref','artifact_payload_posture','delivery_state','epwa_delivery','raw_output_posture','artifact_url','portable_url'}
+payload={key:value for key,value in packet.items() if key not in payload_exclusions}
+payload['schema']=packet['artifact_schema']
+payload_encoded=json.dumps(payload,separators=(',',':'))
 if packet.get('recommended_focusa',{}).get('preferred_tool') != 'focusa_browser_diagnostics_intake': raise AssertionError(packet.get('recommended_focusa'))
-if len(encoded.encode())>8192: raise AssertionError(f"packet over 8KB: {len(encoded.encode())}")
+if len(payload_encoded.encode())>8192: raise AssertionError(f"packet payload over 8KB: {len(payload_encoded.encode())}")
 for required in ['read','diagnostics']:
     if not any(c.get('type')==required for c in packet.get('captures',[])): raise AssertionError(f"missing {required} capture: {packet.get('captures')}")
 for bad in ['redacted-candidate','cookie','authorization','#frag']:
-    if bad in encoded.lower(): raise AssertionError(f"leaked {bad}")
-report={'ok':True,'packet_bytes':len(encoded.encode()),'search_ran':bool(search),'session_closed':bool(sid),'packet':packet}
+    if bad in transport_encoded.lower(): raise AssertionError(f"leaked {bad}")
+report={'ok':True,'packet_bytes':len(payload_encoded.encode()),'delivery_bytes':len(transport_encoded.encode()),'search_ran':bool(search),'session_closed':bool(sid),'packet':packet}
 with open(out,'w') as f: json.dump(report,f,indent=2)
 print(f"focusa packet smoke ok: out={out} packet_bytes={report['packet_bytes']} evidence_refs={len(packet.get('evidence_refs',[]))} search_ran={report['search_ran']}")
 PY

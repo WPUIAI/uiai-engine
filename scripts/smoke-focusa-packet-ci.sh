@@ -46,6 +46,7 @@ if ! curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null; then
   exit 7
 fi
 mkdir -p "$(dirname "$OUT")"
+printf '{}\n' >"$OUT"
 ENGINE_URL="http://127.0.0.1:$ENGINE_PORT" OUT="$OUT" "$SCRIPT_DIR/smoke-focusa-packet.sh"
 python3 - "$OUT" <<'PY'
 import json, sys
