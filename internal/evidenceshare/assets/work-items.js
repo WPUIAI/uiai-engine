@@ -7,12 +7,12 @@ function normalizeWorkItem(item) {
     review_requirement_refs: item.review_requirement_refs,
   };
   const descriptionState = item.description_state || (item.description ? "visible" : item.description_ref ? "redacted" : "unavailable");
-  return { ...item, authority, description_state: descriptionState, revision_state: item.revision_state || "captured" };
+  return { ...item, authority, description_state: descriptionState, revision_state: item.revision_state || "unknown" };
 }
 
 function scopeWorkItems(scope) {
   if (Array.isArray(scope?.work_items) && scope.work_items.length > 0) return scope.work_items.map(normalizeWorkItem);
-  return scope?.work_item_ref ? [normalizeWorkItem({ work_item_ref: scope.work_item_ref, item_type: "work_item", revision_state: "legacy" })] : [];
+  return scope?.work_item_ref ? [normalizeWorkItem({ work_item_ref: scope.work_item_ref, item_type: "work_item", revision_state: "unknown" })] : [];
 }
 
 function workItemSummary(item) {

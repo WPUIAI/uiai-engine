@@ -391,7 +391,7 @@ async function renderRecord() {
     text(byId("truth"), projection.summary);
     text(byId("record-id"), projection.artifact.artifact_ref);
     text(byId("record-revision"), projection.artifact.revision);
-    renderLineage(projection.artifact.scope);
+    renderLineage({ ...projection.artifact.scope, work_items: projection.work_items });
 
     const image = byId("screenshot");
     image.src = source;
@@ -425,7 +425,7 @@ async function renderRecord() {
     text(byId("limitations-copy"), "This is one bounded visual observation with digest and inspection bindings. It does not independently establish completeness, absence of contrary evidence, review acceptance, task completion, provider closure, settlement, or legal admissibility. Legal use depends on jurisdiction, authentication, relevance, custody, applicable evidentiary rules, and independent challenge.");
     renderTimeline(projection.timeline);
 
-    const scope = projection.artifact.scope;
+    const scope = { ...projection.artifact.scope, work_items: projection.work_items };
     byId("inspect-grid").replaceChildren(
       datum("Artifact", projection.artifact.artifact_ref),
       datum("Revision", projection.artifact.revision),

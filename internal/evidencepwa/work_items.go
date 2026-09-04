@@ -120,14 +120,14 @@ func ProjectWorkItems(bindings []evidenceartifact.WorkItemBinding, policies []Wo
 	return projected, nil
 }
 
-func validateWorkItemScope(scope ScopeBinding) error {
-	if len(scope.WorkItems) == 0 {
+func validateWorkItemScope(scope ScopeBinding, items []WorkItemProjection) error {
+	if len(items) == 0 {
 		return nil
 	}
-	if err := validateWorkItemProjections(scope.WorkItems); err != nil {
+	if err := validateWorkItemProjections(items); err != nil {
 		return err
 	}
-	for _, item := range scope.WorkItems {
+	for _, item := range items {
 		if item.WorkItemRef == scope.WorkItemRef {
 			return nil
 		}
@@ -172,14 +172,14 @@ func validWorkItemDescription(item WorkItemProjection) bool {
 	switch item.DescriptionState {
 	case WorkItemDescriptionVisible:
 		if !validWorkItemText(item.Description, MaxSummaryRunes) ||
-			!validOptionalRefDigest(item.DescriptionRef, item.DescriptionSHA256) {
+			(item.DescriptionRef != "" && !validWorkItemRef(item.DescriptionRef)) {
 			return false
 		}
 		if item.DescriptionSHA256 == "" {
 			return true
 		}
 		digest := sha256.Sum256([]byte(item.Description))
-		return hex.EncodeToString(digest[:]) == item.DescriptionSHA256
+		return validSHA256(item.DescriptionSHA256) && hex.EncodeToString(digest[:]) == item.DescriptionSHA256
 	case WorkItemDescriptionRedacted:
 		return item.Description == "" && validWorkItemRef(item.DescriptionRef) && validSHA256(item.DescriptionSHA256)
 	case WorkItemDescriptionUnavailable, WorkItemDescriptionBlocked:

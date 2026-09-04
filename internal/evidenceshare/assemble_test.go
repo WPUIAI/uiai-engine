@@ -85,7 +85,7 @@ func TestAssembleProjectsAllCanonicalWorkItems(t *testing.T) {
 	if err := json.Unmarshal(body, &projection); err != nil {
 		t.Fatal(err)
 	}
-	items := projection.Artifact.Scope.WorkItems
+	items := projection.WorkItems
 	if len(items) != 2 || items[0].WorkItemRef != "work-item:task" || items[1].WorkItemRef != "work-item:epic" {
 		t.Fatalf("canonical work items missing or reordered: %+v", items)
 	}
@@ -98,6 +98,17 @@ func TestAssembleProjectsAllCanonicalWorkItems(t *testing.T) {
 func TestAssembleIncompleteScopeIsExplicitlyBlocked(t *testing.T) {
 	input := validInput()
 	input.Scope = Scope{WorkpointRef: "workpoint:homepage"}
+	assertBlockedShare(t, input)
+}
+
+func TestAssembleOpaqueWorkItemScopeIsExplicitlyBlocked(t *testing.T) {
+	input := validInput()
+	input.Scope.WorkItems = nil
+	assertBlockedShare(t, input)
+}
+
+func assertBlockedShare(t *testing.T, input Input) {
+	t.Helper()
 	result, err := Assemble(t.TempDir(), input)
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +249,17 @@ func validInput() Input {
 	return Input{Screenshot: append([]byte("\x89PNG\r\n\x1a\n"), []byte("bounded-pixel-data")...), Format: "png", Width: 1440, Height: 900, SourceURL: "https://user:secret@example.com/path?token=secret#private", CapturedAt: time.Date(2026, 8, 30, 1, 2, 3, 0, time.UTC), DurationMS: 87, Scope: completeScope()}
 }
 func completeScope() Scope {
-	return Scope{ProjectRef: "project:focusa", WorkstreamRef: "workstream:epwa", WorksetRef: "workset:t08", CallGraphRef: "callgraph:133", WorkpointRef: "workpoint:t08b", WorkItemRef: "work-item:screenshot-share", ContinuityRef: "epwa-t08b"}
+	return Scope{
+		ProjectRef: "project:focusa", WorkstreamRef: "workstream:epwa", WorksetRef: "workset:t08",
+		CallGraphRef: "callgraph:133", WorkpointRef: "workpoint:t08b", WorkItemRef: "work-item:screenshot-share",
+		WorkItems: []evidencepwa.WorkItemProjection{{
+			ProviderSurface: "github", WorkItemRef: "work-item:screenshot-share", ItemID: "153", ItemType: "task",
+			Title: "Bind screenshot shares", Description: "Project the exact evidence work item.", DescriptionState: evidencepwa.WorkItemDescriptionVisible,
+			Revision: "revision:1", Digest: strings.Repeat("d", 64), RevisionState: evidencepwa.WorkItemRevisionCurrent,
+			StatusAtCapture: "in_progress", ClosurePosture: "evidence_pending",
+		}},
+		ContinuityRef: "epwa-t08b",
+	}
 }
 func assemble(t *testing.T, input Input) error {
 	t.Helper()

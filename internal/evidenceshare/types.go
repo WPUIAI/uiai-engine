@@ -21,11 +21,8 @@ type Scope struct {
 
 func (s Scope) Complete() bool {
 	if s.ProjectRef == "" || s.WorkstreamRef == "" || s.WorksetRef == "" ||
-		s.CallGraphRef == "" || s.WorkpointRef == "" || s.WorkItemRef == "" {
+		s.CallGraphRef == "" || s.WorkpointRef == "" || s.WorkItemRef == "" || len(s.WorkItems) == 0 {
 		return false
-	}
-	if len(s.WorkItems) == 0 {
-		return true
 	}
 	for _, item := range s.WorkItems {
 		if item.WorkItemRef == s.WorkItemRef {

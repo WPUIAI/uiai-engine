@@ -1,6 +1,8 @@
 package evidencepwa
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -58,7 +60,7 @@ func TestProjectionAcceptsRichWorkItemsWithoutBreakingLegacyReader(t *testing.T)
 		t.Fatal(err)
 	}
 	projection.Artifact.Scope.WorkItemRef = items[0].WorkItemRef
-	projection.Artifact.Scope.WorkItems = items
+	projection.WorkItems = items
 	if err := ValidateProjection(projection); err != nil {
 		t.Fatal(err)
 	}
@@ -84,6 +86,22 @@ func TestProjectionAcceptsRichWorkItemsWithoutBreakingLegacyReader(t *testing.T)
 	legacyProjection := validProjection()
 	if err := ValidateProjection(legacyProjection); err != nil {
 		t.Fatalf("legacy projection rejected: %v", err)
+	}
+}
+
+func TestVisibleDescriptionAcceptsCanonicalInlineDigestWithoutRef(t *testing.T) {
+	bindings := testWorkItemBindings()
+	digest := sha256.Sum256([]byte(bindings[0].Description))
+	bindings[0].DescriptionSHA256 = hex.EncodeToString(digest[:])
+	items, err := ProjectWorkItems(bindings, []WorkItemProjectionPolicy{
+		{WorkItemRef: bindings[0].WorkItemRef, DescriptionState: WorkItemDescriptionVisible, RevisionState: WorkItemRevisionCurrent},
+		{WorkItemRef: bindings[1].WorkItemRef, DescriptionState: WorkItemDescriptionRedacted, RevisionState: WorkItemRevisionStale},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if items[0].DescriptionRef != "" || items[0].DescriptionSHA256 != bindings[0].DescriptionSHA256 {
+		t.Fatalf("inline description identity changed: %+v", items[0])
 	}
 }
 
@@ -125,7 +143,7 @@ func TestWorkItemProjectionFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	projection := validProjection()
-	projection.Artifact.Scope.WorkItems = items
+	projection.WorkItems = items
 	projection.Artifact.Scope.WorkItemRef = "work-item:not-present"
 	if err := ValidateProjection(projection); !errors.Is(err, ErrProjectionBindingMismatch) {
 		t.Fatalf("legacy anchor mismatch error = %v", err)
