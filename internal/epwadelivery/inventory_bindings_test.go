@@ -51,6 +51,7 @@ func TestConsumerAdaptersRequireReadyEPWA(t *testing.T) {
 	}{
 		{consumer: "Cockpit and Desktop", file: "../../apps/cockpit/src/lib/engine-client.ts", tokens: []string{"validateArtifactDelivery", "EngineDeliveryError", "https://"}},
 		{consumer: "Cockpit live workspace", file: "../../apps/cockpit/src/lib/ui/LiveWorkspace.svelte", tokens: []string{"artifact_url", "portable_url", "durable EPWA"}},
+		{consumer: "Cockpit Studio", file: "../../apps/cockpit/src/routes/studio/+page.svelte", tokens: []string{"artifactRequest<ArtifactDeliveryResult>", "comparison:delivery-failed", "media:produce:not-connected"}},
 		{consumer: "Chrome, Veragensia, and Pi MCP bridge", file: "../../mcp/browser-session-mcp.mjs", tokens: []string{"findRawArtifactField(data)", "evidenceScopeHeaders(args.focusa_scope)"}},
 		{consumer: "CLI", file: "../../scripts/uiai", tokens: []string{"uiai.epwa_delivery.v1", "artifact delivery is not a ready, identity-bound HTTPS EPWA result"}},
 		{consumer: "CLI selected-result workflow", file: "../../scripts/uiai-open-result.sh", tokens: []string{"require_delivery", "UIAI_EVIDENCE_SCOPE_JSON"}},
@@ -69,6 +70,19 @@ func TestConsumerAdaptersRequireReadyEPWA(t *testing.T) {
 			if !strings.Contains(string(body), token) {
 				t.Errorf("%s adapter %s lacks mandatory EPWA binding %q", check.consumer, check.file, token)
 			}
+		}
+	}
+}
+
+func TestStudioDoesNotTreatRawOrMockResultsAsEvidence(t *testing.T) {
+	const path = "../../apps/cockpit/src/routes/studio/+page.svelte"
+	body, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"comparison:mock-receipt", "critique:mock-receipt", "media:produce:artifact-mock", "j?.artifact", "fetch(\"/api/comparison\"", "fetch(\"/api/critique\""} {
+		if strings.Contains(string(body), forbidden) {
+			t.Errorf("Cockpit Studio retains forbidden raw/mock artifact consumer %q", forbidden)
 		}
 	}
 }

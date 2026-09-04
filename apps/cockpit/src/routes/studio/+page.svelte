@@ -7,7 +7,7 @@
   import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
   import { getProject } from "@theatre/core";
   import gsap from "gsap";
-  import { engineClient, type ScreenshotResult } from "$lib/engine-client";
+  import { artifactRequest, engineClient, type ArtifactDeliveryResult, type ScreenshotResult } from "$lib/engine-client";
 
   type Tab = "capture" | "compare" | "analyze" | "design" | "produce";
   let tab: Tab = "capture";
@@ -87,11 +87,31 @@
   }
   async function runComparison(){
     addEvidence("comparison:bloom");
-    try { const r = await fetch("/api/comparison", { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify({ threshold: diffThreshold, bloomStrength }) }); const j = await r.json().catch(()=>null); if(j?.receipt) addEvidence(`comparison:receipt:${j.receipt.slice(0,6)}`); } catch { addEvidence("comparison:mock-receipt"); }
+    try {
+      const delivery = await artifactRequest<ArtifactDeliveryResult>("/api/comparison", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ threshold: diffThreshold, bloomStrength }),
+      });
+      addEvidence(`comparison:epwa:${delivery.epwa_delivery.delivery_id.slice(-12)}`);
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Comparison EPWA delivery failed";
+      addEvidence("comparison:delivery-failed");
+    }
   }
   async function runCritique(){
     addEvidence("critique:cost-gated");
-    try { const r = await fetch("/api/critique", { method: "POST", body: JSON.stringify({ url }) }); const j=await r.json().catch(()=>null); if(j?.provenance) addEvidence(`critique:prov:${j.provenance.slice(0,6)}`);} catch { addEvidence("critique:mock-receipt"); }
+    try {
+      const delivery = await artifactRequest<ArtifactDeliveryResult>("/api/critique", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      addEvidence(`critique:epwa:${delivery.epwa_delivery.delivery_id.slice(-12)}`);
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Critique EPWA delivery failed";
+      addEvidence("critique:delivery-failed");
+    }
   }
   function buildHyperFramesComposition(){
     const comp = {
@@ -109,10 +129,11 @@
   }
   async function renderHyperFrames(){
     hyperframesBusy = true;
-    const comp = buildHyperFramesComposition();
-    addEvidence("media:produce:hyperframes");
-    try { const r = await fetch("/api/media/produce", { method: "POST", headers:{ "content-type":"application/json"}, body: JSON.stringify(comp)}); const j=await r.json().catch(()=>null); if(j?.artifact) { reportCanvas={ id:j.artifact.slice(0,8), title:"WorkRouter.mp4", at:new Date().toISOString()}; addEvidence(`media:produce:artifact:${j.artifact.slice(0,6)}`);} else { reportCanvas={ id:Math.random().toString(36).slice(2,8), title:"WorkRouter.mp4 (mock)", at:new Date().toISOString()}; addEvidence("media:produce:artifact-mock"); } } catch { reportCanvas={ id:Math.random().toString(36).slice(2,8), title:"WorkRouter.mp4 (mock)", at:new Date().toISOString()}; addEvidence("media:produce:artifact-mock"); }
-    finally { hyperframesBusy=false; }
+    buildHyperFramesComposition();
+    reportCanvas = null;
+    error = "HyperFrames rendering is not connected to a governed EPWA media adapter.";
+    addEvidence("media:produce:not-connected");
+    hyperframesBusy = false;
   }
   async function generateReportCanvas(){
     const payload = { title: "Studio Report Canvas — WorkRouter", strokes: whiteboardStrokes.length, theatreTime, bloomStrength, dofAperture, at: new Date().toISOString() };
