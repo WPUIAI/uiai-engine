@@ -5,9 +5,20 @@ clone_folder: c:\gopath\src\github.com\WPUIAI\uiai-engine
 environment:
   GOPATH: c:\gopath
   GO111MODULE: on
-  GOTOOLCHAIN: auto
+  GOTOOLCHAIN: local
+  GOROOT: c:\uiai-go\go
+  GO_VERSION: 1.25.5
+  GO_SHA256: ae756cce1cb80c819b4fe01b0353807178f532211b47f72d7fa77949de054ebb
+  PATH: c:\uiai-go\go\bin;c:\gopath\bin;%PATH%
 install:
-  - set PATH=%GOPATH%\bin;c:\Program Files\Go\bin;%PATH%
+  - ps: |
+      $archive = Join-Path $env:TEMP "go$env:GO_VERSION.windows-amd64.zip"
+      Invoke-WebRequest "https://go.dev/dl/go$env:GO_VERSION.windows-amd64.zip" -OutFile $archive
+      $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+      if ($actual -ne $env:GO_SHA256) { throw "Go toolchain checksum mismatch: $actual" }
+      if (Test-Path "c:\uiai-go") { Remove-Item -Recurse -Force "c:\uiai-go" }
+      New-Item -ItemType Directory -Force "c:\uiai-go" | Out-Null
+      Expand-Archive -Path $archive -DestinationPath "c:\uiai-go"
   - go version
   - go env GOTOOLDIR GOROOT GOTOOLCHAIN
 build_script:
