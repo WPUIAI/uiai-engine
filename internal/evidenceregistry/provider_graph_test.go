@@ -77,6 +77,10 @@ esac`
 	if err != nil || len(searchPage.WorkItems) != 1 || searchPage.WorkItems[0].ItemID != "focusa-epic" {
 		t.Fatalf("provider FTS mismatch: page=%#v err=%v", searchPage, err)
 	}
+	lowMemPage, err := store.ListProviderWorkItems(context.Background(), ProviderWorkItemQuery{ProjectRef: "project:focusa", Limit: MaxPageSize, ResourceProfile: ResourceLowMem})
+	if err != nil || lowMemPage.PageSize != MaxLowMemPageSize || lowMemPage.ResourceProfile != ResourceLowMem || lowMemPage.MediaPosture != MediaOmittedNonessential {
+		t.Fatalf("provider LowMem profile mismatch: page=%#v err=%v", lowMemPage, err)
+	}
 	var rootLeak int
 	if err := store.db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM project_projection WHERE project_ref = ? AND (display_name LIKE ? OR source_revision LIKE ?)`, "project:focusa", "%"+projectRoot+"%", "%"+projectRoot+"%").Scan(&rootLeak); err != nil {
 		t.Fatal(err)

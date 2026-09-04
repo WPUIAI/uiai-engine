@@ -109,12 +109,27 @@ func TestEvidenceRegistryReadRoutes(t *testing.T) {
 	if strings.Contains(publicWorkItems.Body.String(), "external_ref") {
 		t.Fatalf("public work item leaked provider external_ref: %s", publicWorkItems.Body.String())
 	}
+	for _, path := range []string{
+		"/api/evidence/registry/public/artifacts?project_ref=" + project + "&page_size=200&resource_profile=lowmem",
+		"/api/evidence/registry/public/work-items?project_ref=" + project + "&limit=200&resource_profile=lowmem",
+		"/api/evidence/registry/?project_ref=" + project + "&page_size=200&resource_profile=lowmem",
+		"/api/evidence/registry/provider-work-items?project_ref=" + project + "&limit=200&resource_profile=lowmem",
+	} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		body := recorder.Body.String()
+		if recorder.Code != http.StatusOK || !strings.Contains(body, `"page_size":25`) || !strings.Contains(body, `"resource_profile":"lowmem"`) || !strings.Contains(body, `"media_posture":"omitted_nonessential"`) {
+			t.Fatalf("GET %s did not enforce LowMem: status=%d body=%s", path, recorder.Code, body)
+		}
+	}
 
 	for _, path := range []string{
 		"/api/evidence/registry/",
 		"/api/evidence/registry/?project_ref=project:unknown",
 		"/api/evidence/registry/public/work-items?project_ref=project:private",
 		"/api/evidence/registry/resolve?project_ref=" + project + "&artifact_ref=artifact:epwa-001&revision=bad",
+		"/api/evidence/registry/public/artifacts?project_ref=" + project + "&resource_profile=unknown",
+		"/api/evidence/registry/public/work-items?project_ref=" + project + "&resource_profile=unknown",
 	} {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))

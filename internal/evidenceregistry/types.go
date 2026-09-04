@@ -13,9 +13,32 @@ const (
 	EdgeSchemaV1     = "uiai.evidence_registry_edge.v1"
 	ClosureSchemaV1  = "uiai.evidence_closure_projection.v1"
 
-	MaxPageSize   = 200
-	MaxQueryRunes = 512
+	MaxPageSize       = 200
+	MaxLowMemPageSize = 25
+	MaxQueryRunes     = 512
 )
+
+func resourcePage(profile ResourceProfile, requested, fallback uint32) (ResourceProfile, uint32, MediaPosture, error) {
+	if profile == "" {
+		profile = ResourceNormal
+	}
+	if profile != ResourceNormal && profile != ResourceLowMem {
+		return "", 0, "", ErrInputInvalid
+	}
+	if requested == 0 {
+		requested = fallback
+	}
+	if profile == ResourceLowMem {
+		if requested > MaxLowMemPageSize {
+			requested = MaxLowMemPageSize
+		}
+		return profile, requested, MediaOmittedNonessential, nil
+	}
+	if requested > MaxPageSize {
+		return "", 0, "", ErrInputInvalid
+	}
+	return profile, requested, MediaRefOnly, nil
+}
 
 var (
 	ErrConfig           = errors.New("evidence registry configuration invalid")
@@ -28,8 +51,16 @@ var (
 )
 
 type IndexState string
+type ResourceProfile string
+type MediaPosture string
 
 const (
+	ResourceNormal ResourceProfile = "normal"
+	ResourceLowMem ResourceProfile = "lowmem"
+
+	MediaRefOnly             MediaPosture = "ref_only"
+	MediaOmittedNonessential MediaPosture = "omitted_nonessential"
+
 	IndexReady      IndexState = "ready"
 	IndexStale      IndexState = "stale_index"
 	IndexCorrupt    IndexState = "corrupt_index"
@@ -126,22 +157,25 @@ type ProviderGraphResult struct {
 }
 
 type ProviderWorkItemQuery struct {
-	ProjectRef string
-	Text       string
-	Status     string
-	ItemType   string
-	Limit      uint32
-	Cursor     string
+	ProjectRef      string
+	Text            string
+	Status          string
+	ItemType        string
+	Limit           uint32
+	Cursor          string
+	ResourceProfile ResourceProfile
 }
 
 type ProviderWorkItemPage struct {
-	Schema        string             `json:"schema"`
-	ProjectRef    string             `json:"project_ref"`
-	WorkItems     []ProviderWorkItem `json:"work_items"`
-	NextCursor    string             `json:"next_cursor,omitempty"`
-	PageSize      uint32             `json:"page_size"`
-	IndexRevision uint64             `json:"index_revision"`
-	ObservedAt    time.Time          `json:"observed_at"`
+	Schema          string             `json:"schema"`
+	ProjectRef      string             `json:"project_ref"`
+	WorkItems       []ProviderWorkItem `json:"work_items"`
+	NextCursor      string             `json:"next_cursor,omitempty"`
+	PageSize        uint32             `json:"page_size"`
+	IndexRevision   uint64             `json:"index_revision"`
+	ResourceProfile ResourceProfile    `json:"resource_profile"`
+	MediaPosture    MediaPosture       `json:"media_posture"`
+	ObservedAt      time.Time          `json:"observed_at"`
 }
 
 type IndexInput struct {
@@ -271,19 +305,22 @@ type Query struct {
 	Cursor            string
 	PageSize          uint32
 	SortDescending    bool
+	ResourceProfile   ResourceProfile
 }
 
 type Page struct {
-	Schema        string        `json:"schema"`
-	ProjectRef    string        `json:"project_ref"`
-	Rows          []ArtifactRow `json:"rows"`
-	NextCursor    string        `json:"next_cursor,omitempty"`
-	PageSize      uint32        `json:"page_size"`
-	TotalPosture  string        `json:"total_posture"`
-	TotalCount    uint64        `json:"total_count,omitempty"`
-	IndexRevision uint64        `json:"index_revision"`
-	IndexState    IndexState    `json:"index_state"`
-	ObservedAt    time.Time     `json:"observed_at"`
+	Schema          string          `json:"schema"`
+	ProjectRef      string          `json:"project_ref"`
+	Rows            []ArtifactRow   `json:"rows"`
+	NextCursor      string          `json:"next_cursor,omitempty"`
+	PageSize        uint32          `json:"page_size"`
+	TotalPosture    string          `json:"total_posture"`
+	TotalCount      uint64          `json:"total_count,omitempty"`
+	IndexRevision   uint64          `json:"index_revision"`
+	IndexState      IndexState      `json:"index_state"`
+	ResourceProfile ResourceProfile `json:"resource_profile"`
+	MediaPosture    MediaPosture    `json:"media_posture"`
+	ObservedAt      time.Time       `json:"observed_at"`
 }
 
 type ClosureProjection struct {
