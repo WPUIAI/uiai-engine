@@ -70,6 +70,25 @@ func TestBuildResearchPacketFromSourceMarkdownResponse(t *testing.T) {
 	}
 }
 
+func TestBuildResearchPacketKeepsRichWorkItemsOutOfBoundedPayload(t *testing.T) {
+	scope := &focusapacket.FocusaScope{ProjectRef: "project:bounded-packet", ContinuityID: "continuity:bounded-packet"}
+	item := completeEvidenceScope().WorkItems[0]
+	for range 100 {
+		scope.WorkItems = append(scope.WorkItems, item)
+	}
+	packet := buildResearchPacketFromResponses(researchPacketRequest{Goal: "bounded packet", FocusaScope: scope})
+	if packet.FocusaScope == nil || len(packet.FocusaScope.WorkItems) != 0 || len(scope.WorkItems) != 100 {
+		t.Fatalf("rich Work Items leaked or source scope mutated: packet=%#v source=%d", packet.FocusaScope, len(scope.WorkItems))
+	}
+	encoded, err := json.Marshal(packet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(encoded) > focusapacket.DefaultMaxPacketBytes {
+		t.Fatalf("packet exceeded %d-byte contract: %d", focusapacket.DefaultMaxPacketBytes, len(encoded))
+	}
+}
+
 func TestAgentResearchPacketEndpointUsesCompleteBodyScope(t *testing.T) {
 	r := chi.NewRouter()
 	MountAgentPacketRoutes(r, &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}})
@@ -112,8 +131,9 @@ func TestAgentResearchPacketEndpointUsesCompleteBodyScope(t *testing.T) {
 		}
 	}
 	packetScope := packet["focusa_scope"].(map[string]any)
-	if packetScope["project_ref"] != scope.ProjectRef || packetScope["project_root"] != nil || len(packetScope["work_items"].([]any)) != len(scope.WorkItems) {
-		t.Fatalf("packet scope was not public-safe and complete: %#v", packetScope)
+	_, exposedWorkItems := packetScope["work_items"]
+	if packetScope["project_ref"] != scope.ProjectRef || packetScope["project_root"] != nil || exposedWorkItems {
+		t.Fatalf("packet scope was not public-safe and bounded: %#v", packetScope)
 	}
 }
 

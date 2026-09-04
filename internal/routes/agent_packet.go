@@ -64,9 +64,6 @@ func MountAgentPacketRoutes(r chi.Router, cfg *config.Config) {
 			if scope.ContinuityRef == "" {
 				scope.ContinuityRef = body.FocusaScope.ContinuityID
 			}
-			if body.FocusaScope.ProjectRef != "" {
-				packet.FocusaScope.ProjectRoot = ""
-			}
 		}
 		writeJSONArtifactEPWA(w, req, cfg, scope, "", "Focusa research and diagnostics packet", "research_packet", packet, http.StatusOK)
 	})
@@ -94,12 +91,13 @@ func buildResearchPacketFromResponses(req researchPacketRequest) focusapacket.Re
 	if strings.TrimSpace(nextAction) == "" {
 		nextAction = "Call focusa_evidence_capture or focusa_browser_diagnostics_intake with recommended_focusa.args_preview."
 	}
+	packetScope := packetVisibleScope(req.FocusaScope)
 	packet := focusapacket.ResearchDiagnosticsPacket{
 		Schema:             focusapacket.SchemaResearchDiagnosticsPacketV1,
 		Mode:               packetMode(req.Mode),
 		Goal:               req.Goal,
-		ScopeStatus:        packetScopeStatus(req.FocusaScope),
-		FocusaScope:        req.FocusaScope,
+		ScopeStatus:        packetScopeStatus(packetScope),
+		FocusaScope:        packetScope,
 		TargetRefs:         targetRefs,
 		EvidenceRefs:       evidenceRefs,
 		Captures:           captures,
@@ -183,6 +181,18 @@ func packetMode(mode string) focusapacket.PacketMode {
 	default:
 		return focusapacket.ModeResearch
 	}
+}
+
+func packetVisibleScope(scope *focusapacket.FocusaScope) *focusapacket.FocusaScope {
+	if scope == nil {
+		return nil
+	}
+	visible := *scope
+	visible.WorkItems = nil
+	if visible.ProjectRef != "" {
+		visible.ProjectRoot = ""
+	}
+	return &visible
 }
 
 func packetScopeStatus(scope *focusapacket.FocusaScope) focusapacket.ScopeStatus {
