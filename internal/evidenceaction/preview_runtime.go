@@ -34,6 +34,17 @@ func NewPreviewRuntime(now func() time.Time, nonce NonceSource) *PreviewRuntime 
 	return &PreviewRuntime{now: now, nonce: nonce, usedNonces: map[string]struct{}{}, issuedNonces: map[string]string{}}
 }
 
+func (runtime *PreviewRuntime) BuildRegisteredPreview(proposal ActionProposal, registry *OperationRegistry, effects []ExpectedEffect, risk RiskClass, ttl time.Duration) (ActionPreview, error) {
+	if registry == nil {
+		return ActionPreview{}, ErrCapabilityStale
+	}
+	approval, err := registry.Resolve(proposal, runtime.now().UTC())
+	if err != nil {
+		return ActionPreview{}, err
+	}
+	return runtime.BuildPreview(proposal, approval, effects, risk, ttl)
+}
+
 func (runtime *PreviewRuntime) BuildPreview(proposal ActionProposal, approval OperationApproval, effects []ExpectedEffect, risk RiskClass, ttl time.Duration) (ActionPreview, error) {
 	now := runtime.now().UTC()
 	if err := ValidateActionProposalAgainst(proposal, proposal.Scope, proposal.ArtifactRef, proposal.ArtifactSHA256, proposal.TargetAcceptanceAtomRefs, approval, now); err != nil {

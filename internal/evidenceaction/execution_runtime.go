@@ -2,7 +2,7 @@ package evidenceaction
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 )
 
@@ -18,18 +18,24 @@ func (function ActionExecutorFunc) Execute(ctx context.Context, proposal ActionP
 
 type executionRecord struct {
 	proposalSHA256 string
+	previewSHA256  string
+	preview        *ActionPreview
 	done           chan struct{}
 	result         ActionResult
 	err            error
 }
 
 type ExecutionRuntime struct {
-	mu      sync.Mutex
-	records map[string]*executionRecord
+	mu              sync.Mutex
+	records         map[string]*executionRecord
+	reconciliations map[string]string
 }
 
 func NewExecutionRuntime() *ExecutionRuntime {
-	return &ExecutionRuntime{records: map[string]*executionRecord{}}
+	return &ExecutionRuntime{
+		records:         map[string]*executionRecord{},
+		reconciliations: map[string]string{},
+	}
 }
 
 func (runtime *ExecutionRuntime) Execute(ctx context.Context, proposal ActionProposal, preview *ActionPreview, confirmation *ActionConfirmation, actorRef string, previews *PreviewRuntime, executor ActionExecutor) (ActionResult, error) {
@@ -43,6 +49,7 @@ func (runtime *ExecutionRuntime) Execute(ctx context.Context, proposal ActionPro
 	if err != nil {
 		return ActionResult{}, err
 	}
+	previewDigest := ""
 	if preview != nil {
 		if previews == nil {
 			return ActionResult{}, ErrPreviewMismatch
@@ -53,11 +60,15 @@ func (runtime *ExecutionRuntime) Execute(ctx context.Context, proposal ActionPro
 		if err := ValidateActionPreviewAgainst(*preview, proposal, previews.now().UTC()); err != nil {
 			return ActionResult{}, err
 		}
+		previewDigest, err = DigestActionPreview(*preview)
+		if err != nil {
+			return ActionResult{}, err
+		}
 	} else if proposal.SideEffect != EffectReadOnly {
 		return ActionResult{}, ErrPreviewRequired
 	}
 
-	record, owner, err := runtime.reserve(proposal.IdempotencyKey, proposalDigest)
+	record, owner, err := runtime.reserve(proposal.IdempotencyKey, proposalDigest, previewDigest, preview)
 	if err != nil {
 		return ActionResult{}, err
 	}
@@ -82,31 +93,48 @@ func (runtime *ExecutionRuntime) Execute(ctx context.Context, proposal ActionPro
 	}
 
 	result, executionErr := executor.Execute(ctx, proposal, preview)
-	if executionErr != nil {
-		executionErr = fmt.Errorf("%w: %v", ErrOutcomeUnknown, executionErr)
-		runtime.finish(record, ActionResult{}, executionErr)
-		return ActionResult{}, executionErr
-	}
-	if err := ValidateActionResultAgainst(result, proposal, preview); err != nil {
-		executionErr = fmt.Errorf("%w: invalid executor result", ErrOutcomeUnknown)
-		runtime.finish(record, ActionResult{}, executionErr)
-		return ActionResult{}, executionErr
-	}
 	result = cloneActionResult(result)
+	validationErr := ValidateActionResultAgainst(result, proposal, preview)
+	if executionErr != nil {
+		if (result.Status == StatusOutcomeUnknown || result.Status == StatusPartiallyApplied) &&
+			(validationErr == nil || errors.Is(validationErr, ErrOutcomeUnknown)) {
+			runtime.finish(record, result, ErrOutcomeUnknown)
+			return cloneActionResult(result), ErrOutcomeUnknown
+		}
+		runtime.finish(record, ActionResult{}, ErrOutcomeUnknown)
+		return ActionResult{}, ErrOutcomeUnknown
+	}
+	if errors.Is(validationErr, ErrOutcomeUnknown) {
+		runtime.finish(record, result, ErrOutcomeUnknown)
+		return cloneActionResult(result), ErrOutcomeUnknown
+	}
+	if validationErr != nil {
+		runtime.finish(record, ActionResult{}, ErrOutcomeUnknown)
+		return ActionResult{}, ErrOutcomeUnknown
+	}
+	if result.Status == StatusPartiallyApplied {
+		runtime.finish(record, result, ErrReconciliationRequired)
+		return cloneActionResult(result), ErrReconciliationRequired
+	}
 	runtime.finish(record, result, nil)
 	return cloneActionResult(result), nil
 }
 
-func (runtime *ExecutionRuntime) reserve(key, proposalDigest string) (*executionRecord, bool, error) {
+func (runtime *ExecutionRuntime) reserve(key, proposalDigest, previewDigest string, preview *ActionPreview) (*executionRecord, bool, error) {
 	runtime.mu.Lock()
 	defer runtime.mu.Unlock()
 	if record, exists := runtime.records[key]; exists {
-		if record.proposalSHA256 != proposalDigest {
+		if record.proposalSHA256 != proposalDigest || record.previewSHA256 != previewDigest {
 			return nil, false, ErrReplayDetected
 		}
 		return record, false, nil
 	}
-	record := &executionRecord{proposalSHA256: proposalDigest, done: make(chan struct{})}
+	record := &executionRecord{
+		proposalSHA256: proposalDigest,
+		previewSHA256:  previewDigest,
+		preview:        cloneActionPreview(preview),
+		done:           make(chan struct{}),
+	}
 	runtime.records[key] = record
 	return record, true, nil
 }
@@ -127,6 +155,16 @@ func (runtime *ExecutionRuntime) finish(record *executionRecord, result ActionRe
 	record.err = err
 	close(record.done)
 	runtime.mu.Unlock()
+}
+
+func cloneActionPreview(preview *ActionPreview) *ActionPreview {
+	if preview == nil {
+		return nil
+	}
+	cloned := *preview
+	cloned.TargetRefs = append([]string(nil), preview.TargetRefs...)
+	cloned.ExpectedEffects = append([]ExpectedEffect(nil), preview.ExpectedEffects...)
+	return &cloned
 }
 
 func cloneActionResult(result ActionResult) ActionResult {

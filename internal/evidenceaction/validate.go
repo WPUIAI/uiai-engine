@@ -235,7 +235,8 @@ func ValidateReconciliation(reconciliation ActionReconciliation, result ActionRe
 		blank(reconciliation.ResultRef) || !validSHA256(reconciliation.ResultSHA256) ||
 		blank(reconciliation.IdempotencyKey) || len(reconciliation.AuthoritativeInspectionRefs) == 0 ||
 		len(reconciliation.AuthoritativeInspectionRefs) > MaxRefs || hasBlankOrDuplicate(reconciliation.AuthoritativeInspectionRefs) ||
-		!validReconciliationState(reconciliation.State) || reconciliation.ReconciledAt.IsZero() {
+		!validReconciliationState(reconciliation.State) || reconciliation.ReconciledAt.IsZero() ||
+		reconciliation.ReconciledAt.Before(result.ObservedAt) {
 		return ErrActionContractInvalid
 	}
 	resultDigest, err := DigestActionResult(result)
