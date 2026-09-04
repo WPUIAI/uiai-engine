@@ -246,7 +246,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	localeText := string(localeBody)
-	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`} {
+	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`, `.replace(/_/g, "-")`} {
 		if !strings.Contains(localeText, required) {
 			t.Fatalf("locale runtime missing %s", required)
 		}
@@ -265,7 +265,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 			t.Fatalf("translation key %s count=%d want=3", match[1], count)
 		}
 	}
-	for _, key := range []string{"offline_snapshot", "record_limitations", "work_item_unavailable", "relationships", "completion", "settlement", "legal"} {
+	for _, key := range []string{"offline_snapshot", "record_limitations", "work_item_unavailable", "relationships", "completion", "settlement", "legal", "provider", "bound_immutable_summary"} {
 		if count := translationCount(key); count != 3 {
 			t.Fatalf("dynamic translation key %s count=%d want=3", key, count)
 		}

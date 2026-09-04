@@ -174,9 +174,9 @@ async function showRegistryDetail(kind, record) {
   const entries = kind === "artifact" ? [
     [tr("artifact"), record.artifact_ref], [tr("kind_work_item"), record.first_work_item_ref], [tr("verification"), record.verification], [tr("closure"), record.closure], [tr("captured"), formatTime(record.captured_at)],
   ] : [
-    [tr("kind_work_item"), record.work_item_ref], ["Provider", record.provider_surface], [tr("type"), record.item_type], [tr("status"), record.status], [tr("binding"), record.binding_state], [tr("revision"), record.revision],
+    [tr("kind_work_item"), record.work_item_ref], [tr("provider"), record.provider_surface], [tr("type"), record.item_type], [tr("status"), record.status], [tr("binding"), record.binding_state], [tr("revision"), record.revision],
   ];
-  facts.replaceChildren(...entries.map(([label, value]) => fact(label, value || "Unavailable")));
+  facts.replaceChildren(...entries.map(([label, value]) => fact(label, value || tr("unavailable_value"))));
   const children = [title, copy, facts];
   if (kind === "artifact" && publicPath(record.pwa_path)) {
     const link = document.createElement("a");
@@ -246,7 +246,7 @@ async function loadRegistry({ append = false } = {}) {
   byId("registry-more").hidden = !registryState.artifactCursor && !registryState.workItemCursor;
   text(byId("registry-count"), tr("records_count", { count: locale.number(rows.length) }));
   text(byId("registry-revision"), Math.max(artifacts.index_revision || 0, workItems.index_revision || 0));
-  text(byId("registry-freshness"), syncStatus.freshness || "unavailable");
+  text(byId("registry-freshness"), syncStatus.freshness || tr("unavailable_value"));
   byId("registry-facets").replaceChildren(
     fact(tr("kind_artifact"), locale.number(registryState.artifacts.length)), fact(tr("kind_work_item"), locale.number(registryState.workItems.length)),
     fact(tr("epic"), locale.number(registryState.workItems.filter((item) => item.item_type === "epic").length)),
@@ -357,7 +357,7 @@ async function renderPublicRecord() {
     if (!validSHA256(detail.manifest_sha256) || manifest.integrity?.manifest_sha256 !== detail.manifest_sha256) throw new Error(tr("integrity_corrupt"));
     const scope = manifest.scope || {};
     const flatScope = { project_ref: scope.project?.project_ref, workstream_ref: scope.workstream?.workstream_ref, workset_ref: scope.workset?.workset_ref, callgraph_ref: scope.callgraph?.frame_ref || scope.callgraph?.run_ref, workpoint_ref: scope.workpoint?.workpoint_ref, work_item_ref: scope.work_items?.[0]?.work_item_ref, work_items: scope.work_items };
-    text(byId("title"), manifest.title || "Evidence record"); text(byId("truth"), manifest.summary || "Bound immutable evidence artifact.");
+    text(byId("title"), manifest.title || tr("evidence_record")); text(byId("truth"), manifest.summary || tr("bound_immutable_summary"));
     text(byId("record-id"), artifactRef); text(byId("record-revision"), revision); renderLineage(flatScope);
     const assets = Array.isArray(detail.assets) ? detail.assets : [];
     const primary = assets.find((asset) => asset.media_type?.startsWith("image/"));
@@ -417,7 +417,7 @@ async function renderRecord() {
       throw new Error(tr("integrity_corrupt"));
     }
 
-    text(byId("title"), projection.title || "Evidence record");
+    text(byId("title"), projection.title || tr("evidence_record"));
     text(byId("truth"), projection.summary);
     text(byId("record-id"), projection.artifact.artifact_ref);
     text(byId("record-revision"), projection.artifact.revision);
