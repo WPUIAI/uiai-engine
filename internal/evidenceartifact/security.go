@@ -72,6 +72,39 @@ func validateSecurity(s Security) error {
 	return nil
 }
 
+func validateRedactionEvidence(assets []Asset, policy Policy, security Security) error {
+	requiresEvidence := policy.RedactionState != RedactionNone
+	for _, asset := range assets {
+		if asset.RedactionState != RedactionNone {
+			requiresEvidence = true
+		}
+		switch policy.RedactionState {
+		case RedactionNone:
+			if asset.RedactionState != RedactionNone && asset.RedactionState != RedactionBlocked {
+				return invalid(ErrInvalidPolicy, "asset redaction exceeds policy state")
+			}
+		case RedactionRedacted:
+			if asset.RedactionState != RedactionRedacted && asset.RedactionState != RedactionPublicSafe && asset.RedactionState != RedactionBlocked {
+				return invalid(ErrInvalidPolicy, "asset redaction does not satisfy policy")
+			}
+		case RedactionPublicSafe:
+			if asset.RedactionState != RedactionPublicSafe && asset.RedactionState != RedactionBlocked {
+				return invalid(ErrInvalidPolicy, "asset is not public safe")
+			}
+		case RedactionBlocked:
+			if asset.RedactionState != RedactionBlocked {
+				return invalid(ErrInvalidPolicy, "asset is not blocked")
+			}
+		default:
+			return invalid(ErrInvalidPolicy, "redaction policy state")
+		}
+	}
+	if requiresEvidence && len(security.RedactionRefs) == 0 {
+		return invalid(ErrInvalidPolicy, "redaction evidence missing")
+	}
+	return nil
+}
+
 func textSHA256(value string) string {
 	digest := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(digest[:])

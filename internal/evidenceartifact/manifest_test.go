@@ -45,6 +45,30 @@ func TestNormalizeIsDeterministicAndNonMutating(t *testing.T) {
 	}
 }
 
+func TestCanonicalBytesMatchesV1CompatibilityAlias(t *testing.T) {
+	manifest := testManifest()
+	manifest.Integrity.ManifestSHA256 = digestA
+
+	got, err := CanonicalBytes(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := CanonicalJSON(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, legacy) {
+		t.Fatal("CanonicalBytes and CanonicalJSON diverged")
+	}
+	var decoded Manifest
+	if err := json.Unmarshal(got, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Integrity.ManifestSHA256 != "" {
+		t.Fatal("canonical bytes retained self-referential manifest hash")
+	}
+}
+
 func TestCoreBindingsAreRequired(t *testing.T) {
 	tests := map[string]func(*Manifest){
 		"project":    func(m *Manifest) { m.Scope.Project.State = BindingMissing },
@@ -86,6 +110,56 @@ func TestAutonomySafetyStateIsRequired(t *testing.T) {
 				t.Fatalf("Validate() error = %v, want ErrInvalidScope", err)
 			}
 		})
+	}
+}
+
+func TestCanonicalHashExcludesSelfAndIncludesAssetHashes(t *testing.T) {
+	baseline := testManifest()
+	baselineHash, err := ComputeManifestSHA256(baseline)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	withSelfHash := testManifest()
+	withSelfHash.Integrity.ManifestSHA256 = digestA
+	selfHash, err := ComputeManifestSHA256(withSelfHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selfHash != baselineHash {
+		t.Fatal("manifest_sha256 changed its own canonical hash")
+	}
+
+	withChangedAsset := testManifest()
+	withChangedAsset.Assets[0].SHA256 = digestB
+	assetHash, err := ComputeManifestSHA256(withChangedAsset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assetHash == baselineHash {
+		t.Fatal("asset SHA-256 change did not change manifest hash")
+	}
+}
+
+func TestCanonicalizationAndHashDoNotMutateInput(t *testing.T) {
+	manifest := testManifest()
+	manifest.Integrity.ManifestSHA256 = digestA
+	before, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CanonicalBytes(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ComputeManifestSHA256(manifest); err != nil {
+		t.Fatal(err)
+	}
+	after, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("canonicalization or hashing mutated the input manifest")
 	}
 }
 
@@ -200,6 +274,46 @@ func TestProviderDescriptionRemainsJSONData(t *testing.T) {
 	}
 }
 
+func TestDuplicateClaimAndAssetIDsFail(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Manifest)
+		want   error
+	}{
+		{"claim", func(m *Manifest) { m.Claims = append(m.Claims, m.Claims[0]) }, ErrInvalidClaim},
+		{"asset", func(m *Manifest) { m.Assets = append(m.Assets, m.Assets[0]) }, ErrInvalidAsset},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := testManifest()
+			tt.mutate(&m)
+			if err := Validate(m); !errors.Is(err, tt.want) {
+				t.Fatalf("Validate() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestManifestLimitsFailClosed(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Manifest)
+	}{
+		{"kinds", func(m *Manifest) { m.Kinds = make([]string, MaxKinds+1) }},
+		{"claims", func(m *Manifest) { m.Claims = make([]Claim, MaxClaims+1) }},
+		{"assets", func(m *Manifest) { m.Assets = make([]Asset, MaxAssets+1) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := testManifest()
+			tt.mutate(&m)
+			if err := Validate(m); !errors.Is(err, ErrLimitExceeded) {
+				t.Fatalf("Validate() error = %v, want ErrLimitExceeded", err)
+			}
+		})
+	}
+}
+
 func TestRejectsRawLocalRefsAndUnsafeAssetPaths(t *testing.T) {
 	t.Run("local_ref", func(t *testing.T) {
 		m := testManifest()
@@ -208,13 +322,23 @@ func TestRejectsRawLocalRefsAndUnsafeAssetPaths(t *testing.T) {
 			t.Fatalf("Validate() error = %v, want ErrInvalidScope", err)
 		}
 	})
-	t.Run("asset_path", func(t *testing.T) {
-		m := testManifest()
-		m.Assets[0].Path = "../secret.json"
-		if err := Validate(m); !errors.Is(err, ErrInvalidAsset) {
-			t.Fatalf("Validate() error = %v, want ErrInvalidAsset", err)
-		}
-	})
+	unsafePaths := map[string]string{
+		"traversal":   "../secret.json",
+		"absolute":    "/assets/proof.json",
+		"url_scheme":  "https://example.com/proof.json",
+		"backslash":   `assets\proof.json`,
+		"dot_segment": "assets/./proof.json",
+		"control":     "assets/\x01proof.json",
+	}
+	for name, path := range unsafePaths {
+		t.Run(name, func(t *testing.T) {
+			m := testManifest()
+			m.Assets[0].Path = path
+			if err := Validate(m); !errors.Is(err, ErrInvalidAsset) {
+				t.Fatalf("Validate() error = %v, want ErrInvalidAsset", err)
+			}
+		})
+	}
 }
 
 func TestCustodyMustBeChronological(t *testing.T) {
@@ -348,7 +472,7 @@ func testManifest() Manifest {
 			Custody: []CustodyEvent{{EventID: "custody:1", Action: "captured", ActorRef: "agent:executor", InstanceRef: "instance:uiai", InputRefs: []string{"source:go-test"}, OutputRefs: []string{"asset:proof"}, OccurredAt: "2026-08-29T12:00:00Z"}},
 		},
 		Verification: Verification{Status: VerificationPending, ReviewCaseRef: "review-case:epwa-t01", VerifierRefs: []string{"agent:judge"}, JudgeResultRefs: []string{}, DecisionRefs: []string{}},
-		Security:     Security{PolicyRef: StrictSecurityPolicyV1, InspectionReceiptRefs: []string{}, SanitizationRefs: []string{}, RedactionRefs: []string{}},
+		Security:     Security{PolicyRef: StrictSecurityPolicyV1, InspectionReceiptRefs: []string{}, SanitizationRefs: []string{}, RedactionRefs: []string{"redaction:proof"}},
 		ReceiptRefs:  []string{"receipt:capture"},
 		Policy:       Policy{AccessClass: AccessPrivateTeam, RedactionState: RedactionPublicSafe, Audience: "project_reviewers", RetentionClass: RetentionWorkstream, PolicyRefs: []string{"policy:evidence"}},
 		Integrity:    Integrity{Algorithm: "sha256", BundleSHA256: digestB},

@@ -1,0 +1,51 @@
+{
+  "schema": "uiai.evidence_judge_request.v1",
+  "request_id": "judge-request:1",
+  "idempotency_ref": "idempotency:1",
+  "view_ref": "judge-view:1",
+  "view_sha256": "9b832837984331ea345b75f9228990ea143111d5a403a4e6ceedbbf3b32ccc30",
+  "information_set_ref": "information-set:1",
+  "information_set_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "assignment_ref": "assignment:1",
+  "executor_identity_ref": "agent:executor",
+  "verifier_identity_ref": "agent:judge",
+  "policy_refs": [
+    "judge-policy:strict"
+  ],
+  "acceptance_atom_refs": [
+    "atom:layout",
+    "atom:interaction"
+  ],
+  "required_modalities": [
+    {
+      "schema": "uiai.evidence_judge_modality.v1",
+      "requirement_id": "modality:layout",
+      "atom_ref": "atom:layout",
+      "modality": "static_image",
+      "required": true,
+      "status": "satisfied",
+      "citation_ids": [
+        "citation:image"
+      ]
+    },
+    {
+      "schema": "uiai.evidence_judge_modality.v1",
+      "requirement_id": "modality:interaction",
+      "atom_ref": "atom:interaction",
+      "modality": "synchronized_video",
+      "required": true,
+      "status": "satisfied",
+      "citation_ids": [
+        "citation:video"
+      ]
+    }
+  ],
+  "budget": {
+    "max_tokens": 8000,
+    "max_media_bytes": 20971520,
+    "max_spend_micros": 500000,
+    "max_duration_ms": 300000
+  },
+  "expires_at": "2026-08-30T00:30:00Z",
+  "result_detail": "standard"
+}
