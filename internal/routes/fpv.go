@@ -521,12 +521,22 @@ func fpvStreamInterval(token string) time.Duration {
 
 func fpvRegistryPath() string {
 	wd, err := os.Getwd()
-	if err == nil {
-		for dir := wd; dir != "/" && dir != "."; dir = filepath.Dir(dir) {
-			if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-				return filepath.Join(dir, "data", "fpv-shares.json")
-			}
+	if err != nil {
+		return filepath.Join("data", "fpv-shares.json")
+	}
+	return fpvRegistryPathFrom(wd)
+}
+
+func fpvRegistryPathFrom(wd string) string {
+	for dir := wd; dir != "."; {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return filepath.Join(dir, "data", "fpv-shares.json")
 		}
+		parent := filepath.Dir(dir)
+		if parent == dir { // filesystem root (for example / or C:\\)
+			break
+		}
+		dir = parent
 	}
 	return filepath.Join("data", "fpv-shares.json")
 }

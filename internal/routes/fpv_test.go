@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 	"time"
@@ -27,6 +29,30 @@ func TestFPVEntryExpires(t *testing.T) {
 	fpvShares.Store("expired", &fpvShare{Token: "expired", SessionID: "sid", ExpiresAt: time.Now().UTC().Add(-time.Second)})
 	if _, ok := fpvEntry("expired"); ok {
 		t.Fatal("expected expired FPV share to be rejected")
+	}
+}
+
+func TestFPVRegistryPathFromStopsAtFilesystemRoot(t *testing.T) {
+	start := filepath.Join(t.TempDir(), "nested", "directory")
+	if err := os.MkdirAll(start, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := fpvRegistryPathFrom(start), filepath.Join("data", "fpv-shares.json"); got != want {
+		t.Fatalf("fpvRegistryPathFrom() = %q, want %q", got, want)
+	}
+}
+
+func TestFPVRegistryPathFromFindsModuleRoot(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	start := filepath.Join(root, "nested")
+	if err := os.MkdirAll(start, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := fpvRegistryPathFrom(start), filepath.Join(root, "data", "fpv-shares.json"); got != want {
+		t.Fatalf("fpvRegistryPathFrom() = %q, want %q", got, want)
 	}
 }
 

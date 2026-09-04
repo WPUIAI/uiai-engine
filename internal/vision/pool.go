@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -191,6 +193,11 @@ drained:
 		"/usr/bin/google-chrome-stable",
 		"/usr/bin/google-chrome",
 		"/usr/bin/chromium",
+		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
+		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
+		filepath.Join(os.Getenv("LOCALAPPDATA"), `Google\Chrome\Application\chrome.exe`),
+		`C:\Program Files\Microsoft\Edge\Application\msedge.exe`,
+		`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`,
 	} {
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 			chromePath = candidate
@@ -254,6 +261,12 @@ drained:
 			"CalculateNativeWinOcclusion", // Linux: skip Windows occlusion calc
 		)
 
+	if runtime.GOOS == "windows" {
+		// Rod's leakless helper can be blocked by endpoint security or fail to
+		// hand back Chrome's debugger URL on Windows. The pool already owns and
+		// cleans up the launcher process, so launch Chrome directly here.
+		l = l.Leakless(false)
+	}
 	if chromePath != "" {
 		l = l.Bin(chromePath)
 		log.Printf("[vision] Using system browser: %s", chromePath)
@@ -285,7 +298,11 @@ drained:
 	case <-time.After(LaunchTimeout):
 		// Kill the half-launched browser so nothing leaks (2026-08-23 fix).
 		if pid = l.PID(); pid > 0 {
-			exec.Command("kill", "-9", fmt.Sprintf("%d", pid)).Run() // #nosec G204 -- managed launcher PID
+			if runtime.GOOS == "windows" {
+				exec.Command("taskkill", "/PID", fmt.Sprintf("%d", pid), "/T", "/F").Run() // #nosec G204 -- managed launcher PID
+			} else {
+				exec.Command("kill", "-9", fmt.Sprintf("%d", pid)).Run() // #nosec G204 -- managed launcher PID
+			}
 		}
 		l.Cleanup()
 		return ErrLaunchTimeout
@@ -352,10 +369,18 @@ func (p *Pool) tryLockWithin(d time.Duration) bool {
 }
 
 func (p *Pool) isBrowserAlive() bool {
-	if p.browserPID <= 0 {
+	return processAlive(p.browserPID)
+}
+
+func processAlive(pid int) bool {
+	if pid <= 0 {
 		return false
 	}
-	proc, err := os.FindProcess(p.browserPID)
+	if runtime.GOOS == "windows" {
+		out, err := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid), "/FO", "CSV", "/NH").Output()
+		return err == nil && strings.Contains(string(out), fmt.Sprintf("\"%d\"", pid))
+	}
+	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return false
 	}
