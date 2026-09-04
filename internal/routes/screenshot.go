@@ -328,6 +328,8 @@ func requestArtifactURL(_ *http.Request, artifactPath string) string {
 	return artifactPath
 }
 
+const evidenceShareCSP = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'"
+
 func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 	r.Get("/share", func(w http.ResponseWriter, req *http.Request) {
 		entries, err := os.ReadDir(evidenceShareDir(cfg))
@@ -406,7 +408,7 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 		if name == "" {
 			name = "index.html"
 		}
-		allowed := map[string]string{"index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "work-items.js": "application/javascript; charset=utf-8", "app.js": "application/javascript; charset=utf-8", "artifact.json": "application/json; charset=utf-8", "projection.json": "application/json; charset=utf-8", "inspection.json": "application/json; charset=utf-8", "screenshot.png": "image/png", "screenshot.jpg": "image/jpeg", "screenshot.webp": "image/webp"}
+		allowed := map[string]string{"index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "work-items.js": "application/javascript; charset=utf-8", "pwa.js": "application/javascript; charset=utf-8", "app.js": "application/javascript; charset=utf-8", "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml", "sw.js": "application/javascript; charset=utf-8", "artifact.json": "application/json; charset=utf-8", "projection.json": "application/json; charset=utf-8", "inspection.json": "application/json; charset=utf-8", "screenshot.png": "image/png", "screenshot.jpg": "image/jpeg", "screenshot.webp": "image/webp"}
 		mime, ok := allowed[name]
 		if !ok {
 			http.NotFound(w, req)
@@ -419,9 +421,15 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 		}
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if name == "artifact.json" || name == "projection.json" || name == "inspection.json" || strings.HasPrefix(name, "screenshot.") {
+		if name == "index.html" {
+			w.Header().Set("Content-Security-Policy", evidenceShareCSP)
+		}
+		switch {
+		case name == "sw.js":
+			w.Header().Set("Cache-Control", "no-cache")
+		case name == "artifact.json" || name == "projection.json" || name == "inspection.json" || strings.HasPrefix(name, "screenshot."):
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		} else {
+		default:
 			w.Header().Set("Cache-Control", "public, max-age=300")
 		}
 		_, _ = w.Write(data)

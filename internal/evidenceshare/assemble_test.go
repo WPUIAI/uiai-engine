@@ -23,7 +23,7 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if !strings.HasPrefix(result.ArtifactRef, "uiai-evidence-share:sha256:") || !strings.HasPrefix(result.RelativePath, "./") {
 		t.Fatal("invalid portable identity")
 	}
-	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "work-items.js", "app.js"} {
+	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "work-items.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"} {
 		if info, err := os.Stat(filepath.Join(result.Directory, name)); err != nil || info.Size() == 0 {
 			t.Fatalf("missing %s: %v", name, err)
 		}
@@ -34,6 +34,10 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	}
 	if !strings.Contains(string(indexBody), `data-default-view="record"`) || strings.Contains(string(indexBody), `data-default-view="registry"`) {
 		t.Fatal("generated portable package does not default to its bound evidence record")
+	}
+	workerBody, _ := os.ReadFile(filepath.Join(result.Directory, "sw.js"))
+	if strings.Contains(string(workerBody), "__UIAI_ASSET_VERSION__") || !strings.Contains(string(workerBody), `const VERSION = "`+embeddedAssetsSHA256()[:12]+`"`) {
+		t.Fatal("generated service worker does not bind its exact asset revision")
 	}
 	body, _ := os.ReadFile(filepath.Join(result.Directory, "artifact.json"))
 	var manifest Manifest
@@ -158,7 +162,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 	if digest := embeddedAssetsSHA256(); len(digest) != 64 {
 		t.Fatalf("embedded asset digest invalid: %q", digest)
 	}
-	for _, name := range []string{"index.html", "styles.css", "work-items.js", "app.js"} {
+	for _, name := range []string{"index.html", "styles.css", "work-items.js", "pwa.js", "app.js", "manifest.webmanifest", "sw.js"} {
 		body, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			t.Fatal(err)
@@ -195,7 +199,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		}
 		cursor = next
 	}
-	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, `data-default-view="registry"`, `id="registry"`, `id="registry-project"`, `id="registry-rows"`, `id="record-detail"`, `id="registry-back"`, `id="primary-evidence-frame"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
+	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, `data-default-view="registry"`, `data-asset-version="__UIAI_ASSET_VERSION__"`, `data-pwa-status="loading"`, `rel="manifest"`, `id="registry"`, `id="registry-project"`, `id="registry-rows"`, `id="record-detail"`, `id="registry-back"`, `id="primary-evidence-frame"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
 		if !strings.Contains(htmlText, required) {
 			t.Fatalf("semantic shell missing %s", required)
 		}
@@ -209,12 +213,12 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		t.Fatal("renderer must not collapse validity layers into a success badge")
 	}
 	app, _ := assets.ReadFile("assets/app.js")
-	for _, required := range []string{"/api/evidence/registry/public", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`} {
+	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", "offline snapshot; current revocation unavailable", "event.preventDefault()", `byId("registry-back").hidden = true`} {
 		if !strings.Contains(string(app), required) {
 			t.Fatalf("registry consumer missing %s", required)
 		}
 	}
-	for _, forbidden := range []string{"/api/evidence/registry/closure", "/api/evidence/registry/sync?"} {
+	for _, forbidden := range []string{`const registryAPI = "/`, "/api/evidence/registry/closure", "/api/evidence/registry/sync?"} {
 		if strings.Contains(string(app), forbidden) {
 			t.Fatalf("public consumer references private authority endpoint %s", forbidden)
 		}
@@ -229,6 +233,59 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		if strings.Contains(string(css), forbidden) {
 			t.Fatalf("responsive CSS retains forbidden artifact-detail/registry rule %s", forbidden)
 		}
+	}
+}
+
+func TestEmbeddedPWAAssetsArePortableAndScopeConfined(t *testing.T) {
+	manifestBody, err := assets.ReadFile("assets/manifest.webmanifest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		StartURL string `json:"start_url"`
+		Scope    string `json:"scope"`
+		Display  string `json:"display"`
+		Icons    []struct {
+			Source string `json:"src"`
+		} `json:"icons"`
+	}
+	if err := json.Unmarshal(manifestBody, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.StartURL != "./" || manifest.Scope != "./" || manifest.Display != "standalone" || len(manifest.Icons) != 1 || manifest.Icons[0].Source != "./icon.svg" {
+		t.Fatalf("non-portable web manifest: %+v", manifest)
+	}
+	pwaBody, err := assets.ReadFile("assets/pwa.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pwa := string(pwaBody)
+	for _, required := range []string{"serviceWorker.register", `scope: "./"`, `updateViaCache: "none"`, `navigator.onLine === false`, `location.protocol === "file:"`, `document.body.dataset.pwaStatus = "offline"`} {
+		if !strings.Contains(pwa, required) {
+			t.Fatalf("PWA registration/update truth missing %s", required)
+		}
+	}
+	workerBody, err := assets.ReadFile("assets/sw.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker := string(workerBody)
+	for _, required := range []string{`request.method !== "GET"`, "url.origin === SCOPE_URL.origin", "url.pathname.startsWith(SCOPE_URL.pathname)", "name.startsWith(CACHE_PREFIX)", "Promise.allSettled(OPTIONAL_RECORD_ASSETS", `response.type !== "opaque"`, "cache.match(\"./index.html\")", "self.skipWaiting()", "self.clients.claim()", `event.data?.type !== "PURGE_SCOPE_CACHE"`} {
+		if !strings.Contains(worker, required) {
+			t.Fatalf("service worker scope/update safety missing %s", required)
+		}
+	}
+	for _, forbidden := range []string{"http://", "https://", `credentials: "include"`, `request.method === "POST"`} {
+		if strings.Contains(worker, forbidden) {
+			t.Fatalf("service worker contains unsafe dependency or mutation %s", forbidden)
+		}
+	}
+	icon, err := assets.ReadFile("assets/icon.svg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.ToLower(string(icon)), "<script") || strings.Contains(strings.ToLower(string(icon)), "javascript:") {
+		t.Fatal("install icon contains active content")
 	}
 }
 

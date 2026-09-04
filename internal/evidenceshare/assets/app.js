@@ -4,7 +4,8 @@ const byId = (id) => document.getElementById(id);
 const text = (node, value) => { node.textContent = value ?? "—"; };
 const availabilityStates = new Set(["loading", "ready", "unavailable", "blocked", "corrupt", "stale", "redacted", "degraded"]);
 const expectedSections = ["overview", "evidence", "timeline", "inspect", "developer"];
-const registryAPI = "/api/evidence/registry/public";
+const deploymentBase = new URL("../", document.baseURI);
+const registryAPI = new URL("api/evidence/registry/public", deploymentBase).href.replace(/\/$/, "");
 const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 2;
 const registryPageSize = lowMemory ? 25 : 100;
 const registryState = { project: "", query: "", status: "", type: "", artifactCursor: "", workItemCursor: "", artifacts: [], workItems: [], eventSource: null, reloadTimer: 0 };
@@ -50,10 +51,27 @@ function lineageItem(label, value) {
 }
 
 function setStatus(status, state, label) {
+  delete status.dataset.readyLabel;
   status.className = `status ${state === "ready" ? "ready" : "error"}`;
   status.dataset.epwaStatus = state;
   text(status.querySelector("span"), label);
 }
+
+function setReadyStatus(status, label) {
+  const offlineSnapshot = navigator.onLine === false || location.protocol === "file:";
+  if (offlineSnapshot) setStatus(status, "stale", `${label} · offline snapshot; current revocation unavailable`);
+  else setStatus(status, "ready", label);
+  status.dataset.readyLabel = label;
+}
+
+function refreshConnectionStatus() {
+  const status = byId("status");
+  if (status.dataset.readyLabel) setReadyStatus(status, status.dataset.readyLabel);
+  if (navigator.onLine === false) document.body.dataset.pwaStatus = "offline";
+}
+
+addEventListener("online", refreshConnectionStatus);
+addEventListener("offline", refreshConnectionStatus);
 
 function setValidity(layer, value, state) {
   const node = byId(`validity-${layer}`);
@@ -108,7 +126,7 @@ const queryString = (values) => {
   return params.toString();
 };
 
-const publicPath = (value) => typeof value === "string" && /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]+$/.test(value) && !value.includes("..") ? value : null;
+const publicPath = (value) => typeof value === "string" && /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]+$/.test(value) && !value.includes("..") ? new URL(value.slice(1), deploymentBase).href : null;
 
 function registryRow(kind, record) {
   const tr = document.createElement("tr");
@@ -229,7 +247,8 @@ async function loadRegistry({ append = false } = {}) {
   );
   byId("registry").dataset.registryState = syncStatus.freshness || "degraded";
   text(byId("registry-truth"), rows.length ? "Public-safe immutable artifacts and provider-observed Work Items. Focusa bindings remain independently revisioned." : "The project is available, but no public-safe records are currently indexed.");
-  setStatus(status, syncStatus.freshness === "live" ? "ready" : "degraded", `Registry ${syncStatus.freshness || "degraded"}`);
+  if (syncStatus.freshness === "live") setReadyStatus(status, "Registry live");
+  else setStatus(status, "degraded", `Registry ${syncStatus.freshness || "degraded"}`);
   updateRegistryURL();
   const selected = new URL(location.href).searchParams.get("selected");
   const selectedArtifact = registryState.artifacts.find((record) => record.artifact_ref === selected);
@@ -294,6 +313,7 @@ async function renderRegistry() {
 
 function wireRegistryControls() {
   let debounce = 0;
+  byId("registry-controls").addEventListener("submit", (event) => event.preventDefault());
   byId("registry-project").addEventListener("change", (event) => { registryState.project = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
   byId("registry-query").addEventListener("input", (event) => { registryState.query = event.target.value.trim(); clearTimeout(debounce); debounce = setTimeout(() => loadRegistry().catch(showRegistryUnavailable), 250); });
   byId("registry-status").addEventListener("change", (event) => { registryState.status = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
@@ -346,9 +366,9 @@ async function renderPublicRecord() {
     byId("facts").replaceChildren(fact("Captured", formatTime(manifest.captured_at)), fact("Created", formatTime(manifest.created_at)), fact("Evidence assets", assets.length), fact("Claims", claimCount), fact("Access", manifest.policy?.access_class), fact("Redaction", manifest.policy?.redaction_state), fact("Authority posture", manifest.authority?.posture), fact("Retention", manifest.policy?.retention_class));
     renderTimeline((manifest.provenance?.custody || []).map((event) => ({ event_type: event.action, occurred_at: event.occurred_at, refs: [...(event.input_refs || []), ...(event.output_refs || [])] })));
     byId("inspect-grid").replaceChildren(datum("Artifact", artifactRef), datum("Revision", revision), datum("Manifest SHA-256", detail.manifest_sha256), datum("Bundle SHA-256", manifest.integrity?.bundle_sha256), datum("Project", flatScope.project_ref), datum("Workstream", flatScope.workstream_ref), datum("Workset", flatScope.workset_ref), datum("CallGraph", flatScope.callgraph_ref), datum("Workpoint", flatScope.workpoint_ref), ...workItemInspectData(flatScope), datum("Evidence authority", manifest.authority?.evidence_authority_ref), datum("Completion authority", manifest.authority?.completion_authority_ref), datum("Verification", manifest.verification?.status), datum("Redaction", manifest.policy?.redaction_state));
-    byId("detail-json-link").href = base; byId("manifest-json-link").href = detail.manifest_path || `${base}/manifest`; byId("inspection-json-link").hidden = true;
+    byId("detail-json-link").href = base; byId("manifest-json-link").href = publicPath(detail.manifest_path) || `${base}/manifest`; byId("inspection-json-link").hidden = true;
     text(byId("limitations-copy"), "This immutable artifact is a bounded evidence input. Its existence does not independently establish completeness, review acceptance, task completion, provider closure, settlement, or legal admissibility.");
-    setStatus(status, "ready", "Read-only artifact loaded");
+    setReadyStatus(status, "Read-only artifact loaded");
   } catch (error) {
     setStatus(status, "corrupt", "Artifact unavailable"); text(byId("truth"), error instanceof Error ? error.message : "Evidence artifact unavailable"); setUnavailableValidity("corrupt"); byId("evidence").hidden = true;
   }
@@ -442,7 +462,7 @@ async function renderRecord() {
       datum("Provenance posture", projection.federation_posture),
       datum("Redaction", projection.redaction.state),
     );
-    setStatus(status, "ready", "Read-only record loaded");
+    setReadyStatus(status, "Read-only record loaded");
   } catch (error) {
     setStatus(status, "corrupt", "Record corrupt or unavailable");
     text(byId("truth"), error instanceof Error ? error.message : "Evidence record unavailable");
@@ -461,6 +481,7 @@ if (route.searchParams.get("artifact")) {
 } else if (route.searchParams.get("view") === "record" || defaultView === "record") {
   byId("registry").hidden = true;
   byId("record-detail").hidden = false;
+  if (defaultView === "record") byId("registry-back").hidden = true;
   renderRecord();
 } else {
   renderRegistry().catch(showRegistryUnavailable);

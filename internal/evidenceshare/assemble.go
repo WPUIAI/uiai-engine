@@ -23,8 +23,10 @@ var (
 	ErrConflict     = errors.New("screenshot evidence share content conflict")
 )
 
-//go:embed assets/index.html assets/styles.css assets/work-items.js assets/app.js
+//go:embed assets/index.html assets/styles.css assets/work-items.js assets/pwa.js assets/app.js assets/manifest.webmanifest assets/icon.svg assets/sw.js
 var assets embed.FS
+
+var packagedAssetNames = []string{"index.html", "styles.css", "work-items.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"}
 
 func Assemble(root string, input Input) (Result, error) {
 	if strings.TrimSpace(root) == "" || len(input.Screenshot) == 0 || input.Width <= 0 || input.Height <= 0 || input.CapturedAt.IsZero() {
@@ -100,15 +102,18 @@ func Assemble(root string, input Input) (Result, error) {
 		writes["projection.json"] = projectionBody
 	}
 	assetVersion := embeddedAssetsSHA256()[:12]
-	for _, name := range []string{"index.html", "styles.css", "work-items.js", "app.js"} {
+	for _, name := range packagedAssetNames {
 		data, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			return Result{}, err
 		}
-		if name == "index.html" {
+		switch name {
+		case "index.html":
 			page := strings.ReplaceAll(string(data), "__UIAI_ASSET_VERSION__", assetVersion)
 			page = strings.Replace(page, `data-default-view="registry"`, `data-default-view="record"`, 1)
 			data = []byte(page)
+		case "sw.js":
+			data = []byte(strings.ReplaceAll(string(data), "__UIAI_ASSET_VERSION__", assetVersion))
 		}
 		writes[name] = data
 	}
@@ -206,7 +211,7 @@ func inspectScreenshot(data []byte, mediaType, screenshotSHA string) (evidencear
 
 func embeddedAssetsSHA256() string {
 	hash := sha256.New()
-	for _, name := range []string{"index.html", "styles.css", "work-items.js", "app.js"} {
+	for _, name := range packagedAssetNames {
 		data, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			return ""
