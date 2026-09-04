@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -66,6 +67,53 @@ func TestBuildResearchPacketFromSourceMarkdownResponse(t *testing.T) {
 	data, _ := json.Marshal(packet)
 	if strings.Contains(string(data), "secret") || strings.Contains(string(data), "#frag") {
 		t.Fatalf("packet leaked secret/fragment: %s", string(data))
+	}
+}
+
+func TestAgentResearchPacketEndpointUsesCompleteBodyScope(t *testing.T) {
+	r := chi.NewRouter()
+	MountAgentPacketRoutes(r, &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}})
+	scope := completeEvidenceScope()
+	body, err := json.Marshal(researchPacketRequest{
+		Goal:      "body-scoped endpoint packet",
+		Responses: []map[string]any{{"focusa": map[string]any{"target_ref": "browser:https://example.test", "evidence_ref": "uiai-search:brave:body:1", "summary": "Search result"}}},
+		FocusaScope: &focusapacket.FocusaScope{
+			ProjectRef: scope.ProjectRef, ProjectRoot: "/private/source/root", WorkstreamRef: scope.WorkstreamRef,
+			WorksetRef: scope.WorksetRef, CallGraphRef: scope.CallGraphRef, WorkpointID: scope.WorkpointRef,
+			WorkItemRef: scope.WorkItemRef, WorkItems: scope.WorkItems, ContinuityID: scope.ContinuityRef,
+			EvidenceRef: "uiai-agent-packet-body-scope",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "https://evidence.example/research-packet", strings.NewReader(string(body)))
+	res := httptest.NewRecorder()
+	r.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
+	}
+	var packet map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&packet); err != nil {
+		t.Fatal(err)
+	}
+	if packet["schema"] != "uiai.artifact_result.v2" || packet["artifact_schema"] != "uiai.focusa_research_diagnostics_packet.v1" || packet["delivery_state"] != "ready" {
+		t.Fatalf("unexpected packet delivery envelope: %#v", packet)
+	}
+	delivery := packet["epwa_delivery"].(map[string]any)
+	deliveryScope := delivery["scope"].(map[string]any)
+	for key, want := range map[string]string{
+		"project_ref": scope.ProjectRef, "workstream_ref": scope.WorkstreamRef, "workset_ref": scope.WorksetRef,
+		"callgraph_ref": scope.CallGraphRef, "workpoint_ref": scope.WorkpointRef, "work_item_ref": scope.WorkItemRef,
+		"continuity_ref": scope.ContinuityRef,
+	} {
+		if deliveryScope[key] != want {
+			t.Fatalf("delivery scope %s=%v want %q: %#v", key, deliveryScope[key], want, deliveryScope)
+		}
+	}
+	packetScope := packet["focusa_scope"].(map[string]any)
+	if packetScope["project_ref"] != scope.ProjectRef || packetScope["project_root"] != nil || len(packetScope["work_items"].([]any)) != len(scope.WorkItems) {
+		t.Fatalf("packet scope was not public-safe and complete: %#v", packetScope)
 	}
 }
 

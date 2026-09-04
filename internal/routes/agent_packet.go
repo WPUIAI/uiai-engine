@@ -38,13 +38,34 @@ func MountAgentPacketRoutes(r chi.Router, cfg *config.Config) {
 		scope := evidenceScopeFromRequest(req)
 		if body.FocusaScope != nil {
 			if scope.ProjectRef == "" {
-				scope.ProjectRef = body.FocusaScope.ProjectRoot
+				scope.ProjectRef = body.FocusaScope.ProjectRef
+				if scope.ProjectRef == "" {
+					scope.ProjectRef = body.FocusaScope.ProjectRoot
+				}
+			}
+			if scope.WorkstreamRef == "" {
+				scope.WorkstreamRef = body.FocusaScope.WorkstreamRef
+			}
+			if scope.WorksetRef == "" {
+				scope.WorksetRef = body.FocusaScope.WorksetRef
+			}
+			if scope.CallGraphRef == "" {
+				scope.CallGraphRef = body.FocusaScope.CallGraphRef
 			}
 			if scope.WorkpointRef == "" {
 				scope.WorkpointRef = body.FocusaScope.WorkpointID
 			}
+			if scope.WorkItemRef == "" {
+				scope.WorkItemRef = body.FocusaScope.WorkItemRef
+			}
+			if len(scope.WorkItems) == 0 {
+				scope.WorkItems = append(scope.WorkItems, body.FocusaScope.WorkItems...)
+			}
 			if scope.ContinuityRef == "" {
 				scope.ContinuityRef = body.FocusaScope.ContinuityID
+			}
+			if body.FocusaScope.ProjectRef != "" {
+				packet.FocusaScope.ProjectRoot = ""
 			}
 		}
 		writeJSONArtifactEPWA(w, req, cfg, scope, "", "Focusa research and diagnostics packet", "research_packet", packet, http.StatusOK)
@@ -168,7 +189,7 @@ func packetScopeStatus(scope *focusapacket.FocusaScope) focusapacket.ScopeStatus
 	if scope == nil {
 		return focusapacket.ScopeMissing
 	}
-	if scope.ProjectRoot != "" && scope.ContinuityID != "" {
+	if (scope.ProjectRef != "" || scope.ProjectRoot != "") && scope.ContinuityID != "" {
 		return focusapacket.ScopePresent
 	}
 	return focusapacket.ScopePartial
