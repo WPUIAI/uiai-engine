@@ -21,6 +21,9 @@ jobs:
     timeout-minutes: 15
     env:
       OUT_DIR: /tmp/uiai-browser-reliability
+      # Contract fixture only; customer delivery proof must use its audited public HTTPS origin.
+      UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
+      UIAI_EVIDENCE_SCOPE_JSON: '{"project_ref":"project:uiai-engine-ci","project_root":"/home/wpuiai/uiai-engine","workstream_ref":"workstream:browser-reliability","workset_ref":"workset:browser-reliability","callgraph_ref":"callgraph:browser-reliability","workpoint_id":"workpoint:browser-reliability","work_item_ref":"work-item:browser-reliability","continuity_id":"continuity:browser-reliability","evidence_ref":"uiai-browser-reliability-ci","work_items":[{"work_item_ref":"work-item:browser-reliability","status":"in_progress"}]}'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
