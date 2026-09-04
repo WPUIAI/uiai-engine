@@ -78,8 +78,8 @@ func TestScreenshotAutomaticallyReturnsHumanViewableEvidenceShare(t *testing.T) 
 	}
 	view := httptest.NewRecorder()
 	router.ServeHTTP(view, httptest.NewRequest(http.MethodGet, response["artifact_path"].(string), nil))
-	if view.Code != http.StatusOK || !strings.Contains(view.Body.String(), "UIAI <b>×</b> Focusa") {
-		t.Fatalf("generated share not viewable: %d", view.Code)
+	if view.Code != http.StatusOK || !strings.Contains(view.Body.String(), "UIAI <b>×</b> Focusa") || !strings.Contains(view.Body.String(), `data-default-view="record"`) {
+		t.Fatalf("generated share not viewable as its bound record: %d", view.Code)
 	}
 	projectionPath := strings.TrimSuffix(response["artifact_path"].(string), "/") + "/projection.json"
 	projection := httptest.NewRecorder()

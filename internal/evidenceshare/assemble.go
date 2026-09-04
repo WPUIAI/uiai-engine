@@ -106,7 +106,9 @@ func Assemble(root string, input Input) (Result, error) {
 			return Result{}, err
 		}
 		if name == "index.html" {
-			data = []byte(strings.ReplaceAll(string(data), "__UIAI_ASSET_VERSION__", assetVersion))
+			page := strings.ReplaceAll(string(data), "__UIAI_ASSET_VERSION__", assetVersion)
+			page = strings.Replace(page, `data-default-view="registry"`, `data-default-view="record"`, 1)
+			data = []byte(page)
 		}
 		writes[name] = data
 	}

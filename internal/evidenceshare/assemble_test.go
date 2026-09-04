@@ -23,7 +23,7 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if !strings.HasPrefix(result.ArtifactRef, "uiai-evidence-share:sha256:") || !strings.HasPrefix(result.RelativePath, "./") {
 		t.Fatal("invalid portable identity")
 	}
-	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "app.js"} {
+	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "work-items.js", "app.js"} {
 		if info, err := os.Stat(filepath.Join(result.Directory, name)); err != nil || info.Size() == 0 {
 			t.Fatalf("missing %s: %v", name, err)
 		}
@@ -31,6 +31,9 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	indexBody, _ := os.ReadFile(filepath.Join(result.Directory, "index.html"))
 	if strings.Contains(string(indexBody), "__UIAI_ASSET_VERSION__") || !strings.Contains(string(indexBody), "?v="+embeddedAssetsSHA256()[:12]) {
 		t.Fatal("generated page does not bind its exact asset revision")
+	}
+	if !strings.Contains(string(indexBody), `data-default-view="record"`) || strings.Contains(string(indexBody), `data-default-view="registry"`) {
+		t.Fatal("generated portable package does not default to its bound evidence record")
 	}
 	body, _ := os.ReadFile(filepath.Join(result.Directory, "artifact.json"))
 	var manifest Manifest
@@ -192,7 +195,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		}
 		cursor = next
 	}
-	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, `id="registry"`, `id="registry-project"`, `id="registry-rows"`, `id="record-detail"`, `id="registry-back"`, `id="primary-evidence-frame"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
+	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, `data-default-view="registry"`, `id="registry"`, `id="registry-project"`, `id="registry-rows"`, `id="record-detail"`, `id="registry-back"`, `id="primary-evidence-frame"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
 		if !strings.Contains(htmlText, required) {
 			t.Fatalf("semantic shell missing %s", required)
 		}
@@ -206,7 +209,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		t.Fatal("renderer must not collapse validity layers into a success badge")
 	}
 	app, _ := assets.ReadFile("assets/app.js")
-	for _, required := range []string{"/api/evidence/registry/public", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord"} {
+	for _, required := range []string{"/api/evidence/registry/public", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`} {
 		if !strings.Contains(string(app), required) {
 			t.Fatalf("registry consumer missing %s", required)
 		}

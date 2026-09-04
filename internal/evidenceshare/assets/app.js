@@ -453,14 +453,15 @@ async function renderRecord() {
 
 wireRegistryControls();
 const route = new URL(location.href);
+const defaultView = document.body.dataset.defaultView || "registry";
 if (route.searchParams.get("artifact")) {
   byId("registry").hidden = true;
   byId("record-detail").hidden = false;
   renderPublicRecord();
+} else if (route.searchParams.get("view") === "record" || defaultView === "record") {
+  byId("registry").hidden = true;
+  byId("record-detail").hidden = false;
+  renderRecord();
 } else {
   renderRegistry().catch(showRegistryUnavailable);
-  if (route.searchParams.get("view") === "record") {
-    byId("record-detail").hidden = false;
-    renderRecord();
-  }
 }
