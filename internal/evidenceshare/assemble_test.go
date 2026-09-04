@@ -217,9 +217,14 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		t.Fatal("renderer must not collapse validity layers into a success badge")
 	}
 	app, _ := assets.ReadFile("assets/app.js")
-	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", `tr("offline_snapshot")`, "resource_profile", "media_posture", "snapshot_cursor", "AbortController", "controller.signal", "registryOverscan", "registrySpacer", "uiai.epwa_registry_snapshot.v1", "registrySnapshotLimit", "localStorage", "visibilitychange", "paused_lowmem", "paused_hidden", "paused_offline", "locale.number", `dd.dir = "auto"`, `code.dir = "ltr"`, `aria-busy", "true"`, "event.preventDefault()", `byId("registry-back").hidden = true`, `focus({ preventScroll: true })`} {
+	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", `tr("offline_snapshot")`, "resource_profile", "media_posture", "snapshot_cursor", "AbortController", "controller.signal", "registryOverscan", "registrySpacer", `matchMedia("(min-width: 601px)")`, "cursorHistory", `loadRegistry({ previous: true })`, `registryState.artifacts = (artifacts.rows || []).slice(0, registryPageSize)`, `registryState.workItems = (workItems.work_items || []).slice(0, registryPageSize)`, "uiai.epwa_registry_snapshot.v1", "registrySnapshotLimit", "localStorage", "visibilitychange", "paused_lowmem", "paused_hidden", "paused_offline", "locale.number", `dd.dir = "auto"`, `code.dir = "ltr"`, `aria-busy", "true"`, "event.preventDefault()", `byId("registry-back").hidden = true`, `focus({ preventScroll: true })`} {
 		if !strings.Contains(string(app), required) {
 			t.Fatalf("registry consumer missing %s", required)
+		}
+	}
+	for _, forbidden := range []string{"registryState.artifacts.push(", "registryState.workItems.push(", `matchMedia("(min-width: 769px)")`} {
+		if strings.Contains(string(app), forbidden) {
+			t.Fatalf("registry consumer retains unbounded or mismatched behavior %s", forbidden)
 		}
 	}
 	for _, forbidden := range []string{`const registryAPI = "/`, "/api/evidence/registry/closure", "/api/evidence/registry/sync?", `const tr = document.createElement("tr")`} {
@@ -246,7 +251,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	localeText := string(localeBody)
-	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`, `resource_profile:`, `media_posture:`, `snapshot_cursor:`} {
+	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`, `.replace(/_/g, "-")`, `resource_profile:`, `media_posture:`, `snapshot_cursor:`} {
 		if !strings.Contains(localeText, required) {
 			t.Fatalf("locale runtime missing %s", required)
 		}
@@ -265,7 +270,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 			t.Fatalf("translation key %s count=%d want=3", match[1], count)
 		}
 	}
-	for _, key := range []string{"offline_snapshot", "record_limitations", "work_item_unavailable", "relationships", "completion", "settlement", "legal"} {
+	for _, key := range []string{"offline_snapshot", "record_limitations", "work_item_unavailable", "relationships", "completion", "settlement", "legal", "provider", "bound_immutable_summary"} {
 		if count := translationCount(key); count != 3 {
 			t.Fatalf("dynamic translation key %s count=%d want=3", key, count)
 		}
@@ -274,7 +279,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{`tr("work_item_unavailable")`, `tr("relationships_label")`, `tr("settlement")`, `locale.number(index + 1)`} {
+	for _, required := range []string{`const workItemTranslate =`, `workItemTranslate("work_item_unavailable")`, `workItemTranslate("relationships_label")`, `workItemTranslate("settlement")`, `locale.number(index + 1)`} {
 		if !strings.Contains(string(workItems), required) {
 			t.Fatalf("localized Work Item renderer missing %s", required)
 		}
@@ -283,7 +288,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dynamicKeyPattern := regexp.MustCompile(`tr\("([a-z_]+)"`)
+	dynamicKeyPattern := regexp.MustCompile(`(?:tr|workItemTranslate)\("([a-z_]+)"`)
 	for _, match := range dynamicKeyPattern.FindAllStringSubmatch(string(appBody)+string(workItems), -1) {
 		if count := translationCount(match[1]); count != 3 {
 			t.Fatalf("dynamic translation key %s count=%d want=3", match[1], count)

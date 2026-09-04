@@ -118,8 +118,16 @@ func TestEvidenceRegistryReadRoutes(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
 		body := recorder.Body.String()
-		if recorder.Code != http.StatusOK || !strings.Contains(body, `"page_size":25`) || !strings.Contains(body, `"resource_profile":"lowmem"`) || !strings.Contains(body, `"media_posture":"omitted_nonessential"`) {
-			t.Fatalf("GET %s did not enforce LowMem: status=%d body=%s", path, recorder.Code, body)
+		var response struct {
+			PageSize        int    `json:"page_size"`
+			ResourceProfile string `json:"resource_profile"`
+			MediaPosture    string `json:"media_posture"`
+		}
+		if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+			t.Fatalf("GET %s returned invalid JSON: %v body=%s", path, err, body)
+		}
+		if recorder.Code != http.StatusOK || response.PageSize != evidenceregistry.MaxLowMemPageSize || response.ResourceProfile != "lowmem" || response.MediaPosture != "omitted_nonessential" {
+			t.Fatalf("GET %s did not enforce LowMem: status=%d response=%+v body=%s", path, recorder.Code, response, body)
 		}
 	}
 
