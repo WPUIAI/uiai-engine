@@ -472,7 +472,7 @@ func testManifest() Manifest {
 			Custody: []CustodyEvent{{EventID: "custody:1", Action: "captured", ActorRef: "agent:executor", InstanceRef: "instance:uiai", InputRefs: []string{"source:go-test"}, OutputRefs: []string{"asset:proof"}, OccurredAt: "2026-08-29T12:00:00Z"}},
 		},
 		Verification: Verification{Status: VerificationPending, ReviewCaseRef: "review-case:epwa-t01", VerifierRefs: []string{"agent:judge"}, JudgeResultRefs: []string{}, DecisionRefs: []string{}},
-		Security:     Security{PolicyRef: StrictSecurityPolicyV1, InspectionReceiptRefs: []string{}, SanitizationRefs: []string{}, RedactionRefs: []string{}},
+		Security:     Security{PolicyRef: StrictSecurityPolicyV1, InspectionReceiptRefs: []string{}, SanitizationRefs: []string{}, RedactionRefs: []string{"redaction:proof"}},
 		ReceiptRefs:  []string{"receipt:capture"},
 		Policy:       Policy{AccessClass: AccessPrivateTeam, RedactionState: RedactionPublicSafe, Audience: "project_reviewers", RetentionClass: RetentionWorkstream, PolicyRefs: []string{"policy:evidence"}},
 		Integrity:    Integrity{Algorithm: "sha256", BundleSHA256: digestB},
