@@ -20,6 +20,18 @@ assert result == {
 }, result
 PY
 
+malicious_scope='{"project_ref":"project:test\r\nX-Injected: true"}'
+if UIAI_EVIDENCE_SCOPE_JSON="$malicious_scope" scripts/uiai-open-result.sh --search-json "$TMPDIR/empty.json" >"$TMPDIR/open-injection.out" 2>"$TMPDIR/open-injection.err"; then
+  echo "uiai-open-result accepted a scope header injection" >&2
+  exit 1
+fi
+grep -F 'X-UIAI-Project-Ref contains forbidden control characters.' "$TMPDIR/open-injection.out" >/dev/null
+if UIAI_EVIDENCE_SCOPE_JSON="$malicious_scope" scripts/uiai status >"$TMPDIR/cli-injection.out" 2>"$TMPDIR/cli-injection.err"; then
+  echo "uiai CLI accepted a scope header injection" >&2
+  exit 1
+fi
+grep -F 'evidence scope header values must not contain control characters' "$TMPDIR/cli-injection.err" >/dev/null
+
 cat >"$TMPDIR/nested-raw.json" <<'JSON'
 {
   "delivery_state": "ready",

@@ -14,6 +14,7 @@ fi
 SCOPE_ARGS=()
 if [[ -n "${UIAI_EVIDENCE_SCOPE_JSON:-}" ]]; then
   jq -e 'type == "object"' >/dev/null <<<"$UIAI_EVIDENCE_SCOPE_JSON" || { printf 'uiai: UIAI_EVIDENCE_SCOPE_JSON must be a JSON object\n' >&2; exit 4; }
+  jq -e '[.project_ref,.project_root,.workstream_ref,.workset_ref,.callgraph_ref,.workpoint_ref,.workpoint_id,.work_item_ref,.continuity_ref,.continuity_id] | map(select(type == "string")) | all(test("[\\u0000-\\u001F\\u007F]") | not)' >/dev/null <<<"$UIAI_EVIDENCE_SCOPE_JSON" || { printf 'uiai: evidence scope header values must not contain control characters\n' >&2; exit 4; }
   while IFS=$'\t' read -r header value; do
     [[ -n "$value" ]] && SCOPE_ARGS+=(-H "$header: $value")
   done < <(jq -r '

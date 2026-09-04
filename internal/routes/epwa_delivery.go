@@ -228,7 +228,19 @@ func publishStoredArtifactEPWA(req *http.Request, cfg *config.Config, artifacts 
 	if err != nil {
 		return epwadelivery.Delivery{}, err
 	}
-	return epwadelivery.Record(epwaDeliveryRoot(cfg), delivery)
+	recorded, recordErr := epwadelivery.Record(epwaDeliveryRoot(cfg), delivery)
+	if recordErr == nil {
+		return recorded, nil
+	}
+	delivery.State = epwadelivery.StatePendingReconcile
+	delivery.EPWA.RecordURL = ""
+	delivery.EPWA.PortableURL = ""
+	delivery.RecoveryRef = "reconcile:epwa-delivery-record"
+	delivery.ObservedAt = time.Now().UTC()
+	if validationErr := epwadelivery.Validate(delivery); validationErr != nil {
+		return epwadelivery.Delivery{}, errors.Join(recordErr, validationErr)
+	}
+	return delivery, recordErr
 }
 
 func artifactHasBlockedAssets(manifest evidenceartifact.Manifest) bool {

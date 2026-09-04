@@ -48,7 +48,11 @@ for header, keys in {
     'X-UIAI-Continuity-Ref':['continuity_ref','continuity_id'],
 }.items():
     value=next((scope.get(key) for key in keys if isinstance(scope.get(key),str) and scope.get(key).strip()),None)
-    if value: headers[header]=value.strip()
+    if value:
+        value=value.strip()
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            fail('invalid_evidence_scope', f'{header} contains forbidden control characters.')
+        headers[header]=value
 if isinstance(scope.get('work_items'),list): headers['X-UIAI-Work-Items']=json.dumps(scope['work_items'],separators=(',',':'))
 def req(method,path,payload=None):
     data=None; h=dict(headers)

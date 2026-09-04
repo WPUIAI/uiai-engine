@@ -63,15 +63,20 @@ func MountEvidenceArtifacts(r chi.Router, cfg *config.Config, artifacts *evidenc
 			writeEvidenceArtifactError(w, http.StatusUnprocessableEntity, "commit_rejected", err)
 			return
 		}
-		response := map[string]any{"schema": "uiai.evidence_artifact_commit_result.v2", "commit": commit, "registry_state": "projection_pending"}
+		response := map[string]any{"schema": "uiai.evidence_artifact_commit_result.v2", "artifact_ref": commit.ArtifactID, "commit": commit, "registry_state": "projection_pending"}
 		delivery, deliveryErr := publishStoredArtifactEPWA(req, cfg, artifacts, commit.ArtifactID, commit.Revision, "artifact:"+commit.CommitID)
 		if deliveryErr != nil {
-			response["delivery_state"] = epwadelivery.StatePendingReconcile
 			response["epwa_delivery_error"] = epwaPublishError{
 				Schema: "uiai.epwa_delivery_error.v1", State: epwadelivery.StatePendingReconcile,
 				ArtifactRef: commit.ArtifactID, ArtifactSHA256: commit.ManifestSHA256,
 				RecoveryRef: "reconcile:evidence-artifact-epwa-publication",
 				Error:       epwaPublishErrorDetail{Code: "epwa_publication_failed", Message: deliveryErr.Error(), Retryable: true},
+			}
+			if delivery.Schema == epwadelivery.Schema {
+				response["delivery_state"] = delivery.State
+				response["epwa_delivery"] = delivery
+			} else {
+				response["schema"] = "uiai.evidence_artifact_commit_delivery_error.v1"
 			}
 		} else {
 			response["delivery_state"] = delivery.State
