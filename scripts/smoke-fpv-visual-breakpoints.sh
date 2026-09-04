@@ -6,7 +6,21 @@ OUT_DIR=${OUT_DIR:-/tmp/uiai-fpv-visual}
 BASELINE_DIR=${BASELINE_DIR:-tests/fixtures/fpv-visual-baselines}
 UPDATE_BASELINE=${UPDATE_BASELINE:-0}
 DIFF_THRESHOLD=${DIFF_THRESHOLD:-0.28}
+: "${UIAI_EVIDENCE_SCOPE_JSON:?UIAI_EVIDENCE_SCOPE_JSON is required for EPWA-producing browser smoke}"
+jq -e 'type == "object"' >/dev/null <<<"$UIAI_EVIDENCE_SCOPE_JSON" || { echo "UIAI_EVIDENCE_SCOPE_JSON must be a JSON object" >&2; exit 2; }
 mkdir -p "$OUT_DIR"
+
+require_epwa() {
+  jq -e '
+    .epwa_delivery.schema == "uiai.epwa_delivery.v1" and
+    .delivery_state == "ready" and .epwa_delivery.state == .delivery_state and
+    .epwa_delivery.artifact.artifact_ref == .artifact_ref and
+    (.artifact_url | type == "string" and startswith("https://")) and
+    (.portable_url | type == "string" and startswith("https://")) and
+    .artifact_url == .epwa_delivery.epwa.record_url and
+    .portable_url == .epwa_delivery.epwa.portable_url and
+    ([.. | objects | keys[]] | any(. == "screenshot" or . == "imageBase64" or . == "image_base64" or . == "artifact_path" or . == "result_path" or . == "result_url") | not)' >/dev/null
+}
 
 cleanup() {
   curl -fsS "$ENGINE_URL/api/session" 2>/dev/null | jq -r '.sessions[].id' | while read -r id; do
@@ -15,9 +29,12 @@ cleanup() {
 }
 cleanup
 
-source_json=$(curl -fsS -X POST "$ENGINE_URL/api/session" -H 'Content-Type: application/json' -d '{"url":"https://project-nullframe.vercel.app/","width":1440,"height":1000}')
+source_payload=$(jq -cn --argjson scope "$UIAI_EVIDENCE_SCOPE_JSON" '{url:"https://project-nullframe.vercel.app/",width:1440,height:1000,focusa_scope:$scope}')
+source_json=$(curl -fsS -X POST "$ENGINE_URL/api/session" -H 'Content-Type: application/json' -d "$source_payload")
+printf '%s' "$source_json" | require_epwa
 source_id=$(printf '%s' "$source_json" | jq -r .session.id)
 share_json=$(curl -fsS -X POST "$ENGINE_URL/api/fpv/share" -H 'Content-Type: application/json' -d "{\"session_id\":\"$source_id\",\"expires_minutes\":10,\"controls\":true}")
+printf '%s' "$share_json" | require_epwa
 token=$(printf '%s' "$share_json" | jq -r .token)
 url="https://$PUBLIC_HOST/m/$token"
 
@@ -28,13 +45,17 @@ api_code=$(curl -ksS -o /dev/null -w '%{http_code}' "https://$PUBLIC_HOST/api/he
 
 for spec in 375x812 768x1024 1024x900 1440x1000; do
   w=${spec%x*}; h=${spec#*x}
-  viewer=$(curl -fsS -X POST "$ENGINE_URL/api/session" -H 'Content-Type: application/json' -d "{\"url\":\"$url\",\"width\":$w,\"height\":$h}")
+  viewer_payload=$(jq -cn --arg url "$url" --argjson width "$w" --argjson height "$h" --argjson scope "$UIAI_EVIDENCE_SCOPE_JSON" '{url:$url,width:$width,height:$height,focusa_scope:$scope}')
+  viewer=$(curl -fsS -X POST "$ENGINE_URL/api/session" -H 'Content-Type: application/json' -d "$viewer_payload")
+  printf '%s' "$viewer" | require_epwa
   vid=$(printf '%s' "$viewer" | jq -r .session.id)
   sleep 2
   shot=$(curl -fsS -X POST "$ENGINE_URL/api/session/$vid/screenshot" -H 'Content-Type: application/json' -d '{"format":"jpeg","quality":70}')
-  printf '%s' "$shot" | jq -r .screenshot > "$OUT_DIR/$spec.b64"
-  base64 -d "$OUT_DIR/$spec.b64" > "$OUT_DIR/$spec.jpg"
-  [ -s "$OUT_DIR/$spec.jpg" ] || { echo "missing screenshot for $spec" >&2; exit 1; }
+  printf '%s' "$shot" | require_epwa
+  portable_url=$(printf '%s' "$shot" | jq -r .portable_url)
+  curl -fsS "$portable_url" -o "$OUT_DIR/$spec.zip"
+  unzip -p "$OUT_DIR/$spec.zip" screenshot.jpeg > "$OUT_DIR/$spec.jpg"
+  [ -s "$OUT_DIR/$spec.jpg" ] || { echo "EPWA portable package omitted screenshot.jpeg for $spec" >&2; exit 1; }
   if [ "$UPDATE_BASELINE" = "1" ]; then
     mkdir -p "$BASELINE_DIR"
     cp "$OUT_DIR/$spec.jpg" "$BASELINE_DIR/$spec.jpg"
@@ -61,6 +82,7 @@ PY
     echo "fpv visual $spec baseline missing; set UPDATE_BASELINE=1 to capture $BASELINE_DIR/$spec.jpg"
   fi
   diag=$(curl -fsS "$ENGINE_URL/api/session/$vid/diagnostics?level=error&limit=40")
+  printf '%s' "$diag" | require_epwa
   printf '%s' "$diag" | jq -e '(.exceptions|length)==0 and (.console|length)==0' >/dev/null
   curl -fsS -X DELETE "$ENGINE_URL/api/session/$vid" >/dev/null || true
   echo "fpv visual $spec ok"

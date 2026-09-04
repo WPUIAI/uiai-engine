@@ -10,6 +10,11 @@ DURATION_SECONDS="${DURATION_SECONDS:-300}"
 CONCURRENCY="${CONCURRENCY:-2}"
 OUT="${OUT:-/tmp/uiai-browser-flakiness-soak.json}"
 ENGINE_BIN="${ENGINE_BIN:-/tmp/uiai-engine-soak}"
+: "${UIAI_EVIDENCE_SCOPE_JSON:?UIAI_EVIDENCE_SCOPE_JSON is required for EPWA-producing soak runs}"
+: "${UIAI_EPWA_PUBLIC_BASE_URL:?UIAI_EPWA_PUBLIC_BASE_URL must name the governed HTTPS EPWA surface}"
+[[ "$UIAI_EPWA_PUBLIC_BASE_URL" == https://* ]] || { echo "UIAI_EPWA_PUBLIC_BASE_URL must use HTTPS" >&2; exit 2; }
+jq -e 'type == "object"' >/dev/null <<<"$UIAI_EVIDENCE_SCOPE_JSON" || { echo "UIAI_EVIDENCE_SCOPE_JSON must be a JSON object" >&2; exit 2; }
+export UIAI_EPWA_PUBLIC_BASE_URL
 
 cd "$ROOT_DIR"
 go build -o "$ENGINE_BIN" ./cmd/uiai-engine
@@ -54,7 +59,7 @@ python3 -m http.server "$SITE_PORT" -d "$TMPDIR/site" >/tmp/uiai-soak-site.log 2
 for _ in $(seq 1 120); do curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null 2>&1 && break; sleep 0.5; done
 curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null
 
-export ENGINE_PORT SITE_PORT DURATION_SECONDS CONCURRENCY OUT FOCUSA_WORKPOINT_ID="${FOCUSA_WORKPOINT_ID:-}" FOCUSA_CONTINUITY_ID="${FOCUSA_CONTINUITY_ID:-}" FOCUSA_PROJECT_ROOT="${FOCUSA_PROJECT_ROOT:-}" FOCUSA_EVIDENCE_REF="${FOCUSA_EVIDENCE_REF:-uiai-browser-flakiness-soak:$OUT}"
+export ENGINE_PORT SITE_PORT DURATION_SECONDS CONCURRENCY OUT UIAI_EVIDENCE_SCOPE_JSON
 python3 - <<'PY'
 import concurrent.futures, json, os, statistics, time, urllib.error, urllib.request
 engine=f"http://127.0.0.1:{os.environ['ENGINE_PORT']}"
@@ -63,12 +68,7 @@ duration=int(os.environ['DURATION_SECONDS'])
 concurrency=int(os.environ['CONCURRENCY'])
 out=os.environ['OUT']
 end=time.time()+duration
-focusa_scope={k:v for k,v in {
-    'workpoint_id': os.environ.get('FOCUSA_WORKPOINT_ID',''),
-    'continuity_id': os.environ.get('FOCUSA_CONTINUITY_ID',''),
-    'project_root': os.environ.get('FOCUSA_PROJECT_ROOT',''),
-    'evidence_ref': os.environ.get('FOCUSA_EVIDENCE_REF',''),
-}.items() if v}
+focusa_scope=json.loads(os.environ['UIAI_EVIDENCE_SCOPE_JSON'])
 
 def req(method,url,body=None,ok=(200,201)):
     data=None if body is None else json.dumps(body).encode()
@@ -83,6 +83,16 @@ def req(method,url,body=None,ok=(200,201)):
         except Exception: body={'error': raw}
         return e.code, body
 
+def require_delivery(body, operation):
+    forbidden={'screenshot','imageBase64','image_base64','artifact_path','result_path','result_url'}
+    delivery=body.get('epwa_delivery') or {}
+    epwa=delivery.get('epwa') or {}
+    if forbidden.intersection(body): raise ValueError(f'{operation}: raw artifact field returned')
+    if delivery.get('schema')!='uiai.epwa_delivery.v1' or delivery.get('state')!='ready' or body.get('delivery_state')!='ready' or (delivery.get('artifact') or {}).get('artifact_ref')!=body.get('artifact_ref'):
+        raise ValueError(f'{operation}: EPWA delivery is not ready and identity-bound')
+    if not str(epwa.get('record_url','')).startswith('https://') or not str(epwa.get('portable_url','')).startswith('https://') or body.get('artifact_url')!=epwa.get('record_url') or body.get('portable_url')!=epwa.get('portable_url'):
+        raise ValueError(f'{operation}: canonical HTTPS EPWA URLs missing')
+
 def one(i):
     label=f"w{i}-{int(time.time()*1000)}"
     started=time.time()
@@ -94,10 +104,13 @@ def one(i):
         return {'ok':False,'phase':'open','status':status,'error_class':opened.get('error_class'),'elapsed_ms':round((time.time()-started)*1000)}
     sid=opened['session']['id']
     try:
+        require_delivery(opened,'session open')
         status, late=req('POST',f"{engine}/api/session/{sid}/click",{'selector':'#late'})
         status2, shot=req('POST',f"{engine}/api/session/{sid}/screenshot",{})
         status3, missing=req('POST',f"{engine}/api/session/{sid}/click",{'selector':'#missing'},ok=(500,))
         status4, diag=req('GET',f"{engine}/api/session/{sid}/diagnostics?limit=50")
+        require_delivery(shot,'screenshot')
+        require_delivery(diag,'diagnostics')
         req('DELETE',f"{engine}/api/session/{sid}")
         # Core soak assertions: session opens, late click succeeds, screenshot succeeds.
         # Negative assertions (missing selector, failed network) are tracked separately.

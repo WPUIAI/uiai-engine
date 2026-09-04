@@ -1,6 +1,7 @@
 package evidenceshare
 
 import (
+	"archive/zip"
 	"context"
 	"crypto/sha256"
 	"embed"
@@ -8,9 +9,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,10 +26,10 @@ var (
 	ErrConflict     = errors.New("screenshot evidence share content conflict")
 )
 
-//go:embed assets/index.html assets/styles.css assets/work-items.js assets/pwa.js assets/app.js assets/manifest.webmanifest assets/icon.svg assets/sw.js
+//go:embed assets/index.html assets/styles.css assets/work-items.js assets/generic-record.js assets/pwa.js assets/app.js assets/manifest.webmanifest assets/icon.svg assets/sw.js
 var assets embed.FS
 
-var packagedAssetNames = []string{"index.html", "styles.css", "work-items.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"}
+var packagedAssetNames = []string{"index.html", "styles.css", "work-items.js", "generic-record.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"}
 
 func Assemble(root string, input Input) (Result, error) {
 	if strings.TrimSpace(root) == "" || len(input.Screenshot) == 0 || input.Width <= 0 || input.Height <= 0 || input.CapturedAt.IsZero() {
@@ -67,6 +70,7 @@ func Assemble(root string, input Input) (Result, error) {
 	manifestBindingSHA := hex.EncodeToString(manifestDigest[:])
 	manifestSHA := id
 	var projectionBody []byte
+	projectionSHA := ""
 	if input.Scope.Complete() {
 		projection, err := buildProjection(manifest, manifestBindingSHA)
 		if err != nil {
@@ -77,13 +81,30 @@ func Assemble(root string, input Input) (Result, error) {
 			return Result{}, err
 		}
 		projectionBody = append(projectionBody, '\n')
+		projectionDigest := sha256.Sum256(projectionBody)
+		projectionSHA = hex.EncodeToString(projectionDigest[:])
 	}
 	finalDir := filepath.Join(root, id)
+	result := func(packageSHA string) Result {
+		projectionRef := ""
+		if projectionSHA != "" {
+			projectionRef = "uiai-evidence-projection:sha256:" + manifest.ArtifactSHA256
+		}
+		return Result{
+			PackageID: id, ArtifactRef: artifactRef, ArtifactSHA256: manifestSHA, ManifestSHA256: manifestBindingSHA,
+			ProjectionRef: projectionRef, ProjectionSHA256: projectionSHA, OutputSHA256: screenshotSHA,
+			PackageSHA256: packageSHA, RelativePath: "./" + id + "/", PortableRelativePath: "./" + id + "/portable.zip", Directory: finalDir,
+		}
+	}
 	if existing, err := os.ReadFile(filepath.Join(finalDir, "artifact.json")); err == nil {
 		if string(existing) != string(body) {
 			return Result{}, ErrConflict
 		}
-		return Result{ArtifactRef: artifactRef, ArtifactSHA256: manifestSHA, RelativePath: "./" + id + "/", Directory: finalDir}, nil
+		packageSHA, err := EnsurePortableArchive(root, id)
+		if err != nil {
+			return Result{}, err
+		}
+		return result(packageSHA), nil
 	}
 	if err := os.MkdirAll(root, 0o750); err != nil {
 		return Result{}, err
@@ -128,7 +149,128 @@ func Assemble(root string, input Input) (Result, error) {
 		}
 		return Result{}, err
 	}
-	return Result{ArtifactRef: artifactRef, ArtifactSHA256: manifestSHA, RelativePath: "./" + id + "/", Directory: finalDir}, nil
+	packageSHA, err := EnsurePortableArchive(root, id)
+	if err != nil {
+		return Result{}, err
+	}
+	return result(packageSHA), nil
+}
+
+// EnsurePortableArchive creates the deterministic, dependency-free archive for an
+// EPWA directory. The archive is adjacent to the immutable directory so it never
+// participates in its own digest.
+func EnsurePortableArchive(root, id string) (string, error) {
+	if strings.TrimSpace(root) == "" || len(id) != 64 {
+		return "", ErrInvalidInput
+	}
+	if _, err := hex.DecodeString(id); err != nil {
+		return "", ErrInvalidInput
+	}
+	directory := filepath.Join(root, id)
+	names := make([]string, 0, len(packagedAssetNames)+4)
+	if err := filepath.WalkDir(directory, func(current string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if current == directory {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return ErrInvalidInput
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !entry.Type().IsRegular() {
+			return ErrInvalidInput
+		}
+		relative, err := filepath.Rel(directory, current)
+		if err != nil {
+			return err
+		}
+		name := filepath.ToSlash(relative)
+		if !safePackagePath(name) {
+			return ErrInvalidInput
+		}
+		names = append(names, name)
+		return nil
+	}); err != nil {
+		return "", err
+	}
+	if len(names) == 0 {
+		return "", ErrInvalidInput
+	}
+	sort.Strings(names)
+	archivePath := filepath.Join(root, id+".zip")
+	temporary, err := os.CreateTemp(root, ".portable-*.zip")
+	if err != nil {
+		return "", err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	writer := zip.NewWriter(temporary)
+	for _, name := range names {
+		data, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(name)))
+		if err != nil {
+			_ = writer.Close()
+			_ = temporary.Close()
+			return "", err
+		}
+		header := &zip.FileHeader{Name: name, Method: zip.Store}
+		header.SetMode(0o644)
+		header.Modified = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
+		file, err := writer.CreateHeader(header)
+		if err != nil {
+			_ = writer.Close()
+			_ = temporary.Close()
+			return "", err
+		}
+		if _, err := file.Write(data); err != nil {
+			_ = writer.Close()
+			_ = temporary.Close()
+			return "", err
+		}
+	}
+	if err := writer.Close(); err != nil {
+		_ = temporary.Close()
+		return "", err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return "", err
+	}
+	if err := temporary.Close(); err != nil {
+		return "", err
+	}
+	candidateSHA, err := fileSHA256(temporaryPath)
+	if err != nil {
+		return "", err
+	}
+	if existingSHA, err := fileSHA256(archivePath); err == nil {
+		if existingSHA != candidateSHA {
+			return "", ErrConflict
+		}
+		return existingSHA, nil
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	if err := os.Rename(temporaryPath, archivePath); err != nil {
+		return "", err
+	}
+	return candidateSHA, nil
+}
+
+func fileSHA256(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	digest := sha256.New()
+	if _, err := io.Copy(digest, file); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
 func buildProjection(manifest Manifest, manifestSHA string) (evidencepwa.Projection, error) {

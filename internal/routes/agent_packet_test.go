@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -70,9 +71,19 @@ func TestBuildResearchPacketFromSourceMarkdownResponse(t *testing.T) {
 
 func TestAgentResearchPacketEndpoint(t *testing.T) {
 	r := chi.NewRouter()
-	MountAgentPacketRoutes(r)
+	MountAgentPacketRoutes(r, &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}})
 	body := `{"goal":"endpoint packet","responses":[{"focusa":{"target_ref":"browser:https://example.test","evidence_ref":"uiai-search:brave:abc:1","summary":"Search result"}}]}`
-	req := httptest.NewRequest(http.MethodPost, "/research-packet", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "https://evidence.example/research-packet", strings.NewReader(body))
+	scope := completeEvidenceScope()
+	req.Header.Set("X-UIAI-Project-Ref", scope.ProjectRef)
+	req.Header.Set("X-UIAI-Workstream-Ref", scope.WorkstreamRef)
+	req.Header.Set("X-UIAI-Workset-Ref", scope.WorksetRef)
+	req.Header.Set("X-UIAI-CallGraph-Ref", scope.CallGraphRef)
+	req.Header.Set("X-UIAI-Workpoint-Ref", scope.WorkpointRef)
+	req.Header.Set("X-UIAI-Work-Item-Ref", scope.WorkItemRef)
+	req.Header.Set("X-UIAI-Continuity-Ref", scope.ContinuityRef)
+	workItems, _ := json.Marshal(scope.WorkItems)
+	req.Header.Set("X-UIAI-Work-Items", string(workItems))
 	res := httptest.NewRecorder()
 	r.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
@@ -82,8 +93,8 @@ func TestAgentResearchPacketEndpoint(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&packet); err != nil {
 		t.Fatal(err)
 	}
-	if packet["schema"] != "uiai.focusa_research_diagnostics_packet.v1" {
-		t.Fatalf("unexpected packet: %#v", packet)
+	if packet["schema"] != "uiai.artifact_result.v2" || packet["artifact_schema"] != "uiai.focusa_research_diagnostics_packet.v1" || packet["delivery_state"] != "ready" {
+		t.Fatalf("unexpected packet delivery envelope: %#v", packet)
 	}
 	captures := packet["captures"].([]any)
 	if len(captures) != 1 {

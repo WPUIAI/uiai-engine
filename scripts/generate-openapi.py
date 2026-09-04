@@ -17,6 +17,8 @@ for sid, entry in schemas.items():
     sch = json.loads(p.read_text())
     # store under sanitized key for OpenAPI components
     key = sid.replace(".", "_").replace("-", "_")
+    if sid == "uiai.artifact_delivery_envelope.v2":
+        sch["properties"]["epwa_delivery"]["$ref"] = "#/components/schemas/uiai_epwa_delivery_v1"
     components_schemas[key] = sch
 
 openapi = {
@@ -59,6 +61,36 @@ openapi = {
     },
     "components": {"schemas": components_schemas}
 }
+
+artifact_response = {
+    "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"}}},
+}
+artifact_responses = {"200": artifact_response, "201": artifact_response, "202": artifact_response}
+artifact_routes = {
+    "/api/screenshot": ("post", "Capture screenshot with mandatory EPWA delivery"),
+    "/api/screenshot/compare": ("post", "Compare screenshots with mandatory EPWA report delivery"),
+    "/api/session": ("post", "Create browser session with mandatory initial visual EPWA delivery"),
+    "/api/session/{sessionID}/screenshot": ("post", "Capture session visual with mandatory EPWA delivery"),
+    "/api/session/{sessionID}/snapshot": ("get", "Capture accessibility snapshot with mandatory EPWA delivery"),
+    "/api/session/{sessionID}/dom": ("get", "Capture DOM snapshot with mandatory EPWA delivery"),
+    "/api/session/{sessionID}/read": ("post", "Capture source snapshot with mandatory EPWA delivery"),
+    "/api/session/{sessionID}/diagnostics": ("get", "Capture diagnostics bundle with mandatory EPWA delivery"),
+    "/api/search": ("post", "Produce search report with mandatory EPWA delivery"),
+    "/api/markdown": ("post", "Produce source-to-Markdown artifact with mandatory EPWA delivery"),
+    "/api/agent/research-packet": ("post", "Produce bounded research packet with mandatory EPWA delivery"),
+    "/api/critique": ("post", "Produce critique report with mandatory EPWA delivery"),
+    "/api/media/frame/render": ("post", "Render framed media with mandatory EPWA delivery"),
+    "/api/evidence/artifacts/commit": ("post", "Commit immutable artifact with mandatory EPWA delivery"),
+    "/api/share/{id}/screenshot": ("post", "Capture share screenshot with mandatory EPWA delivery"),
+    "/api/fpv/share": ("post", "Create operational FPV mirror with mandatory EPWA evidence snapshot"),
+    "/api/intelligence/index/upload": ("post", "Upload index artifacts with mandatory EPWA delivery for every artifact"),
+    "/api/intelligence/wasm/{runId}": ("post", "Upload WASM with mandatory EPWA delivery"),
+    "/api/intelligence/js/{runId}": ("post", "Upload JavaScript with mandatory EPWA delivery"),
+}
+for path, (method, summary) in artifact_routes.items():
+    openapi["paths"].setdefault(path, {})[method] = {"summary": summary, "responses": artifact_responses}
+
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(json.dumps(openapi, indent=2) + "\n")
 # MR-P0-03/04: keep Go embed in sync — binary serves via //go:embed

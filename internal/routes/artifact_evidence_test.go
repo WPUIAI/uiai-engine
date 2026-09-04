@@ -23,8 +23,8 @@ func TestShareEvidence(t *testing.T) {
 	if ev["evidence_ref"] != "uiai-share:abc" {
 		t.Fatalf("unexpected evidence ref: %#v", ev)
 	}
-	if ev["artifact_ref"] != "/api/share/abc" {
-		t.Fatalf("unexpected artifact ref: %#v", ev)
+	if ev["artifact_ref"] != nil || ev["operational_share_ref"] != "/api/share/abc" || ev["delivery_posture"] != "ephemeral_non_evidence" {
+		t.Fatalf("operational share was mislabeled as artifact delivery: %#v", ev)
 	}
 }
 

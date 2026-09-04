@@ -11,6 +11,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/ai"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/WPUIAI/uiai-engine/internal/ratelimit"
 	"github.com/WPUIAI/uiai-engine/internal/storage"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
@@ -63,6 +64,7 @@ func MountScreenshotCompare(r chi.Router, cfg *config.Config, pool vision.PoolSo
 		// Capture screenshots if URLs provided
 		img1 := body.Base64_1
 		img2 := body.Base64_2
+		width1, height1, width2, height2 := body.Width, body.Height, body.Width, body.Height
 
 		if body.URL1 != "" && pool != nil {
 			result, err := pool.Screenshot(vision.ScreenshotOpts{
@@ -74,6 +76,7 @@ func MountScreenshotCompare(r chi.Router, cfg *config.Config, pool vision.PoolSo
 				return
 			}
 			img1 = base64.StdEncoding.EncodeToString(result.Data)
+			width1, height1 = result.Width, result.Height
 		}
 
 		if body.URL2 != "" && pool != nil {
@@ -86,6 +89,40 @@ func MountScreenshotCompare(r chi.Router, cfg *config.Config, pool vision.PoolSo
 				return
 			}
 			img2 = base64.StdEncoding.EncodeToString(result.Data)
+			width2, height2 = result.Width, result.Height
+		}
+
+		pixels1, err := base64.StdEncoding.DecodeString(img1)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "base64_1 is invalid"})
+			return
+		}
+		pixels2, err := base64.StdEncoding.DecodeString(img2)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "base64_2 is invalid"})
+			return
+		}
+		firstDelivery, err := publishLegacyVisualEPWA(req, cfg, pixels1, compareImageFormat(pixels1), width1, height1, body.URL1)
+		if err != nil {
+			writeEPWAPublishError(w, http.StatusServiceUnavailable, "comparison_input_epwa_failed", err, screenshotEvidenceRef(pixels1), "", "reconcile:screenshot-compare-input-1")
+			return
+		}
+		secondDelivery, err := publishLegacyVisualEPWA(req, cfg, pixels2, compareImageFormat(pixels2), width2, height2, body.URL2)
+		if err != nil {
+			writeEPWAPublishError(w, http.StatusServiceUnavailable, "comparison_input_epwa_failed", err, screenshotEvidenceRef(pixels2), "", "reconcile:screenshot-compare-input-2")
+			return
+		}
+		if firstDelivery.State != epwadelivery.StateReady || secondDelivery.State != epwadelivery.StateReady {
+			state := firstDelivery.State
+			if state == epwadelivery.StateReady {
+				state = secondDelivery.State
+			}
+			writeJSON(w, http.StatusAccepted, map[string]any{
+				"schema": "uiai.screenshot_compare_result.v2", "delivery_state": state,
+				"input_deliveries":   []epwadelivery.Delivery{firstDelivery, secondDelivery},
+				"comparison_posture": "withheld_until_all_epwa_inputs_ready",
+			})
+			return
 		}
 
 		// Send both images to AI for comparison
@@ -141,13 +178,22 @@ Return JSON: {
 			})
 		}
 
-		writeJSON(w, 200, map[string]any{
-			"comparison":   resp.Content,
-			"model":        resp.Model,
-			"inputTokens":  resp.InputTokens,
-			"outputTokens": resp.OutputTokens,
-			"costUSD":      resp.CostUSD,
-			"duration_ms":  time.Since(start).Milliseconds(),
-		})
+		result := map[string]any{
+			"comparison": resp.Content, "model": resp.Model, "inputTokens": resp.InputTokens,
+			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD, "duration_ms": time.Since(start).Milliseconds(),
+			"input_deliveries": []epwadelivery.Delivery{firstDelivery, secondDelivery},
+		}
+		writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromRequest(req), body.URL1, "Visual comparison report", "visual_comparison_report", result, http.StatusOK, firstDelivery.Artifact.ArtifactRef, secondDelivery.Artifact.ArtifactRef)
 	})
+}
+
+func compareImageFormat(pixels []byte) string {
+	switch http.DetectContentType(pixels) {
+	case "image/png":
+		return "png"
+	case "image/webp":
+		return "webp"
+	default:
+		return "jpeg"
+	}
 }

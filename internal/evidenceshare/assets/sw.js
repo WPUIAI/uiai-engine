@@ -9,6 +9,7 @@ const SHELL_ASSETS = [
   "./index.html",
   `./styles.css?v=${VERSION}`,
   `./work-items.js?v=${VERSION}`,
+  `./generic-record.js?v=${VERSION}`,
   `./pwa.js?v=${VERSION}`,
   `./app.js?v=${VERSION}`,
   `./manifest.webmanifest?v=${VERSION}`,

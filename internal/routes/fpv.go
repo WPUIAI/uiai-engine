@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
@@ -56,7 +58,13 @@ var fpvRegistryOnce sync.Once
 var fpvStreamMu sync.Mutex
 var fpvStreamViewers = map[string]int{}
 
-func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
+func markFPVOperationalMirror(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-UIAI-Artifact-Posture", "ephemeral_non_evidence")
+	w.Header().Set("X-Robots-Tag", "noindex, noarchive")
+}
+
+func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager) {
 	fpvLoadRegistry()
 	r.Post("/share", func(w http.ResponseWriter, req *http.Request) {
 		if sm == nil {
@@ -75,8 +83,19 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "session_id required"})
 			return
 		}
-		if _, ok := sm.Get(body.SessionID); !ok {
+		sess, ok := sm.Get(body.SessionID)
+		if !ok {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
+			return
+		}
+		snap, err := sess.Screenshot("jpeg", 80)
+		if err != nil {
+			writeEPWAPublishError(w, http.StatusServiceUnavailable, "fpv_snapshot_failed", err, "", "", "reconcile:fpv-session-snapshot")
+			return
+		}
+		delivery, err := publishSessionSnapshotEPWA(req, cfg, sess, snap, epwadelivery.ProducerFPV)
+		if err != nil {
+			writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_publication_failed", err, "", "", "reconcile:fpv-epwa-publication")
 			return
 		}
 		share, err := fpvCreateShare(body.SessionID, body.ExpiresMinutes, body.Controls, body.OneTime, body.MaxViews)
@@ -84,7 +103,20 @@ func MountFPVRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, share)
+		status := http.StatusAccepted
+		if delivery.State == epwadelivery.StateReady {
+			status = http.StatusCreated
+		}
+		response := map[string]any{
+			"schema": "uiai.fpv_share_result.v2", "delivery_state": delivery.State, "epwa_delivery": delivery,
+			"operational_mirror": share, "operational_mirror_posture": "ephemeral_non_evidence",
+			"token": share["token"], "session_id": share["session_id"], "expires_at": share["mirror_url_expires_at"],
+		}
+		if delivery.State == epwadelivery.StateReady {
+			response["artifact_url"] = delivery.EPWA.RecordURL
+			response["portable_url"] = delivery.EPWA.PortableURL
+		}
+		writeJSON(w, status, response)
 	})
 	r.Get("/events", func(w http.ResponseWriter, req *http.Request) {
 		since := uint64(0)
@@ -171,24 +203,25 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 		}
 		diag := sess.DiagnosticsWithOptions(vision.DiagnosticsOptions{Format: "summary", Limit: 1})
 		writeJSON(w, http.StatusOK, map[string]any{
-			"token":       entry.Token,
-			"session_id":  entry.SessionID,
-			"mode":        fpvMode(entry.Controls),
-			"controls":    entry.Controls,
-			"audit_count": len(entry.Audit),
-			"audit":       entry.Audit,
-			"views":       entry.Views,
-			"one_time":    entry.OneTime,
-			"max_views":   entry.MaxViews,
-			"revoked":     entry.Revoked,
-			"viewers":     fpvViewerCount(entry.Token),
-			"created_at":  entry.CreatedAt,
-			"url":         sess.URL,
-			"title":       sess.Title,
-			"width":       sess.Width,
-			"height":      sess.Height,
-			"expires_at":  entry.ExpiresAt,
-			"diagnostics": diag.Summary,
+			"token":            entry.Token,
+			"session_id":       entry.SessionID,
+			"mode":             fpvMode(entry.Controls),
+			"controls":         entry.Controls,
+			"audit_count":      len(entry.Audit),
+			"audit":            entry.Audit,
+			"views":            entry.Views,
+			"one_time":         entry.OneTime,
+			"max_views":        entry.MaxViews,
+			"revoked":          entry.Revoked,
+			"viewers":          fpvViewerCount(entry.Token),
+			"created_at":       entry.CreatedAt,
+			"url":              sess.URL,
+			"title":            sess.Title,
+			"width":            sess.Width,
+			"height":           sess.Height,
+			"expires_at":       entry.ExpiresAt,
+			"evidence_posture": "ephemeral_non_evidence",
+			"diagnostics":      diag.Summary,
 			"transport": map[string]any{
 				"primary":       "cdp_screencast",
 				"stream_url":    "/m/" + entry.Token + "/stream.cdp.mjpg",
@@ -293,8 +326,8 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeSessionError(w, http.StatusInternalServerError, classifySessionError(err), err, sess)
 			return
 		}
+		markFPVOperationalMirror(w)
 		w.Header().Set("Content-Type", "image/jpeg")
-		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(data)
 	})
 
@@ -319,8 +352,8 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "streaming unsupported"})
 			return
 		}
+		markFPVOperationalMirror(w)
 		w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
-		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Accel-Buffering", "no")
 		frames, stop, err := sess.CDPScreencast(req.Context(), 60, 1)
 		if err != nil {
@@ -368,8 +401,8 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			return
 		}
 		defer fpvReleaseViewer(entry.Token)
+		markFPVOperationalMirror(w)
 		w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
-		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Accel-Buffering", "no")
 		ticker := time.NewTicker(fpvStreamInterval(entry.Token))
 		defer ticker.Stop()

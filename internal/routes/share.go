@@ -11,20 +11,23 @@ import (
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
 
 type shareEntry struct {
-	ID             string         `json:"id"`
-	URL            string         `json:"url"`
-	Title          string         `json:"title"`
-	Data           map[string]any `json:"data"`
-	CreatedAt      time.Time      `json:"createdAt"`
-	ExpiresAt      time.Time      `json:"expiresAt"`
-	Views          int            `json:"views"`
-	FocusaEvidence map[string]any `json:"focusa_evidence,omitempty"`
+	ID             string              `json:"id"`
+	URL            string              `json:"url"`
+	Title          string              `json:"title"`
+	Data           map[string]any      `json:"data"`
+	CreatedAt      time.Time           `json:"createdAt"`
+	ExpiresAt      time.Time           `json:"expiresAt"`
+	Views          int                 `json:"views"`
+	FocusaEvidence map[string]any      `json:"focusa_evidence,omitempty"`
+	FocusaScope    *vision.FocusaScope `json:"focusa_scope,omitempty"`
 }
 
 var shareStore sync.Map
@@ -64,19 +67,20 @@ func persistShare(entry *shareEntry) {
 }
 
 func shareEvidence(id, targetURL, title string, scope *vision.FocusaScope) map[string]any {
-	result := "UIAI share artifact created"
+	result := "UIAI operational share created; this expiring link is not artifact delivery"
 	if title != "" {
 		result += ": " + title
 	}
 	evidence := map[string]any{
-		"target_ref":          "browser:" + focusapacket.SanitizeURL(targetURL),
-		"result":              result,
-		"summary":             result,
-		"evidence_ref":        "uiai-share:" + id,
-		"artifact_ref":        "/api/share/" + id,
-		"preferred_tool":      "focusa_evidence_capture",
-		"next_tools":          []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
-		"focusa_scope_status": routeFocusaScopeStatus(scope),
+		"target_ref":            "browser:" + focusapacket.SanitizeURL(targetURL),
+		"result":                result,
+		"summary":               result,
+		"evidence_ref":          "uiai-share:" + id,
+		"operational_share_ref": "/api/share/" + id,
+		"delivery_posture":      "ephemeral_non_evidence",
+		"preferred_tool":        "focusa_evidence_capture",
+		"next_tools":            []string{"focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
+		"focusa_scope_status":   routeFocusaScopeStatus(scope),
 	}
 	if scope != nil {
 		evidence["focusa_scope"] = scope
@@ -137,6 +141,7 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool vision.PoolSource) {
 			CreatedAt:      time.Now(),
 			ExpiresAt:      time.Now().Add(time.Duration(expiresIn) * time.Minute),
 			FocusaEvidence: shareEvidence(id, body.URL, body.Title, body.FocusaScope),
+			FocusaScope:    body.FocusaScope,
 		}
 		shareStore.Store(id, entry)
 		persistShare(entry)
@@ -185,6 +190,7 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool vision.PoolSource) {
 			CreatedAt:      time.Now(),
 			ExpiresAt:      time.Now().Add(time.Duration(expiresIn) * time.Minute),
 			FocusaEvidence: shareEvidence(id, body.URLs[0], body.Title, body.FocusaScope),
+			FocusaScope:    body.FocusaScope,
 		}
 		shareStore.Store(id, entry)
 		persistShare(entry)
@@ -248,9 +254,27 @@ func MountShareReal(r chi.Router, cfg *config.Config, pool vision.PoolSource) {
 		}
 
 		artifactRef := screenshotEvidenceRef(result.Data)
-		w.Header().Set("Content-Type", "image/jpeg")
-		w.Header().Set("X-Focusa-Evidence-Ref", artifactRef)
-		w.Header().Set("X-Focusa-Target-Ref", entry.URL)
-		w.Write(result.Data)
+		delivery, err := publishScreenshotEPWA(req, cfg, evidenceshare.Input{
+			Screenshot: result.Data, Format: "jpeg", Width: result.Width, Height: result.Height,
+			SourceURL: entry.URL, CapturedAt: time.Now().UTC(), Scope: evidenceScopeFromFocusa(entry.FocusaScope),
+		}, epwadelivery.ProducerShareScreenshot)
+		if err != nil {
+			writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_publication_failed", err, artifactRef, "", "reconcile:legacy-share-epwa-publication")
+			return
+		}
+		status := http.StatusAccepted
+		if delivery.State == epwadelivery.StateReady {
+			status = http.StatusCreated
+		}
+		response := map[string]any{
+			"schema": "uiai.share_screenshot_result.v2", "artifact_ref": artifactRef,
+			"delivery_state": delivery.State, "epwa_delivery": delivery,
+			"inline_posture": "withheld_by_mandatory_epwa_delivery", "operational_share_ref": "/api/share/" + entry.ID,
+		}
+		if delivery.State == epwadelivery.StateReady {
+			response["artifact_url"] = delivery.EPWA.RecordURL
+			response["portable_url"] = delivery.EPWA.PortableURL
+		}
+		writeJSON(w, status, response)
 	})
 }

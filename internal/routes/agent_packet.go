@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/go-chi/chi/v5"
 )
@@ -22,7 +23,7 @@ type researchPacketRequest struct {
 
 // MountAgentPacketRoutes composes bounded agent packet proposals from existing UIAI response metadata.
 // Schema: uiai.focusa_research_diagnostics_packet.v1
-func MountAgentPacketRoutes(r chi.Router) {
+func MountAgentPacketRoutes(r chi.Router, cfg *config.Config) {
 	r.Post("/research-packet", func(w http.ResponseWriter, req *http.Request) {
 		var body researchPacketRequest
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
@@ -33,7 +34,20 @@ func MountAgentPacketRoutes(r chi.Router) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "goal_required", "message": "goal is required"})
 			return
 		}
-		writeJSON(w, http.StatusOK, buildResearchPacketFromResponses(body))
+		packet := buildResearchPacketFromResponses(body)
+		scope := evidenceScopeFromRequest(req)
+		if body.FocusaScope != nil {
+			if scope.ProjectRef == "" {
+				scope.ProjectRef = body.FocusaScope.ProjectRoot
+			}
+			if scope.WorkpointRef == "" {
+				scope.WorkpointRef = body.FocusaScope.WorkpointID
+			}
+			if scope.ContinuityRef == "" {
+				scope.ContinuityRef = body.FocusaScope.ContinuityID
+			}
+		}
+		writeJSONArtifactEPWA(w, req, cfg, scope, "", "Focusa research and diagnostics packet", "research_packet", packet, http.StatusOK)
 	})
 }
 

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpuiai.com/schemas/uiai.artifact_delivery_envelope.v2.schema.json",
+  "title": "UIAI Artifact Delivery Envelope",
+  "description": "Common REST and tool response envelope for artifact-producing operations. Raw payload fields may appear only when epwa_delivery.state is ready.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "artifact_ref", "delivery_state", "epwa_delivery"],
+  "properties": {
+    "schema": {
+      "enum": [
+        "uiai.artifact_result.v2",
+        "uiai.binary_artifact_result.v2",
+        "uiai.visual_artifact_result.v2",
+        "uiai.screenshot_result.v2",
+        "uiai.share_screenshot_result.v2",
+        "uiai.fpv_share_result.v2",
+        "uiai.evidence_artifact_commit_result.v2"
+      ]
+    },
+    "artifact_ref": {"type": "string", "minLength": 1},
+    "delivery_state": {"enum": ["ready", "blocked", "pending_reconcile", "unavailable", "corrupt", "stale", "redacted", "degraded"]},
+    "epwa_delivery": {"$ref": "uiai.epwa_delivery.v1.schema.json"},
+    "artifact_url": {"type": "string", "pattern": "^https://"},
+    "portable_url": {"type": "string", "pattern": "^https://.*\\.zip$"},
+    "raw_output_posture": {"type": "string"},
+    "inline_posture": {"type": "string"},
+    "artifact_payload_posture": {"type": "string"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"delivery_state": {"const": "ready"}}, "required": ["delivery_state"]},
+      "then": {"required": ["artifact_url", "portable_url"]},
+      "else": {"not": {"anyOf": [{"required": ["artifact_url"]}, {"required": ["portable_url"]}]}}
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { requireCapabilityEntitlement } from "$lib/contracts/entitlement";
-import { engineRequest, engineUrl } from "$lib/engine-client";
+import { artifactRequest, engineRequest, engineUrl, type ArtifactDeliveryResult, type ReadyArtifactDeliveryResult } from "$lib/engine-client";
 
 export interface FpvLiveAttachment {
   token: string;
@@ -9,32 +9,44 @@ export interface FpvLiveAttachment {
   viewer_url: string;
   stream_url: string;
   fallback_url: string;
+  evidence_url: string;
+  portable_url: string;
+  delivery_id: string;
 }
 
-interface FpvShareResponse {
+interface FpvShareResponse extends ArtifactDeliveryResult {
   token: string;
   session_id: string;
-  controls: boolean;
-  mirror_url_expires_at: string;
+  expires_at: string;
+  operational_mirror: {
+    token: string;
+    session_id: string;
+    controls: boolean;
+    mirror_url_expires_at: string;
+  };
 }
 
-export function fpvAttachmentUrls(share: FpvShareResponse): FpvLiveAttachment {
+export function fpvAttachmentUrls(share: FpvShareResponse & ReadyArtifactDeliveryResult): FpvLiveAttachment {
   const base = engineUrl().replace(/\/$/, "");
-  const token = encodeURIComponent(share.token);
+  const mirror = share.operational_mirror;
+  const token = encodeURIComponent(mirror.token);
   return {
-    token: share.token,
-    session_id: share.session_id,
-    controls: share.controls,
-    expires_at: share.mirror_url_expires_at,
+    token: mirror.token,
+    session_id: mirror.session_id,
+    controls: mirror.controls,
+    expires_at: mirror.mirror_url_expires_at || share.expires_at,
     viewer_url: `${base}/m/${token}`,
     stream_url: `${base}/m/${token}/stream.cdp.mjpg`,
     fallback_url: `${base}/m/${token}/screenshot.jpg`,
+    evidence_url: share.artifact_url,
+    portable_url: share.portable_url,
+    delivery_id: share.epwa_delivery.delivery_id,
   };
 }
 
 export async function attachFpvSession(sessionId: string, controls = false, expiresMinutes = 60): Promise<FpvLiveAttachment> {
   requireCapabilityEntitlement(controls ? "uiai.browser.session.control" : "uiai.browser.screenshot.execute");
-  const share = await engineRequest<FpvShareResponse>("/api/fpv/share", {
+  const share = await artifactRequest<FpvShareResponse>("/api/fpv/share", {
     method: "POST",
     body: JSON.stringify({ session_id: sessionId, controls, expires_minutes: expiresMinutes, one_time: false }),
   });

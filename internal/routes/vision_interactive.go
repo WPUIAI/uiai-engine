@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-rod/rod"
@@ -42,20 +42,20 @@ func MountVisionInteractive(r chi.Router, cfg *config.Config, pool vision.PoolSo
 
 	// Core endpoints
 	r.Get("/state", handleState(pool))
-	r.Post("/capture", handleCapture(pool))
-	r.Post("/look", handleLook(pool))
-	r.Get("/look", handleLook(pool))
-	r.Post("/inject", handleInject(pool))
-	r.Get("/el", handleElement(pool))
-	r.Post("/multi", handleMulti(pool))
-	r.Get("/multi", handleMulti(pool))
-	r.Get("/diff", handleDiff(pool))
+	r.Post("/capture", handleCapture(cfg, pool))
+	r.Post("/look", handleLook(cfg, pool))
+	r.Get("/look", handleLook(cfg, pool))
+	r.Post("/inject", handleInject(cfg, pool))
+	r.Get("/el", handleElement(cfg, pool))
+	r.Post("/multi", handleMulti(cfg, pool))
+	r.Get("/multi", handleMulti(cfg, pool))
+	r.Get("/diff", handleDiff(cfg, pool))
 	r.Get("/viewport", handleViewport(pool))
 
 	// Added: analyze, critique, regression
 	r.Get("/analyze", handleAnalyze(pool))
-	r.Post("/critique", handleCritiqueCapture(pool))
-	r.Post("/regression", handleRegression(pool))
+	r.Post("/critique", handleCritiqueCapture(cfg, pool))
+	r.Post("/regression", handleRegression(cfg, pool))
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -76,7 +76,7 @@ func handleState(pool vision.PoolSource) http.HandlerFunc {
 	}
 }
 
-func handleCapture(pool vision.PoolSource) http.HandlerFunc {
+func handleCapture(cfg *config.Config, pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, err := pool.GetPage()
 		if err != nil {
@@ -96,20 +96,14 @@ func handleCapture(pool vision.PoolSource) http.HandlerFunc {
 		analysis := runDOMAnalysis(page)
 		storeCapture(data, "")
 
-		result := map[string]interface{}{
-			"screenshot": b64(data),
-			"viewport":   map[string]int{"width": 1280, "height": 800},
-			"analysis":   analysis,
-			"timing": map[string]int64{
-				"capture_ms": time.Since(start).Milliseconds(),
-			},
-		}
-
-		writeJSON(w, 200, result)
+		writeLegacyVisualEPWA(w, r, cfg, data, "png", 1280, 800, evalStr(page, `() => window.location.href`), map[string]any{
+			"viewport": map[string]int{"width": 1280, "height": 800}, "analysis": analysis,
+			"timing": map[string]int64{"capture_ms": time.Since(start).Milliseconds()},
+		}, epwadelivery.ProducerInteractive)
 	}
 }
 
-func handleLook(pool vision.PoolSource) http.HandlerFunc {
+func handleLook(cfg *config.Config, pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pageParam := r.URL.Query().Get("page")
 		if pageParam == "" {
@@ -153,22 +147,14 @@ func handleLook(pool vision.PoolSource) http.HandlerFunc {
 		analysis := runDOMAnalysis(page)
 		storeCapture(data, targetURL)
 
-		result := map[string]interface{}{
-			"url":        targetURL,
-			"title":      title,
-			"screenshot": b64(data),
-			"viewport":   map[string]int{"width": 1280, "height": 800},
-			"analysis":   analysis,
-			"timing": map[string]int64{
-				"look_ms": time.Since(start).Milliseconds(),
-			},
-		}
-
-		writeJSON(w, 200, result)
+		writeLegacyVisualEPWA(w, r, cfg, data, "png", 1280, 800, targetURL, map[string]any{
+			"url": targetURL, "title": title, "viewport": map[string]int{"width": 1280, "height": 800}, "analysis": analysis,
+			"timing": map[string]int64{"look_ms": time.Since(start).Milliseconds()},
+		}, epwadelivery.ProducerInteractive)
 	}
 }
 
-func handleInject(pool vision.PoolSource) http.HandlerFunc {
+func handleInject(cfg *config.Config, pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			CSS string `json:"css"`
@@ -220,18 +206,13 @@ func handleInject(pool vision.PoolSource) http.HandlerFunc {
 		analysis := runDOMAnalysis(page)
 		storeCapture(data, "")
 
-		result := map[string]interface{}{
-			"injected":   1,
-			"inject_ms":  time.Since(start).Milliseconds(),
-			"screenshot": b64(data),
-			"analysis":   analysis,
-		}
-
-		writeJSON(w, 200, result)
+		writeLegacyVisualEPWA(w, r, cfg, data, "png", 1280, 800, evalStr(page, `() => window.location.href`), map[string]any{
+			"injected": 1, "inject_ms": time.Since(start).Milliseconds(), "analysis": analysis,
+		}, epwadelivery.ProducerInteractive)
 	}
 }
 
-func handleElement(pool vision.PoolSource) http.HandlerFunc {
+func handleElement(cfg *config.Config, pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sel := r.URL.Query().Get("sel")
 		if sel == "" {
@@ -272,22 +253,14 @@ func handleElement(pool vision.PoolSource) http.HandlerFunc {
 			bounds = box.Quads[0]
 		}
 
-		result := map[string]interface{}{
-			"selector":   sel,
-			"tag":        tag,
-			"text":       text,
-			"bounds":     bounds,
-			"screenshot": b64(data),
-			"timing": map[string]int64{
-				"element_ms": time.Since(start).Milliseconds(),
-			},
-		}
-
-		writeJSON(w, 200, result)
+		writeLegacyVisualEPWA(w, r, cfg, data, "png", 0, 0, evalStr(page, `() => window.location.href`), map[string]any{
+			"selector": sel, "tag": tag, "text": text, "bounds": bounds,
+			"timing": map[string]int64{"element_ms": time.Since(start).Milliseconds()},
+		}, epwadelivery.ProducerInteractive)
 	}
 }
 
-func handleMulti(pool vision.PoolSource) http.HandlerFunc {
+func handleMulti(cfg *config.Config, pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, err := pool.GetPage()
 		if err != nil {
@@ -307,37 +280,52 @@ func handleMulti(pool vision.PoolSource) http.HandlerFunc {
 			{"mobile", 375, 812},
 		}
 
-		result := make(map[string]interface{})
+		result := map[string]interface{}{"schema": "uiai.visual_artifact_collection_result.v1", "inline_posture": "withheld_by_mandatory_epwa_delivery"}
+		allReady := true
+		sourceURL := evalStr(page, `() => window.location.href`)
 		for _, vp := range viewports {
 			page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
 				Width: vp.width, Height: vp.height, DeviceScaleFactor: 1,
 			})
 			time.Sleep(200 * time.Millisecond)
 
-			data, _ := screenshotPNG(page)
-			analysis := runDOMAnalysis(page)
-
-			result[vp.name] = map[string]interface{}{
-				"screenshot": b64(data),
-				"viewport":   map[string]int{"width": vp.width, "height": vp.height},
-				"analysis":   analysis,
+			data, err := screenshotPNG(page)
+			if err != nil {
+				writeEPWAPublishError(w, http.StatusServiceUnavailable, "visual_capture_failed", err, "", "", "reconcile:legacy-multi-capture")
+				return
 			}
+			delivery, err := publishLegacyVisualEPWA(r, cfg, data, "png", vp.width, vp.height, sourceURL, epwadelivery.ProducerInteractive)
+			if err != nil {
+				writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_publication_failed", err, screenshotEvidenceRef(data), "", "reconcile:legacy-multi-epwa-publication")
+				return
+			}
+			item := map[string]interface{}{
+				"viewport": map[string]int{"width": vp.width, "height": vp.height}, "analysis": runDOMAnalysis(page),
+				"delivery_state": delivery.State, "epwa_delivery": delivery,
+			}
+			if delivery.State == epwadelivery.StateReady {
+				item["artifact_url"] = delivery.EPWA.RecordURL
+				item["portable_url"] = delivery.EPWA.PortableURL
+			} else {
+				allReady = false
+			}
+			result[vp.name] = item
 		}
 
 		// Restore desktop viewport
 		page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
 			Width: 1440, Height: 900, DeviceScaleFactor: 1,
 		})
-
-		result["timing"] = map[string]int64{
-			"multi_ms": time.Since(start).Milliseconds(),
+		result["timing"] = map[string]int64{"multi_ms": time.Since(start).Milliseconds()}
+		status := http.StatusAccepted
+		if allReady {
+			status = http.StatusCreated
 		}
-
-		writeJSON(w, 200, result)
+		writeJSON(w, status, result)
 	}
 }
 
-func handleDiff(pool vision.PoolSource) http.HandlerFunc {
+func handleDiff(cfg *config.Config, pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, err := pool.GetPage()
 		if err != nil {
@@ -361,11 +349,9 @@ func handleDiff(pool vision.PoolSource) http.HandlerFunc {
 
 		if previous == nil {
 			storeCapture(current, "")
-			writeJSON(w, 200, map[string]interface{}{
-				"diff_pixels":  0,
-				"has_previous": false,
-				"note":         "No previous capture stored. Current frame saved.",
-			})
+			writeLegacyVisualEPWA(w, r, cfg, current, "png", 0, 0, evalStr(page, `() => window.location.href`), map[string]any{
+				"diff_pixels": 0, "has_previous": false, "note": "No previous capture stored. Current frame saved.",
+			}, epwadelivery.ProducerInteractive)
 			return
 		}
 
@@ -387,13 +373,10 @@ func handleDiff(pool vision.PoolSource) http.HandlerFunc {
 
 		storeCapture(current, "")
 
-		writeJSON(w, 200, map[string]interface{}{
-			"diff_pixels":  estimatedPixels,
-			"diff_bytes":   diffBytes,
-			"has_previous": true,
-			"previous_url": prevURL,
-			"previous_ts":  prevTS.Format(time.RFC3339),
-		})
+		writeLegacyVisualEPWA(w, r, cfg, current, "png", 0, 0, evalStr(page, `() => window.location.href`), map[string]any{
+			"diff_pixels": estimatedPixels, "diff_bytes": diffBytes, "has_previous": true,
+			"previous_url": prevURL, "previous_ts": prevTS.Format(time.RFC3339),
+		}, epwadelivery.ProducerInteractive)
 	}
 }
 
@@ -468,7 +451,7 @@ func handleAnalyze(pool vision.PoolSource) http.HandlerFunc {
 
 // handleCritiqueCapture navigates, captures desktop + optional mobile + DOM analysis.
 // POST body: { "page": "url-or-slug", "mobile": true }
-func handleCritiqueCapture(pool vision.PoolSource) http.HandlerFunc {
+func handleCritiqueCapture(cfg *config.Config, pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Page   string `json:"page"`
@@ -515,15 +498,22 @@ func handleCritiqueCapture(pool vision.PoolSource) http.HandlerFunc {
 		analysis := runDOMAnalysis(page)
 		storeCapture(desktopData, targetURL)
 
+		desktopDelivery, err := publishLegacyVisualEPWA(r, cfg, desktopData, "png", 1440, 900, targetURL, epwadelivery.ProducerInteractive)
+		if err != nil {
+			writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_publication_failed", err, screenshotEvidenceRef(desktopData), "", "reconcile:legacy-critique-desktop")
+			return
+		}
+		allReady := desktopDelivery.State == epwadelivery.StateReady
+		desktop := map[string]interface{}{
+			"viewport": map[string]int{"width": 1440, "height": 900}, "delivery_state": desktopDelivery.State, "epwa_delivery": desktopDelivery,
+		}
+		if allReady {
+			desktop["artifact_url"] = desktopDelivery.EPWA.RecordURL
+			desktop["portable_url"] = desktopDelivery.EPWA.PortableURL
+		}
 		result := map[string]interface{}{
-			"page":  body.Page,
-			"url":   targetURL,
-			"title": title,
-			"desktop": map[string]interface{}{
-				"screenshot": b64(desktopData),
-				"viewport":   map[string]int{"width": 1440, "height": 900},
-			},
-			"analysis": analysis,
+			"schema": "uiai.visual_artifact_collection_result.v1", "inline_posture": "withheld_by_mandatory_epwa_delivery",
+			"page": body.Page, "url": targetURL, "title": title, "desktop": desktop, "analysis": analysis,
 		}
 
 		// Mobile capture if requested
@@ -534,14 +524,26 @@ func handleCritiqueCapture(pool vision.PoolSource) http.HandlerFunc {
 			time.Sleep(300 * time.Millisecond)
 
 			mobileData, err := screenshotPNG(page)
-			if err == nil {
-				mobileAnalysis := runDOMAnalysis(page)
-				result["mobile"] = map[string]interface{}{
-					"screenshot": b64(mobileData),
-					"viewport":   map[string]int{"width": 375, "height": 812},
-					"analysis":   mobileAnalysis,
-				}
+			if err != nil {
+				writeEPWAPublishError(w, http.StatusServiceUnavailable, "visual_capture_failed", err, "", "", "reconcile:legacy-critique-mobile")
+				return
 			}
+			mobileDelivery, err := publishLegacyVisualEPWA(r, cfg, mobileData, "png", 375, 812, targetURL, epwadelivery.ProducerInteractive)
+			if err != nil {
+				writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_publication_failed", err, screenshotEvidenceRef(mobileData), "", "reconcile:legacy-critique-mobile")
+				return
+			}
+			mobile := map[string]interface{}{
+				"viewport": map[string]int{"width": 375, "height": 812}, "analysis": runDOMAnalysis(page),
+				"delivery_state": mobileDelivery.State, "epwa_delivery": mobileDelivery,
+			}
+			if mobileDelivery.State == epwadelivery.StateReady {
+				mobile["artifact_url"] = mobileDelivery.EPWA.RecordURL
+				mobile["portable_url"] = mobileDelivery.EPWA.PortableURL
+			} else {
+				allReady = false
+			}
+			result["mobile"] = mobile
 
 			// Restore desktop viewport
 			page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
@@ -574,14 +576,17 @@ func handleCritiqueCapture(pool vision.PoolSource) http.HandlerFunc {
 		result["issue_summary"] = issueSummary
 		result["total_issues"] = totalIssues
 		result["elapsed_ms"] = time.Since(start).Milliseconds()
-
-		writeJSON(w, 200, result)
+		status := http.StatusAccepted
+		if allReady {
+			status = http.StatusCreated
+		}
+		writeJSON(w, status, result)
 	}
 }
 
 // handleRegression captures current state and compares to previous.
 // POST body: { "page": "url-or-slug", "threshold": 500 }
-func handleRegression(pool vision.PoolSource) http.HandlerFunc {
+func handleRegression(cfg *config.Config, pool vision.PoolSource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Page      string `json:"page"`
@@ -653,29 +658,17 @@ func handleRegression(pool vision.PoolSource) http.HandlerFunc {
 
 		storeCapture(current, targetURL)
 
-		writeJSON(w, 200, map[string]interface{}{
-			"page":         body.Page,
-			"url":          targetURL,
-			"regression":   regression,
-			"diff_pixels":  diffPixels,
-			"threshold":    body.Threshold,
-			"has_previous": hasPrevious,
-			"analysis":     analysis,
-			"elapsed_ms":   time.Since(start).Milliseconds(),
-		})
+		writeLegacyVisualEPWA(w, r, cfg, current, "png", 0, 0, targetURL, map[string]any{
+			"page": body.Page, "url": targetURL, "regression": regression, "diff_pixels": diffPixels,
+			"threshold": body.Threshold, "has_previous": hasPrevious, "analysis": analysis,
+			"elapsed_ms": time.Since(start).Milliseconds(),
+		}, epwadelivery.ProducerInteractive)
 	}
 }
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════
-
-func b64(data []byte) string {
-	if len(data) == 0 {
-		return ""
-	}
-	return base64.StdEncoding.EncodeToString(data)
-}
 
 func screenshotPNG(page *rod.Page) ([]byte, error) {
 	q := 85

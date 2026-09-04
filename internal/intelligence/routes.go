@@ -3,6 +3,7 @@ package intelligence
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -16,18 +17,22 @@ import (
 
 	"github.com/WPUIAI/uiai-engine/internal/ai"
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
 // Layer is the Intelligence Layer service container.
+type ArtifactPublisher func(*http.Request, string, string, string, string, string, []byte) (epwadelivery.Delivery, error)
+
 type Layer struct {
-	store    *Store
-	usage    *UsageTracker
-	github   *GitHubConfig
-	cfg      *config.Config
-	aiProv   *ai.Provider
-	svcToken string // AI_API_TOKEN for service auth
+	store             *Store
+	usage             *UsageTracker
+	github            *GitHubConfig
+	cfg               *config.Config
+	aiProv            *ai.Provider
+	svcToken          string // AI_API_TOKEN for service auth
+	artifactPublisher ArtifactPublisher
 }
 
 // NewLayer creates a fully-wired intelligence layer.
@@ -52,6 +57,10 @@ func NewLayer(cfg *config.Config, aiProv *ai.Provider) *Layer {
 		aiProv:   aiProv,
 		svcToken: os.Getenv("AI_API_TOKEN"),
 	}
+}
+
+func (l *Layer) SetArtifactPublisher(publisher ArtifactPublisher) {
+	l.artifactPublisher = publisher
 }
 
 // Mount registers all intelligence routes on the given chi.Router.
@@ -239,39 +248,79 @@ func (l *Layer) handleIndexUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store documents
+	var docs []Document
 	if len(docsData) > 0 {
-		var docs []Document
-		if err := json.Unmarshal(docsData, &docs); err == nil {
-			l.store.WriteDocuments(runID, docs)
+		if err := json.Unmarshal(docsData, &docs); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "documents are invalid"})
+			return
 		}
 	}
-
-	// Store WASM artifact
+	type artifactInput struct {
+		ref, title, kind, mediaType, extension string
+		payload                                []byte
+	}
+	inputs := []artifactInput{}
+	if len(docsData) > 0 {
+		inputs = append(inputs, artifactInput{"intelligence:documents:" + runID, "Intelligence document snapshot " + runID, "source_snapshot", "application/json", "json", docsData})
+	}
 	if len(wasmData) > 0 {
-		l.store.WriteArtifact(runID, "docfind_bg.wasm", wasmData)
+		inputs = append(inputs, artifactInput{"intelligence:wasm:" + runID, "Intelligence WASM artifact " + runID, "runtime_binary", "application/wasm", "wasm", wasmData})
 	}
-
-	// Store JS artifact
 	if len(jsData) > 0 {
-		l.store.WriteArtifact(runID, "docfind.js", jsData)
+		inputs = append(inputs, artifactInput{"intelligence:javascript:" + runID, "Intelligence JavaScript artifact " + runID, "runtime_binary", "application/javascript", "js", jsData})
 	}
-
-	// Update metadata
-	meta, _ := l.store.UpdateMetadata(runID, func(m *IndexMetadata) {
-		m.Status = "ready"
-		m.Artifacts = ArtifactStatus{
-			WASM: l.store.HasArtifact(runID, "docfind_bg.wasm"),
-			JS:   l.store.HasArtifact(runID, "docfind.js"),
+	if len(inputs) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "documents, wasm, or js artifact required"})
+		return
+	}
+	deliveries := make([]epwadelivery.Delivery, 0, len(inputs))
+	allReady := true
+	for _, input := range inputs {
+		delivery, err := l.publishArtifact(r, input.ref, input.title, input.kind, input.mediaType, input.extension, input.payload)
+		if err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "EPWA publication failed"})
+			return
 		}
+		deliveries = append(deliveries, delivery)
+		allReady = allReady && delivery.State == epwadelivery.StateReady
+	}
+	if !allReady {
+		writeJSON(w, http.StatusAccepted, map[string]any{
+			"schema": "uiai.intelligence_index_upload_result.v2", "runId": runID,
+			"delivery_state": "blocked", "epwa_deliveries": deliveries, "storage_posture": "withheld_until_all_epwa_deliveries_ready",
+		})
+		return
+	}
+	if len(docs) > 0 {
+		if err := l.store.WriteDocuments(runID, docs); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "document compatibility write failed after EPWA publication"})
+			return
+		}
+	}
+	if len(wasmData) > 0 {
+		if err := l.store.WriteArtifact(runID, "docfind_bg.wasm", wasmData); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "WASM compatibility write failed after EPWA publication"})
+			return
+		}
+	}
+	if len(jsData) > 0 {
+		if err := l.store.WriteArtifact(runID, "docfind.js", jsData); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "JavaScript compatibility write failed after EPWA publication"})
+			return
+		}
+	}
+	meta, err := l.store.UpdateMetadata(runID, func(m *IndexMetadata) {
+		m.Status = "ready"
+		m.Artifacts = ArtifactStatus{WASM: len(wasmData) > 0, JS: len(jsData) > 0}
 		m.UpdatedAt = NowISO()
 	})
-
-	writeJSON(w, 200, map[string]any{
-		"success":   true,
-		"runId":     runID,
-		"status":    meta.Status,
-		"artifacts": meta.Artifacts,
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "metadata write failed after EPWA publication"})
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"schema": "uiai.intelligence_index_upload_result.v2", "success": true, "runId": runID,
+		"status": meta.Status, "artifacts": meta.Artifacts, "delivery_state": "ready", "epwa_deliveries": deliveries,
 	})
 }
 
@@ -485,15 +534,33 @@ func (l *Layer) handleEmbed(w http.ResponseWriter, r *http.Request) {
 
 // ── WASM/JS Artifact Delivery ───────────────────────────
 
-func (l *Layer) handleServeWASM(w http.ResponseWriter, r *http.Request) {
-	runID := chi.URLParam(r, "runId")
-	path := l.store.ArtifactPath(runID, "docfind_bg.wasm")
-	if _, err := os.Stat(path); err != nil { // #nosec G703 -- Store.ArtifactPath validates runID and uses a fixed artifact filename.
-		writeJSON(w, 404, map[string]string{"error": "WASM artifact not found"})
-		return
+func (l *Layer) publishArtifact(req *http.Request, artifactRef, title, kind, mediaType, extension string, payload []byte) (epwadelivery.Delivery, error) {
+	if l.artifactPublisher == nil {
+		return epwadelivery.Delivery{}, errors.New("EPWA artifact publisher unavailable")
 	}
-	w.Header().Set("Content-Type", "application/wasm")
-	http.ServeFile(w, r, path) // #nosec G703 -- Store.ArtifactPath validates runID and uses a fixed artifact filename.
+	return l.artifactPublisher(req, artifactRef, title, kind, mediaType, extension, payload)
+}
+
+func writeArtifactDelivery(w http.ResponseWriter, delivery epwadelivery.Delivery, successStatus int) {
+	status := http.StatusAccepted
+	response := map[string]any{
+		"schema": "uiai.binary_artifact_result.v2", "artifact_ref": delivery.Artifact.ArtifactRef,
+		"delivery_state": delivery.State, "epwa_delivery": delivery, "raw_output_posture": "withheld_by_mandatory_epwa_delivery",
+	}
+	if delivery.State == epwadelivery.StateReady {
+		status = successStatus
+		response["artifact_url"] = delivery.EPWA.RecordURL
+		response["portable_url"] = delivery.EPWA.PortableURL
+	}
+	writeJSON(w, status, response)
+}
+
+func (l *Layer) handleServeWASM(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusGone, map[string]any{
+		"schema": "uiai.epwa_delivery_error.v1", "code": "legacy_raw_artifact_removed",
+		"artifact_kind": "wasm", "runId": chi.URLParam(r, "runId"),
+		"message": "raw WASM is available only through its EPWA viewer and portable package",
+	})
 }
 
 func (l *Layer) handleUploadWASM(w http.ResponseWriter, r *http.Request) {
@@ -501,31 +568,42 @@ func (l *Layer) handleUploadWASM(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	runID := chi.URLParam(r, "runId")
-	data, err := io.ReadAll(io.LimitReader(r.Body, 50*1024*1024))
+	const maxWASMBytes = 50 * 1024 * 1024
+	data, err := io.ReadAll(io.LimitReader(r.Body, maxWASMBytes+1))
 	if err != nil {
-		writeJSON(w, 400, map[string]string{"error": "read body failed"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "read body failed"})
+		return
+	}
+	if len(data) > maxWASMBytes {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "WASM artifact exceeds 50 MiB"})
+		return
+	}
+	delivery, err := l.publishArtifact(r, "intelligence:wasm:"+runID, "Intelligence WASM artifact "+runID, "runtime_binary", "application/wasm", "wasm", data)
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "EPWA publication failed"})
+		return
+	}
+	if delivery.State != epwadelivery.StateReady {
+		writeArtifactDelivery(w, delivery, http.StatusCreated)
 		return
 	}
 	if err := l.store.WriteArtifact(runID, "docfind_bg.wasm", data); err != nil {
-		writeJSON(w, 500, map[string]string{"error": "write failed"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "compatibility artifact write failed after EPWA publication"})
 		return
 	}
-	l.store.UpdateMetadata(runID, func(m *IndexMetadata) {
+	_, _ = l.store.UpdateMetadata(runID, func(m *IndexMetadata) {
 		m.Artifacts.WASM = true
 		m.UpdatedAt = NowISO()
 	})
-	writeJSON(w, 200, map[string]any{"runId": runID, "size": len(data), "status": "uploaded"})
+	writeArtifactDelivery(w, delivery, http.StatusCreated)
 }
 
 func (l *Layer) handleServeJS(w http.ResponseWriter, r *http.Request) {
-	runID := chi.URLParam(r, "runId")
-	path := l.store.ArtifactPath(runID, "docfind.js")
-	if _, err := os.Stat(path); err != nil { // #nosec G703 -- Store.ArtifactPath validates runID and uses a fixed artifact filename.
-		writeJSON(w, 404, map[string]string{"error": "JS artifact not found"})
-		return
-	}
-	w.Header().Set("Content-Type", "application/javascript")
-	http.ServeFile(w, r, path) // #nosec G703 -- Store.ArtifactPath validates runID and uses a fixed artifact filename.
+	writeJSON(w, http.StatusGone, map[string]any{
+		"schema": "uiai.epwa_delivery_error.v1", "code": "legacy_raw_artifact_removed",
+		"artifact_kind": "javascript", "runId": chi.URLParam(r, "runId"),
+		"message": "raw JavaScript is available only through its EPWA viewer and portable package",
+	})
 }
 
 func (l *Layer) handleUploadJS(w http.ResponseWriter, r *http.Request) {
@@ -533,20 +611,34 @@ func (l *Layer) handleUploadJS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	runID := chi.URLParam(r, "runId")
-	data, err := io.ReadAll(io.LimitReader(r.Body, 20*1024*1024))
+	const maxJavaScriptBytes = 20 * 1024 * 1024
+	data, err := io.ReadAll(io.LimitReader(r.Body, maxJavaScriptBytes+1))
 	if err != nil {
-		writeJSON(w, 400, map[string]string{"error": "read body failed"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "read body failed"})
+		return
+	}
+	if len(data) > maxJavaScriptBytes {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "JavaScript artifact exceeds 20 MiB"})
+		return
+	}
+	delivery, err := l.publishArtifact(r, "intelligence:javascript:"+runID, "Intelligence JavaScript artifact "+runID, "runtime_binary", "application/javascript", "js", data)
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "EPWA publication failed"})
+		return
+	}
+	if delivery.State != epwadelivery.StateReady {
+		writeArtifactDelivery(w, delivery, http.StatusCreated)
 		return
 	}
 	if err := l.store.WriteArtifact(runID, "docfind.js", data); err != nil {
-		writeJSON(w, 500, map[string]string{"error": "write failed"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "compatibility artifact write failed after EPWA publication"})
 		return
 	}
-	l.store.UpdateMetadata(runID, func(m *IndexMetadata) {
+	_, _ = l.store.UpdateMetadata(runID, func(m *IndexMetadata) {
 		m.Artifacts.JS = true
 		m.UpdatedAt = NowISO()
 	})
-	writeJSON(w, 200, map[string]any{"runId": runID, "size": len(data), "status": "uploaded"})
+	writeArtifactDelivery(w, delivery, http.StatusCreated)
 }
 
 // ── Embeddings call ─────────────────────────────────────
