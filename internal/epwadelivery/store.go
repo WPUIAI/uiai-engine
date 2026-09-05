@@ -6,12 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/WPUIAI/uiai-engine/internal/durablefile"
 )
 
 const DeliveryEventSchema = "uiai.epwa_delivery_event.v1"
@@ -211,16 +212,8 @@ func writeAtomic(path string, data []byte) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(temporaryPath, path); err != nil {
+	if err := durablefile.Rename(temporaryPath, path); err != nil {
 		return err
 	}
-	directory, err := os.Open(filepath.Dir(path)) // #nosec G304 -- caller supplies validated store directory.
-	if err != nil {
-		return err
-	}
-	defer directory.Close()
-	if err := directory.Sync(); err != nil {
-		return fmt.Errorf("sync delivery directory: %w", err)
-	}
-	return nil
+	return durablefile.SyncDirectory(filepath.Dir(path))
 }
