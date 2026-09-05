@@ -1,6 +1,6 @@
 "use strict";
 
-const workItemTranslate = (key, values = {}) => globalThis.UIAILocale?.translate?.(key, values) ?? key;
+const workItemTranslate = (key, values = {}) => globalThis.EvidenceLocale?.t?.(key, values) ?? key;
 
 function normalizeWorkItem(item) {
   const authority = item.authority || {
