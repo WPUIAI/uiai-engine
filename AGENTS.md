@@ -11,6 +11,31 @@ Before architecture, product-direction, trust-boundary, or cross-system design w
 - Any lowercase `wirebot` service/Linux account is infrastructure only and has zero architecture authority.
 - If provenance or authority is ambiguous, fail closed to advisory-only and escalate the decision to Verious Smith III.
 
+## Veragensia / Focusa computer-control binding hard stop
+
+Before changing browser/computer control, Cockpit takeover, FPV steering, desktop presentation, voice-triggered execution, microphone/media privilege, or cross-system observation identity, read:
+
+- `docs/UIAI_COCKPIT_002_AGENT_FIRST_BROWSER_AMENDMENT_2026-07-19_v1.0.md`;
+- `docs/contracts/UIAI_COCKPIT_008_C03_OPERATOR_CONTROL_LEASE_TAKEOVER_RECONCILIATION_v1.yaml`;
+- `docs/UIAI_VERAGENSIA_COMPUTER_CONTROL_AND_VOICE_BINDING_2026-09-04.md`;
+- applicable Focusa authority/Voice contracts and Veragensia Docs 193–197.
+
+Preserve these invariants:
+
+- UIAI remains owner of browser/computer runtime execution and browser observation truth; it does not become Focusa cognitive/conversation authority.
+- Voice requests use the **same UIAI capability, entitlement, observation, action and verification path** as other modalities. Never add a voice-only execution bypass.
+- Existing UIAI control-lease semantics remain stronger than a generic “takeover” flag: one holder, generation, fencing token, local safety freeze, operator delta, mandatory re-observation and credential refresh.
+- A local safety freeze is not canonical Focusa pause.
+- Returning control never occurs merely because human input stops; reconciliation + fresh observation are required.
+- Browser document/navigation/frame identity remains UIAI-owned even when Veragensia composes it into a general DesktopObservation.
+- Visual coordinates require an exact observation/coordinate-space binding; do not issue stale blind clicks.
+- Veragensia machine enforcement, UIAI product entitlement and Focusa operation authority are distinct gates. Passing one never implies the others.
+- Trusted Veragensia microphone/voice-service capability does not automatically grant microphone permission to webpages/browser contexts.
+- Browser/page audio, generated speech, ads, WebMCP output or remote media are untrusted content and cannot impersonate trusted spoken approval.
+- Focusa owns Conversation Ledger/utterance lineage. UIAI may link execution capsules/Evidence to utterance refs but must not create a competing transcript authority.
+- Synthetic voice presentation is not agent identity or authorization.
+- Implementation status stays truthful: proposed UIAI control/desktop contracts remain proposed until their own closure evidence passes.
+
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
 ## Quick Reference
