@@ -100,6 +100,7 @@ fi
 export ENGINE_PORT SITE_PORT WIDTH HEIGHT UIAI_EVIDENCE_SCOPE_JSON
 python3 - "$SESSIONS" "$ROUNDS" "$OUT" <<'PY'
 import concurrent.futures, json, os, subprocess, sys, time, urllib.request
+sys.dont_write_bytecode = True
 sys.path.insert(0, os.environ['UIAI_EPWA_CONTRACT_DIR'])
 from epwa_raw_contract import find_raw
 
@@ -122,9 +123,9 @@ def require_delivery(body, operation):
     delivery = body.get('epwa_delivery') or {}
     epwa = delivery.get('epwa') or {}
     if delivery.get('schema') != 'uiai.epwa_delivery.v1' or delivery.get('state') != 'ready' or body.get('delivery_state') != 'ready' or (delivery.get('artifact') or {}).get('artifact_ref') != body.get('artifact_ref'):
-        raise AssertionError(f'{operation}: EPWA delivery not ready and identity-bound: {body}')
+        raise AssertionError(f'{operation}: EPWA delivery not ready and identity-bound')
     if not str(epwa.get('record_url', '')).startswith('https://') or not str(epwa.get('portable_url', '')).startswith('https://') or body.get('artifact_url') != epwa.get('record_url') or body.get('portable_url') != epwa.get('portable_url'):
-        raise AssertionError(f'{operation}: canonical HTTPS EPWA URLs missing: {body}')
+        raise AssertionError(f'{operation}: canonical HTTPS EPWA URLs missing')
     leaked = find_raw(body)
     if leaked:
         raise AssertionError(f'{operation}: raw artifact field returned at {leaked}')

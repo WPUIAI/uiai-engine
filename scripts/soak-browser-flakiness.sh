@@ -63,6 +63,7 @@ curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null
 export ENGINE_PORT SITE_PORT DURATION_SECONDS CONCURRENCY OUT UIAI_EVIDENCE_SCOPE_JSON
 python3 - <<'PY'
 import concurrent.futures, json, os, statistics, sys, time, urllib.error, urllib.request
+sys.dont_write_bytecode = True
 sys.path.insert(0, os.environ['UIAI_EPWA_CONTRACT_DIR'])
 from epwa_raw_contract import find_raw
 engine=f"http://127.0.0.1:{os.environ['ENGINE_PORT']}"

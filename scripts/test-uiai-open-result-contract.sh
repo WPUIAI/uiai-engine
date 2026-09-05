@@ -58,6 +58,6 @@ if UIAI_EVIDENCE_SCOPE_JSON="$scope" scripts/uiai-open-result.sh --search-json "
 fi
 grep -F 'search: forbidden raw artifact field: $.session.screenshot' "$TMPDIR/raw.err" >/dev/null
 
-python3 scripts/test_epwa_raw_contract.py
+python3 -B scripts/test_epwa_raw_contract.py
 
 echo "uiai-open-result contract: PASS"
