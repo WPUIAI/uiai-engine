@@ -61,7 +61,7 @@ def req(method,path,payload=None):
     r=urllib.request.Request(engine+path, data=data, headers=h, method=method)
     with urllib.request.urlopen(r, timeout=timeout) as res: return json.load(res)
 def find_raw_artifact(value, path='$'):
-    forbidden={'screenshot','imageBase64','image_base64','artifact_path','result_path','result_url'}
+    forbidden={'screenshot','imageBase64','image_base64','artifact_path','result_path','result_url','screenshot_path','inline_bytes'}
     if isinstance(value, dict):
         for key, child in value.items():
             child_path=f'{path}.{key}'

@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${UIAI_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+export UIAI_EPWA_CONTRACT_DIR="$SCRIPT_DIR"
 ENGINE_PORT="${ENGINE_PORT:-7470}"
 SITE_PORT="${SITE_PORT:-7471}"
 DURATION_SECONDS="${DURATION_SECONDS:-300}"
@@ -61,7 +62,9 @@ curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null
 
 export ENGINE_PORT SITE_PORT DURATION_SECONDS CONCURRENCY OUT UIAI_EVIDENCE_SCOPE_JSON
 python3 - <<'PY'
-import concurrent.futures, json, os, statistics, time, urllib.error, urllib.request
+import concurrent.futures, json, os, statistics, sys, time, urllib.error, urllib.request
+sys.path.insert(0, os.environ['UIAI_EPWA_CONTRACT_DIR'])
+from epwa_raw_contract import find_raw
 engine=f"http://127.0.0.1:{os.environ['ENGINE_PORT']}"
 site=f"http://127.0.0.1:{os.environ['SITE_PORT']}"
 duration=int(os.environ['DURATION_SECONDS'])
@@ -84,10 +87,10 @@ def req(method,url,body=None,ok=(200,201)):
         return e.code, body
 
 def require_delivery(body, operation):
-    forbidden={'screenshot','imageBase64','image_base64','artifact_path','result_path','result_url'}
     delivery=body.get('epwa_delivery') or {}
     epwa=delivery.get('epwa') or {}
-    if forbidden.intersection(body): raise ValueError(f'{operation}: raw artifact field returned')
+    leaked = find_raw(body)
+    if leaked: raise ValueError(f'{operation}: raw artifact field returned at {leaked}')
     if delivery.get('schema')!='uiai.epwa_delivery.v1' or delivery.get('state')!='ready' or body.get('delivery_state')!='ready' or (delivery.get('artifact') or {}).get('artifact_ref')!=body.get('artifact_ref'):
         raise ValueError(f'{operation}: EPWA delivery is not ready and identity-bound')
     if not str(epwa.get('record_url','')).startswith('https://') or not str(epwa.get('portable_url','')).startswith('https://') or body.get('artifact_url')!=epwa.get('record_url') or body.get('portable_url')!=epwa.get('portable_url'):

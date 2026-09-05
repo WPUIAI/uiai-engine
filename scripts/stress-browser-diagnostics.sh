@@ -6,6 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${UIAI_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+export UIAI_EPWA_CONTRACT_DIR="$SCRIPT_DIR"
 ENGINE_PORT="${ENGINE_PORT:-7468}"
 SITE_PORT="${SITE_PORT:-7469}"
 SESSIONS="${SESSIONS:-4}"
@@ -99,6 +100,8 @@ fi
 export ENGINE_PORT SITE_PORT WIDTH HEIGHT UIAI_EVIDENCE_SCOPE_JSON
 python3 - "$SESSIONS" "$ROUNDS" "$OUT" <<'PY'
 import concurrent.futures, json, os, subprocess, sys, time, urllib.request
+sys.path.insert(0, os.environ['UIAI_EPWA_CONTRACT_DIR'])
+from epwa_raw_contract import find_raw
 
 sessions = int(sys.argv[1])
 rounds = int(sys.argv[2])
@@ -122,8 +125,9 @@ def require_delivery(body, operation):
         raise AssertionError(f'{operation}: EPWA delivery not ready and identity-bound: {body}')
     if not str(epwa.get('record_url', '')).startswith('https://') or not str(epwa.get('portable_url', '')).startswith('https://') or body.get('artifact_url') != epwa.get('record_url') or body.get('portable_url') != epwa.get('portable_url'):
         raise AssertionError(f'{operation}: canonical HTTPS EPWA URLs missing: {body}')
-    if any(key in body for key in ('screenshot', 'imageBase64', 'image_base64', 'artifact_path', 'result_path', 'result_url')):
-        raise AssertionError(f'{operation}: raw artifact field returned')
+    leaked = find_raw(body)
+    if leaked:
+        raise AssertionError(f'{operation}: raw artifact field returned at {leaked}')
 
 def run_one(round_idx, idx):
     label = f"r{round_idx}s{idx}"
