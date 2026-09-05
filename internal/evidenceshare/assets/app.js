@@ -258,14 +258,30 @@ function renderRegistryRows() {
   const visible = Math.max(1, Math.ceil((wrap?.clientHeight || 680) / registryRowHeight));
   const start = virtualized ? Math.max(0, Math.floor((wrap?.scrollTop || 0) / registryRowHeight) - registryOverscan) : 0;
   const end = virtualized ? Math.min(total, start + visible + (registryOverscan * 2)) : total;
-  const rows = [];
-  if (start > 0) rows.push(registrySpacer(start * registryRowHeight));
-  for (let index = start; index < end; index += 1) {
-    const entry = registryRecordAt(index);
-    rows.push(registryRow(entry.kind, entry.record));
+  const tbody = byId("registry-rows");
+  const focused = tbody.contains(document.activeElement) && document.activeElement.matches(".registry-record") ? document.activeElement : null;
+  let focusedIndex = -1;
+  if (focused) {
+    for (let index = 0; index < total; index += 1) {
+      const entry = registryRecordAt(index);
+      const ref = entry.kind === "artifact" ? entry.record.artifact_ref : entry.record.work_item_ref;
+      if (entry.kind === focused.dataset.kind && ref === focused.dataset.ref) { focusedIndex = index; break; }
+    }
   }
-  if (end < total) rows.push(registrySpacer((total - end) * registryRowHeight));
-  byId("registry-rows").replaceChildren(...rows);
+  // Keep at most one extra row so scrolling cannot destroy keyboard focus.
+  const indexes = new Set(Array.from({ length: Math.max(0, end - start) }, (_, offset) => start + offset));
+  if (focusedIndex >= 0) indexes.add(focusedIndex);
+  const rows = [];
+  let previous = 0;
+  for (const index of [...indexes].sort((a, b) => a - b)) {
+    if (index > previous) rows.push(registrySpacer((index - previous) * registryRowHeight));
+    const entry = registryRecordAt(index);
+    rows.push(index === focusedIndex ? focused.closest("tr") : registryRow(entry.kind, entry.record));
+    previous = index + 1;
+  }
+  if (previous < total) rows.push(registrySpacer((total - previous) * registryRowHeight));
+  tbody.replaceChildren(...rows);
+  if (focusedIndex >= 0) focused.focus({ preventScroll: true });
   byId("registry-empty").hidden = total !== 0;
   byId("registry-previous").hidden = registryState.offline || registryState.cursorHistory.length === 0;
   byId("registry-more").hidden = registryState.offline || (!registryState.artifactCursor && !registryState.workItemCursor);
