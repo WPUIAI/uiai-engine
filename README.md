@@ -15,6 +15,14 @@ UIAI Engine is an **agent-first browser and proof backend**. It provides persist
 
 UIAI Engine owns browser/search/session/media/diagnostics execution and stable evidence handles. [Focusa](https://github.com/Startempire-Wire/focusa) owns ProjectIdentity, Workpoints, Trajectory, evidence linkage, predictions, metacognition, continuation, and recovery.
 
+### Veragensia Agent Computer composition
+
+Within a supported **full Veragensia Agent Computer profile, UIAI Engine + Cockpit/browser surfaces are deliberately listed canonical first-party defaults** for browser/computer execution, observation, diagnostics, operator oversight, and proof. UIAI is not merely one optional browser candidate in that composition.
+
+The other deliberately listed first-party defaults are Focusa daemon/core, Focusa Desktop, Pi + the Focusa Pi extension as the reference/default Focusa-aware harness, and Veragensia session/shell integration. Those surfaces retain their own responsibilities; listing them together does not merge their authority domains.
+
+Veragensia SHOULD reuse UIAI's existing Agent-First Browser contracts—compact capability discovery, versioned observations, observation-bound actions, semantic references, Focusa-directed verification, provenance/influence controls, execution capsules, Cockpit/FPV oversight, and visual computer-use fallback—rather than creating a parallel browser automation authority.
+
 Authentication and entitlement are separate:
 
 - loopback changes network-auth risk only;
