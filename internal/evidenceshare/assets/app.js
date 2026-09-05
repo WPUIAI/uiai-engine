@@ -13,7 +13,7 @@ const requestedResourceProfile = route.searchParams.get("resource_profile");
 const lowMemory = requestedResourceProfile === "lowmem" || (typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 2);
 const registryPageSize = lowMemory ? 25 : 100;
 const registryOverscan = lowMemory ? 2 : 8;
-const registryRowHeight = 56;
+let registryRowHeight = 56;
 const registrySnapshotLimit = lowMemory ? 50 : 200;
 const registryState = {
   project: "", query: "", status: "", type: "", artifactCursor: "", workItemCursor: "",
@@ -250,6 +250,8 @@ function registrySpacer(height) {
 }
 
 function renderRegistryRows() {
+  // Match CSS's 3.5rem rows when the user changes their base font size.
+  registryRowHeight = 3.5 * parseFloat(getComputedStyle(document.documentElement).fontSize);
   const total = registryRecordCount();
   const wrap = registryTableWrap();
   const virtualized = matchMedia("(min-width: 601px)").matches;

@@ -258,6 +258,9 @@ func TestRegistryVirtualizationBreakpointAndScrollBatching(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(app)
+	if !strings.Contains(text, "3.5 * parseFloat(getComputedStyle(document.documentElement).fontSize)") {
+		t.Fatal("virtualized row heights must track rem sizing")
+	}
 	start := strings.Index(text, `tableWrap.addEventListener("scroll"`)
 	if start < 0 {
 		t.Fatal("scroll element must be cached")
@@ -304,7 +307,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{`const workItemTranslate =`, `globalThis.EvidenceLocale?.t?.(key, values)`, `workItemTranslate("work_item_unavailable")`, `workItemTranslate("relationships_label")`, `workItemTranslate("settlement")`, `locale.number(index + 1)`} {
+	for _, required := range []string{`const workItemTranslate =`, `globalThis.EvidenceLocale?.t?.(key, values)`, `workItemTranslate("work_item_unavailable")`, `workItemTranslate("relationships_label")`, `workItemTranslate("settlement")`, `globalThis.EvidenceLocale.number(index + 1)`} {
 		if !strings.Contains(string(workItems), required) {
 			t.Fatalf("localized Work Item renderer missing %s", required)
 		}
