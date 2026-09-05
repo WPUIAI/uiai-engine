@@ -1,5 +1,7 @@
 "use strict";
 
+const workItemTranslate = (key, values = {}) => globalThis.UIAILocale?.translate?.(key, values) ?? key;
+
 function normalizeWorkItem(item) {
   const authority = item.authority || {
     acceptance_atom_refs: item.acceptance_atom_refs,
@@ -16,41 +18,41 @@ function scopeWorkItems(scope) {
 }
 
 function workItemSummary(item) {
-  const descriptor = item.title || item.work_item_ref || tr("work_item_unavailable");
+  const descriptor = item.title || item.work_item_ref || workItemTranslate("work_item_unavailable");
   const identity = item.item_id || item.work_item_ref || "unknown";
-  const revision = item.revision || tr("revision_unavailable");
+  const revision = item.revision || workItemTranslate("revision_unavailable");
   const state = item.revision_state || "unknown";
-  const status = item.status_at_capture || item.status || tr("status_unavailable");
+  const status = item.status_at_capture || item.status || workItemTranslate("status_unavailable");
   return `${descriptor} · ${identity} · ${revision} · ${state} · ${status}`;
 }
 
 function workItemRefs(values) {
-  return Array.isArray(values) && values.length > 0 ? values.join(", ") : tr("none");
+  return Array.isArray(values) && values.length > 0 ? values.join(", ") : workItemTranslate("none");
 }
 
 function workItemInspectData(scope) {
   return scopeWorkItems(scope).flatMap((item, index) => {
     const authority = item.authority || {};
     const position = locale.number(index + 1);
-    const label = `${tr("kind_work_item")} ${position}`;
+    const label = `${workItemTranslate("kind_work_item")} ${position}`;
     return [
-      datum(`${label} · ${item.item_type || tr("item")}`, workItemSummary(item)),
-      datum(`${label} · ${tr("description")}`, `${item.description_state || "unavailable"}${item.description ? ` · ${item.description}` : ""}`),
-      datum(`${label} · ${tr("relationships_label")}`, `${tr("parents")}: ${workItemRefs(item.parent_refs)} · ${tr("dependencies")}: ${workItemRefs(item.dependency_refs)} · ${tr("blockers")}: ${workItemRefs(item.blocker_refs)}`),
-      datum(`${label} · ${tr("requirements")}`, `${tr("acceptance")}: ${workItemRefs(authority.acceptance_atom_refs)} · ${tr("evidence")}: ${workItemRefs(authority.evidence_requirement_refs)} · ${tr("review")}: ${workItemRefs(authority.review_requirement_refs)}`),
-      datum(`${label} · ${tr("closure")}`, `${tr("record_posture")}: ${item.closure_posture || "unknown"} · ${tr("case_label")}: ${authority.completion_case_ref || tr("none")} · ${tr("decision")}: ${authority.completion_decision_ref || tr("none")} · ${tr("provider_close")}: ${authority.provider_close_receipt_ref || tr("none")} · ${tr("reopen")}: ${authority.reopen_ref || tr("none")} · ${tr("settlement")}: ${authority.settlement_posture || "unknown"}`),
+      datum(`${label} · ${item.item_type || workItemTranslate("item")}`, workItemSummary(item)),
+      datum(`${label} · ${workItemTranslate("description")}`, `${item.description_state || "unavailable"}${item.description ? ` · ${item.description}` : ""}`),
+      datum(`${label} · ${workItemTranslate("relationships_label")}`, `${workItemTranslate("parents")}: ${workItemRefs(item.parent_refs)} · ${workItemTranslate("dependencies")}: ${workItemRefs(item.dependency_refs)} · ${workItemTranslate("blockers")}: ${workItemRefs(item.blocker_refs)}`),
+      datum(`${label} · ${workItemTranslate("requirements")}`, `${workItemTranslate("acceptance")}: ${workItemRefs(authority.acceptance_atom_refs)} · ${workItemTranslate("evidence")}: ${workItemRefs(authority.evidence_requirement_refs)} · ${workItemTranslate("review")}: ${workItemRefs(authority.review_requirement_refs)}`),
+      datum(`${label} · ${workItemTranslate("closure")}`, `${workItemTranslate("record_posture")}: ${item.closure_posture || "unknown"} · ${workItemTranslate("case_label")}: ${authority.completion_case_ref || workItemTranslate("none")} · ${workItemTranslate("decision")}: ${authority.completion_decision_ref || workItemTranslate("none")} · ${workItemTranslate("provider_close")}: ${authority.provider_close_receipt_ref || workItemTranslate("none")} · ${workItemTranslate("reopen")}: ${authority.reopen_ref || workItemTranslate("none")} · ${workItemTranslate("settlement")}: ${authority.settlement_posture || "unknown"}`),
     ];
   });
 }
 
 function renderLineage(scope) {
   const lineage = [
-    lineageItem(tr("project_label"), scope.project_ref),
-    lineageItem(tr("workstream"), scope.workstream_ref),
-    lineageItem(tr("workset"), scope.workset_ref),
-    lineageItem(tr("callgraph"), scope.callgraph_ref),
-    lineageItem(tr("workpoint"), scope.workpoint_ref),
+    lineageItem(workItemTranslate("project_label"), scope.project_ref),
+    lineageItem(workItemTranslate("workstream"), scope.workstream_ref),
+    lineageItem(workItemTranslate("workset"), scope.workset_ref),
+    lineageItem(workItemTranslate("callgraph"), scope.callgraph_ref),
+    lineageItem(workItemTranslate("workpoint"), scope.workpoint_ref),
   ];
-  scopeWorkItems(scope).forEach((item) => lineage.push(lineageItem(item.item_type || tr("kind_work_item"), workItemSummary(item))));
+  scopeWorkItems(scope).forEach((item) => lineage.push(lineageItem(item.item_type || workItemTranslate("kind_work_item"), workItemSummary(item))));
   byId("lineage-list").replaceChildren(...lineage);
 }

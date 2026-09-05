@@ -274,7 +274,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{`tr("work_item_unavailable")`, `tr("relationships_label")`, `tr("settlement")`, `locale.number(index + 1)`} {
+	for _, required := range []string{`const workItemTranslate =`, `workItemTranslate("work_item_unavailable")`, `workItemTranslate("relationships_label")`, `workItemTranslate("settlement")`, `locale.number(index + 1)`} {
 		if !strings.Contains(string(workItems), required) {
 			t.Fatalf("localized Work Item renderer missing %s", required)
 		}
@@ -283,7 +283,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dynamicKeyPattern := regexp.MustCompile(`tr\("([a-z_]+)"`)
+	dynamicKeyPattern := regexp.MustCompile(`(?:tr|workItemTranslate)\("([a-z_]+)"`)
 	for _, match := range dynamicKeyPattern.FindAllStringSubmatch(string(appBody)+string(workItems), -1) {
 		if count := translationCount(match[1]); count != 3 {
 			t.Fatalf("dynamic translation key %s count=%d want=3", match[1], count)
