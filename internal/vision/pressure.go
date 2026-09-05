@@ -28,7 +28,7 @@ func initRecycleRSS() {
 			mb = n
 		}
 	}
-	RecycleRSSBytes.Store(mb * 1024)
+	RecycleRSSBytes.Store(mb * 1024 * 1024)
 }
 
 // shouldRecycleByPressure reports whether the browser tree exceeded the RSS budget.
@@ -38,11 +38,11 @@ func (p *Pool) shouldRecycleByPressure() bool {
 		return false
 	}
 	rss := treeRSSKB(p.browserPID)
-	return rss > limit*1024 // KB compare
+	return rss*1024 > limit // Convert the KiB sample once to the byte budget.
 }
 
-// treeRSSKB sums resident memory of pid and all descendants via procfs.
-func treeRSSKB(pid int) int64 {
+// procTreeRSSKB sums resident memory of pid and all descendants via procfs.
+func procTreeRSSKB(pid int) int64 {
 	seen := map[int]bool{}
 	var walk func(int) int64
 	walk = func(p int) int64 {

@@ -23,6 +23,7 @@
  */
 
 import { createInterface } from "readline";
+import { evidenceScopeHeaders, findNonReadyArtifactDelivery, findRawArtifactField } from "./epwa-contract.mjs";
 
 const ENGINE = (process.env.UIAI_ENGINE_URL || "http://localhost:7456").replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = Number(process.env.UIAI_MCP_TIMEOUT_MS || 60000);
@@ -171,7 +172,7 @@ const BRIDGE_CORE_TOOLS = [
   },
   {
     name: "uiai_focusa_packet_compose",
-    description: "Compose a bounded uiai.focusa_research_diagnostics_packet.v1 through POST /api/agent/research-packet from existing UIAI responses.",
+    description: "Compose a bounded research/diagnostics packet and deliver it through a durable HTTPS EPWA viewer plus portable package; packet fields are returned only when delivery is ready.",
     inputSchema: {
       type: "object",
       properties: {
@@ -201,7 +202,7 @@ const BRIDGE_CORE_TOOLS = [
   },
   {
     name: "browser_search",
-    description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with browser_open, then browser_read.",
+    description: "Provider-neutral web search delivered as a durable HTTPS EPWA research packet plus portable package. Result fields are returned only when delivery is ready.",
     inputSchema: {
       type: "object",
       properties: {
@@ -214,7 +215,7 @@ const BRIDGE_CORE_TOOLS = [
   },
   {
     name: "source_to_markdown",
-    description: "One-shot Source-to-Markdown conversion for public URLs. Returns uiai.source_markdown.v1 with Markdown, metadata, optional JSONL records/chunks, diagnostics, Focusa-ready evidence, and auto-closes the temporary session.",
+    description: "One-shot Source-to-Markdown snapshot delivered through a durable HTTPS EPWA viewer plus portable package; source fields are returned only when delivery is ready and the temporary session is closed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -232,7 +233,7 @@ const BRIDGE_CORE_TOOLS = [
   },
   {
     name: "browser_read",
-    description: "Extract compact readable page/region text or Markdown without taking a screenshot. Use for agent web surfing after open/navigate.",
+    description: "Capture compact readable page or region text as an EPWA source snapshot. Raw source is returned only with ready HTTPS viewer and portable-package delivery.",
     inputSchema: {
       type: "object",
       properties: {
@@ -554,7 +555,7 @@ async function toolsCall(name, args) {
       throw new Error(`Unknown tool: ${name}`);
   }
 
-  const fetchOpts = { method, headers: { "Content-Type": "application/json" } };
+  const fetchOpts = { method, headers: { "Content-Type": "application/json", ...evidenceScopeHeaders(args.focusa_scope) } };
   if (body && method !== "GET") fetchOpts.body = JSON.stringify(body);
 
   let res, data;
@@ -574,22 +575,23 @@ async function toolsCall(name, args) {
     };
   }
 
-  // Build MCP response — include screenshot as image content if present
-  const content = [];
-
-  // Extract screenshot from response (present in most session actions)
-  const b64 = data.screenshot || (data.session && data.screenshot);
-  if (b64) {
-    content.push({
-      type: "image",
-      data: b64,
-      mimeType: "image/jpeg",
-    });
+  // Raw visual bytes are a contract violation; MCP exposes only EPWA metadata.
+  const rawArtifactField = findRawArtifactField(data);
+  if (rawArtifactField) {
+    return {
+      content: [{ type: "text", text: `UIAI contract violation at ${rawArtifactField}: raw artifact output was withheld; retry after EPWA producer reconciliation` }],
+      isError: true,
+    };
   }
-
-  // Build text summary (everything except the base64 blob)
+  const nonReadyDelivery = findNonReadyArtifactDelivery(data);
+  if (nonReadyDelivery) {
+    return {
+      content: [{ type: "text", text: `UIAI delivery unavailable at ${nonReadyDelivery}: EPWA delivery is not ready; reconcile before use` }],
+      isError: true,
+    };
+  }
+  const content = [];
   const summary = { ...data };
-  delete summary.screenshot;
   if (Object.keys(summary).length > 0) {
     content.push({ type: "text", text: JSON.stringify(summary, null, 2) });
   }

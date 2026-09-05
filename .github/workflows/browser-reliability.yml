@@ -46,15 +46,30 @@ jobs:
         run: scripts/check-docs-completeness.py
       - name: Tool parity check
         run: scripts/check-tool-parity.sh
+      - name: MCP and CLI EPWA contract checks
+        run: |
+          node --test mcp/epwa-contract.test.mjs
+          scripts/test-uiai-open-result-contract.sh
       - name: Focusa packet endpoint smoke
+        env:
+          # Contract fixture only; customer delivery proof must use its audited public HTTPS origin.
+          UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
         run: |
           mkdir -p "$OUT_DIR"
           OUT="$OUT_DIR/focusa-packet-smoke.json" scripts/smoke-focusa-packet-ci.sh
       - name: Diagnostics stress 40/40
+        env:
+          # Contract fixtures are scoped to this isolated source test only.
+          UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
+          UIAI_EVIDENCE_SCOPE_JSON: '{"project_ref":"project:uiai-engine-ci","project_root":"/home/wpuiai/uiai-engine","workstream_ref":"workstream:browser-reliability","workset_ref":"workset:browser-reliability","callgraph_ref":"callgraph:browser-reliability","workpoint_id":"workpoint:browser-reliability","work_item_ref":"work-item:browser-reliability","continuity_id":"continuity:browser-reliability","evidence_ref":"uiai-browser-reliability-ci","work_items":[{"provider_surface":"github-actions","work_item_ref":"work-item:browser-reliability","item_id":"browser-reliability","item_type":"ci_fixture","title":"Browser reliability EPWA contract fixture","description_state":"unavailable","revision":"1","digest":"d3e13a9e497b0604d61771ded63254f78a9fc5c4d5a30b8e654f905eeff48102","revision_state":"current","status_at_capture":"in_progress","closure_posture":"open","authority":{"acceptance_atom_refs":["acceptance:ready-epwa"],"evidence_requirement_refs":["evidence:browser-reliability-ci"],"completion_contract_ref":"contract:browser-reliability-ci","settlement_posture":"unsettled"}}]}'
         run: |
           mkdir -p "$OUT_DIR"
           SESSIONS=4 ROUNDS=10 OUT="$OUT_DIR/diagnostics-4x10.json" scripts/stress-browser-diagnostics.sh
       - name: Mixed browser soak
+        env:
+          # Contract fixtures are scoped to this isolated source test only.
+          UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
+          UIAI_EVIDENCE_SCOPE_JSON: '{"project_ref":"project:uiai-engine-ci","project_root":"/home/wpuiai/uiai-engine","workstream_ref":"workstream:browser-reliability","workset_ref":"workset:browser-reliability","callgraph_ref":"callgraph:browser-reliability","workpoint_id":"workpoint:browser-reliability","work_item_ref":"work-item:browser-reliability","continuity_id":"continuity:browser-reliability","evidence_ref":"uiai-browser-reliability-ci","work_items":[{"provider_surface":"github-actions","work_item_ref":"work-item:browser-reliability","item_id":"browser-reliability","item_type":"ci_fixture","title":"Browser reliability EPWA contract fixture","description_state":"unavailable","revision":"1","digest":"d3e13a9e497b0604d61771ded63254f78a9fc5c4d5a30b8e654f905eeff48102","revision_state":"current","status_at_capture":"in_progress","closure_posture":"open","authority":{"acceptance_atom_refs":["acceptance:ready-epwa"],"evidence_requirement_refs":["evidence:browser-reliability-ci"],"completion_contract_ref":"contract:browser-reliability-ci","settlement_posture":"unsettled"}}]}'
         run: |
           mkdir -p "$OUT_DIR"
           SOAK="${{ github.event.inputs.soak_seconds || 30 }}"

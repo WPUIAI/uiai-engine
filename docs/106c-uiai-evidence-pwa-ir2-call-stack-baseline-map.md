@@ -20,7 +20,9 @@ Pi/MCP browser_screenshot
 
 Current output exposes `artifact_path`, `artifact_url`, format, dimensions, size, source URL/title, duration, and output mode. Path traversal has a basename guard and tests in `internal/routes/session_screenshot_output_test.go`. Focusa metadata/evidence behavior is covered by `internal/routes/artifact_evidence_test.go`.
 
-Gaps: timestamp identity is not content-addressed; output exposes a raw local path; assets are session-namespaced; no immutable bundle, media lineage, manifest, redaction/access/retention contract, video/interaction segment, or automatic pre-cleanup publication.
+> **Supersession note (issue #196):** The preceding paragraph records the IR2 baseline at commit `653eb32`; it is not current consumer guidance. Current successful artifact delivery requires a ready `uiai.epwa_delivery.v1`, complete evidence scope, durable HTTPS viewer, and portable package. Raw path/base64 routes are retired or fail closed.
+
+Gaps at the recorded baseline: timestamp identity was not content-addressed; output exposed a raw local path; assets were session-namespaced; there was no immutable bundle, media lineage, manifest, redaction/access/retention contract, video/interaction segment, or automatic pre-cleanup publication.
 
 ### Existing persisted share path
 

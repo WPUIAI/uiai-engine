@@ -95,10 +95,37 @@
     },
     "/api/session": {
       "post": {
-        "summary": "Create browser session",
+        "summary": "Create browser session with mandatory initial visual EPWA delivery",
         "responses": {
           "200": {
-            "description": "ok"
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
           }
         }
       },
@@ -117,6 +144,679 @@
         "responses": {
           "200": {
             "description": "ok"
+          }
+        }
+      }
+    },
+    "/api/screenshot": {
+      "post": {
+        "summary": "Capture screenshot with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screenshot/compare": {
+      "post": {
+        "summary": "Compare screenshots with mandatory EPWA report delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionID}/screenshot": {
+      "post": {
+        "summary": "Capture session visual with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionID}/snapshot": {
+      "get": {
+        "summary": "Capture accessibility snapshot with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionID}/dom": {
+      "get": {
+        "summary": "Capture DOM snapshot with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionID}/read": {
+      "post": {
+        "summary": "Capture source snapshot with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionID}/diagnostics": {
+      "get": {
+        "summary": "Capture diagnostics bundle with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "post": {
+        "summary": "Produce search report with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/markdown": {
+      "post": {
+        "summary": "Produce source-to-Markdown artifact with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent/research-packet": {
+      "post": {
+        "summary": "Produce bounded research packet with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/critique": {
+      "post": {
+        "summary": "Produce critique report with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/frame/render": {
+      "post": {
+        "summary": "Render framed media with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/artifacts/commit": {
+      "post": {
+        "summary": "Commit immutable artifact with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Artifact committed; delivery withheld or package publication failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/uiai_evidence_artifact_commit_delivery_error_v1"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/{id}/screenshot": {
+      "post": {
+        "summary": "Capture share screenshot with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fpv/share": {
+      "post": {
+        "summary": "Create operational FPV mirror with mandatory EPWA evidence snapshot",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/intelligence/index/upload": {
+      "post": {
+        "summary": "Upload index artifacts with mandatory EPWA delivery for every artifact",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/intelligence/wasm/{runId}": {
+      "post": {
+        "summary": "Upload WASM with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/intelligence/js/{runId}": {
+      "post": {
+        "summary": "Upload JavaScript with mandatory EPWA delivery",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
           }
         }
       }
@@ -514,6 +1214,457 @@
           }
         },
         "additionalProperties": false
+      },
+      "uiai_epwa_delivery_v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://wpuiai.com/schemas/uiai.epwa_delivery.v1.schema.json",
+        "title": "UIAI EPWA Delivery",
+        "description": "Fail-closed artifact delivery binding for a durable HTTPS EPWA viewer and portable package.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "delivery_id",
+          "revision",
+          "producer",
+          "artifact",
+          "epwa",
+          "scope",
+          "state",
+          "idempotency_key",
+          "created_at",
+          "observed_at",
+          "truth_notice"
+        ],
+        "properties": {
+          "schema": {
+            "const": "uiai.epwa_delivery.v1"
+          },
+          "delivery_id": {
+            "type": "string",
+            "pattern": "^uiai-epwa-delivery:sha256:[a-f0-9]{64}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "producer": {
+            "enum": [
+              "screenshot.capture",
+              "session.visual",
+              "vision.interactive",
+              "media.render",
+              "artifact.runtime",
+              "share.screenshot",
+              "fpv.create",
+              "artifact.commit",
+              "derivative.connect",
+              "diagnostics.bundle",
+              "source.snapshot",
+              "dom.snapshot",
+              "report.critique",
+              "report.visual_compare",
+              "research.packet",
+              "report.generated"
+            ]
+          },
+          "artifact": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifact_ref",
+              "revision",
+              "manifest_sha256",
+              "output_sha256"
+            ],
+            "properties": {
+              "artifact_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "output_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "epwa": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "package_id",
+              "package_ref",
+              "package_sha256",
+              "record_url",
+              "portable_url",
+              "access"
+            ],
+            "properties": {
+              "package_id": {
+                "$ref": "#/$defs/sha256"
+              },
+              "projection_ref": {
+                "type": "string"
+              },
+              "projection_sha256": {
+                "type": "string",
+                "pattern": "^$|^[a-f0-9]{64}$"
+              },
+              "package_ref": {
+                "type": "string",
+                "pattern": "^uiai-epwa-package:sha256:[a-f0-9]{64}$"
+              },
+              "package_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "record_url": {
+                "type": "string"
+              },
+              "portable_url": {
+                "type": "string"
+              },
+              "access": {
+                "enum": [
+                  "public_safe",
+                  "private",
+                  "unlisted",
+                  "redacted"
+                ]
+              }
+            }
+          },
+          "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "posture"
+            ],
+            "properties": {
+              "posture": {
+                "enum": [
+                  "complete",
+                  "blocked"
+                ]
+              },
+              "project_ref": {
+                "type": "string"
+              },
+              "workstream_ref": {
+                "type": "string"
+              },
+              "workset_ref": {
+                "type": "string"
+              },
+              "callgraph_ref": {
+                "type": "string"
+              },
+              "workpoint_ref": {
+                "type": "string"
+              },
+              "work_item_ref": {
+                "type": "string"
+              },
+              "continuity_ref": {
+                "type": "string"
+              }
+            }
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "blocked",
+              "pending_reconcile",
+              "unavailable",
+              "corrupt",
+              "stale",
+              "redacted",
+              "degraded"
+            ]
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recovery_ref": {
+            "type": "string"
+          },
+          "truth_notice": {
+            "const": "Artifact existence and EPWA delivery do not establish review, verification, completion, provider closure, settlement, or legal admissibility."
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "ready"
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            "then": {
+              "properties": {
+                "recovery_ref": {
+                  "maxLength": 0
+                },
+                "scope": {
+                  "properties": {
+                    "posture": {
+                      "const": "complete"
+                    }
+                  },
+                  "required": [
+                    "posture",
+                    "project_ref",
+                    "workstream_ref",
+                    "workset_ref",
+                    "callgraph_ref",
+                    "workpoint_ref",
+                    "work_item_ref",
+                    "continuity_ref"
+                  ]
+                },
+                "epwa": {
+                  "properties": {
+                    "record_url": {
+                      "type": "string",
+                      "pattern": "^https://"
+                    },
+                    "portable_url": {
+                      "type": "string",
+                      "pattern": "^https://.*\\.zip$"
+                    },
+                    "access": {
+                      "const": "public_safe"
+                    }
+                  },
+                  "required": [
+                    "projection_ref",
+                    "projection_sha256"
+                  ]
+                }
+              }
+            },
+            "else": {
+              "required": [
+                "recovery_ref"
+              ],
+              "properties": {
+                "recovery_ref": {
+                  "minLength": 1
+                },
+                "epwa": {
+                  "properties": {
+                    "record_url": {
+                      "const": ""
+                    },
+                    "portable_url": {
+                      "const": ""
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "$defs": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "uiai_artifact_delivery_envelope_v2": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://wpuiai.com/schemas/uiai.artifact_delivery_envelope.v2.schema.json",
+        "title": "UIAI Artifact Delivery Envelope",
+        "description": "Common REST and tool response envelope for artifact-producing operations. Raw artifact bytes and legacy paths are never delivery outputs; ready deliveries expose only bound HTTPS viewer and portable-package URLs.",
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "schema",
+          "artifact_ref",
+          "delivery_state",
+          "epwa_delivery"
+        ],
+        "properties": {
+          "schema": {
+            "enum": [
+              "uiai.artifact_result.v2",
+              "uiai.binary_artifact_result.v2",
+              "uiai.visual_artifact_result.v2",
+              "uiai.screenshot_result.v2",
+              "uiai.share_screenshot_result.v2",
+              "uiai.fpv_share_result.v2",
+              "uiai.evidence_artifact_commit_result.v2"
+            ]
+          },
+          "artifact_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "delivery_state": {
+            "enum": [
+              "ready",
+              "blocked",
+              "pending_reconcile",
+              "unavailable",
+              "corrupt",
+              "stale",
+              "redacted",
+              "degraded"
+            ]
+          },
+          "epwa_delivery": {
+            "$ref": "#/components/schemas/uiai_epwa_delivery_v1"
+          },
+          "artifact_url": {
+            "type": "string",
+            "pattern": "^https://"
+          },
+          "portable_url": {
+            "type": "string",
+            "pattern": "^https://.*\\.zip$"
+          },
+          "raw_output_posture": {
+            "type": "string"
+          },
+          "inline_posture": {
+            "type": "string"
+          },
+          "artifact_payload_posture": {
+            "type": "string"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "delivery_state": {
+                  "const": "ready"
+                }
+              },
+              "required": [
+                "delivery_state"
+              ]
+            },
+            "then": {
+              "required": [
+                "artifact_url",
+                "portable_url"
+              ]
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "artifact_url"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "portable_url"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "uiai_evidence_artifact_commit_delivery_error_v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://wpuiai.com/schemas/uiai.evidence_artifact_commit_delivery_error.v1.schema.json",
+        "title": "Committed Artifact Awaiting EPWA Publication",
+        "description": "HTTP 202: immutable artifact committed, but no valid EPWA package binding could be produced. Never a ready delivery; retry publication using the committed identity.",
+        "type": "object",
+        "required": [
+          "schema",
+          "artifact_ref",
+          "commit",
+          "registry_state",
+          "epwa_delivery_error"
+        ],
+        "properties": {
+          "schema": {
+            "const": "uiai.evidence_artifact_commit_delivery_error.v1"
+          },
+          "artifact_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "commit": {
+            "type": "object"
+          },
+          "registry_state": {
+            "type": "string"
+          },
+          "epwa_delivery_error": {
+            "type": "object",
+            "required": [
+              "schema",
+              "state",
+              "artifact_ref",
+              "recovery_ref",
+              "error"
+            ],
+            "properties": {
+              "schema": {
+                "const": "uiai.epwa_delivery_error.v1"
+              },
+              "state": {
+                "const": "pending_reconcile"
+              },
+              "artifact_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "error": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "artifact_url"
+              ]
+            },
+            {
+              "required": [
+                "portable_url"
+              ]
+            },
+            {
+              "required": [
+                "epwa_delivery"
+              ]
+            }
+          ]
+        }
       }
     }
   }

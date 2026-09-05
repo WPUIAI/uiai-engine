@@ -7,7 +7,7 @@
   import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
   import { getProject } from "@theatre/core";
   import gsap from "gsap";
-  import { engineClient, type ScreenshotResult } from "$lib/engine-client";
+  import { artifactRequest, engineClient, type ArtifactDeliveryResult, type ScreenshotResult } from "$lib/engine-client";
 
   type Tab = "capture" | "compare" | "analyze" | "design" | "produce";
   let tab: Tab = "capture";
@@ -87,11 +87,31 @@
   }
   async function runComparison(){
     addEvidence("comparison:bloom");
-    try { const r = await fetch("/api/comparison", { method: "POST", headers: {"content-type":"application/json"}, body: JSON.stringify({ threshold: diffThreshold, bloomStrength }) }); const j = await r.json().catch(()=>null); if(j?.receipt) addEvidence(`comparison:receipt:${j.receipt.slice(0,6)}`); } catch { addEvidence("comparison:mock-receipt"); }
+    try {
+      const delivery = await artifactRequest<ArtifactDeliveryResult>("/api/comparison", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ threshold: diffThreshold, bloomStrength }),
+      });
+      addEvidence(`comparison:epwa:${delivery.epwa_delivery.delivery_id.slice(-12)}`);
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Comparison EPWA delivery failed";
+      addEvidence("comparison:delivery-failed");
+    }
   }
   async function runCritique(){
     addEvidence("critique:cost-gated");
-    try { const r = await fetch("/api/critique", { method: "POST", body: JSON.stringify({ url }) }); const j=await r.json().catch(()=>null); if(j?.provenance) addEvidence(`critique:prov:${j.provenance.slice(0,6)}`);} catch { addEvidence("critique:mock-receipt"); }
+    try {
+      const delivery = await artifactRequest<ArtifactDeliveryResult>("/api/critique", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      addEvidence(`critique:epwa:${delivery.epwa_delivery.delivery_id.slice(-12)}`);
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Critique EPWA delivery failed";
+      addEvidence("critique:delivery-failed");
+    }
   }
   function buildHyperFramesComposition(){
     const comp = {
@@ -109,10 +129,11 @@
   }
   async function renderHyperFrames(){
     hyperframesBusy = true;
-    const comp = buildHyperFramesComposition();
-    addEvidence("media:produce:hyperframes");
-    try { const r = await fetch("/api/media/produce", { method: "POST", headers:{ "content-type":"application/json"}, body: JSON.stringify(comp)}); const j=await r.json().catch(()=>null); if(j?.artifact) { reportCanvas={ id:j.artifact.slice(0,8), title:"WorkRouter.mp4", at:new Date().toISOString()}; addEvidence(`media:produce:artifact:${j.artifact.slice(0,6)}`);} else { reportCanvas={ id:Math.random().toString(36).slice(2,8), title:"WorkRouter.mp4 (mock)", at:new Date().toISOString()}; addEvidence("media:produce:artifact-mock"); } } catch { reportCanvas={ id:Math.random().toString(36).slice(2,8), title:"WorkRouter.mp4 (mock)", at:new Date().toISOString()}; addEvidence("media:produce:artifact-mock"); }
-    finally { hyperframesBusy=false; }
+    buildHyperFramesComposition();
+    reportCanvas = null;
+    error = "HyperFrames rendering is not connected to a governed EPWA media adapter.";
+    addEvidence("media:produce:not-connected");
+    hyperframesBusy = false;
   }
   async function generateReportCanvas(){
     const payload = { title: "Studio Report Canvas — WorkRouter", strokes: whiteboardStrokes.length, theatreTime, bloomStrength, dofAperture, at: new Date().toISOString() };
@@ -280,12 +301,12 @@
   {#if tab === "capture"}
     {#if error}<div class="error-banner" role="alert"><strong>Capture unavailable.</strong><span>{error}</span></div>{/if}
     <section class="screen-card studio-launcher"><div><p class="screen-kicker">Capture — /api/screenshot/*</p><h2>Render a page for inspection</h2><p>Same-session screenshot via Engine. Baseline + frames later.</p></div><div class="launch-form"><input bind:value={url} aria-label="URL to capture" placeholder="https://example.com" on:keydown={(e)=>e.key==="Enter"&&capture()} /><button class="screen-button primary" on:click={capture} disabled={capturing || !url.trim()}>{capturing ? "Capturing…" : "Capture"}</button></div></section>
-    {#if result?.screenshot}<section class="screen-card studio-result"><div class="screen-toolbar"><div><p class="screen-kicker">Captured surface</p><h2>{result.title || result.url}</h2><p>{result.url} · {result.width}×{result.height} · {result.duration_ms} ms</p></div><button class="screen-button" on:click={() => (result = null)}>Clear</button></div><img class="studio-image" src={`data:image/${result.format || "jpeg"};base64,${result.screenshot}`} alt="capture" /></section>{:else}<section class="empty-screen"><div class="empty-mark">▧</div><h2>No capture yet</h2><p>Engine returns image + bounded Focusa metadata. Stub for Compare/Analyze consumes this artifact.</p></section>{/if}
+    {#if result?.artifact_url}<section class="screen-card studio-result"><div class="screen-toolbar"><div><p class="screen-kicker">Captured evidence</p><h2>{result.title || result.url}</h2><p>{result.url} · {result.width}×{result.height} · {result.duration_ms} ms</p><p><a href={result.artifact_url} target="_blank" rel="noreferrer">Open durable EPWA record</a> · <a href={result.portable_url} target="_blank" rel="noreferrer">Download portable package</a></p></div><button class="screen-button" on:click={() => (result = null)}>Clear</button></div><iframe class="studio-image" src={result.artifact_url} title="Captured EPWA evidence record"></iframe></section>{:else}<section class="empty-screen"><div class="empty-mark">▧</div><h2>No capture yet</h2><p>The Engine returns a durable HTTPS EPWA viewer and portable package; raw pixels and local paths are never successful delivery.</p></section>{/if}
   {:else if tab === "compare"}
     <section class="screen-card"><p class="screen-kicker">Compare — /api/comparison + /api/layout-compare + /api/media/frame/*</p><h2>Visual diff</h2><p>Threshold + changed-region overlay. Artifact-backed, Evidence-receipted.</p>
       <div style="display:flex;gap:12px;align-items:center;margin:10px 0;flex-wrap:wrap"><label>Threshold <input type="range" min="0" max="30" bind:value={diffThreshold} /></label><span>{diffThreshold}px</span><label>Bloom <input type="range" min="0" max="1.5" step="0.05" bind:value={bloomStrength} /></label><span>{bloomStrength.toFixed(2)}</span><button class="screen-button primary" on:click={runComparison}>Run diff → /api/comparison</button><button class="screen-button" on:click={initSSE}>{sseConnected ? "SSE ✓" : "Connect H44 SSE"}</button></div>
       <div style="position:relative;border:1px solid var(--color-border);border-radius:8px;overflow:hidden;background:#0f1115;min-height:220px">
-        {#if result?.screenshot}<img src={`data:image/${result.format||"jpeg"};base64,${result.screenshot}`} style="width:100%;display:block;opacity:0.85" alt="baseline" />{:else}<div style="padding:40px;text-align:center;color:var(--color-text-muted)">Capture first to use as baseline. Mock overlay shown on grey.</div>{/if}
+        {#if result?.artifact_url}<iframe src={result.artifact_url} title="Baseline EPWA evidence record" style="width:100%;min-height:420px;display:block;border:0;opacity:0.85"></iframe>{:else}<div style="padding:40px;text-align:center;color:var(--color-text-muted)">Capture a durable EPWA record first. Mock overlay shown on grey.</div>{/if}
         <div style="position:absolute;left:8%;top:18%;width:34%;height:18%;border:2px solid #ff3b30;background:rgba(255,59,48,0.18)"></div>
         <div style="position:absolute;right:12%;top:52%;width:26%;height:22%;border:2px solid #ffcc02;background:rgba(255,204,2,0.18)"></div>
         <span style="position:absolute;left:8%;top:14%;font-size:10px;background:#ff3b30;color:#fff;padding:2px 4px;border-radius:4px">changed · {diffThreshold}px</span>

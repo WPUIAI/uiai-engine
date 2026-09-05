@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/url"
 	"strings"
+
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 )
 
 const (
@@ -43,10 +45,16 @@ const (
 )
 
 type FocusaScope struct {
-	ProjectRoot  string `json:"project_root,omitempty"`
-	ContinuityID string `json:"continuity_id,omitempty"`
-	WorkpointID  string `json:"workpoint_id,omitempty"`
-	EvidenceRef  string `json:"evidence_ref,omitempty"`
+	ProjectRef    string                           `json:"project_ref,omitempty"`
+	ProjectRoot   string                           `json:"project_root,omitempty"`
+	WorkstreamRef string                           `json:"workstream_ref,omitempty"`
+	WorksetRef    string                           `json:"workset_ref,omitempty"`
+	CallGraphRef  string                           `json:"callgraph_ref,omitempty"`
+	WorkpointID   string                           `json:"workpoint_id,omitempty"`
+	WorkItemRef   string                           `json:"work_item_ref,omitempty"`
+	WorkItems     []evidencepwa.WorkItemProjection `json:"work_items,omitempty"`
+	ContinuityID  string                           `json:"continuity_id,omitempty"`
+	EvidenceRef   string                           `json:"evidence_ref,omitempty"`
 }
 
 type Capture struct {

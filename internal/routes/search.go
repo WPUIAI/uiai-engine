@@ -92,10 +92,10 @@ type braveWebResponse struct {
 // MountSearchRoutes exposes provider-neutral web discovery for browser agents.
 // Brave is the default provider, but the public contract stays provider-neutral
 // so other providers can be added without changing browser/session semantics.
-func MountSearchRoutes(r chi.Router, _ *config.Config) {
+func MountSearchRoutes(r chi.Router, cfg *config.Config) {
 	r.Get("/providers", handleSearchProviders)
-	r.Get("/", handleSearchGET)
-	r.Post("/", handleSearchPOST)
+	r.Get("/", func(w http.ResponseWriter, req *http.Request) { handleSearchGET(w, req, cfg) })
+	r.Post("/", func(w http.ResponseWriter, req *http.Request) { handleSearchPOST(w, req, cfg) })
 }
 
 func handleSearchProviders(w http.ResponseWriter, _ *http.Request) {
@@ -133,26 +133,26 @@ func handleSearchProviders(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func handleSearchGET(w http.ResponseWriter, r *http.Request) {
+func handleSearchGET(w http.ResponseWriter, r *http.Request, cfg *config.Config) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	req := searchRequest{
 		Query:    r.URL.Query().Get("q"),
 		Provider: r.URL.Query().Get("provider"),
 		Limit:    limit,
 	}
-	runSearch(w, req)
+	runSearch(w, r, cfg, req)
 }
 
-func handleSearchPOST(w http.ResponseWriter, r *http.Request) {
+func handleSearchPOST(w http.ResponseWriter, r *http.Request, cfg *config.Config) {
 	var req searchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json", "message": err.Error()})
 		return
 	}
-	runSearch(w, req)
+	runSearch(w, r, cfg, req)
 }
 
-func runSearch(w http.ResponseWriter, req searchRequest) {
+func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config, req searchRequest) {
 	query := strings.TrimSpace(req.Query)
 	if query == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "query_required", "message": "query or q is required"})
@@ -167,7 +167,7 @@ func runSearch(w http.ResponseWriter, req searchRequest) {
 	ttl := searchCacheTTL()
 	if ttl > 0 {
 		if cachedResults, ok := getCachedSearch(provider, query, limit, time.Now()); ok {
-			writeSearchResponse(w, provider, query, cachedResults, true, ttl)
+			writeSearchResponse(w, httpReq, cfg, provider, query, cachedResults, true, ttl)
 			return
 		}
 	}
@@ -209,7 +209,7 @@ func runSearch(w http.ResponseWriter, req searchRequest) {
 	if ttl > 0 {
 		setCachedSearch(provider, query, limit, results, time.Now().Add(ttl))
 	}
-	writeSearchResponse(w, provider, query, results, false, ttl)
+	writeSearchResponse(w, httpReq, cfg, provider, query, results, false, ttl)
 }
 
 func normalizeSearchLimit(limit int) int {
@@ -257,8 +257,8 @@ func searchCacheTTL() time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-func writeSearchResponse(w http.ResponseWriter, provider, query string, results []searchResult, cached bool, ttl time.Duration) {
-	writeJSON(w, 200, searchResponse{
+func writeSearchResponse(w http.ResponseWriter, req *http.Request, cfg *config.Config, provider, query string, results []searchResult, cached bool, ttl time.Duration) {
+	response := searchResponse{
 		Schema:          "uiai.search_results.v1",
 		Provider:        provider,
 		Query:           query,
@@ -268,7 +268,8 @@ func writeSearchResponse(w http.ResponseWriter, provider, query string, results 
 		Results:         results,
 		Next:            []string{"browser_open a selected result URL", "browser_read page text", "browser_diagnostics on navigation failure", "cite selected result with evidence_ref"},
 		Focusa:          buildSearchFocusaMetadata(provider, query, results),
-	})
+	}
+	writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromRequest(req), "", "Web search result packet", "research_packet", response, http.StatusOK)
 }
 
 func buildSearchFocusaMetadata(provider, query string, results []searchResult) searchFocusaMetadata {

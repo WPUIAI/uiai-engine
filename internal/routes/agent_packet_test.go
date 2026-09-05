@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -68,11 +70,43 @@ func TestBuildResearchPacketFromSourceMarkdownResponse(t *testing.T) {
 	}
 }
 
-func TestAgentResearchPacketEndpoint(t *testing.T) {
+func TestBuildResearchPacketKeepsRichWorkItemsOutOfBoundedPayload(t *testing.T) {
+	scope := &focusapacket.FocusaScope{ProjectRef: "project:bounded-packet", ContinuityID: "continuity:bounded-packet"}
+	item := completeEvidenceScope().WorkItems[0]
+	for range 100 {
+		scope.WorkItems = append(scope.WorkItems, item)
+	}
+	packet := buildResearchPacketFromResponses(researchPacketRequest{Goal: "bounded packet", FocusaScope: scope})
+	if packet.FocusaScope == nil || len(packet.FocusaScope.WorkItems) != 0 || len(scope.WorkItems) != 100 {
+		t.Fatalf("rich Work Items leaked or source scope mutated: packet=%#v source=%d", packet.FocusaScope, len(scope.WorkItems))
+	}
+	encoded, err := json.Marshal(packet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(encoded) > focusapacket.DefaultMaxPacketBytes {
+		t.Fatalf("packet exceeded %d-byte contract: %d", focusapacket.DefaultMaxPacketBytes, len(encoded))
+	}
+}
+
+func TestAgentResearchPacketEndpointUsesCompleteBodyScope(t *testing.T) {
 	r := chi.NewRouter()
-	MountAgentPacketRoutes(r)
-	body := `{"goal":"endpoint packet","responses":[{"focusa":{"target_ref":"browser:https://example.test","evidence_ref":"uiai-search:brave:abc:1","summary":"Search result"}}]}`
-	req := httptest.NewRequest(http.MethodPost, "/research-packet", strings.NewReader(body))
+	MountAgentPacketRoutes(r, &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}})
+	scope := completeEvidenceScope()
+	body, err := json.Marshal(researchPacketRequest{
+		Goal:      "body-scoped endpoint packet",
+		Responses: []map[string]any{{"focusa": map[string]any{"target_ref": "browser:https://example.test", "evidence_ref": "uiai-search:brave:body:1", "summary": "Search result"}}},
+		FocusaScope: &focusapacket.FocusaScope{
+			ProjectRef: scope.ProjectRef, ProjectRoot: "/private/source/root", WorkstreamRef: scope.WorkstreamRef,
+			WorksetRef: scope.WorksetRef, CallGraphRef: scope.CallGraphRef, WorkpointID: scope.WorkpointRef,
+			WorkItemRef: scope.WorkItemRef, WorkItems: scope.WorkItems, ContinuityID: scope.ContinuityRef,
+			EvidenceRef: "uiai-agent-packet-body-scope",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "https://evidence.example/research-packet", strings.NewReader(string(body)))
 	res := httptest.NewRecorder()
 	r.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
@@ -82,8 +116,53 @@ func TestAgentResearchPacketEndpoint(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&packet); err != nil {
 		t.Fatal(err)
 	}
-	if packet["schema"] != "uiai.focusa_research_diagnostics_packet.v1" {
-		t.Fatalf("unexpected packet: %#v", packet)
+	if packet["schema"] != "uiai.artifact_result.v2" || packet["artifact_schema"] != "uiai.focusa_research_diagnostics_packet.v1" || packet["delivery_state"] != "ready" {
+		t.Fatalf("unexpected packet delivery envelope: %#v", packet)
+	}
+	delivery := packet["epwa_delivery"].(map[string]any)
+	deliveryScope := delivery["scope"].(map[string]any)
+	for key, want := range map[string]string{
+		"project_ref": scope.ProjectRef, "workstream_ref": scope.WorkstreamRef, "workset_ref": scope.WorksetRef,
+		"callgraph_ref": scope.CallGraphRef, "workpoint_ref": scope.WorkpointRef, "work_item_ref": scope.WorkItemRef,
+		"continuity_ref": scope.ContinuityRef,
+	} {
+		if deliveryScope[key] != want {
+			t.Fatalf("delivery scope %s=%v want %q: %#v", key, deliveryScope[key], want, deliveryScope)
+		}
+	}
+	packetScope := packet["focusa_scope"].(map[string]any)
+	_, exposedWorkItems := packetScope["work_items"]
+	if packetScope["project_ref"] != scope.ProjectRef || packetScope["project_root"] != nil || exposedWorkItems {
+		t.Fatalf("packet scope was not public-safe and bounded: %#v", packetScope)
+	}
+}
+
+func TestAgentResearchPacketEndpoint(t *testing.T) {
+	r := chi.NewRouter()
+	MountAgentPacketRoutes(r, &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}})
+	body := `{"goal":"endpoint packet","responses":[{"focusa":{"target_ref":"browser:https://example.test","evidence_ref":"uiai-search:brave:abc:1","summary":"Search result"}}]}`
+	req := httptest.NewRequest(http.MethodPost, "https://evidence.example/research-packet", strings.NewReader(body))
+	scope := completeEvidenceScope()
+	req.Header.Set("X-UIAI-Project-Ref", scope.ProjectRef)
+	req.Header.Set("X-UIAI-Workstream-Ref", scope.WorkstreamRef)
+	req.Header.Set("X-UIAI-Workset-Ref", scope.WorksetRef)
+	req.Header.Set("X-UIAI-CallGraph-Ref", scope.CallGraphRef)
+	req.Header.Set("X-UIAI-Workpoint-Ref", scope.WorkpointRef)
+	req.Header.Set("X-UIAI-Work-Item-Ref", scope.WorkItemRef)
+	req.Header.Set("X-UIAI-Continuity-Ref", scope.ContinuityRef)
+	workItems, _ := json.Marshal(scope.WorkItems)
+	req.Header.Set("X-UIAI-Work-Items", string(workItems))
+	res := httptest.NewRecorder()
+	r.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
+	}
+	var packet map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&packet); err != nil {
+		t.Fatal(err)
+	}
+	if packet["schema"] != "uiai.artifact_result.v2" || packet["artifact_schema"] != "uiai.focusa_research_diagnostics_packet.v1" || packet["delivery_state"] != "ready" {
+		t.Fatalf("unexpected packet delivery envelope: %#v", packet)
 	}
 	captures := packet["captures"].([]any)
 	if len(captures) != 1 {

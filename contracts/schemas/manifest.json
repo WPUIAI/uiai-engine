@@ -29,6 +29,18 @@
     {
       "id": "uiai.status.v1",
       "src": "contracts/schemas/uiai.status.v1.schema.json"
+    },
+    {
+      "id": "uiai.epwa_delivery.v1",
+      "src": "contracts/schemas/uiai.epwa_delivery.v1.schema.json"
+    },
+    {
+      "id": "uiai.artifact_delivery_envelope.v2",
+      "src": "contracts/schemas/uiai.artifact_delivery_envelope.v2.schema.json"
+    },
+    {
+      "id": "uiai.evidence_artifact_commit_delivery_error.v1",
+      "src": "contracts/schemas/uiai.evidence_artifact_commit_delivery_error.v1.schema.json"
     }
   ]
 }
