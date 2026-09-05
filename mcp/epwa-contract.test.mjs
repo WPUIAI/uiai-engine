@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { evidenceScopeHeaders, findRawArtifactField } from "./epwa-contract.mjs";
+import { evidenceScopeHeaders, findNonReadyArtifactDelivery, findRawArtifactField } from "./epwa-contract.mjs";
 
 test("evidenceScopeHeaders forwards complete scope without inventing values", () => {
   const workItems = [{ work_item_ref: "work-item:196", revision: "4" }];
@@ -37,4 +37,13 @@ test("findRawArtifactField rejects nested legacy screenshot and path fields", ()
   assert.equal(findRawArtifactField({ results: [{ delivery: { result_path: "/tmp/report.json" } }] }), "$.results[0].delivery.result_path");
   assert.equal(findRawArtifactField({ result: { result_url: "http://localhost/raw" } }), "$.result.result_url");
   assert.equal(findRawArtifactField({ imageBase64: "bytes" }), "$.imageBase64");
+});
+
+test("findNonReadyArtifactDelivery rejects pending and malformed envelopes recursively", () => {
+  assert.equal(findNonReadyArtifactDelivery({ delivery_state: "ready", epwa_delivery: { state: "ready" } }), "");
+  assert.equal(findNonReadyArtifactDelivery({ delivery_state: "pending_reconcile", epwa_delivery: { state: "pending_reconcile" } }), "$.delivery_state");
+  assert.equal(findNonReadyArtifactDelivery({ results: [{ delivery_state: "ready" }] }), "$.results[0].delivery_state");
+  assert.equal(findNonReadyArtifactDelivery({ nested: { epwa_delivery: { state: "blocked" } } }), "$.nested.delivery_state");
+  assert.equal(findNonReadyArtifactDelivery({ epwa_delivery_error: { state: "pending_reconcile" } }), "$.epwa_delivery_error");
+  assert.equal(findNonReadyArtifactDelivery({ schema: "uiai.epwa_delivery.v1", state: "blocked" }), "$.state");
 });

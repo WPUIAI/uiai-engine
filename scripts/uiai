@@ -108,7 +108,7 @@ api() {
   fi
   if jq -e 'type == "object" and (has("artifact_ref") or has("delivery_state") or has("epwa_delivery"))' >/dev/null 2>&1 <"$tmp"; then
     if ! jq -e '
-      ([.. | objects | keys[]] | any(. == "screenshot" or . == "imageBase64" or . == "image_base64" or . == "artifact_path" or . == "result_path" or . == "result_url") | not) and
+      ([.. | objects | keys[]] | any(. == "screenshot" or . == "screenshot_path" or . == "imageBase64" or . == "image_base64" or . == "inline_bytes" or . == "artifact_path" or . == "result_path" or . == "result_url") | not) and
       (.epwa_delivery.schema == "uiai.epwa_delivery.v1") and
       (.delivery_state == "ready" and .epwa_delivery.state == .delivery_state) and
       (.epwa_delivery.artifact.artifact_ref == .artifact_ref) and
@@ -297,10 +297,21 @@ def req(method,path,body=None):
         except Exception: data={'error':raw or str(e)}
         raise SystemExit(json.dumps({'ok':False,'status':e.code,'error':data}, indent=2))
 def require_delivery(body, operation):
-    forbidden={'screenshot','imageBase64','image_base64','artifact_path','result_path','result_url'}
+    forbidden={'screenshot','screenshot_path','imageBase64','image_base64','inline_bytes','artifact_path','result_path','result_url'}
     delivery=body.get('epwa_delivery') or {}
     epwa=delivery.get('epwa') or {}
-    if forbidden.intersection(body): raise SystemExit(f'{operation}: raw artifact field returned')
+    def find_raw(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in forbidden and child not in (None, ''): return key
+                found=find_raw(child)
+                if found: return found
+        elif isinstance(value, list):
+            for child in value:
+                found=find_raw(child)
+                if found: return found
+        return ''
+    if find_raw(body): raise SystemExit(f'{operation}: raw artifact field returned')
     if delivery.get('schema')!='uiai.epwa_delivery.v1' or delivery.get('state')!='ready' or body.get('delivery_state')!='ready' or (delivery.get('artifact') or {}).get('artifact_ref')!=body.get('artifact_ref'):
         raise SystemExit(f"{operation}: EPWA delivery not ready ({delivery.get('recovery_ref') or 'invalid binding'})")
     if not str(epwa.get('record_url','')).startswith('https://') or not str(epwa.get('portable_url','')).startswith('https://') or body.get('artifact_url')!=epwa.get('record_url') or body.get('portable_url')!=epwa.get('portable_url'):

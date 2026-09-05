@@ -52,3 +52,25 @@ export function findRawArtifactField(value, path = "$") {
   }
   return "";
 }
+
+export function findNonReadyArtifactDelivery(value, path = "$") {
+  if (!value || typeof value !== "object") return "";
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const found = findNonReadyArtifactDelivery(value[index], `${path}[${index}]`);
+      if (found) return found;
+    }
+    return "";
+  }
+  if (Object.hasOwn(value, "epwa_delivery_error") || value.schema === "uiai.epwa_delivery_error.v1") return `${path}.epwa_delivery_error`;
+  if (value.schema === "uiai.epwa_delivery.v1" && value.state !== "ready") return `${path}.state`;
+  if (Object.hasOwn(value, "delivery_state") || Object.hasOwn(value, "epwa_delivery")) {
+    const deliveryState = value.delivery_state || value.epwa_delivery?.state || "missing";
+    if (deliveryState !== "ready" || value.epwa_delivery?.state !== "ready") return `${path}.delivery_state`;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    const found = findNonReadyArtifactDelivery(child, `${path}.${key}`);
+    if (found) return found;
+  }
+  return "";
+}
