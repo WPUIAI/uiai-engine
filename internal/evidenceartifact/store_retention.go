@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/durablefile"
 )
 
 func (s *Store) Tombstone(artifactID string, revision uint64, reason, authorityRef string) (Tombstone, error) {
@@ -83,7 +85,7 @@ func (s *Store) GC() (GCResult, error) {
 		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 			return result, fail(ErrStoreUnavailable, "create retired layout")
 		}
-		if err := os.Rename(source, target); err != nil {
+		if err := durablefile.Rename(source, target); err != nil {
 			return result, fail(ErrStoreUnavailable, "retire commit")
 		}
 		mutated = true

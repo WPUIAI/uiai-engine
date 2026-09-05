@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/durablefile"
 )
 
 var storeDirs = []string{
@@ -122,7 +124,7 @@ func writeAtomicFile(path string, data []byte, mode os.FileMode) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(tmpName, path); err != nil {
+	if err := durablefile.Rename(tmpName, path); err != nil {
 		return err
 	}
 	if err := syncDir(filepath.Dir(path)); err != nil {
@@ -151,7 +153,7 @@ func promoteFile(staged, target, expectedHash string, expectedSize int64) (bool,
 	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		return false, err
 	}
-	if err := os.Rename(staged, target); err != nil {
+	if err := durablefile.Rename(staged, target); err != nil {
 		if _, statErr := os.Stat(target); statErr == nil {
 			return promoteFile(staged, target, expectedHash, expectedSize)
 		}
@@ -181,12 +183,7 @@ func hashFile(path string) (string, int64, error) {
 }
 
 func syncDir(path string) error {
-	dir, err := os.Open(path) // #nosec G304 -- caller passes configured store directory.
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-	return dir.Sync()
+	return durablefile.SyncDirectory(path)
 }
 
 func readJSONFile(path string, maxBytes int64, out any) error {
@@ -226,7 +223,7 @@ func (s *Store) quarantinePath(source, kind, digest string) error {
 		return err
 	}
 	dest := filepath.Join(destDir, filepath.Base(source))
-	if err := os.Rename(source, dest); err != nil {
+	if err := durablefile.Rename(source, dest); err != nil {
 		return err
 	}
 	meta := map[string]string{"kind": kind, "digest": digest, "quarantined_at": s.cfg.Now().UTC().Format(time.RFC3339Nano)}

@@ -21,6 +21,14 @@ func TestShouldRecycleByPressureThreshold(t *testing.T) {
 	if !p.shouldRecycleByPressure() {
 		t.Fatal("expected pressure recycle at 1KB budget")
 	}
+	measured := treeRSSKB(os.Getpid())
+	if measured <= 2 {
+		t.Fatalf("invalid process memory sample: %d", measured)
+	}
+	RecycleRSSBytes.Store(measured / 2)
+	if !p.shouldRecycleByPressure() {
+		t.Fatal("KiB budget was incorrectly scaled a second time")
+	}
 	RecycleRSSBytes.Store(1 << 40) // absurd budget
 	if p.shouldRecycleByPressure() {
 		t.Fatal("unexpected recycle at huge budget")
