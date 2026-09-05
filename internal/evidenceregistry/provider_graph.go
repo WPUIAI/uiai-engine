@@ -137,12 +137,11 @@ func (s *Store) ListProviderWorkItems(ctx context.Context, query ProviderWorkIte
 	if s == nil || s.db == nil || (query.ProjectRef != "" && query.ProjectRef != s.projectRef) {
 		return ProviderWorkItemPage{}, ErrInputInvalid
 	}
-	if query.Limit == 0 {
-		query.Limit = 100
+	profile, limit, mediaPosture, err := resourcePage(query.ResourceProfile, query.Limit, 100)
+	if err != nil {
+		return ProviderWorkItemPage{}, err
 	}
-	if query.Limit > MaxPageSize {
-		return ProviderWorkItemPage{}, ErrInputInvalid
-	}
+	query.Limit = limit
 	cursor, err := decodeProviderCursor(query.Cursor)
 	if err != nil {
 		return ProviderWorkItemPage{}, err
@@ -184,7 +183,7 @@ func (s *Store) ListProviderWorkItems(ctx context.Context, query ProviderWorkIte
 	if err != nil {
 		return ProviderWorkItemPage{}, err
 	}
-	page := ProviderWorkItemPage{Schema: "uiai.evidence_provider_work_items.v1", ProjectRef: s.projectRef, WorkItems: items, PageSize: query.Limit, ObservedAt: s.now().UTC()}
+	page := ProviderWorkItemPage{Schema: "uiai.evidence_provider_work_items.v1", ProjectRef: s.projectRef, WorkItems: items, PageSize: query.Limit, ResourceProfile: profile, MediaPosture: mediaPosture, ObservedAt: s.now().UTC()}
 	if len(page.WorkItems) > int(query.Limit) {
 		last := page.WorkItems[query.Limit-1]
 		page.NextCursor, err = encodeProviderCursor(providerCursor{Priority: last.Priority, ItemType: last.ItemType, ItemID: last.ItemID})

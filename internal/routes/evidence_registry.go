@@ -111,6 +111,7 @@ func mountEvidenceRegistry(r chi.Router, provider registryProvider) {
 			Closure:           req.URL.Query().Get("closure"),
 			Cursor:            req.URL.Query().Get("cursor"),
 			PageSize:          uint32(pageSize),
+			ResourceProfile:   evidenceregistry.ResourceProfile(req.URL.Query().Get("resource_profile")),
 		}
 		page, err := store.List(req.Context(), query)
 		if err != nil {
@@ -186,6 +187,7 @@ func mountEvidenceRegistry(r chi.Router, provider registryProvider) {
 			ProjectRef: req.URL.Query().Get("project_ref"), Text: req.URL.Query().Get("q"),
 			Status: req.URL.Query().Get("status"), ItemType: req.URL.Query().Get("item_type"),
 			Limit: uint32(limit), Cursor: req.URL.Query().Get("cursor"),
+			ResourceProfile: evidenceregistry.ResourceProfile(req.URL.Query().Get("resource_profile")),
 		})
 		if err != nil {
 			writeRegistryError(w, err)

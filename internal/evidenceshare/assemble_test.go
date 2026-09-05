@@ -217,18 +217,23 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		t.Fatal("renderer must not collapse validity layers into a success badge")
 	}
 	app, _ := assets.ReadFile("assets/app.js")
-	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", `tr("offline_snapshot")`, "locale.number", `dd.dir = "auto"`, `code.dir = "ltr"`, `aria-busy", "true"`, "event.preventDefault()", `byId("registry-back").hidden = true`, `focus({ preventScroll: true })`} {
+	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", `tr("offline_snapshot")`, "resource_profile", "media_posture", "snapshot_cursor", "AbortController", "controller.signal", "registryOverscan", "registrySpacer", `matchMedia("(min-width: 601px)")`, "cursorHistory", `loadRegistry({ previous: true })`, `registryState.artifacts = (artifacts.rows || []).slice(0, registryPageSize)`, `registryState.workItems = (workItems.work_items || []).slice(0, registryPageSize)`, "uiai.epwa_registry_snapshot.v1", "registrySnapshotLimit", "localStorage", "visibilitychange", "paused_lowmem", "paused_hidden", "paused_offline", "locale.number", `dd.dir = "auto"`, `code.dir = "ltr"`, `aria-busy", "true"`, "event.preventDefault()", `byId("registry-back").hidden = true`, `focus({ preventScroll: true })`} {
 		if !strings.Contains(string(app), required) {
 			t.Fatalf("registry consumer missing %s", required)
 		}
 	}
-	for _, forbidden := range []string{`const registryAPI = "/`, "/api/evidence/registry/closure", "/api/evidence/registry/sync?"} {
+	for _, forbidden := range []string{"registryState.artifacts.push(", "registryState.workItems.push(", `matchMedia("(min-width: 769px)")`} {
+		if strings.Contains(string(app), forbidden) {
+			t.Fatalf("registry consumer retains unbounded or mismatched behavior %s", forbidden)
+		}
+	}
+	for _, forbidden := range []string{`const registryAPI = "/`, "/api/evidence/registry/closure", "/api/evidence/registry/sync?", `const tr = document.createElement("tr")`} {
 		if strings.Contains(string(app), forbidden) {
 			t.Fatalf("public consumer references private authority endpoint %s", forbidden)
 		}
 	}
 	css, _ := assets.ReadFile("assets/styles.css")
-	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "forced-colors:active", `[hidden]{display:none!important}`, "overflow-x:hidden", "border-inline-start", "inset-inline-start", "text-align:start", "unicode-bidi:embed", "content:attr(data-label)", `html[dir="rtl"]`, `.registry-table td:nth-child(2){grid-column:1/-1`, ".record-navigation"} {
+	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "forced-colors:active", `[hidden]{display:none!important}`, "overflow-x:hidden", "border-inline-start", "inset-inline-start", "text-align:start", "unicode-bidi:embed", "content:attr(data-label)", `html[dir="rtl"]`, `.registry-table td:nth-child(2){grid-column:1/-1`, ".registry-spacer", `.registry-table tbody tr:not(.registry-spacer)`, ".record-navigation"} {
 		if !strings.Contains(string(css), required) {
 			t.Fatalf("responsive CSS missing %s", required)
 		}
@@ -240,13 +245,41 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 	}
 }
 
+func TestRegistryVirtualizationBreakpointAndScrollBatching(t *testing.T) {
+	css, err := assets.ReadFile("assets/styles.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(css), "@media(min-width:601px)") || strings.Contains(string(css), "@media(min-width:769px)") {
+		t.Fatal("fixed row heights must match the JavaScript virtualization breakpoint")
+	}
+	app, err := assets.ReadFile("assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(app)
+	if !strings.Contains(text, "3.5 * parseFloat(getComputedStyle(document.documentElement).fontSize)") {
+		t.Fatal("virtualized row heights must track rem sizing")
+	}
+	start := strings.Index(text, `tableWrap.addEventListener("scroll"`)
+	if start < 0 {
+		t.Fatal("scroll element must be cached")
+	}
+	text = text[start:]
+	frame := strings.Index(text, "requestAnimationFrame")
+	storage := strings.Index(text, "sessionStorage.setItem")
+	if frame < 0 || storage < frame {
+		t.Fatal("scroll persistence must run inside the scheduled frame")
+	}
+}
+
 func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 	localeBody, err := assets.ReadFile("assets/locale.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	localeText := string(localeBody)
-	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`, `.replace(/_/g, "-")`} {
+	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`, `.replace(/_/g, "-")`, `resource_profile:`, `media_posture:`, `snapshot_cursor:`} {
 		if !strings.Contains(localeText, required) {
 			t.Fatalf("locale runtime missing %s", required)
 		}
