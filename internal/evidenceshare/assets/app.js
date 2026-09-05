@@ -493,11 +493,12 @@ function wireRegistryControls() {
   byId("registry-type").addEventListener("change", (event) => { registryState.type = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
   byId("registry-previous").addEventListener("click", () => loadRegistry({ previous: true }).catch(showRegistryUnavailable));
   byId("registry-more").addEventListener("click", () => loadRegistry({ append: true }).catch(showRegistryUnavailable));
-  registryTableWrap().addEventListener("scroll", () => {
-    sessionStorage.setItem(registryScrollKey(), String(registryTableWrap().scrollTop));
+  const tableWrap = registryTableWrap();
+  tableWrap.addEventListener("scroll", () => {
     if (registryState.scrollFrame) return;
     registryState.scrollFrame = requestAnimationFrame(() => {
       registryState.scrollFrame = 0;
+      sessionStorage.setItem(registryScrollKey(), String(tableWrap.scrollTop));
       renderRegistryRows();
     });
   }, { passive: true });

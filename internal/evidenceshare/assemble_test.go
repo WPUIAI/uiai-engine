@@ -245,6 +245,31 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 	}
 }
 
+func TestRegistryVirtualizationBreakpointAndScrollBatching(t *testing.T) {
+	css, err := assets.ReadFile("assets/styles.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(css), "@media(min-width:601px)") || strings.Contains(string(css), "@media(min-width:769px)") {
+		t.Fatal("fixed row heights must match the JavaScript virtualization breakpoint")
+	}
+	app, err := assets.ReadFile("assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(app)
+	start := strings.Index(text, `tableWrap.addEventListener("scroll"`)
+	if start < 0 {
+		t.Fatal("scroll element must be cached")
+	}
+	text = text[start:]
+	frame := strings.Index(text, "requestAnimationFrame")
+	storage := strings.Index(text, "sessionStorage.setItem")
+	if frame < 0 || storage < frame {
+		t.Fatal("scroll persistence must run inside the scheduled frame")
+	}
+}
+
 func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 	localeBody, err := assets.ReadFile("assets/locale.js")
 	if err != nil {
