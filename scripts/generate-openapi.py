@@ -91,6 +91,18 @@ artifact_routes = {
 for path, (method, summary) in artifact_routes.items():
     openapi["paths"].setdefault(path, {})[method] = {"summary": summary, "responses": artifact_responses}
 
+# A committed artifact may fail before a real package binding exists. Preserve
+# commit/recovery truth in a documented error variant rather than inventing hashes.
+commit_operation = openapi["paths"]["/api/evidence/artifacts/commit"]["post"]
+commit_operation["responses"] = dict(artifact_responses)
+commit_operation["responses"]["202"] = {
+    "description": "Artifact committed; delivery withheld or package publication failed",
+    "content": {"application/json": {"schema": {"oneOf": [
+        {"$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"},
+        {"$ref": "#/components/schemas/uiai_evidence_artifact_commit_delivery_error_v1"},
+    ]}}},
+}
+
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(json.dumps(openapi, indent=2) + "\n")
 # MR-P0-03/04: keep Go embed in sync — binary serves via //go:embed

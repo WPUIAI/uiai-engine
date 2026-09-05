@@ -74,6 +74,7 @@ func TestEvidenceArtifactCommitReadAndRebuildRoutes(t *testing.T) {
 	router := chi.NewRouter()
 	router.Route("/api/evidence/artifacts", func(r chi.Router) { MountEvidenceArtifacts(r, cfg, artifacts, registry) })
 	router.Route("/api/screenshot", func(r chi.Router) { mountEvidenceShare(r, cfg) })
+	multipartBytes := append([]byte(nil), body.Bytes()...)
 	request := httptest.NewRequest(http.MethodPost, "https://evidence.example/api/evidence/artifacts/commit", &body)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	response := httptest.NewRecorder()
@@ -152,6 +153,27 @@ func TestEvidenceArtifactCommitReadAndRebuildRoutes(t *testing.T) {
 	page, err := project.List(context.Background(), evidenceregistry.Query{ProjectRef: manifest.Scope.Project.ProjectRef, PageSize: 10})
 	if err != nil || len(page.Rows) != 1 {
 		t.Fatalf("page=%#v err=%v", page, err)
+	}
+	blockedRoot := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blockedRoot, []byte("block package publication"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", blockedRoot)
+	retry := httptest.NewRequest(http.MethodPost, "https://evidence.example/api/evidence/artifacts/commit", bytes.NewReader(multipartBytes))
+	retry.Header.Set("Content-Type", writer.FormDataContentType())
+	failed := httptest.NewRecorder()
+	router.ServeHTTP(failed, retry)
+	var failedBody map[string]any
+	if err := json.Unmarshal(failed.Body.Bytes(), &failedBody); err != nil {
+		t.Fatal(err)
+	}
+	if failed.Code != http.StatusAccepted || failedBody["schema"] != "uiai.evidence_artifact_commit_delivery_error.v1" || failedBody["artifact_ref"] != manifest.ArtifactID || failedBody["commit"] == nil || failedBody["epwa_delivery_error"] == nil {
+		t.Fatalf("publication failure lost committed identity or error contract: status=%d body=%#v", failed.Code, failedBody)
+	}
+	for _, key := range []string{"artifact_url", "portable_url", "epwa_delivery"} {
+		if _, ok := failedBody[key]; ok {
+			t.Fatalf("publication failure fabricated %s", key)
+		}
 	}
 }
 

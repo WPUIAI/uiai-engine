@@ -37,6 +37,10 @@
     {
       "id": "uiai.artifact_delivery_envelope.v2",
       "src": "contracts/schemas/uiai.artifact_delivery_envelope.v2.schema.json"
+    },
+    {
+      "id": "uiai.evidence_artifact_commit_delivery_error.v1",
+      "src": "contracts/schemas/uiai.evidence_artifact_commit_delivery_error.v1.schema.json"
     }
   ]
 }

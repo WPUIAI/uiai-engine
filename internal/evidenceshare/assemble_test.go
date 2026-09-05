@@ -26,6 +26,20 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if !strings.HasPrefix(result.ArtifactRef, "uiai-evidence-share:sha256:") || !strings.HasPrefix(result.RelativePath, "./") || !strings.HasSuffix(result.PortableRelativePath, "/portable.zip") {
 		t.Fatal("invalid portable identity")
 	}
+	projectionBody, err := os.ReadFile(filepath.Join(result.Directory, "projection.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var projectionIdentity struct {
+		ProjectionID string `json:"projection_id"`
+	}
+	if err := json.Unmarshal(projectionBody, &projectionIdentity); err != nil {
+		t.Fatal(err)
+	}
+	projectionDigest := sha256.Sum256(projectionBody)
+	if result.ProjectionRef != projectionIdentity.ProjectionID || result.ProjectionRef == result.ArtifactRef || result.ProjectionSHA256 != hex.EncodeToString(projectionDigest[:]) {
+		t.Fatal("delivery projection identity or digest differs from packaged projection")
+	}
 	archivePath := filepath.Join(root, result.PackageID+".zip")
 	archiveBody, err := os.ReadFile(archivePath)
 	if err != nil {
@@ -75,7 +89,6 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if manifest.Interaction != "read_only" || manifest.Availability != "ready" || manifest.ProjectionRef != "./projection.json" {
 		t.Fatal("truth posture drift")
 	}
-	projectionBody, _ := os.ReadFile(filepath.Join(result.Directory, "projection.json"))
 	var projection evidencepwa.Projection
 	if err := json.Unmarshal(projectionBody, &projection); err != nil || evidencepwa.ValidateProjection(projection) != nil {
 		t.Fatal("canonical evidence PWA projection missing or invalid")

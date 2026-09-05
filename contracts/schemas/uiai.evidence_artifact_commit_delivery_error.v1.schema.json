@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpuiai.com/schemas/uiai.evidence_artifact_commit_delivery_error.v1.schema.json",
+  "title": "Committed Artifact Awaiting EPWA Publication",
+  "description": "HTTP 202: immutable artifact committed, but no valid EPWA package binding could be produced. Never a ready delivery; retry publication using the committed identity.",
+  "type": "object",
+  "required": ["schema", "artifact_ref", "commit", "registry_state", "epwa_delivery_error"],
+  "properties": {
+    "schema": {"const": "uiai.evidence_artifact_commit_delivery_error.v1"},
+    "artifact_ref": {"type": "string", "minLength": 1},
+    "commit": {"type": "object"},
+    "registry_state": {"type": "string"},
+    "epwa_delivery_error": {
+      "type": "object",
+      "required": ["schema", "state", "artifact_ref", "recovery_ref", "error"],
+      "properties": {
+        "schema": {"const": "uiai.epwa_delivery_error.v1"},
+        "state": {"const": "pending_reconcile"},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "recovery_ref": {"type": "string", "minLength": 1},
+        "error": {"type": "object"}
+      }
+    }
+  },
+  "not": {"anyOf": [{"required": ["artifact_url"]}, {"required": ["portable_url"]}, {"required": ["epwa_delivery"]}]}
+}

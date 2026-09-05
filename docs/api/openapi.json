@@ -617,11 +617,18 @@
             }
           },
           "202": {
-            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "description": "Artifact committed; delivery withheld or package publication failed",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/uiai_evidence_artifact_commit_delivery_error_v1"
+                    }
+                  ]
                 }
               }
             }
@@ -1487,7 +1494,7 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://wpuiai.com/schemas/uiai.artifact_delivery_envelope.v2.schema.json",
         "title": "UIAI Artifact Delivery Envelope",
-        "description": "Common REST and tool response envelope for artifact-producing operations. Raw payload fields may appear only when epwa_delivery.state is ready.",
+        "description": "Common REST and tool response envelope for artifact-producing operations. Raw artifact bytes and legacy paths are never delivery outputs; ready deliveries expose only bound HTTPS viewer and portable-package URLs.",
         "type": "object",
         "additionalProperties": true,
         "required": [
@@ -1581,6 +1588,83 @@
             }
           }
         ]
+      },
+      "uiai_evidence_artifact_commit_delivery_error_v1": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://wpuiai.com/schemas/uiai.evidence_artifact_commit_delivery_error.v1.schema.json",
+        "title": "Committed Artifact Awaiting EPWA Publication",
+        "description": "HTTP 202: immutable artifact committed, but no valid EPWA package binding could be produced. Never a ready delivery; retry publication using the committed identity.",
+        "type": "object",
+        "required": [
+          "schema",
+          "artifact_ref",
+          "commit",
+          "registry_state",
+          "epwa_delivery_error"
+        ],
+        "properties": {
+          "schema": {
+            "const": "uiai.evidence_artifact_commit_delivery_error.v1"
+          },
+          "artifact_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "commit": {
+            "type": "object"
+          },
+          "registry_state": {
+            "type": "string"
+          },
+          "epwa_delivery_error": {
+            "type": "object",
+            "required": [
+              "schema",
+              "state",
+              "artifact_ref",
+              "recovery_ref",
+              "error"
+            ],
+            "properties": {
+              "schema": {
+                "const": "uiai.epwa_delivery_error.v1"
+              },
+              "state": {
+                "const": "pending_reconcile"
+              },
+              "artifact_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "error": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "artifact_url"
+              ]
+            },
+            {
+              "required": [
+                "portable_url"
+              ]
+            },
+            {
+              "required": [
+                "epwa_delivery"
+              ]
+            }
+          ]
+        }
       }
     }
   }

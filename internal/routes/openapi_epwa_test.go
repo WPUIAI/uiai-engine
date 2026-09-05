@@ -75,6 +75,13 @@ func TestOpenAPIAdvertisesMandatoryEPWADeliveryEnvelope(t *testing.T) {
 			}
 			content := accepted["content"].(map[string]any)["application/json"].(map[string]any)
 			schema := content["schema"].(map[string]any)
+			if path == "/api/evidence/artifacts/commit" {
+				variants, ok := schema["oneOf"].([]any)
+				if !ok || len(variants) != 2 || variants[0].(map[string]any)["$ref"] != "#/components/schemas/uiai_artifact_delivery_envelope_v2" || variants[1].(map[string]any)["$ref"] != "#/components/schemas/uiai_evidence_artifact_commit_delivery_error_v1" {
+					t.Fatalf("commit publication failure missing documented response variant: %#v", schema)
+				}
+				continue
+			}
 			if schema["$ref"] != "#/components/schemas/uiai_artifact_delivery_envelope_v2" {
 				t.Fatalf("%s %s uses wrong delivery schema: %#v", method, path, schema)
 			}
