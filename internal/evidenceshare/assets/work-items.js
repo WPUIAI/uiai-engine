@@ -33,7 +33,7 @@ function workItemRefs(values) {
 function workItemInspectData(scope) {
   return scopeWorkItems(scope).flatMap((item, index) => {
     const authority = item.authority || {};
-    const position = locale.number(index + 1);
+    const position = globalThis.EvidenceLocale.number(index + 1);
     const label = `${workItemTranslate("kind_work_item")} ${position}`;
     return [
       datum(`${label} · ${item.item_type || workItemTranslate("item")}`, workItemSummary(item)),

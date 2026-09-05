@@ -274,7 +274,7 @@ func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{`const workItemTranslate =`, `globalThis.EvidenceLocale?.t?.(key, values)`, `workItemTranslate("work_item_unavailable")`, `workItemTranslate("relationships_label")`, `workItemTranslate("settlement")`, `locale.number(index + 1)`} {
+	for _, required := range []string{`const workItemTranslate =`, `globalThis.EvidenceLocale?.t?.(key, values)`, `workItemTranslate("work_item_unavailable")`, `workItemTranslate("relationships_label")`, `workItemTranslate("settlement")`, `globalThis.EvidenceLocale.number(index + 1)`} {
 		if !strings.Contains(string(workItems), required) {
 			t.Fatalf("localized Work Item renderer missing %s", required)
 		}
