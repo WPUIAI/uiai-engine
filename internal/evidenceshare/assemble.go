@@ -23,10 +23,10 @@ var (
 	ErrConflict     = errors.New("screenshot evidence share content conflict")
 )
 
-//go:embed assets/index.html assets/styles.css assets/work-items.js assets/pwa.js assets/app.js assets/manifest.webmanifest assets/icon.svg assets/sw.js
+//go:embed assets/index.html assets/styles.css assets/work-items.js assets/locale.js assets/pwa.js assets/app.js assets/manifest.webmanifest assets/icon.svg assets/sw.js
 var assets embed.FS
 
-var packagedAssetNames = []string{"index.html", "styles.css", "work-items.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"}
+var packagedAssetNames = []string{"index.html", "styles.css", "work-items.js", "locale.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"}
 
 func Assemble(root string, input Input) (Result, error) {
 	if strings.TrimSpace(root) == "" || len(input.Screenshot) == 0 || input.Width <= 0 || input.Height <= 0 || input.CapturedAt.IsZero() {

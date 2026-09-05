@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if !strings.HasPrefix(result.ArtifactRef, "uiai-evidence-share:sha256:") || !strings.HasPrefix(result.RelativePath, "./") {
 		t.Fatal("invalid portable identity")
 	}
-	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "work-items.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"} {
+	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "work-items.js", "locale.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"} {
 		if info, err := os.Stat(filepath.Join(result.Directory, name)); err != nil || info.Size() == 0 {
 			t.Fatalf("missing %s: %v", name, err)
 		}
@@ -162,7 +163,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 	if digest := embeddedAssetsSHA256(); len(digest) != 64 {
 		t.Fatalf("embedded asset digest invalid: %q", digest)
 	}
-	for _, name := range []string{"index.html", "styles.css", "work-items.js", "pwa.js", "app.js", "manifest.webmanifest", "sw.js"} {
+	for _, name := range []string{"index.html", "styles.css", "work-items.js", "locale.js", "pwa.js", "app.js", "manifest.webmanifest", "sw.js"} {
 		body, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			t.Fatal(err)
@@ -188,6 +189,9 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 	if strings.Index(htmlText, "work-items.js") >= strings.Index(htmlText, "app.js") {
 		t.Fatal("work-item renderer must load before the main application")
 	}
+	if strings.Index(htmlText, "locale.js") <= strings.Index(htmlText, "work-items.js") || strings.Index(htmlText, "locale.js") >= strings.Index(htmlText, "app.js") {
+		t.Fatal("locale runtime must load after function declarations and before the main application")
+	}
 	if strings.Count(htmlText, "<article") != 1 || strings.Count(htmlText, "</article>") != 1 {
 		t.Fatal("semantic shell must contain exactly one evidence article")
 	}
@@ -199,7 +203,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		}
 		cursor = next
 	}
-	for _, required := range []string{`data-epwa-status="loading"`, `data-interaction="read-only"`, `data-default-view="registry"`, `data-asset-version="__UIAI_ASSET_VERSION__"`, `data-pwa-status="loading"`, `rel="manifest"`, `id="registry"`, `id="registry-project"`, `id="registry-rows"`, `id="record-detail"`, `id="registry-back"`, `id="primary-evidence-frame"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
+	for _, required := range []string{`lang="en" dir="ltr"`, `data-epwa-status="loading"`, `data-interaction="read-only"`, `data-default-view="registry"`, `data-asset-version="__UIAI_ASSET_VERSION__"`, `data-pwa-status="loading"`, `rel="manifest"`, `id="locale-select"`, `id="registry"`, `aria-busy="true"`, `id="registry-project"`, `id="registry-rows"`, `<caption class="visually-hidden"`, `scope="col"`, `id="record-detail"`, `id="registry-back"`, `id="primary-evidence-frame"`, `tabindex="-1"`, `dir="auto" data-i18n="evidence_record"`, `id="record-id" dir="ltr"`, "UIAI <b>×</b> Focusa", "Independent states—not one “valid” badge", "not automatically legally admissible"} {
 		if !strings.Contains(htmlText, required) {
 			t.Fatalf("semantic shell missing %s", required)
 		}
@@ -213,7 +217,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		t.Fatal("renderer must not collapse validity layers into a success badge")
 	}
 	app, _ := assets.ReadFile("assets/app.js")
-	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", "offline snapshot; current revocation unavailable", "event.preventDefault()", `byId("registry-back").hidden = true`} {
+	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", `tr("offline_snapshot")`, "locale.number", `dd.dir = "auto"`, `code.dir = "ltr"`, `aria-busy", "true"`, "event.preventDefault()", `byId("registry-back").hidden = true`, `focus({ preventScroll: true })`} {
 		if !strings.Contains(string(app), required) {
 			t.Fatalf("registry consumer missing %s", required)
 		}
@@ -224,7 +228,7 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		}
 	}
 	css, _ := assets.ReadFile("assets/styles.css")
-	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "overflow-x:hidden", `.registry-table td:nth-child(2){grid-column:1/-1`, ".record-navigation"} {
+	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "forced-colors:active", `[hidden]{display:none!important}`, "overflow-x:hidden", "border-inline-start", "inset-inline-start", "text-align:start", "unicode-bidi:embed", "content:attr(data-label)", `html[dir="rtl"]`, `.registry-table td:nth-child(2){grid-column:1/-1`, ".record-navigation"} {
 		if !strings.Contains(string(css), required) {
 			t.Fatalf("responsive CSS missing %s", required)
 		}
@@ -232,6 +236,57 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 	for _, forbidden := range []string{"min-width:720px", `.registry[data-registry-state="unavailable"] .registry-table-wrap{display:none}`, ".record-heading{.record-heading"} {
 		if strings.Contains(string(css), forbidden) {
 			t.Fatalf("responsive CSS retains forbidden artifact-detail/registry rule %s", forbidden)
+		}
+	}
+}
+
+func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
+	localeBody, err := assets.ReadFile("assets/locale.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	localeText := string(localeBody)
+	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`, `.replace(/_/g, "-")`} {
+		if !strings.Contains(localeText, required) {
+			t.Fatalf("locale runtime missing %s", required)
+		}
+	}
+	htmlBody, err := assets.ReadFile("assets/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPattern := regexp.MustCompile(`data-i18n(?:-placeholder|-aria-label)?="([a-z_]+)"`)
+	translationCount := func(key string) int {
+		pattern := regexp.MustCompile(`(?:^|[,{])\s*` + regexp.QuoteMeta(key) + `\s*:`)
+		return len(pattern.FindAllString(localeText, -1))
+	}
+	for _, match := range keyPattern.FindAllStringSubmatch(string(htmlBody), -1) {
+		if count := translationCount(match[1]); count != 3 {
+			t.Fatalf("translation key %s count=%d want=3", match[1], count)
+		}
+	}
+	for _, key := range []string{"offline_snapshot", "record_limitations", "work_item_unavailable", "relationships", "completion", "settlement", "legal", "provider", "bound_immutable_summary"} {
+		if count := translationCount(key); count != 3 {
+			t.Fatalf("dynamic translation key %s count=%d want=3", key, count)
+		}
+	}
+	workItems, err := assets.ReadFile("assets/work-items.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{`const workItemTranslate =`, `globalThis.EvidenceLocale?.t?.(key, values)`, `workItemTranslate("work_item_unavailable")`, `workItemTranslate("relationships_label")`, `workItemTranslate("settlement")`, `globalThis.EvidenceLocale.number(index + 1)`} {
+		if !strings.Contains(string(workItems), required) {
+			t.Fatalf("localized Work Item renderer missing %s", required)
+		}
+	}
+	appBody, err := assets.ReadFile("assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicKeyPattern := regexp.MustCompile(`(?:tr|workItemTranslate)\("([a-z_]+)"`)
+	for _, match := range dynamicKeyPattern.FindAllStringSubmatch(string(appBody)+string(workItems), -1) {
+		if count := translationCount(match[1]); count != 3 {
+			t.Fatalf("dynamic translation key %s count=%d want=3", match[1], count)
 		}
 	}
 }
@@ -270,7 +325,7 @@ func TestEmbeddedPWAAssetsArePortableAndScopeConfined(t *testing.T) {
 		t.Fatal(err)
 	}
 	worker := string(workerBody)
-	for _, required := range []string{`request.method !== "GET"`, "url.origin === SCOPE_URL.origin", "url.pathname.startsWith(SCOPE_URL.pathname)", "name.startsWith(CACHE_PREFIX)", "Promise.allSettled(OPTIONAL_RECORD_ASSETS", `response.type !== "opaque"`, "cache.match(\"./index.html\")", "self.skipWaiting()", "self.clients.claim()", `event.data?.type !== "PURGE_SCOPE_CACHE"`} {
+	for _, required := range []string{`request.method !== "GET"`, "url.origin === SCOPE_URL.origin", "url.pathname.startsWith(SCOPE_URL.pathname)", "name.startsWith(CACHE_PREFIX)", "Promise.allSettled(OPTIONAL_RECORD_ASSETS", `./locale.js?v=${VERSION}`, `response.type !== "opaque"`, "cache.match(\"./index.html\")", "self.skipWaiting()", "self.clients.claim()", `event.data?.type !== "PURGE_SCOPE_CACHE"`} {
 		if !strings.Contains(worker, required) {
 			t.Fatalf("service worker scope/update safety missing %s", required)
 		}

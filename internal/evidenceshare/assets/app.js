@@ -1,6 +1,8 @@
 "use strict";
 
 const byId = (id) => document.getElementById(id);
+const locale = window.EvidenceLocale;
+const tr = (key, values) => locale?.t(key, values) ?? key;
 const text = (node, value) => { node.textContent = value ?? "—"; };
 const availabilityStates = new Set(["loading", "ready", "unavailable", "blocked", "corrupt", "stale", "redacted", "degraded"]);
 const expectedSections = ["overview", "evidence", "timeline", "inspect", "developer"];
@@ -12,16 +14,16 @@ const registryState = { project: "", query: "", status: "", type: "", artifactCu
 
 const safeRef = (value) => typeof value === "string" && /^\.\/[A-Za-z0-9._/-]+$/.test(value) && !value.includes("../") ? value : null;
 const validSHA256 = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-const formatBytes = (value) => new Intl.NumberFormat(undefined, { style: "unit", unit: "byte", notation: value > 999999 ? "compact" : "standard" }).format(value);
+const formatBytes = (value) => new Intl.NumberFormat(locale?.locale, { style: "unit", unit: "byte", notation: value > 999999 ? "compact" : "standard" }).format(value);
 const formatTime = (value) => {
   const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? "Invalid recorded time" : date.toLocaleString();
+  return Number.isNaN(date.valueOf()) ? tr("invalid_time") : (locale?.time(date) ?? date.toLocaleString());
 };
 
 function fact(label, value) {
   const wrap = document.createElement("div");
   const dt = document.createElement("dt");
-  const dd = document.createElement("dd");
+  const dd = document.createElement("dd"); dd.dir = "auto";
   wrap.className = "fact";
   text(dt, label);
   text(dd, value);
@@ -32,7 +34,7 @@ function fact(label, value) {
 function datum(label, value) {
   const wrap = document.createElement("div");
   const small = document.createElement("small");
-  const code = document.createElement("code");
+  const code = document.createElement("code"); code.dir = "ltr";
   wrap.className = "datum";
   text(small, label);
   text(code, value);
@@ -43,23 +45,24 @@ function datum(label, value) {
 function lineageItem(label, value) {
   const item = document.createElement("li");
   const strong = document.createElement("strong");
-  const code = document.createElement("code");
+  const code = document.createElement("code"); code.dir = "ltr";
   text(strong, label + " ");
-  text(code, value || "Unbound");
+  text(code, value || tr("unbound"));
   item.append(strong, code);
   return item;
 }
 
 function setStatus(status, state, label) {
   delete status.dataset.readyLabel;
-  status.className = `status ${state === "ready" ? "ready" : "error"}`;
+  status.className = `status ${state}`;
   status.dataset.epwaStatus = state;
+  document.querySelector("main > :not([hidden])")?.setAttribute("aria-busy", state === "loading" ? "true" : "false");
   text(status.querySelector("span"), label);
 }
 
 function setReadyStatus(status, label) {
   const offlineSnapshot = navigator.onLine === false || location.protocol === "file:";
-  if (offlineSnapshot) setStatus(status, "stale", `${label} · offline snapshot; current revocation unavailable`);
+  if (offlineSnapshot) setStatus(status, "stale", `${label} · ${tr("offline_snapshot")}`);
   else setStatus(status, "ready", label);
   status.dataset.readyLabel = label;
 }
@@ -80,14 +83,14 @@ function setValidity(layer, value, state) {
 }
 
 function setUnavailableValidity(state) {
-  setValidity("integrity", state === "corrupt" ? "Failed" : "Unavailable", state);
-  setValidity("provenance", "Unavailable", state);
-  setValidity("observation", "Unavailable", state);
-  setValidity("sufficiency", "Not assessable", "blocked");
-  setValidity("verification", "Not determined", "not_determined");
-  setValidity("completion", "Not determined", "not_determined");
-  setValidity("settlement", "Not determined", "not_determined");
-  setValidity("legal", "Not determined", "not_determined");
+  setValidity("integrity", state === "corrupt" ? tr("record_corrupt") : tr("unavailable_value"), state);
+  setValidity("provenance", tr("unavailable_value"), state);
+  setValidity("observation", tr("unavailable_value"), state);
+  setValidity("sufficiency", tr("not_assessable"), "blocked");
+  setValidity("verification", tr("not_determined"), "not_determined");
+  setValidity("completion", tr("not_determined"), "not_determined");
+  setValidity("settlement", tr("not_determined"), "not_determined");
+  setValidity("legal", tr("not_determined"), "not_determined");
 }
 
 const validProjection = (value) => value?.schema === "uiai.evidence_pwa_projection.v1" &&
@@ -96,7 +99,7 @@ const validProjection = (value) => value?.schema === "uiai.evidence_pwa_projecti
 
 async function fetchJSON(ref) {
   const response = await fetch(ref, { cache: "no-store", credentials: "omit" });
-  if (!response.ok) throw new Error(`Record unavailable (${response.status})`);
+  if (!response.ok) throw new Error(`${tr("unavailable_value")} (${response.status})`);
   return response.json();
 }
 
@@ -105,7 +108,7 @@ function renderTimeline(entries) {
   const rows = (entries || []).map((entry) => {
     const item = document.createElement("li");
     const time = document.createElement("time");
-    const copy = document.createElement("div");
+    const copy = document.createElement("div"); copy.dir = "auto";
     time.dateTime = entry.occurred_at;
     text(time, formatTime(entry.occurred_at));
     text(copy, entry.event_type);
@@ -114,7 +117,7 @@ function renderTimeline(entries) {
   });
   if (rows.length === 0) {
     const item = document.createElement("li");
-    text(item, "No bounded timeline entries are available in this projection.");
+    text(item, tr("no_timeline"));
     rows.push(item);
   }
   events.replaceChildren(...rows);
@@ -140,9 +143,11 @@ function registryRow(kind, record) {
   button.className = "registry-record";
   button.dataset.kind = kind;
   button.dataset.ref = kind === "artifact" ? record.artifact_ref : record.work_item_ref;
-  text(kindCell, kind === "artifact" ? "Artifact" : record.item_type || "Work item");
+  const cellLabels = ["kind", "record", "status", "binding", "revision"].map((key) => tr(key));
+  [kindCell, recordCell, statusCell, bindingCell, revisionCell].forEach((cell, index) => { cell.dataset.label = cellLabels[index]; cell.dir = index === 1 ? "ltr" : "auto"; });
+  text(kindCell, kind === "artifact" ? tr("kind_artifact") : record.item_type || tr("kind_work_item"));
   const strong = document.createElement("strong");
-  const code = document.createElement("code");
+  const code = document.createElement("code"); strong.dir = "auto"; code.dir = "ltr";
   text(strong, kind === "artifact" ? record.title : record.title);
   text(code, kind === "artifact" ? record.artifact_ref : record.item_id);
   button.append(strong, code);
@@ -161,22 +166,22 @@ function registryRow(kind, record) {
 async function showRegistryDetail(kind, record) {
   const panel = byId("registry-detail");
   const title = document.createElement("h2");
-  const copy = document.createElement("p");
+  const copy = document.createElement("p"); copy.dir = "auto";
   const facts = document.createElement("dl");
   title.textContent = record.title || record.item_id || record.artifact_ref;
-  copy.textContent = kind === "artifact" ? `Public-safe immutable artifact revision ${record.revision}.` : (record.description || "No provider description was projected.");
+  copy.textContent = kind === "artifact" ? tr("public_artifact_revision", { revision: record.revision }) : (record.description || tr("no_provider_description"));
   facts.className = "registry-detail-facts";
   const entries = kind === "artifact" ? [
-    ["Artifact", record.artifact_ref], ["Work item", record.first_work_item_ref], ["Verification", record.verification], ["Closure", record.closure], ["Captured", formatTime(record.captured_at)],
+    [tr("artifact"), record.artifact_ref], [tr("kind_work_item"), record.first_work_item_ref], [tr("verification"), record.verification], [tr("closure"), record.closure], [tr("captured"), formatTime(record.captured_at)],
   ] : [
-    ["Work item", record.work_item_ref], ["Provider", record.provider_surface], ["Type", record.item_type], ["Status", record.status], ["Binding", record.binding_state], ["Revision", record.revision],
+    [tr("kind_work_item"), record.work_item_ref], [tr("provider"), record.provider_surface], [tr("type"), record.item_type], [tr("status"), record.status], [tr("binding"), record.binding_state], [tr("revision"), record.revision],
   ];
-  facts.replaceChildren(...entries.map(([label, value]) => fact(label, value || "Unavailable")));
+  facts.replaceChildren(...entries.map(([label, value]) => fact(label, value || tr("unavailable_value"))));
   const children = [title, copy, facts];
   if (kind === "artifact" && publicPath(record.pwa_path)) {
     const link = document.createElement("a");
     link.href = record.pwa_path;
-    link.textContent = "Open forensic evidence record";
+    link.textContent = tr("open_evidence_record");
     children.push(link);
   }
   if (kind === "work_item") {
@@ -187,12 +192,13 @@ async function showRegistryDetail(kind, record) {
         fetchJSON(`${registryAPI}/edges?${queryString({ ...base, direction: "reverse" })}`),
       ]);
       const relationships = document.createElement("p");
-      relationships.textContent = `${forward.edges?.length || 0} outgoing · ${reverse.edges?.length || 0} incoming relationships`;
+      relationships.textContent = tr("relationships", { outgoing: locale.number(forward.edges?.length || 0), incoming: locale.number(reverse.edges?.length || 0) });
       children.push(relationships);
     } catch { /* Detail remains useful when relationship projection is degraded. */ }
   }
   panel.replaceChildren(...children);
   panel.hidden = false;
+  panel.focus();
   const url = new URL(location.href);
   url.searchParams.set("selected", kind === "artifact" ? record.artifact_ref : record.work_item_ref);
   history.replaceState(null, "", url);
@@ -222,7 +228,8 @@ async function loadRegistry({ append = false } = {}) {
     registryState.artifacts = [];
     registryState.workItems = [];
   }
-  setStatus(status, "loading", "Synchronizing registry");
+  byId("registry").setAttribute("aria-busy", "true");
+  setStatus(status, "loading", tr("syncing_registry"));
   const shared = { project_ref: registryState.project, q: registryState.query };
   const [artifacts, workItems, syncStatus] = await Promise.all([
     append && !registryState.artifactCursor ? Promise.resolve({ rows: [] }) : fetchJSON(`${registryAPI}/artifacts?${queryString({ ...shared, page_size: registryPageSize, cursor: registryState.artifactCursor })}`),
@@ -237,18 +244,19 @@ async function loadRegistry({ append = false } = {}) {
   byId("registry-rows").replaceChildren(...rows);
   byId("registry-empty").hidden = rows.length !== 0;
   byId("registry-more").hidden = !registryState.artifactCursor && !registryState.workItemCursor;
-  text(byId("registry-count"), `${rows.length} records`);
+  text(byId("registry-count"), tr("records_count", { count: locale.number(rows.length) }));
   text(byId("registry-revision"), Math.max(artifacts.index_revision || 0, workItems.index_revision || 0));
-  text(byId("registry-freshness"), syncStatus.freshness || "unavailable");
+  text(byId("registry-freshness"), syncStatus.freshness || tr("unavailable_value"));
   byId("registry-facets").replaceChildren(
-    fact("Artifacts", registryState.artifacts.length), fact("Work items", registryState.workItems.length),
-    fact("Epics", registryState.workItems.filter((item) => item.item_type === "epic").length),
-    fact("Blocked", registryState.workItems.filter((item) => item.status === "blocked").length),
+    fact(tr("kind_artifact"), locale.number(registryState.artifacts.length)), fact(tr("kind_work_item"), locale.number(registryState.workItems.length)),
+    fact(tr("epic"), locale.number(registryState.workItems.filter((item) => item.item_type === "epic").length)),
+    fact(tr("state_blocked"), locale.number(registryState.workItems.filter((item) => item.status === "blocked").length)),
   );
   byId("registry").dataset.registryState = syncStatus.freshness || "degraded";
-  text(byId("registry-truth"), rows.length ? "Public-safe immutable artifacts and provider-observed Work Items. Focusa bindings remain independently revisioned." : "The project is available, but no public-safe records are currently indexed.");
-  if (syncStatus.freshness === "live") setReadyStatus(status, "Registry live");
-  else setStatus(status, "degraded", `Registry ${syncStatus.freshness || "degraded"}`);
+  text(byId("registry-truth"), rows.length ? tr("registry_has_records") : tr("registry_no_records"));
+  byId("registry").setAttribute("aria-busy", "false");
+  if (syncStatus.freshness === "live") setReadyStatus(status, tr("registry_live"));
+  else setStatus(status, "degraded", tr("registry_degraded", { state: syncStatus.freshness || "degraded" }));
   updateRegistryURL();
   const selected = new URL(location.href).searchParams.get("selected");
   const selectedArtifact = registryState.artifacts.find((record) => record.artifact_ref === selected);
@@ -269,21 +277,22 @@ function connectRegistryEvents() {
         clearTimeout(registryState.reloadTimer);
         registryState.reloadTimer = setTimeout(() => loadRegistry().catch(showRegistryUnavailable), 150);
       }
-    } catch { showRegistryUnavailable(new Error("Registry event contract is invalid")); }
+    } catch { showRegistryUnavailable(new Error(tr("registry_unavailable"))); }
   });
   source.onerror = () => {
-    text(byId("registry-freshness"), "degraded · reconnecting");
-    setStatus(byId("status"), "degraded", "Registry reconnecting");
+    text(byId("registry-freshness"), tr("reconnecting"));
+    setStatus(byId("status"), "degraded", tr("registry_reconnecting"));
   };
 }
 
 function showRegistryUnavailable(error) {
   byId("registry").dataset.registryState = "unavailable";
-  text(byId("registry-truth"), error instanceof Error ? error.message : "Registry unavailable");
-  text(byId("registry-freshness"), "unavailable");
+  byId("registry").setAttribute("aria-busy", "false");
+  text(byId("registry-truth"), error instanceof Error ? error.message : tr("registry_unavailable"));
+  text(byId("registry-freshness"), tr("unavailable_value"));
   byId("registry-empty").hidden = false;
   byId("registry-rows").replaceChildren();
-  setStatus(byId("status"), "unavailable", "Registry unavailable");
+  setStatus(byId("status"), "unavailable", tr("registry_unavailable"));
 }
 
 async function renderRegistry() {
@@ -305,7 +314,7 @@ async function renderRegistry() {
   }));
   registryState.project = projects.some((project) => project.project_ref === url.searchParams.get("project")) ? url.searchParams.get("project") : (projects[0]?.project_ref || "");
   select.value = registryState.project;
-  if (!registryState.project) throw new Error("No public-safe project registry is configured.");
+  if (!registryState.project) throw new Error(tr("no_public_project"));
   await loadRegistry();
   connectRegistryEvents();
   requestAnimationFrame(() => scrollTo(0, Number(sessionStorage.getItem("epwa-registry-scroll") || 0)));
@@ -340,37 +349,38 @@ async function renderPublicRecord() {
   back.searchParams.delete("artifact"); back.searchParams.delete("revision");
   byId("registry-back").href = back.href;
   try {
-    if (!artifactRef || !Number.isSafeInteger(revision) || revision < 1) throw new Error("Exact artifact identity is invalid");
+    if (!artifactRef || !Number.isSafeInteger(revision) || revision < 1) throw new Error(tr("exact_identity_invalid"));
     const base = `${registryAPI}/artifacts/${encodeURIComponent(artifactRef)}/revisions/${revision}`;
     const detail = await fetchJSON(base);
     const manifest = detail.manifest;
-    if (detail.schema !== "uiai.public_evidence_artifact_detail.v1" || detail.artifact_id !== artifactRef || detail.revision !== revision || manifest?.artifact_id !== artifactRef || manifest?.revision !== revision) throw new Error("Artifact detail contract is invalid");
-    if (!validSHA256(detail.manifest_sha256) || manifest.integrity?.manifest_sha256 !== detail.manifest_sha256) throw new Error("Artifact integrity binding is corrupt");
+    if (detail.schema !== "uiai.public_evidence_artifact_detail.v1" || detail.artifact_id !== artifactRef || detail.revision !== revision || manifest?.artifact_id !== artifactRef || manifest?.revision !== revision) throw new Error(tr("artifact_contract_invalid"));
+    if (!validSHA256(detail.manifest_sha256) || manifest.integrity?.manifest_sha256 !== detail.manifest_sha256) throw new Error(tr("integrity_corrupt"));
     const scope = manifest.scope || {};
     const flatScope = { project_ref: scope.project?.project_ref, workstream_ref: scope.workstream?.workstream_ref, workset_ref: scope.workset?.workset_ref, callgraph_ref: scope.callgraph?.frame_ref || scope.callgraph?.run_ref, workpoint_ref: scope.workpoint?.workpoint_ref, work_item_ref: scope.work_items?.[0]?.work_item_ref, work_items: scope.work_items };
-    text(byId("title"), manifest.title || "Evidence record"); text(byId("truth"), manifest.summary || "Bound immutable evidence artifact.");
+    text(byId("title"), manifest.title || tr("evidence_record")); text(byId("truth"), manifest.summary || tr("bound_immutable_summary"));
     text(byId("record-id"), artifactRef); text(byId("record-revision"), revision); renderLineage(flatScope);
     const assets = Array.isArray(detail.assets) ? detail.assets : [];
     const primary = assets.find((asset) => asset.media_type?.startsWith("image/"));
     const frame = byId("primary-evidence-frame");
     if (primary && publicPath(primary.href) && validSHA256(primary.sha256)) {
       frame.hidden = false; byId("screenshot").src = primary.href; byId("screenshot").alt = primary.alt_text || `Evidence asset ${primary.asset_id}`; byId("image-link").href = primary.href;
-      text(byId("source-label"), primary.source_ref || "Source not disclosed"); text(byId("capture-label"), `${primary.width || "—"} × ${primary.height || "—"} · ${primary.media_type}`);
-      text(byId("caption"), `Captured ${formatTime(primary.captured_at || manifest.captured_at)} · ${formatBytes(primary.byte_size)} · SHA-256 ${primary.sha256}`);
+      text(byId("source-label"), primary.source_ref || tr("source_not_disclosed")); text(byId("capture-label"), `${primary.width || "—"} × ${primary.height || "—"} · ${primary.media_type}`);
+      text(byId("caption"), `${tr("captured")} ${formatTime(primary.captured_at || manifest.captured_at)} · ${formatBytes(primary.byte_size)} · SHA-256 ${primary.sha256}`);
     } else frame.hidden = true;
     const claimCount = manifest.claims?.length || 0;
-    setValidity("integrity", "Digest-bound", "recorded"); setValidity("provenance", `${manifest.provenance?.custody?.length || 0} custody event(s)`, "recorded");
-    setValidity("observation", manifest.claims?.[0]?.status || "Recorded", "recorded"); setValidity("sufficiency", `Limited · ${claimCount} claim / ${assets.length} asset`, "limited");
-    setValidity("verification", manifest.verification?.status || "indeterminate", manifest.verification?.status || "not_determined"); setValidity("completion", "Not asserted by this artifact", "not_determined");
-    setValidity("settlement", "Not asserted by this artifact", "not_determined"); setValidity("legal", "Not determined", "not_determined");
-    byId("facts").replaceChildren(fact("Captured", formatTime(manifest.captured_at)), fact("Created", formatTime(manifest.created_at)), fact("Evidence assets", assets.length), fact("Claims", claimCount), fact("Access", manifest.policy?.access_class), fact("Redaction", manifest.policy?.redaction_state), fact("Authority posture", manifest.authority?.posture), fact("Retention", manifest.policy?.retention_class));
+    setValidity("integrity", tr("digest_bound"), "recorded"); setValidity("provenance", tr("custody_events", { count: locale.number(manifest.provenance?.custody?.length || 0) }), "recorded");
+    setValidity("observation", manifest.claims?.[0]?.status || tr("recorded"), "recorded"); setValidity("sufficiency", tr("limited_counts", { claims: locale.number(claimCount), assets: locale.number(assets.length) }), "limited");
+    setValidity("verification", manifest.verification?.status || "indeterminate", manifest.verification?.status || "not_determined"); setValidity("completion", tr("not_asserted"), "not_determined");
+    setValidity("settlement", tr("not_asserted"), "not_determined"); setValidity("legal", tr("not_determined"), "not_determined");
+    byId("facts").replaceChildren(fact(tr("captured"), formatTime(manifest.captured_at)), fact(tr("created"), formatTime(manifest.created_at)), fact(tr("evidence_assets"), locale.number(assets.length)), fact(tr("claims"), locale.number(claimCount)), fact(tr("access"), manifest.policy?.access_class), fact(tr("redaction"), manifest.policy?.redaction_state), fact(tr("authority_posture"), manifest.authority?.posture), fact(tr("retention"), manifest.policy?.retention_class));
     renderTimeline((manifest.provenance?.custody || []).map((event) => ({ event_type: event.action, occurred_at: event.occurred_at, refs: [...(event.input_refs || []), ...(event.output_refs || [])] })));
-    byId("inspect-grid").replaceChildren(datum("Artifact", artifactRef), datum("Revision", revision), datum("Manifest SHA-256", detail.manifest_sha256), datum("Bundle SHA-256", manifest.integrity?.bundle_sha256), datum("Project", flatScope.project_ref), datum("Workstream", flatScope.workstream_ref), datum("Workset", flatScope.workset_ref), datum("CallGraph", flatScope.callgraph_ref), datum("Workpoint", flatScope.workpoint_ref), ...workItemInspectData(flatScope), datum("Evidence authority", manifest.authority?.evidence_authority_ref), datum("Completion authority", manifest.authority?.completion_authority_ref), datum("Verification", manifest.verification?.status), datum("Redaction", manifest.policy?.redaction_state));
+    byId("inspect-grid").replaceChildren(datum(tr("artifact"), artifactRef), datum(tr("revision"), revision), datum("Manifest SHA-256", detail.manifest_sha256), datum("Bundle SHA-256", manifest.integrity?.bundle_sha256), datum(tr("project_label"), flatScope.project_ref), datum(tr("workstream"), flatScope.workstream_ref), datum(tr("workset"), flatScope.workset_ref), datum(tr("callgraph"), flatScope.callgraph_ref), datum(tr("workpoint"), flatScope.workpoint_ref), ...workItemInspectData(flatScope), datum(tr("evidence_authority"), manifest.authority?.evidence_authority_ref), datum(tr("execution_authority"), manifest.authority?.completion_authority_ref), datum(tr("verification"), manifest.verification?.status), datum(tr("redaction"), manifest.policy?.redaction_state));
     byId("detail-json-link").href = base; byId("manifest-json-link").href = publicPath(detail.manifest_path) || `${base}/manifest`; byId("inspection-json-link").hidden = true;
-    text(byId("limitations-copy"), "This immutable artifact is a bounded evidence input. Its existence does not independently establish completeness, review acceptance, task completion, provider closure, settlement, or legal admissibility.");
-    setReadyStatus(status, "Read-only artifact loaded");
+    text(byId("limitations-copy"), tr("artifact_limitations"));
+    setReadyStatus(status, tr("artifact_loaded"));
+    byId("title").focus({ preventScroll: true });
   } catch (error) {
-    setStatus(status, "corrupt", "Artifact unavailable"); text(byId("truth"), error instanceof Error ? error.message : "Evidence artifact unavailable"); setUnavailableValidity("corrupt"); byId("evidence").hidden = true;
+    setStatus(status, "corrupt", tr("artifact_unavailable")); text(byId("truth"), error instanceof Error ? error.message : tr("artifact_unavailable")); setUnavailableValidity("corrupt"); byId("evidence").hidden = true;
   }
 }
 
@@ -378,20 +388,20 @@ async function renderRecord() {
   const status = byId("status");
   try {
     const manifest = await fetchJSON("./artifact.json");
-    if (manifest.schema !== "uiai.screenshot_evidence_share.v1") throw new Error("Artifact manifest contract is unsupported");
+    if (manifest.schema !== "uiai.screenshot_evidence_share.v1") throw new Error(tr("record_unsupported"));
     if (manifest.availability !== "ready" || !safeRef(manifest.projection_ref)) {
       const state = availabilityStates.has(manifest.availability) ? manifest.availability : "corrupt";
-      setStatus(status, state, `Record ${state}`);
-      text(byId("truth"), "Canonical projection lineage is incomplete; evidentiary rendering is prohibited.");
+      setStatus(status, state, tr("record_state", { state }));
+      text(byId("truth"), tr("incomplete_lineage"));
       setUnavailableValidity(state);
       byId("evidence").hidden = true;
       return;
     }
 
     const projection = await fetchJSON(manifest.projection_ref);
-    if (!validProjection(projection)) throw new Error("Canonical Evidence PWA projection is invalid");
+    if (!validProjection(projection)) throw new Error(tr("projection_invalid"));
     if (projection.availability !== "ready") {
-      setStatus(status, projection.availability, `Record ${projection.availability}`);
+      setStatus(status, projection.availability, tr("record_state", { state: projection.availability }));
       text(byId("truth"), projection.summary);
       setUnavailableValidity(projection.availability);
       byId("evidence").hidden = true;
@@ -401,13 +411,13 @@ async function renderRecord() {
     const asset = projection.assets?.find((item) => item.modality === "screenshot");
     const source = safeRef(asset?.ref);
     if (!source || source !== safeRef(manifest.screenshot_ref) || asset.sha256 !== manifest.screenshot_sha256 || !validSHA256(asset.sha256)) {
-      throw new Error("Screenshot binding is corrupt");
+      throw new Error(tr("screenshot_corrupt"));
     }
     if (!validSHA256(projection.artifact.manifest_sha256) || !validSHA256(projection.artifact.bundle_sha256)) {
-      throw new Error("Artifact integrity binding is corrupt");
+      throw new Error(tr("integrity_corrupt"));
     }
 
-    text(byId("title"), projection.title || "Evidence record");
+    text(byId("title"), projection.title || tr("evidence_record"));
     text(byId("truth"), projection.summary);
     text(byId("record-id"), projection.artifact.artifact_ref);
     text(byId("record-revision"), projection.artifact.revision);
@@ -416,56 +426,57 @@ async function renderRecord() {
     const image = byId("screenshot");
     image.src = source;
     byId("image-link").href = source;
-    text(byId("source-label"), manifest.source_url || "Source not disclosed");
+    text(byId("source-label"), manifest.source_url || tr("source_not_disclosed"));
     text(byId("capture-label"), `${manifest.width} × ${manifest.height} · ${manifest.mime}`);
-    text(byId("caption"), `Captured ${formatTime(manifest.captured_at)} · ${formatBytes(asset.bytes)} · SHA-256 ${asset.sha256}`);
+    text(byId("caption"), `${tr("captured")} ${formatTime(manifest.captured_at)} · ${formatBytes(asset.bytes)} · SHA-256 ${asset.sha256}`);
 
     const claimCount = projection.claims?.length || 0;
     const assetCount = projection.assets?.length || 0;
-    setValidity("integrity", "Digest-bound", "recorded");
-    setValidity("provenance", `Engine-recorded · ${projection.federation_posture}`, "recorded");
-    setValidity("observation", projection.claims?.[0]?.posture || "Captured visual only", "recorded");
-    setValidity("sufficiency", `Limited · ${claimCount} claim / ${assetCount} asset`, "limited");
-    setValidity("verification", "Not asserted by this artifact", "not_determined");
-    setValidity("completion", "Not asserted by this artifact", "not_determined");
-    setValidity("settlement", "Not asserted by this artifact", "not_determined");
-    setValidity("legal", "Not determined", "not_determined");
+    setValidity("integrity", tr("digest_bound"), "recorded");
+    setValidity("provenance", `${tr("recorded")} · ${projection.federation_posture}`, "recorded");
+    setValidity("observation", projection.claims?.[0]?.posture || tr("recorded"), "recorded");
+    setValidity("sufficiency", tr("limited_counts", { claims: locale.number(claimCount), assets: locale.number(assetCount) }), "limited");
+    setValidity("verification", tr("not_asserted"), "not_determined");
+    setValidity("completion", tr("not_asserted"), "not_determined");
+    setValidity("settlement", tr("not_asserted"), "not_determined");
+    setValidity("legal", tr("not_determined"), "not_determined");
 
     byId("facts").replaceChildren(
-      fact("Captured", formatTime(manifest.captured_at)),
-      fact("Freshness observed", formatTime(projection.freshness_observed_at)),
-      fact("Target", manifest.source_url || "Not disclosed"),
-      fact("Viewport", `${manifest.width} × ${manifest.height}`),
-      fact("Access", projection.access),
-      fact("Redaction", projection.redaction?.state || "unknown"),
-      fact("Interaction", projection.interaction),
-      fact("Inspection receipt", manifest.inspection_ref || "Unavailable"),
+      fact(tr("captured"), formatTime(manifest.captured_at)),
+      fact(tr("freshness_observed"), formatTime(projection.freshness_observed_at)),
+      fact(tr("target"), manifest.source_url || tr("source_not_disclosed")),
+      fact(tr("viewport"), `${manifest.width} × ${manifest.height}`),
+      fact(tr("access"), projection.access),
+      fact(tr("redaction"), projection.redaction?.state || "unknown"),
+      fact(tr("interaction"), projection.interaction),
+      fact(tr("inspection_receipt"), manifest.inspection_ref || tr("unavailable_value")),
     );
 
-    text(byId("limitations-copy"), "This is one bounded visual observation with digest and inspection bindings. It does not independently establish completeness, absence of contrary evidence, review acceptance, task completion, provider closure, settlement, or legal admissibility. Legal use depends on jurisdiction, authentication, relevance, custody, applicable evidentiary rules, and independent challenge.");
+    text(byId("limitations-copy"), tr("record_limitations"));
     renderTimeline(projection.timeline);
 
     const scope = { ...projection.artifact.scope, work_items: projection.work_items };
     byId("inspect-grid").replaceChildren(
-      datum("Artifact", projection.artifact.artifact_ref),
-      datum("Revision", projection.artifact.revision),
+      datum(tr("artifact"), projection.artifact.artifact_ref),
+      datum(tr("revision"), projection.artifact.revision),
       datum("Manifest SHA-256", projection.artifact.manifest_sha256),
       datum("Bundle SHA-256", projection.artifact.bundle_sha256),
       datum("Screenshot SHA-256", asset.sha256),
       datum("Inspection", manifest.inspection_ref),
-      datum("Project", scope.project_ref),
-      datum("Workstream", scope.workstream_ref),
-      datum("Workset", scope.workset_ref),
-      datum("CallGraph", scope.callgraph_ref),
-      datum("Workpoint", scope.workpoint_ref),
+      datum(tr("project_label"), scope.project_ref),
+      datum(tr("workstream"), scope.workstream_ref),
+      datum(tr("workset"), scope.workset_ref),
+      datum(tr("callgraph"), scope.callgraph_ref),
+      datum(tr("workpoint"), scope.workpoint_ref),
       ...workItemInspectData(scope),
-      datum("Provenance posture", projection.federation_posture),
-      datum("Redaction", projection.redaction.state),
+      datum(tr("provenance"), projection.federation_posture),
+      datum(tr("redaction"), projection.redaction.state),
     );
-    setReadyStatus(status, "Read-only record loaded");
+    setReadyStatus(status, tr("record_loaded"));
+    byId("title").focus({ preventScroll: true });
   } catch (error) {
-    setStatus(status, "corrupt", "Record corrupt or unavailable");
-    text(byId("truth"), error instanceof Error ? error.message : "Evidence record unavailable");
+    setStatus(status, "corrupt", tr("record_corrupt"));
+    text(byId("truth"), error instanceof Error ? error.message : tr("record_corrupt"));
     setUnavailableValidity("corrupt");
     byId("evidence").hidden = true;
   }
