@@ -13,6 +13,7 @@ const requestedResourceProfile = route.searchParams.get("resource_profile");
 const lowMemory = requestedResourceProfile === "lowmem" || (typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 2);
 const registryPageSize = lowMemory ? 25 : 100;
 const registryOverscan = lowMemory ? 2 : 8;
+const registryHistoryLimit = lowMemory ? 32 : 64;
 let registryRowHeight = 56;
 const registrySnapshotLimit = lowMemory ? 50 : 200;
 const registryState = {
@@ -357,7 +358,7 @@ async function loadRegistry({ append = false, previous = false } = {}) {
   const requestedWorkItemCursor = direction === "next" ? registryState.workItemCursor : (priorPage?.workItem || "");
   const nextHistory = direction === "reset" ? [] : (direction === "previous"
     ? registryState.cursorHistory.slice(0, -1)
-    : [...registryState.cursorHistory, { artifact: registryState.artifactPageCursor, workItem: registryState.workItemPageCursor }]);
+    : [...registryState.cursorHistory, { artifact: registryState.artifactPageCursor, workItem: registryState.workItemPageCursor }].slice(-registryHistoryLimit));
   registryState.abortController?.abort();
   const controller = new AbortController();
   const requestID = ++registryState.requestID;

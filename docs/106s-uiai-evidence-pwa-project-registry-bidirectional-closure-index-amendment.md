@@ -108,7 +108,8 @@ On the reference local deployment after warm-up:
 - indexed text/facet search p95 ≤ 150 ms;
 - reverse Artifact ↔ Work Item/Atom lookup p95 ≤ 100 ms;
 - initial semantic registry shell interactive ≤ 1 s excluding unavailable remote media;
-- UI maintains responsive input and scroll without rendering more than a bounded viewport overscan.
+- UI maintains responsive input and scroll without rendering more than a bounded viewport overscan, plus at most one focused row retained for keyboard continuity.
+- The current shell retains 32 previous-page cursor pairs in LowMem and 64 normally. Previous traverses that bounded window; submitting the filters again returns to the first page. This discards only transient navigation history, never indexed records or evidence.
 
 Budgets must be reported with fixture size, hardware class, cold/warm state, index revision, and LowMem posture. A slower environment degrades truthfully; it does not fake compliance.
 
