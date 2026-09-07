@@ -1,10 +1,11 @@
 <script lang="ts">
-<<<<<<< HEAD
   import { onMount } from "svelte";
   import "$lib/ui/screen.css";
   import { openInFocusa } from "$lib/controllers/desktop-handoff-controller";
   import { engineClient, engineUrl, type BrowserHealth, type BrowserSession, type EngineHealth } from "$lib/engine-client";
   import { parseCockpitWorkpointResume, workpointResumeFromHost, type CockpitWorkpointResume } from "$lib/contracts/workpoint-resume";
+  import BrowserProfileSettings from "$lib/components/BrowserProfileSettings.svelte";
+  import FocusaLiveSurfaces from "$lib/components/FocusaLiveSurfaces.svelte";
 
   let health: EngineHealth | null = null;
   let browserHealth: BrowserHealth | null = null;
@@ -70,17 +71,6 @@
 </script>
 
 <svelte:head><title>Overview · UIAI Engine Cockpit</title></svelte:head>
-=======
-  import { phase0Cards } from "$lib/cards/phase0-card-manifest";
-  import BrowserProfileSettings from "$lib/components/BrowserProfileSettings.svelte";
-  import FocusaLiveSurfaces from "$lib/components/FocusaLiveSurfaces.svelte";
-</script>
-
-<h1>UIAI Engine Cockpit</h1>
-<p class="muted">Operator workspace for live Focusa mission intelligence and UIAI Engine execution.</p>
-
-<FocusaLiveSurfaces />
->>>>>>> pr-4
 
 <div class="screen overview-screen">
   <div class="screen-header">
@@ -102,6 +92,8 @@
       <button class="data-row-action" type="button" onclick={refresh}>Retry</button>
     </div>
   {/if}
+
+  <FocusaLiveSurfaces />
 
   <section class="continue-card screen-card" aria-labelledby="continue-heading">
     <div class="continue-mark" aria-hidden="true">→</div>

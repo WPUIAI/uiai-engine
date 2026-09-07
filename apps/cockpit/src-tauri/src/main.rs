@@ -6,8 +6,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod bonjour;
-<<<<<<< HEAD
 mod bridge;
+mod browser_profiles;
 // Contract types are bound by T004-04; keep the strict release gate green while the scaffold is intentionally ahead of its presenter.
 mod deep_link;
 #[allow(dead_code)]
@@ -17,28 +17,25 @@ mod desktop_handoff;
 mod focusa_credentials;
 #[allow(dead_code)]
 mod focusa_credentials_linux;
-#[allow(dead_code)]
-mod focusa_credentials_windows;
 #[cfg(target_os = "macos")]
 #[allow(dead_code)]
 mod focusa_credentials_macos;
+#[allow(dead_code)]
+mod focusa_credentials_windows;
 mod focusa_manifest_client;
 mod focusa_manifest_server;
+#[allow(dead_code)]
+mod focusa_menubar_fallback;
+#[allow(dead_code)]
+mod focusa_menubar_mint;
 #[allow(dead_code)]
 mod focusa_pairing_client;
 #[allow(dead_code)]
 mod focusa_pairing_completion;
 #[allow(dead_code)]
-mod focusa_pairing_verify;
-#[allow(dead_code)]
 mod focusa_pairing_contract;
 #[allow(dead_code)]
-mod focusa_menubar_mint;
-#[allow(dead_code)]
-mod focusa_menubar_fallback;
-=======
-mod browser_profiles;
->>>>>>> pr-4
+mod focusa_pairing_verify;
 
 fn main() {
     let focusa_manifest_endpoint = focusa_manifest_server::start()
@@ -59,17 +56,14 @@ fn main() {
             bridge::focusa_start_pairing_bridge,
             bridge::focusa_clear_bridge,
             bonjour::focusa_discover_via_bonjour,
-<<<<<<< HEAD
             deep_link::cockpit_take_deep_link,
             desktop_handoff::cockpit_open_focusa_handoff,
             focusa_manifest_server::cockpit_focusa_manifest_endpoint,
             focusa_manifest_client::cockpit_fetch_focusa_manifest,
-=======
             browser_profiles::browser_profiles_default,
             browser_profiles::browser_profiles_load,
             browser_profiles::browser_profiles_validate,
             browser_profiles::browser_profiles_save,
->>>>>>> pr-4
         ])
         .manage(deep_link::PendingDeepLink::default())
         .setup(|app| {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -195,6 +196,33 @@ func TestToolGraphIncludesFocusaAndRelations(t *testing.T) {
 	}
 	if !foundGraph {
 		t.Fatal("expected uiai_tool_graph in tool list")
+	}
+}
+
+func TestVisualToolContractsAdvertiseOnlyMandatoryEPWADelivery(t *testing.T) {
+	var screenshot, fpv map[string]any
+	for _, tool := range openAITools() {
+		switch tool["name"] {
+		case "browser_screenshot":
+			screenshot = tool
+		case "browser_fpv_share":
+			fpv = tool
+		}
+	}
+	if screenshot == nil || fpv == nil {
+		t.Fatalf("missing visual tool definitions: screenshot=%v fpv=%v", screenshot != nil, fpv != nil)
+	}
+	properties := screenshot["parameters"].(map[string]any)["properties"].(map[string]any)
+	output := properties["output"].(map[string]any)
+	enums := output["enum"].([]string)
+	if output["default"] != "epwa" || len(enums) != 1 || enums[0] != "epwa" {
+		t.Fatalf("browser_screenshot advertises a raw output escape: %#v", output)
+	}
+	if description := screenshot["description"].(string); !strings.Contains(description, "durable HTTPS viewer") || strings.Contains(description, "base64") {
+		t.Fatalf("browser_screenshot delivery description drifted: %q", description)
+	}
+	if description := fpv["description"].(string); !strings.Contains(description, "ephemeral and never evidence delivery") || !strings.Contains(description, "EPWA") {
+		t.Fatalf("FPV description does not separate operational mirrors from delivery: %q", description)
 	}
 }
 

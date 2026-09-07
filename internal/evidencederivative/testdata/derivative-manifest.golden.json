@@ -1,0 +1,65 @@
+{
+  "schema": "uiai.evidence_derivative_manifest.v1",
+  "derivative_id": "derivative:4bd60613d60f2deaffc40fbbd1c262ba83d43b6cb6ebea765dc8bcc4851a0420",
+  "request_ref": "request:1",
+  "request_sha256": "8288f4fb9dc83888ac7bbdebb2cefb73abb300918c10e48a94b35c7f7c41779b",
+  "artifact_ref": "artifact:1",
+  "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "projection_ref": "projection:1",
+  "projection_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "output_ref": "./exports/proof.pdf",
+  "output_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "output_bytes": 4096,
+  "output_mime": "application/pdf",
+  "renderer": {
+    "renderer_ref": "renderer:1",
+    "version": "1.0.0",
+    "binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "rendering": {
+    "profile_ref": "profile:1",
+    "profile_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "font_refs": [
+      "font:1"
+    ],
+    "color_profile_ref": "srgb",
+    "dependency_refs": [
+      "./fonts/font.woff2"
+    ]
+  },
+  "accessibility_target": "pdf_ua_1",
+  "accessibility_posture": "verified",
+  "pdfua_profile": "PDF/UA-1",
+  "accessibility_evidence_refs": [
+    "evidence:a11y"
+  ],
+  "archive_posture": "not_applicable",
+  "viewer_matrix": {
+    "schema": "uiai.evidence_derivative_viewer_matrix.v1",
+    "matrix_ref": "viewers:1",
+    "entries": [
+      {
+        "client": "Acrobat",
+        "version": "2026",
+        "status": "supported",
+        "evidence_refs": [
+          "evidence:viewer"
+        ]
+      }
+    ]
+  },
+  "licenses": [
+    {
+      "schema": "uiai.evidence_derivative_license.v1",
+      "asset_ref": "asset:1",
+      "license_ref": "license:1",
+      "license_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "attribution_required": true,
+      "attribution_ref": "attribution:1",
+      "derivative_permitted": true,
+      "evidence_ref": "evidence:license"
+    }
+  ],
+  "receipt_ref": "receipt:render",
+  "created_at": "2026-08-30T00:00:00Z"
+}

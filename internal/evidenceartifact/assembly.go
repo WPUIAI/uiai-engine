@@ -12,6 +12,7 @@ var (
 	ErrEvidenceClassMismatch = errors.New("evidence class mismatch")
 	ErrOmissionConflict      = errors.New("evidence omission conflict")
 	ErrRuntimeAmbiguous      = errors.New("evidence runtime identity ambiguous")
+	ErrAnnotationInvalid     = errors.New("evidence annotation geometry invalid")
 )
 
 type RequirementKind string
@@ -40,6 +41,7 @@ type CaptureMetadata struct {
 	Observations   []CaptureObservation `json:"observations"`
 	Requirements   []ClaimRequirement   `json:"requirements"`
 	Omissions      []CaptureOmission    `json:"omissions"`
+	Annotations    []CaptureAnnotation  `json:"annotations,omitempty"`
 }
 
 type CaptureViewport struct {
@@ -72,6 +74,34 @@ type CaptureOmission struct {
 	PolicyRef      string
 }
 
+type CaptureAnnotation struct {
+	AnnotationRef     string             `json:"annotation_ref"`
+	ObservationRef    string             `json:"observation_ref"`
+	SourceAssetID     string             `json:"source_asset_id"`
+	SourceAssetSHA256 string             `json:"source_asset_sha256"`
+	SourceRevision    uint64             `json:"source_revision"`
+	AuthorRef         string             `json:"author_ref"`
+	CreatedAt         string             `json:"created_at"`
+	Label             string             `json:"label"`
+	Geometry          AnnotationGeometry `json:"geometry"`
+	OverlaySHA256     string             `json:"overlay_sha256"`
+}
+
+type AnnotationGeometry struct {
+	CoordinateSpace string `json:"coordinate_space"`
+	X               int    `json:"x"`
+	Y               int    `json:"y"`
+	Width           int    `json:"width"`
+	Height          int    `json:"height"`
+	SourceWidth     int    `json:"source_width"`
+	SourceHeight    int    `json:"source_height"`
+	CropX           int    `json:"crop_x"`
+	CropY           int    `json:"crop_y"`
+	CropWidth       int    `json:"crop_width"`
+	CropHeight      int    `json:"crop_height"`
+	RotationDegrees int    `json:"rotation_degrees"`
+}
+
 func normalizeCapture(in CaptureMetadata) CaptureMetadata {
 	out := in
 	out.Viewports = append([]CaptureViewport(nil), in.Viewports...)
@@ -85,6 +115,8 @@ func normalizeCapture(in CaptureMetadata) CaptureMetadata {
 	sort.Slice(out.Requirements, func(i, j int) bool { return out.Requirements[i].ClaimID < out.Requirements[j].ClaimID })
 	out.Omissions = append([]CaptureOmission(nil), in.Omissions...)
 	sort.Slice(out.Omissions, func(i, j int) bool { return out.Omissions[i].ObservationRef < out.Omissions[j].ObservationRef })
+	out.Annotations = append([]CaptureAnnotation(nil), in.Annotations...)
+	sort.Slice(out.Annotations, func(i, j int) bool { return out.Annotations[i].AnnotationRef < out.Annotations[j].AnnotationRef })
 	return out
 }
 
@@ -103,6 +135,8 @@ func AssembleCapture(request CaptureAssembly) (Manifest, error) {
 	sort.Slice(requirements, func(i, j int) bool { return requirements[i].ClaimID < requirements[j].ClaimID })
 	omissions := append([]CaptureOmission(nil), request.Omissions...)
 	sort.Slice(omissions, func(i, j int) bool { return omissions[i].ObservationRef < omissions[j].ObservationRef })
+	annotations := append([]CaptureAnnotation(nil), request.Annotations...)
+	sort.Slice(annotations, func(i, j int) bool { return annotations[i].AnnotationRef < annotations[j].AnnotationRef })
 
 	base := Normalize(request.Base)
 	if err := validateAssemblyCoverage(base, observations, viewports, requirements, omissions, request.WindowComplete); err != nil {
@@ -112,6 +146,7 @@ func AssembleCapture(request CaptureAssembly) (Manifest, error) {
 		RunRef: request.RunRef, RuntimeRef: request.RuntimeRef, EnvironmentRef: request.EnvironmentRef,
 		TargetRef: request.TargetRef, AccountRef: request.AccountRef, WindowComplete: request.WindowComplete,
 		Viewports: viewports, Observations: observations, Requirements: requirements, Omissions: omissions,
+		Annotations: annotations,
 	}
 	base.Integrity.ManifestSHA256 = ""
 	base.Provenance.SourceRefs = normalizeSet(append(base.Provenance.SourceRefs, request.RunRef, request.TargetRef, request.AccountRef))

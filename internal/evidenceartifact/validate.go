@@ -72,6 +72,9 @@ func Validate(in Manifest) error {
 	if err := validatePolicy(m.Policy); err != nil {
 		return err
 	}
+	if err := validateRedactionEvidence(m.Assets, m.Policy, m.Security); err != nil {
+		return err
+	}
 	if err := validateIntegrity(m.Integrity); err != nil {
 		return err
 	}

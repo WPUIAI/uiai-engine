@@ -39,7 +39,6 @@ describe("T005-07.02 profile credential resolver", () => {
     expect(res.kind).toBe("available");
     if (res.kind === "available") {
       expect(res.tokenHandle).toBe(__tokenHandleForTests(valid.profileId));
-      // @ts-expect-error — should not expose secret
       expect((res as unknown as { secret?: string }).secret).toBeUndefined();
     }
   });
@@ -50,6 +49,7 @@ describe("T005-07.02 profile credential resolver", () => {
     __setProfileLocked(valid.profileId, true);
     const res = await resolveProfileCredential(valid.profileId);
     expect(res.kind).toBe("locked");
+    if (res.kind !== "locked") throw new Error(`expected locked resolution, received ${res.kind}`);
     expect(res.reason).toMatch(/locked/i);
   });
 

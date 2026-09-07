@@ -1013,6 +1013,36 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		async execute(_toolCallId, params) { return textResult(await callEngine(`/api/screenshot/share/${params.packet_id}/verify`), { endpoint: "/api/screenshot/share/{id}/verify" }); },
 	});
 	pi.registerTool({
+		name: "uiai_evidence_share_settings_get",
+		description: "Read effective Evidence Share Settings. Returns defaults plus global/project/workstream inheritance; no mutation.",
+		parameters: Type.Object({
+			project_ref: Type.Optional(Type.String({ description: "Canonical project ref" })),
+			workstream_ref: Type.Optional(Type.String({ description: "Canonical workstream ref" })),
+		}),
+		async execute(_toolCallId, params) {
+			const query = new URLSearchParams(cleanBody(params as Record<string, any>) as Record<string, string>);
+			return textResult(await callEngine(`/api/screenshot/settings${query.size ? `?${query}` : ""}`), { endpoint: "/api/screenshot/settings", mutation: false });
+		},
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_settings_preview",
+		description: "Preview Evidence Share Settings changes without saving them.",
+		parameters: Type.Object({ project_ref: Type.Optional(Type.String()), workstream_ref: Type.Optional(Type.String()), values: Type.Record(Type.String(), Type.Any()) }),
+		async execute(_toolCallId, params) { return textResult(await post("/api/screenshot/settings/preview", params as Record<string, any>), { endpoint: "/api/screenshot/settings/preview", mutation: false }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_settings_set",
+		description: "Save scoped Evidence Share Settings after a preview. Requires the current expected revision.",
+		parameters: Type.Object({ project_ref: Type.Optional(Type.String()), workstream_ref: Type.Optional(Type.String()), expected_revision: Type.Number(), values: Type.Record(Type.String(), Type.Any()) }),
+		async execute(_toolCallId, params) { return textResult(await callEngine("/api/screenshot/settings", { method: "PUT", body: JSON.stringify(params) }), { endpoint: "/api/screenshot/settings", mutation: true }); },
+	});
+	pi.registerTool({
+		name: "uiai_evidence_share_settings_reset",
+		description: "Reset one scoped Evidence Share Settings override after explicit revision confirmation.",
+		parameters: Type.Object({ project_ref: Type.Optional(Type.String()), workstream_ref: Type.Optional(Type.String()), expected_revision: Type.Number() }),
+		async execute(_toolCallId, params) { return textResult(await callEngine("/api/screenshot/settings", { method: "DELETE", body: JSON.stringify(params) }), { endpoint: "/api/screenshot/settings", mutation: true }); },
+	});
+	pi.registerTool({
 		name: "uiai_evidence_share_resolve",
 		label: "UIAI Evidence Share Resolve",
 		description: "Resolve an exact Screenshot Evidence Share Packet to its clickable human-viewable URL with ID + descriptor.",

@@ -251,6 +251,28 @@ storage:
   data_dir: "/home/wpuiai/uiai-engine/data"
   usage_file: "usage.json"
 
+# Project-scoped Evidence PWA registry. Provider observations remain
+# focusa_binding_pending until exact Focusa/artifact revisions reconcile.
+evidence_registry:
+  # Immutable artifacts are authoritative; the SQLite registry is rebuilt from these manifests.
+  artifact_store_enabled: false
+  artifact_store_root: ""
+  max_artifact_bytes: 10737418240
+  max_artifact_count: 100000
+  max_asset_bytes: 536870912
+  provider_sync_enabled: false
+  focusa_url: "http://127.0.0.1:8787"
+  # Optional root-provisioned credential file; token values are never accepted in YAML or logs.
+  focusa_token_file: ""
+  br_path: "/usr/local/bin/br"
+  project_ids: []
+  # Only these exact project refs may be exposed through the sanitized public read API.
+  public_project_refs: []
+  allowed_root_prefixes: []
+  max_projects: 100
+  max_items: 100000
+  reconcile_interval: 5s
+
 logging:
   level: "info"
   file: "/var/log/uiai/engine.log"

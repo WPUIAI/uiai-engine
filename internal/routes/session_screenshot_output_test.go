@@ -2,49 +2,45 @@ package routes
 
 import (
 	"encoding/base64"
-	"os"
-	"path/filepath"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 )
 
-func TestSaveScreenshotArtifact(t *testing.T) {
-	dir := t.TempDir()
-	cfg := &config.Config{Vision: config.VisionConfig{ShareDir: dir}}
+func TestSessionScreenshotOutputIsOnlyHTTPSPortableEPWA(t *testing.T) {
+	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	snap := &vision.SnapResult{
-		Screenshot: base64.StdEncoding.EncodeToString([]byte("fake image")),
-		Format:     "png",
-		Size:       len("fake image"),
-		Width:      10,
-		Height:     20,
+		Screenshot: base64.StdEncoding.EncodeToString(append([]byte("\x89PNG\r\n\x1a\n"), []byte("session evidence")...)),
+		Format:     "png", Size: 24, Width: 375, Height: 812, URL: "https://example.test", Title: "Example", Duration: 12,
 	}
-	name, path, err := saveScreenshotArtifact(cfg, "session/with spaces", snap)
-	if err != nil {
-		t.Fatalf("saveScreenshotArtifact returned error: %v", err)
+	scope := completeEvidenceScope()
+	sess := &vision.Session{FocusaScope: &vision.FocusaScope{
+		ProjectRef: scope.ProjectRef, WorkstreamRef: scope.WorkstreamRef, WorksetRef: scope.WorksetRef,
+		CallGraphRef: scope.CallGraphRef, WorkpointID: scope.WorkpointRef, WorkItemRef: scope.WorkItemRef,
+		WorkItems: scope.WorkItems, ContinuityID: scope.ContinuityRef,
+	}}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "https://engine.example/api/session/example/screenshot", nil)
+	writeScreenshotOutput(recorder, request, cfg, sess, snap, "file")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("session delivery status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
-	if filepath.Dir(path) != filepath.Join(dir, "session-screenshots") {
-		t.Fatalf("unexpected artifact dir: %s", path)
+	var response map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
 	}
-	if filepath.Base(path) != name {
-		t.Fatalf("name/path mismatch: name=%s path=%s", name, path)
+	if response["screenshot"] != nil || response["artifact_path"] != nil || response["delivery_state"] != "ready" || response["raw_output_posture"] != "withheld_by_mandatory_epwa_delivery" {
+		t.Fatalf("session raw-only output escaped: %#v", response)
 	}
-	got, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read artifact: %v", err)
-	}
-	if string(got) != "fake image" {
-		t.Fatalf("unexpected artifact content: %q", got)
-	}
-}
-
-func TestScreenshotArtifactPathRejectsTraversal(t *testing.T) {
-	cfg := &config.Config{Vision: config.VisionConfig{ShareDir: t.TempDir()}}
-	if _, ok := screenshotArtifactPath(cfg, "../secret.png"); ok {
-		t.Fatal("expected traversal artifact name to be rejected")
-	}
-	if path, ok := screenshotArtifactPath(cfg, "safe.png"); !ok || filepath.Base(path) != "safe.png" {
-		t.Fatalf("expected safe artifact path, got path=%q ok=%v", path, ok)
+	for _, key := range []string{"artifact_url", "portable_url"} {
+		value, _ := response[key].(string)
+		if !strings.HasPrefix(value, "https://engine.example/api/screenshot/share/") {
+			t.Fatalf("%s is not an HTTPS EPWA link: %q", key, value)
+		}
 	}
 }

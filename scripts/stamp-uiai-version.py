@@ -55,13 +55,13 @@ def replace_go_version(path: str, version: str):
         raise SystemExit(f"Expected one Go version var in {path}")
     p.write_text(nxt, encoding="utf-8")
 
-def regen_manifest(version: str):
-    """Regenerate docs/distribution-manifest.json — single writer, never hand-edited."""
+def regen_manifest(version: str, mode: str):
+    """Regenerate the dual-track distribution manifest — single writer, never hand-edited."""
     mp = ROOT / "docs/distribution-manifest.json"
     if not mp.exists():
         # create minimal manifest if missing
         data = {
-            "schema": "uiai.distribution_manifest.v1",
+            "schema": "uiai.distribution_manifest.v2",
             "release_version": version,
             "artifacts": {},
             "compatibility_status": "compatible",
@@ -79,13 +79,23 @@ def regen_manifest(version: str):
             digest = "sha256:" + hashlib.sha256(ap.read_bytes()).hexdigest()
             new_artifacts[rel] = digest
         data["artifacts"] = new_artifacts
-        data.setdefault("schema", "uiai.distribution_manifest.v1")
+        data["schema"] = "uiai.distribution_manifest.v2"
         data.setdefault("compatibility_status", "compatible")
+    data["engine_version"] = read_current_go_version()
+    data["cockpit_version"] = json.loads((ROOT / "apps/cockpit/package.json").read_text(encoding="utf-8"))["version"]
+    data["release_track"] = "engine" if mode == "--engine-only" else "cockpit" if mode == "--cockpit-only" else "unified"
     head = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=str(ROOT)).decode().strip()
     data["source_commit"] = head
     data["generated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
     mp.parent.mkdir(parents=True, exist_ok=True)
     mp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+def read_current_go_version() -> str:
+    text = (ROOT / "cmd/uiai-engine/main.go").read_text(encoding="utf-8")
+    match = re.search(r'version\s*=\s*"([^"]+)"', text)
+    if not match:
+        raise SystemExit("Go engine version not found")
+    return match.group(1)
 
 def main() -> int:
     if len(sys.argv) < 2:
@@ -151,7 +161,7 @@ def main() -> int:
         stamp.parent.mkdir(parents=True, exist_ok=True)
         stamp.write_text(version + "\n", encoding="utf-8")
 
-    regen_manifest(version)
+    regen_manifest(version, mode)
     print(f"Stamped UIAI version {version} (mode={mode})")
     return 0
 

@@ -11,6 +11,7 @@
   let focusaDaemonHints = "";
   let projectRoot = "";
   let continuityId = "";
+  let workstreamRef = "";
   let workpointId = "";
   let responseProfile = "agent_compact";
   let liveUpdates = true;
@@ -18,18 +19,46 @@
   let reducedMotion = false;
   let evidenceSettings: import("$lib/evidence-share").EvidenceShareSettings | null = null;
   let evidenceSettingsState: "loading" | "ready" | "saving" | "unavailable" = "loading";
-  let evidenceSettingsError = "";
+  let evidenceSettingsError = "", evidenceSettingsJSON = "", loadedSettingsContext = "";
+  const settingsContext = () => JSON.stringify([window.localStorage.getItem("uiai.engine.url") || DEFAULT_ENGINE_URL, projectRoot.trim(), workstreamRef.trim()]);
 
   async function loadEvidenceSettings() {
     evidenceSettingsState = "loading"; evidenceSettingsError = "";
-    try { evidenceSettings = await engineClient.evidenceShareSettings({ project_root: projectRoot || undefined, workstream_key: continuityId || undefined }); evidenceSettingsState = "ready"; }
-    catch (cause) { evidenceSettingsState = "unavailable"; evidenceSettingsError = cause instanceof Error ? cause.message : "Canonical Evidence Share Settings are unavailable."; }
+    const context = settingsContext();
+    try {
+      evidenceSettings = await engineClient.evidenceShareSettings({ project_ref: projectRoot.trim() || undefined, workstream_ref: workstreamRef.trim() || undefined });
+      evidenceSettingsJSON = JSON.stringify(evidenceSettings.values, null, 2);
+      loadedSettingsContext = context;
+      evidenceSettingsState = "ready";
+    } catch (cause) { evidenceSettingsState = "unavailable"; evidenceSettingsError = cause instanceof Error ? cause.message : "Canonical Evidence Settings are unavailable."; }
+  }
+  function requireLoadedSettings() {
+    if (!evidenceSettings || loadedSettingsContext !== settingsContext()) throw new Error("Connection or scope changed. Refresh Evidence settings before changing them.");
+    return { ...evidenceSettings.scope, expected_revision: evidenceSettings.revision };
   }
   async function saveEvidenceSettings() {
-    if (!evidenceSettings) return;
-    evidenceSettingsState = "saving"; evidenceSettingsError = "";
-    try { evidenceSettings = await engineClient.updateEvidenceShareSettings({ project_ref: projectRoot, workstream_ref: continuityId, expected_revision: evidenceSettings.revision, values: { enablement: { auto_screenshot: evidenceSettings.values.enablement.auto_screenshot }, image: { quality: Number(evidenceSettings.values.image.quality) }, presentation: { theme: evidenceSettings.values.presentation.theme } } }); evidenceSettingsState = "ready"; }
-    catch (cause) { evidenceSettingsState = "unavailable"; evidenceSettingsError = cause instanceof Error ? cause.message : "Settings update rejected; refresh and retry."; }
+    evidenceSettingsError = "";
+    try {
+      const scope = requireLoadedSettings();
+      const values = JSON.parse(evidenceSettingsJSON);
+      if (!values || typeof values !== "object" || Array.isArray(values)) throw new Error("Settings must be a JSON object.");
+      if (!window.confirm("Save these Evidence settings for the loaded scope?")) return;
+      evidenceSettingsState = "saving";
+      evidenceSettings = await engineClient.updateEvidenceShareSettings({ ...scope, values });
+      evidenceSettingsJSON = JSON.stringify(evidenceSettings.values, null, 2);
+      evidenceSettingsState = "ready";
+    } catch (cause) { evidenceSettingsState = evidenceSettings ? "ready" : "unavailable"; evidenceSettingsError = cause instanceof Error ? cause.message : "Settings update rejected; refresh after a revision conflict."; }
+  }
+  async function resetEvidenceSettings() {
+    evidenceSettingsError = "";
+    try {
+      const scope = requireLoadedSettings();
+      if (!window.confirm("Reset Evidence overrides for the loaded scope to inherited defaults?")) return;
+      evidenceSettingsState = "saving";
+      const result = await engineClient.resetEvidenceShareSettings(scope);
+      if (!result.reset) throw new Error("The engine did not confirm the reset.");
+      await loadEvidenceSettings();
+    } catch (cause) { evidenceSettingsState = evidenceSettings ? "ready" : "unavailable"; evidenceSettingsError = cause instanceof Error ? cause.message : "Settings reset rejected; refresh and retry."; }
   }
 
   function saveSettings() {
@@ -37,12 +66,14 @@
     saveFocusaDaemonHints(focusaDaemonHints.split(/[\n,]/).map((value) => value.trim()).filter(Boolean));
     window.localStorage.setItem("uiai.scope.project_root", projectRoot.trim());
     window.localStorage.setItem("uiai.scope.continuity_id", continuityId.trim());
+    window.localStorage.setItem("uiai.scope.workstream_ref", workstreamRef.trim());
     window.localStorage.setItem("uiai.scope.workpoint_id", workpointId.trim());
     window.localStorage.setItem("uiai.response.profile", responseProfile);
     window.localStorage.setItem("uiai.live-updates", String(liveUpdates));
     window.localStorage.setItem("uiai.confirm-mutations", String(confirmMutations));
     window.localStorage.setItem("uiai.reduced-motion", String(reducedMotion));
     saved = true;
+    void loadEvidenceSettings();
     window.setTimeout(() => (saved = false), 2200);
   }
 
@@ -58,6 +89,7 @@
     focusaDaemonHints = readSavedFocusaDaemonHints().join("\n");
     projectRoot = window.localStorage.getItem("uiai.scope.project_root") || "";
     continuityId = window.localStorage.getItem("uiai.scope.continuity_id") || "";
+    workstreamRef = window.localStorage.getItem("uiai.scope.workstream_ref") || "";
     workpointId = window.localStorage.getItem("uiai.scope.workpoint_id") || "";
     responseProfile = window.localStorage.getItem("uiai.response.profile") || responseProfile;
     liveUpdates = window.localStorage.getItem("uiai.live-updates") !== "false";
@@ -71,5 +103,5 @@
 <div class="screen">
   <div class="screen-header"><div><p class="screen-kicker">Configure</p><h1>Settings</h1><p class="screen-lede">Tune the connected engine and the amount of context this Cockpit keeps visible.</p></div><div class="screen-actions"><button class="screen-button" type="button" onclick={testConnection} disabled={testing}>{testing ? "Testing…" : "Test connection"}</button><button class="screen-button primary" type="button" onclick={saveSettings}>Save changes</button></div></div>
   {#if saved || connectionResult}<div class="selection-banner" style="margin: -14px 0 18px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--color-success) 25%, var(--color-border)); border-radius: 9px; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 7%, transparent); font-size: 12px">{saved ? "Settings saved locally." : "Connection result:"} {connectionResult}</div>{/if}
-  <section class="screen-card evidence-settings-card"><div class="form-section"><h2>Evidence sharing</h2><p>Connected to canonical UIAI Evidence Share Settings. Existing packets remain immutable; changes apply to future captures.</p>{#if evidenceSettingsState === "loading"}<p class="scope-note">Loading effective settings…</p>{:else if evidenceSettingsState === "unavailable"}<div class="settings-warning" role="alert">{evidenceSettingsError}<button class="screen-button" type="button" onclick={loadEvidenceSettings}>Retry</button></div>{:else if evidenceSettings}<p class="scope-note">Source: {evidenceSettings.sources.join(" → ")} · Revision {evidenceSettings.revision}</p><label class="form-field">Presentation theme<select bind:value={evidenceSettings.values.presentation.theme}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><label class="form-field">Image quality: {evidenceSettings.values.image.quality}<input type="range" min="40" max="100" bind:value={evidenceSettings.values.image.quality} /></label><label class="toggle-row"><span>Automatically create screenshot packets</span><input type="checkbox" bind:checked={evidenceSettings.values.enablement.auto_screenshot} /></label><div class="screen-actions"><button class="screen-button" type="button" onclick={loadEvidenceSettings}>Refresh</button><button class="screen-button primary" type="button" onclick={saveEvidenceSettings} disabled={evidenceSettingsState === "saving"}>{evidenceSettingsState === "saving" ? "Saving…" : "Save evidence settings"}</button></div>{/if}</div><div class="form-section"><h2>Engine connection</h2><p>The local engine remains the execution boundary for browser work.</p><label class="form-field">Engine URL<input bind:value={engineUrl} /></label><label class="form-field">Remote Focusa daemon hints<textarea bind:value={focusaDaemonHints} rows="3" placeholder="http://focusa-vps.tailnet.ts.net:8787"></textarea><span>Optional saved VPS/Tailscale URLs. Cockpit always probes loopback and Bonjour too; discovery never grants authority.</span></label><p class="scope-note">Scope is required for governed Workpoint continuity. Leave fields empty only for an explicitly local, unscoped session.</p><label class="form-field">Project root<input bind:value={projectRoot} placeholder="/path/to/project" /></label><label class="form-field">Continuity ID<input bind:value={continuityId} placeholder="Focusa continuity id" /></label><label class="form-field">Workpoint ID<input bind:value={workpointId} placeholder="Focusa Workpoint id" /></label><label class="form-field" style="margin-top: 16px">Response profile<select bind:value={responseProfile}><option value="agent_compact">Agent compact</option><option value="agent_standard">Agent standard</option><option value="evidence_grade">Evidence grade</option></select></label></div><div class="form-section"><h2>Workspace behavior</h2><div class="toggle-row"><div><strong>Live updates</strong><span>Keep run and engine status moving without manual refresh.</span></div><input type="checkbox" bind:checked={liveUpdates} aria-label="Live updates" /></div><div class="toggle-row"><div><strong>Confirm consequential actions</strong><span>Require an explicit confirmation before browser mutations.</span></div><input type="checkbox" bind:checked={confirmMutations} aria-label="Confirm consequential actions" /></div><div class="toggle-row"><div><strong>Reduce motion</strong><span>Respect a calmer presentation for longer work sessions.</span></div><input type="checkbox" bind:checked={reducedMotion} aria-label="Reduce motion" /></div></div></section>
+  <section class="screen-card evidence-settings-card"><div class="form-section"><h2>Evidence sharing</h2><p>Connected to canonical UIAI Evidence Share Settings. Existing packets remain immutable; changes apply to future captures.</p>{#if evidenceSettingsError && evidenceSettingsState !== "unavailable"}<div class="settings-warning" role="alert">{evidenceSettingsError}</div>{/if}{#if evidenceSettingsState === "loading"}<p class="scope-note">Loading effective settings…</p>{:else if evidenceSettingsState === "unavailable"}<div class="settings-warning" role="alert">{evidenceSettingsError}<button class="screen-button" type="button" onclick={loadEvidenceSettings}>Retry</button></div>{:else if evidenceSettings}<p class="scope-note">Source: {evidenceSettings.sources.join(" → ")} · Revision {evidenceSettings.revision}</p><label class="form-field">All Evidence settings domains (JSON)<textarea rows="18" spellcheck="false" bind:value={evidenceSettingsJSON}></textarea></label><p>The engine validates supported fields and revision conflicts. Refresh to discard the draft and load current values.</p><button class="screen-button" type="button" onclick={resetEvidenceSettings} disabled={evidenceSettingsState !== "ready"}>Reset scoped overrides</button><div class="screen-actions"><button class="screen-button" type="button" onclick={loadEvidenceSettings}>Refresh</button><button class="screen-button primary" type="button" onclick={saveEvidenceSettings} disabled={evidenceSettingsState === "saving"}>{evidenceSettingsState === "saving" ? "Saving…" : "Save evidence settings"}</button></div>{/if}</div><div class="form-section"><h2>Engine connection</h2><p>The local engine remains the execution boundary for browser work.</p><label class="form-field">Engine URL<input bind:value={engineUrl} /></label><label class="form-field">Remote Focusa daemon hints<textarea bind:value={focusaDaemonHints} rows="3" placeholder="http://focusa-vps.tailnet.ts.net:8787"></textarea><span>Optional saved VPS/Tailscale URLs. Cockpit always probes loopback and Bonjour too; discovery never grants authority.</span></label><p class="scope-note">Scope is required for governed Workpoint continuity. Leave fields empty only for an explicitly local, unscoped session.</p><label class="form-field">Project root<input bind:value={projectRoot} placeholder="/path/to/project" /></label><label class="form-field">Workstream reference<input bind:value={workstreamRef} placeholder="Explicit Focusa Workstream reference" /></label><label class="form-field">Continuity ID<input bind:value={continuityId} placeholder="Focusa continuity id" /></label><label class="form-field">Workpoint ID<input bind:value={workpointId} placeholder="Focusa Workpoint id" /></label><label class="form-field" style="margin-top: 16px">Response profile<select bind:value={responseProfile}><option value="agent_compact">Agent compact</option><option value="agent_standard">Agent standard</option><option value="evidence_grade">Evidence grade</option></select></label></div><div class="form-section"><h2>Workspace behavior</h2><div class="toggle-row"><div><strong>Live updates</strong><span>Keep run and engine status moving without manual refresh.</span></div><input type="checkbox" bind:checked={liveUpdates} aria-label="Live updates" /></div><div class="toggle-row"><div><strong>Confirm consequential actions</strong><span>Require an explicit confirmation before browser mutations.</span></div><input type="checkbox" bind:checked={confirmMutations} aria-label="Confirm consequential actions" /></div><div class="toggle-row"><div><strong>Reduce motion</strong><span>Respect a calmer presentation for longer work sessions.</span></div><input type="checkbox" bind:checked={reducedMotion} aria-label="Reduce motion" /></div></div></section>
 </div>

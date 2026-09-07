@@ -15,6 +15,7 @@ set -euo pipefail
 : "${REMOTE_GROUP:=wpuiai}"
 : "${DRY_RUN:=0}"
 : "${RUN_BROWSER_SMOKE:=1}"
+: "${REMOTE_EVIDENCE_SCOPE_JSON:=}"
 : "${RELEASE_TAG:=manual}"
 
 if [[ ! -f "$ASSET_PATH" ]]; then
@@ -37,6 +38,7 @@ UIAI Engine OVH deploy plan
   health_url=$REMOTE_HEALTH_URL
   dry_run=$DRY_RUN
   browser_smoke=$RUN_BROWSER_SMOKE
+  evidence_scope_configured=$([[ -n "$REMOTE_EVIDENCE_SCOPE_JSON" ]] && echo true || echo false)
 PLAN
 
 if [[ "$DRY_RUN" == "1" || "$DRY_RUN" == "true" ]]; then
@@ -105,10 +107,13 @@ case "$http_code" in 200|401) ;; *) echo "unexpected health status: $http_code" 
 REMOTE_DEPLOY
 
 if [[ "$RUN_BROWSER_SMOKE" == "1" || "$RUN_BROWSER_SMOKE" == "true" ]]; then
-  "${SSH[@]}" python3 - <<"PY"
-import json, subprocess, urllib.request, time
+  [[ -n "$REMOTE_EVIDENCE_SCOPE_JSON" ]] || { echo "REMOTE_EVIDENCE_SCOPE_JSON is required for the mandatory EPWA browser smoke" >&2; exit 4; }
+  scope_b64="$(printf '%s' "$REMOTE_EVIDENCE_SCOPE_JSON" | base64 -w0)"
+  "${SSH[@]}" python3 - "$scope_b64" <<"PY"
+import base64, json, subprocess, sys, urllib.request, time
 base = "http://127.0.0.1:7456"
-body = json.dumps({"url":"https://example.com", "width":800, "height":600}).encode()
+scope = json.loads(base64.b64decode(sys.argv[1]))
+body = json.dumps({"url":"https://example.com", "width":800, "height":600, "focusa_scope":scope}).encode()
 req = urllib.request.Request(base + "/api/session", data=body, headers={"Content-Type":"application/json"}, method="POST")
 t0 = time.perf_counter()
 sid = None
@@ -118,8 +123,12 @@ with urllib.request.urlopen(req, timeout=75) as resp:
     js = json.loads(raw)
     session = js.get("session") or {}
     sid = js.get("session_id") or js.get("id") or session.get("session_id") or session.get("id")
-    ss = js.get("screenshot")
-    print(json.dumps({"status": resp.status, "ms": round(ms, 2), "session_id_present": bool(sid), "screenshot_present": isinstance(ss, str) and len(ss) > 0}, sort_keys=True))
+    delivery = js.get("epwa_delivery") or {}
+    epwa = delivery.get("epwa") or {}
+    valid = (delivery.get("schema") == "uiai.epwa_delivery.v1" and delivery.get("state") == "ready" and js.get("delivery_state") == "ready" and str(epwa.get("record_url", "")).startswith("https://") and str(epwa.get("portable_url", "")).startswith("https://") and js.get("artifact_url") == epwa.get("record_url") and js.get("portable_url") == epwa.get("portable_url") and not any(key in js for key in ("screenshot", "imageBase64", "image_base64", "artifact_path", "result_path", "result_url")))
+    print(json.dumps({"status": resp.status, "ms": round(ms, 2), "session_id_present": bool(sid), "epwa_delivery_ready": valid, "delivery_id": delivery.get("delivery_id")}, sort_keys=True))
+    if not valid:
+        raise SystemExit("browser smoke did not return a ready HTTPS EPWA delivery")
 if sid:
     subprocess.run(["curl", "-sS", "-m", "15", "-X", "DELETE", base + "/api/session/" + sid], check=False)
 PY

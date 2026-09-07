@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -156,69 +155,46 @@ func MountIntelligenceReal(r chi.Router, cfg *config.Config, aiProv *ai.Provider
 		})
 	})
 
-	// --- WASM artifact delivery ---
+	// Raw executable artifact routes are retired; creation returns mandatory EPWA delivery.
+	for _, kind := range []string{"wasm", "js"} {
+		kind := kind
+		r.Get("/"+kind+"/{runId}", func(w http.ResponseWriter, req *http.Request) {
+			writeJSON(w, http.StatusGone, map[string]any{
+				"schema": "uiai.epwa_delivery_error.v1", "code": "legacy_raw_artifact_removed",
+				"artifact_kind": kind, "runId": chi.URLParam(req, "runId"),
+				"message": "raw executable artifacts are available only through their EPWA viewer and portable package",
+			})
+		})
+	}
 
-	r.Get("/wasm/{runId}", func(w http.ResponseWriter, req *http.Request) {
-		runId := chi.URLParam(req, "runId")
-		wasmDir := filepath.Join(cfg.Storage.DataDir, "wasm")
-		wasmPath := filepath.Join(wasmDir, runId+".wasm")
-		if _, err := os.Stat(wasmPath); err != nil {
-			writeJSON(w, 404, map[string]string{"error": "WASM artifact not found", "runId": runId})
-			return
-		}
-		w.Header().Set("Content-Type", "application/wasm")
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.wasm", runId))
-		http.ServeFile(w, req, wasmPath)
-	})
-
-	// Upload WASM artifact
 	r.Post("/wasm/{runId}", func(w http.ResponseWriter, req *http.Request) {
-		runId := chi.URLParam(req, "runId")
-		wasmDir := filepath.Join(cfg.Storage.DataDir, "wasm")
-		os.MkdirAll(wasmDir, 0750)
-		wasmPath := filepath.Join(wasmDir, runId+".wasm")
-
-		data, err := io.ReadAll(io.LimitReader(req.Body, 50*1024*1024)) // 50MB limit
+		runID := chi.URLParam(req, "runId")
+		const maxWASMBytes = 50 * 1024 * 1024
+		data, err := io.ReadAll(io.LimitReader(req.Body, maxWASMBytes+1))
 		if err != nil {
-			writeJSON(w, 400, map[string]string{"error": "read body failed"})
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "read body failed"})
 			return
 		}
-		if err := os.WriteFile(wasmPath, data, 0600); err != nil {
-			writeJSON(w, 500, map[string]string{"error": "write failed"})
+		if len(data) > maxWASMBytes {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "WASM artifact exceeds 50 MiB"})
 			return
 		}
-		writeJSON(w, 200, map[string]any{"runId": runId, "size": len(data), "status": "uploaded"})
+		writeBinaryArtifactEPWA(w, req, cfg, "runtime:wasm:"+runID, "WASM runtime artifact "+runID, "application/wasm", "wasm", data, http.StatusCreated)
 	})
 
-	r.Get("/js/{runId}", func(w http.ResponseWriter, req *http.Request) {
-		runId := chi.URLParam(req, "runId")
-		jsDir := filepath.Join(cfg.Storage.DataDir, "js")
-		jsPath := filepath.Join(jsDir, runId+".js")
-		if _, err := os.Stat(jsPath); err != nil {
-			writeJSON(w, 404, map[string]string{"error": "JS artifact not found", "runId": runId})
-			return
-		}
-		w.Header().Set("Content-Type", "application/javascript")
-		http.ServeFile(w, req, jsPath)
-	})
-
-	// Upload JS artifact
 	r.Post("/js/{runId}", func(w http.ResponseWriter, req *http.Request) {
-		runId := chi.URLParam(req, "runId")
-		jsDir := filepath.Join(cfg.Storage.DataDir, "js")
-		os.MkdirAll(jsDir, 0750)
-		jsPath := filepath.Join(jsDir, runId+".js")
-
-		data, err := io.ReadAll(io.LimitReader(req.Body, 20*1024*1024)) // 20MB limit
+		runID := chi.URLParam(req, "runId")
+		const maxJavaScriptBytes = 20 * 1024 * 1024
+		data, err := io.ReadAll(io.LimitReader(req.Body, maxJavaScriptBytes+1))
 		if err != nil {
-			writeJSON(w, 400, map[string]string{"error": "read body failed"})
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "read body failed"})
 			return
 		}
-		if err := os.WriteFile(jsPath, data, 0600); err != nil {
-			writeJSON(w, 500, map[string]string{"error": "write failed"})
+		if len(data) > maxJavaScriptBytes {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "JavaScript artifact exceeds 20 MiB"})
 			return
 		}
-		writeJSON(w, 200, map[string]any{"runId": runId, "size": len(data), "status": "uploaded"})
+		writeBinaryArtifactEPWA(w, req, cfg, "runtime:javascript:"+runID, "JavaScript runtime artifact "+runID, "application/javascript", "js", data, http.StatusCreated)
 	})
 }
 

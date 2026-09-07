@@ -1,0 +1,55 @@
+{
+  "schema": "uiai.evidence_judge_result.v1",
+  "result_id": "judge-result:1",
+  "request_id": "judge-request:1",
+  "request_sha256": "b2a99c260266799a268ed95fc687e8cd2e08c78d0da26a3d4114e8ea1cf4f7f8",
+  "view_ref": "judge-view:1",
+  "view_sha256": "9b832837984331ea345b75f9228990ea143111d5a403a4e6ceedbbf3b32ccc30",
+  "information_set_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "judge_identity_ref": "agent:judge",
+  "model_provider": "provider:example",
+  "model_version": "model:multimodal-v1",
+  "capability_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "policy_revision": "4",
+  "evaluated_at": "2026-08-30T00:10:00Z",
+  "outcome": "verified",
+  "atom_decisions": [
+    {
+      "atom_ref": "atom:layout",
+      "verdict": "supported",
+      "citation_ids": [
+        "citation:image"
+      ],
+      "reason_code": "cited_visual_match"
+    },
+    {
+      "atom_ref": "atom:interaction",
+      "verdict": "supported",
+      "citation_ids": [
+        "citation:video"
+      ],
+      "reason_code": "cited_temporal_match"
+    }
+  ],
+  "citation_ids": [
+    "citation:image",
+    "citation:video"
+  ],
+  "rationales": [
+    {
+      "atom_ref": "atom:layout",
+      "summary": "The cited source image shows the required layout.",
+      "citation_ids": [
+        "citation:image"
+      ]
+    },
+    {
+      "atom_ref": "atom:interaction",
+      "summary": "The cited synchronized segment records the interaction.",
+      "citation_ids": [
+        "citation:video"
+      ]
+    }
+  ],
+  "confidence_ppm": 990000
+}
