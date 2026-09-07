@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/WPUIAI/uiai-engine/internal/media/deviceframes"
 	"github.com/go-chi/chi/v5"
 )
@@ -18,9 +20,9 @@ var (
 	frameRendererOnce sync.Once
 )
 
-func mountFrameRoutes(r chi.Router) {
+func mountFrameRoutes(r chi.Router, cfg *config.Config) {
 	r.Get("/catalog", handleFrameCatalog)
-	r.Post("/render", handleFrameRender)
+	r.Post("/render", handleFrameRender(cfg))
 }
 
 func getFrameRenderer() (*deviceframes.Renderer, error) {
@@ -62,73 +64,69 @@ func frameCatalogResponse(frames []deviceframes.FrameConfig) []map[string]any {
 	return out
 }
 
-func handleFrameRender(w http.ResponseWriter, r *http.Request) {
-	renderer, err := getFrameRenderer()
-	if err != nil {
-		writeJSON(w, 503, map[string]string{"error": "frame renderer unavailable: " + err.Error()})
-		return
-	}
-
-	var body struct {
-		FrameID     string `json:"frameId"`
-		FrameIDAlt  string `json:"frame_id"`
-		ImageBase64 string `json:"imageBase64"`
-		Fit         string `json:"fit"`
-		Format      string `json:"format"`
-		Quality     int    `json:"quality"`
-		Scale       int    `json:"scale"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
-		return
-	}
-	if body.FrameID == "" {
-		body.FrameID = body.FrameIDAlt
-	}
-	if body.FrameID == "" {
-		writeJSON(w, 400, map[string]string{"error": "frameId required"})
-		return
-	}
-	if body.ImageBase64 == "" {
-		writeJSON(w, 400, map[string]string{"error": "imageBase64 required"})
-		return
-	}
-
-	imgB64 := body.ImageBase64
-	if idx := strings.Index(imgB64, ","); strings.HasPrefix(imgB64, "data:") && idx > 0 {
-		imgB64 = imgB64[idx+1:]
-	}
-	imgBytes, err := base64.StdEncoding.DecodeString(imgB64)
-	if err != nil {
-		imgBytes, err = base64.RawStdEncoding.DecodeString(imgB64)
+func handleFrameRender(cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		renderer, err := getFrameRenderer()
 		if err != nil {
-			writeJSON(w, 400, map[string]string{"error": "invalid imageBase64"})
+			writeJSON(w, 503, map[string]string{"error": "frame renderer unavailable: " + err.Error()})
 			return
 		}
-	}
 
-	start := time.Now()
-	out, err := renderer.Render(deviceframes.RenderRequest{
-		FrameID: body.FrameID,
-		Image:   imgBytes,
-		Fit:     body.Fit,
-		Format:  body.Format,
-		Quality: body.Quality,
-		Scale:   body.Scale,
-	})
-	if err != nil {
-		writeJSON(w, 400, map[string]string{"error": err.Error()})
-		return
-	}
+		var body struct {
+			FrameID     string `json:"frameId"`
+			FrameIDAlt  string `json:"frame_id"`
+			ImageBase64 string `json:"imageBase64"`
+			Fit         string `json:"fit"`
+			Format      string `json:"format"`
+			Quality     int    `json:"quality"`
+			Scale       int    `json:"scale"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		if body.FrameID == "" {
+			body.FrameID = body.FrameIDAlt
+		}
+		if body.FrameID == "" {
+			writeJSON(w, 400, map[string]string{"error": "frameId required"})
+			return
+		}
+		if body.ImageBase64 == "" {
+			writeJSON(w, 400, map[string]string{"error": "imageBase64 required"})
+			return
+		}
 
-	writeJSON(w, 200, map[string]any{
-		"frameId":     body.FrameID,
-		"format":      out.Format,
-		"width":       out.Width,
-		"height":      out.Height,
-		"imageBase64": base64.StdEncoding.EncodeToString(out.Image),
-		"cacheHit":    false,
-		"source":      out.Source,
-		"duration_ms": time.Since(start).Milliseconds(),
-	})
+		imgB64 := body.ImageBase64
+		if idx := strings.Index(imgB64, ","); strings.HasPrefix(imgB64, "data:") && idx > 0 {
+			imgB64 = imgB64[idx+1:]
+		}
+		imgBytes, err := base64.StdEncoding.DecodeString(imgB64)
+		if err != nil {
+			imgBytes, err = base64.RawStdEncoding.DecodeString(imgB64)
+			if err != nil {
+				writeJSON(w, 400, map[string]string{"error": "invalid imageBase64"})
+				return
+			}
+		}
+
+		start := time.Now()
+		out, err := renderer.Render(deviceframes.RenderRequest{
+			FrameID: body.FrameID,
+			Image:   imgBytes,
+			Fit:     body.Fit,
+			Format:  body.Format,
+			Quality: body.Quality,
+			Scale:   body.Scale,
+		})
+		if err != nil {
+			writeJSON(w, 400, map[string]string{"error": err.Error()})
+			return
+		}
+
+		writeLegacyVisualEPWA(w, r, cfg, out.Image, out.Format, out.Width, out.Height, "", map[string]any{
+			"frameId": body.FrameID, "format": out.Format, "width": out.Width, "height": out.Height,
+			"cacheHit": false, "source": out.Source, "duration_ms": time.Since(start).Milliseconds(),
+		}, epwadelivery.ProducerMedia)
+	}
 }

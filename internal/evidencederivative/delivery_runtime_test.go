@@ -6,9 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 )
 
 type fakeDeliveryTransport struct {
@@ -30,8 +33,35 @@ func deliveryCommand() DeliveryCommand {
 		DKIMEvidenceRef: "dkim:1", SPFEvidenceRef: "spf:1", DMARCEvidenceRef: "dmarc:1", NoTracking: true,
 		MaxMessageBytes: 1024, BounceReconciliationRef: "bounce-policy:1",
 	}
-	return DeliveryCommand{DerivativeRef: "derivative:1", DerivativeSHA256: hex.EncodeToString(sum[:]), DestinationRef: "mailbox:1", IdempotencyKey: "key:1", Payload: body, EmailPolicy: &policy}
+	outputSHA := hex.EncodeToString(sum[:])
+	digest := strings.Repeat("a", 64)
+	createdAt := time.Unix(9, 0).UTC()
+	delivery, err := epwadelivery.New(epwadelivery.Input{
+		Producer: epwadelivery.ProducerDerivative,
+		Artifact: epwadelivery.ArtifactBinding{ArtifactRef: "derivative:1", Revision: 1, ManifestSHA256: digest, OutputSHA256: outputSHA},
+		EPWA:     epwadelivery.EPWABinding{PackageID: digest, ProjectionRef: "uiai-evidence-projection:sha256:" + digest, ProjectionSHA256: digest, PackageRef: "uiai-epwa-package:sha256:" + digest, PackageSHA256: digest, RecordURL: "https://evidence.example/derivative/1/", PortableURL: "https://evidence.example/derivative/1/portable.zip", Access: epwadelivery.AccessPublicSafe},
+		Scope:    epwadelivery.ScopeBinding{Posture: epwadelivery.ScopeComplete, ProjectRef: "project:1", WorkstreamRef: "workstream:1", WorksetRef: "workset:1", CallGraphRef: "callgraph:1", WorkpointRef: "workpoint:1", WorkItemRef: "work-item:1", ContinuityRef: "continuity:1"},
+		State:    epwadelivery.StateReady, IdempotencyKey: "derivative-epwa:1", CreatedAt: createdAt, ObservedAt: createdAt,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return DeliveryCommand{DerivativeRef: "derivative:1", DerivativeSHA256: outputSHA, DestinationRef: "mailbox:1", IdempotencyKey: "key:1", Payload: body, EmailPolicy: &policy, EPWADelivery: delivery}
 }
+func TestDeliveryRuntimeRequiresReadyBoundEPWA(t *testing.T) {
+	transport := &fakeDeliveryTransport{}
+	command := deliveryCommand()
+	command.EPWADelivery = epwadelivery.Delivery{}
+	if _, err := NewDeliveryRuntime().Deliver(context.Background(), command, transport); !errors.Is(err, ErrDerivativeContractInvalid) || transport.calls != 0 {
+		t.Fatalf("raw derivative reached connector without EPWA: error=%v calls=%d", err, transport.calls)
+	}
+	command = deliveryCommand()
+	command.EPWADelivery.Artifact.OutputSHA256 = strings.Repeat("b", 64)
+	if _, err := NewDeliveryRuntime().Deliver(context.Background(), command, transport); !errors.Is(err, ErrDerivativeContractInvalid) || transport.calls != 0 {
+		t.Fatalf("mismatched EPWA derivative reached connector: error=%v calls=%d", err, transport.calls)
+	}
+}
+
 func TestDeliveryRuntimeIdempotencyAndConflict(t *testing.T) {
 	now := time.Unix(10, 0).UTC()
 	tr := &fakeDeliveryTransport{result: ProviderDeliveryResult{State: DeliveryAccepted, ProviderReceiptRef: "smtp:1", EvidenceRefs: []string{"evidence:smtp"}, ObservedAt: now}}

@@ -20,6 +20,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
 	"github.com/WPUIAI/uiai-engine/internal/desktop"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceregistry"
 	"github.com/WPUIAI/uiai-engine/internal/intelligence"
@@ -338,6 +339,9 @@ func (e *Engine) mountRoutes() {
 	})
 	r.Route("/api/intelligence", func(r chi.Router) {
 		intel := intelligence.NewLayer(e.cfg, e.ai)
+		intel.SetArtifactPublisher(func(req *http.Request, artifactRef, title, kind, mediaType, extension string, payload []byte) (epwadelivery.Delivery, error) {
+			return routes.PublishGenericArtifactEPWA(req, e.cfg, artifactRef, title, kind, mediaType, extension, payload)
+		})
 		intel.Mount(r)
 	})
 	r.Route("/api/training", func(r chi.Router) {
@@ -361,7 +365,7 @@ func (e *Engine) mountRoutes() {
 	})
 	if e.evidenceRegistry != nil && e.evidenceArtifacts != nil {
 		r.Route("/api/evidence/artifacts", func(r chi.Router) {
-			routes.MountEvidenceArtifacts(r, e.evidenceArtifacts, e.evidenceRegistry)
+			routes.MountEvidenceArtifacts(r, e.cfg, e.evidenceArtifacts, e.evidenceRegistry)
 		})
 	}
 	if e.evidenceRegistry != nil {
@@ -386,7 +390,7 @@ func (e *Engine) mountRoutes() {
 		routes.MountShareReal(r, e.cfg, e.vision)
 	})
 	r.Route("/api/fpv", func(r chi.Router) {
-		routes.MountFPVRoutes(r, e.sessions)
+		routes.MountFPVRoutes(r, e.cfg, e.sessions)
 	})
 	r.Route("/m", func(r chi.Router) {
 		routes.MountFPVPublicRoutes(r, e.sessions)
@@ -436,7 +440,7 @@ func (e *Engine) mountRoutes() {
 
 	// Agent packet composer — bounded Focusa-compatible packet from existing UIAI responses
 	r.Route("/api/agent", func(r chi.Router) {
-		routes.MountAgentPacketRoutes(r)
+		routes.MountAgentPacketRoutes(r, e.cfg)
 	})
 
 	// Engine/browser error history — bounded and redacted for agent/operator troubleshooting

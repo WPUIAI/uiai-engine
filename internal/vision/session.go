@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
@@ -35,11 +36,17 @@ const (
 // the page alive between calls — enabling instant re-screenshots, scrolling,
 // clicking, CSS injection, and JS evaluation without re-navigating.
 type FocusaScope struct {
-	WorkpointID   string `json:"workpoint_id,omitempty"`
-	ContinuityID  string `json:"continuity_id,omitempty"`
-	ProjectRoot   string `json:"project_root,omitempty"`
-	WorkstreamKey string `json:"workstream_key,omitempty"`
-	EvidenceRef   string `json:"evidence_ref,omitempty"`
+	WorkpointID   string                           `json:"workpoint_id,omitempty"`
+	ContinuityID  string                           `json:"continuity_id,omitempty"`
+	ProjectRoot   string                           `json:"project_root,omitempty"`
+	WorkstreamKey string                           `json:"workstream_key,omitempty"`
+	EvidenceRef   string                           `json:"evidence_ref,omitempty"`
+	ProjectRef    string                           `json:"project_ref,omitempty"`
+	WorkstreamRef string                           `json:"workstream_ref,omitempty"`
+	WorksetRef    string                           `json:"workset_ref,omitempty"`
+	CallGraphRef  string                           `json:"callgraph_ref,omitempty"`
+	WorkItemRef   string                           `json:"work_item_ref,omitempty"`
+	WorkItems     []evidencepwa.WorkItemProjection `json:"work_items,omitempty"`
 }
 
 func (s *FocusaScope) DerivedWorkstreamKey() string {
@@ -192,7 +199,7 @@ func generateID() string {
 }
 
 func (s *Session) SetFocusaScope(scope *FocusaScope) {
-	if scope == nil || (scope.WorkpointID == "" && scope.ContinuityID == "" && scope.ProjectRoot == "" && scope.WorkstreamKey == "" && scope.EvidenceRef == "") {
+	if scope == nil || (scope.WorkpointID == "" && scope.ContinuityID == "" && scope.ProjectRoot == "" && scope.WorkstreamKey == "" && scope.EvidenceRef == "" && scope.ProjectRef == "" && scope.WorkstreamRef == "" && scope.WorksetRef == "" && scope.CallGraphRef == "" && scope.WorkItemRef == "" && len(scope.WorkItems) == 0) {
 		s.FocusaScope = nil
 		return
 	}

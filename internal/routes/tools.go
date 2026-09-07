@@ -506,20 +506,21 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_search",
-			"description": "Provider-neutral web search for browser agents. Returns result titles, snippets, and source URLs; open selected URLs with browser_open, then browser_read. Brave is the default provider but not baked into browser semantics.",
+			"description": "Provider-neutral web search delivered as a durable HTTPS EPWA research packet plus portable package. Result fields are included only when delivery is ready; open selected source URLs with browser_open, then browser_read.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"query":    map[string]string{"type": "string", "description": "Search query"},
-					"provider": map[string]any{"type": "string", "description": "Search provider id; default brave", "default": "brave"},
-					"limit":    map[string]any{"type": "integer", "description": "Result limit, max 20", "default": 5},
+					"query":        map[string]string{"type": "string", "description": "Search query"},
+					"provider":     map[string]any{"type": "string", "description": "Search provider id; default brave", "default": "brave"},
+					"limit":        map[string]any{"type": "integer", "description": "Result limit, max 20", "default": 5},
+					"focusa_scope": map[string]any{"type": "object", "description": "Complete Project, Workstream, Workset, CallGraph, Workpoint, Work Item, continuity, and work-items binding required for ready EPWA delivery"},
 				},
 				"required": []string{"query"},
 			},
 		},
 		{
 			"name":        "source_to_markdown",
-			"description": "One-shot Source-to-Markdown conversion for public URLs. Opens a temporary browser session, reads main/full content as Markdown, returns uiai.source_markdown.v1 with metadata, optional JSONL records/chunks, diagnostics, Focusa-ready evidence fields, and closes the session.",
+			"description": "One-shot Source-to-Markdown capture for public URLs. Returns the source snapshot only with ready durable HTTPS EPWA and portable-package delivery, includes bounded metadata/records/diagnostics, and closes the temporary session.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -530,14 +531,14 @@ func openAITools() []map[string]any {
 					"format":         map[string]any{"type": "string", "description": "Response format hint: json, markdown, or jsonl", "default": "json", "enum": []string{"json", "markdown", "jsonl"}},
 					"include_links":  map[string]any{"type": "boolean", "description": "Include visible link metadata", "default": true},
 					"include_images": map[string]any{"type": "boolean", "description": "Include Markdown image tags", "default": false},
-					"focusa_scope":   map[string]any{"type": "object", "description": "Optional Focusa scope echoed into read metadata"},
+					"focusa_scope":   map[string]any{"type": "object", "description": "Complete evidence scope required for ready EPWA delivery"},
 				},
 				"required": []string{"url"},
 			},
 		},
 		{
 			"name":        "browser_fpv_share",
-			"description": "Create a short-lived read-only FPV PWA share link for an existing browser session. Returns mirror_url, status_url, screenshot_url, and expiry.",
+			"description": "Create a short-lived operational FPV mirror and a mandatory durable EPWA snapshot for an existing browser session. The FPV mirror is ephemeral and never evidence delivery; success requires the HTTPS EPWA viewer and portable package.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -549,7 +550,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_open",
-			"description": "Open a persistent browser session on a URL. Retries transient page startup/navigation flakiness. Returns session_id and initial screenshot. For browser errors, console logs, JS exceptions, failed requests/failed_request, API failures, CORS, or network debugging, call browser_diagnostics next.",
+			"description": "Open a persistent browser session on a URL. Returns session metadata plus mandatory EPWA delivery for the initial visual capture; inline pixels and raw file paths are withheld. For browser errors or visual failures, call browser_diagnostics next.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -566,7 +567,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_screenshot",
-			"description": "Instant re-screenshot of current page state (~30ms). No navigation — captures what's visible now. If the page looks broken or blank, call browser_diagnostics for console/network evidence.",
+			"description": "Capture the current page and return only mandatory EPWA delivery metadata: a durable HTTPS viewer and portable package when ready. Inline pixels and raw file paths are withheld. Call browser_diagnostics for broken or blank pages.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -574,7 +575,7 @@ func openAITools() []map[string]any {
 					"format":     map[string]any{"type": "string", "description": "Image format", "default": "jpeg", "enum": []string{"jpeg", "png"}},
 					"quality":    map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 60},
 					"fullPage":   map[string]any{"type": "boolean", "description": "Capture entire scrollable page", "default": false},
-					"output":     map[string]any{"type": "string", "description": "Return mode: json includes base64, file/url return artifact_path/artifact_url without base64", "default": "json", "enum": []string{"json", "file", "url"}},
+					"output":     map[string]any{"type": "string", "description": "Compatibility input; delivery is always EPWA and raw modes are withheld", "default": "epwa", "enum": []string{"epwa"}},
 				},
 				"required": []string{"session_id"},
 			},
@@ -645,7 +646,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_eval",
-			"description": "Execute short synchronous JavaScript on the page. Returns result + screenshot. Use 'return' for output. Avoid long async Promises here; use browser_eval_async for bounded awaits, or split into direct browser actions/clicks. For console, JS exception, or network logs, use browser_diagnostics.",
+			"description": "Execute short synchronous JavaScript on the page. Returns the result plus mandatory EPWA delivery for the resulting visual state; inline pixels and raw paths are withheld. Use 'return' for output. Prefer direct actions for long workflows and browser_diagnostics for failures.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -657,7 +658,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_eval_async",
-			"description": "Execute bounded async JavaScript and await the result with timeout_ms (max 15000). Use for small awaited DOM/network checks only; for long UI workflows prefer browser_snapshot + direct click/type/wait actions to avoid Promise collection flake.",
+			"description": "Execute bounded async JavaScript and await the result with timeout_ms (max 15000). Successful visual output includes mandatory EPWA delivery; inline pixels and raw paths are withheld. Prefer browser_snapshot plus direct actions for long workflows.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -670,7 +671,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_diagnostics",
-			"description": "DEVTOOLS DEBUG TOOL: inspect browser console logs/errors/warnings, JS exceptions/page errors, network requests, failed requests/failed_request, HTTP 4xx/5xx, CORS/API failures, retry/flakiness clues, long async eval issues, blank page, broken page, and visual failure clues. Call during browser troubleshooting after browser_open, browser_click, browser_eval, browser_eval_async, browser_wait, or any visual failure. No screenshot.",
+			"description": "DEVTOOLS DEBUG TOOL: inspect console, exceptions, requests, HTTP failures, CORS/API clues, and visual-failure clues. The diagnostics bundle is delivered through a durable HTTPS EPWA viewer plus portable package; raw-only success is forbidden. No screenshot is captured by this operation.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -698,7 +699,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_snapshot",
-			"description": "Get accessibility tree with @ref selectors. PREFERRED over browser_dom. Returns a text tree like: '- link \"Sign In\" [ref=@e3]'. Use refs in click/type/hover: {\"selector\": \"@e3\"}. Options: interactive (only buttons/links/inputs), compact (remove empty nodes), max_depth.",
+			"description": "Get an accessibility-tree snapshot with @ref selectors. The source snapshot is delivered through a durable HTTPS EPWA viewer plus portable package; raw content is included only when delivery is ready. Prefer this over browser_dom.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -713,7 +714,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_dom",
-			"description": "Get structured DOM info: headings, links, buttons, forms, interactive elements. Legacy — prefer browser_snapshot for @ref support.",
+			"description": "Get a structured DOM snapshot of headings, links, buttons, forms, and interactive elements. The snapshot requires ready EPWA delivery; legacy callers should prefer browser_snapshot for @ref support.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -850,7 +851,7 @@ func openAITools() []map[string]any {
 
 		{
 			"name":        "browser_read",
-			"description": "Read compact page text or Markdown for web surfing without a screenshot. Extracts main/article/body content, headings, optional links, and supports selector or @ref plus max_chars. Prefer this after browser_open/navigate when the agent needs page content, not pixels.",
+			"description": "Extract and capture compact page text or Markdown as a source snapshot. The snapshot requires a durable HTTPS EPWA viewer and portable package; raw content is included only when delivery is ready. Prefer this after browser_open or navigate when content matters more than pixels.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -901,32 +902,34 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "frame_render",
-			"description": "Render a screenshot into a selected device frame. Use frame_catalog first to find frameId.",
+			"description": "Render a screenshot into a selected device frame and return mandatory EPWA delivery metadata. Inline rendered pixels and raw paths are withheld. Use frame_catalog first to find frameId.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"frameId":     map[string]string{"type": "string", "description": "Frame ID from frame_catalog (`frameId`; `frame_id` alias also accepted by HTTP)"},
-					"imageBase64": map[string]string{"type": "string", "description": "Source screenshot base64"},
-					"fit":         map[string]any{"type": "string", "description": "cover or contain", "default": "cover"},
-					"format":      map[string]any{"type": "string", "description": "png or jpeg", "default": "png"},
-					"quality":     map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 90},
-					"scale":       map[string]any{"type": "integer", "description": "Output scale multiplier", "default": 1},
+					"frameId":      map[string]string{"type": "string", "description": "Frame ID from frame_catalog (`frameId`; `frame_id` alias also accepted by HTTP)"},
+					"imageBase64":  map[string]string{"type": "string", "description": "Source screenshot base64"},
+					"fit":          map[string]any{"type": "string", "description": "cover or contain", "default": "cover"},
+					"format":       map[string]any{"type": "string", "description": "png or jpeg", "default": "png"},
+					"quality":      map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 90},
+					"scale":        map[string]any{"type": "integer", "description": "Output scale multiplier", "default": 1},
+					"focusa_scope": map[string]any{"type": "object", "description": "Complete evidence scope required for ready EPWA delivery"},
 				},
 				"required": []string{"frameId", "imageBase64"},
 			},
 		},
 		{
 			"name":        "screenshot",
-			"description": "One-shot screenshot: navigate, capture, forget. For single checks when you don't need a persistent session.",
+			"description": "One-shot screenshot with mandatory durable HTTPS EPWA viewer and portable-package delivery. Inline pixels and raw file paths are withheld.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"url":      map[string]string{"type": "string", "description": "URL to screenshot"},
-					"width":    map[string]any{"type": "integer", "description": "Viewport width", "default": 1280},
-					"height":   map[string]any{"type": "integer", "description": "Viewport height", "default": 800},
-					"format":   map[string]any{"type": "string", "description": "Image format", "default": "jpeg"},
-					"quality":  map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 80},
-					"fullPage": map[string]any{"type": "boolean", "description": "Full page capture", "default": false},
+					"url":          map[string]string{"type": "string", "description": "URL to screenshot"},
+					"width":        map[string]any{"type": "integer", "description": "Viewport width", "default": 1280},
+					"height":       map[string]any{"type": "integer", "description": "Viewport height", "default": 800},
+					"format":       map[string]any{"type": "string", "description": "Image format", "default": "jpeg"},
+					"quality":      map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 80},
+					"fullPage":     map[string]any{"type": "boolean", "description": "Full page capture", "default": false},
+					"focusa_scope": map[string]any{"type": "object", "description": "Complete evidence scope required for ready EPWA delivery"},
 				},
 				"required": []string{"url"},
 			},

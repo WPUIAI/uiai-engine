@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceregistry"
 	"github.com/go-chi/chi/v5"
@@ -16,7 +18,7 @@ import (
 
 const maxEvidenceCommitBody = 10 << 20
 
-func MountEvidenceArtifacts(r chi.Router, artifacts *evidenceartifact.Store, registry *evidenceregistry.Manager) {
+func MountEvidenceArtifacts(r chi.Router, cfg *config.Config, artifacts *evidenceartifact.Store, registry *evidenceregistry.Manager) {
 	r.Post("/commit", func(w http.ResponseWriter, req *http.Request) {
 		req.Body = http.MaxBytesReader(w, req.Body, maxEvidenceCommitBody)
 		if err := req.ParseMultipartForm(maxEvidenceCommitBody); err != nil {
@@ -61,17 +63,42 @@ func MountEvidenceArtifacts(r chi.Router, artifacts *evidenceartifact.Store, reg
 			writeEvidenceArtifactError(w, http.StatusUnprocessableEntity, "commit_rejected", err)
 			return
 		}
-		project, err := registry.EnsureProject(req.Context(), manifest.Scope.Project.ProjectRef)
-		if err != nil {
-			writeJSON(w, http.StatusAccepted, map[string]any{"schema": "uiai.evidence_artifact_commit_result.v1", "commit": commit, "registry_state": "projection_pending", "registry_error": err.Error()})
-			return
+		response := map[string]any{"schema": "uiai.evidence_artifact_commit_result.v2", "artifact_ref": commit.ArtifactID, "commit": commit, "registry_state": "projection_pending"}
+		delivery, deliveryErr := publishStoredArtifactEPWA(req, cfg, artifacts, commit.ArtifactID, commit.Revision, "artifact:"+commit.CommitID)
+		if deliveryErr != nil {
+			response["epwa_delivery_error"] = epwaPublishError{
+				Schema: "uiai.epwa_delivery_error.v1", State: epwadelivery.StatePendingReconcile,
+				ArtifactRef: commit.ArtifactID, ArtifactSHA256: commit.ManifestSHA256,
+				RecoveryRef: "reconcile:evidence-artifact-epwa-publication",
+				Error:       epwaPublishErrorDetail{Code: "epwa_publication_failed", Message: deliveryErr.Error(), Retryable: true},
+			}
+			if delivery.Schema == epwadelivery.Schema {
+				response["delivery_state"] = delivery.State
+				response["epwa_delivery"] = delivery
+			} else {
+				response["schema"] = "uiai.evidence_artifact_commit_delivery_error.v1"
+			}
+		} else {
+			response["delivery_state"] = delivery.State
+			response["epwa_delivery"] = delivery
+			if delivery.State == epwadelivery.StateReady {
+				response["artifact_url"] = delivery.EPWA.RecordURL
+				response["portable_url"] = delivery.EPWA.PortableURL
+			}
 		}
-		indexed, err := project.Index(req.Context(), evidenceregistry.IndexInput{Manifest: manifest, ManifestSHA256: commit.ManifestSHA256})
-		if err != nil {
-			writeJSON(w, http.StatusAccepted, map[string]any{"schema": "uiai.evidence_artifact_commit_result.v1", "commit": commit, "registry_state": "projection_pending", "registry_error": err.Error()})
-			return
+		if project, registryErr := registry.EnsureProject(req.Context(), manifest.Scope.Project.ProjectRef); registryErr != nil {
+			response["registry_error"] = registryErr.Error()
+		} else if indexed, indexErr := project.Index(req.Context(), evidenceregistry.IndexInput{Manifest: manifest, ManifestSHA256: commit.ManifestSHA256}); indexErr != nil {
+			response["registry_error"] = indexErr.Error()
+		} else {
+			response["registry_state"] = "projected"
+			response["registry"] = indexed
 		}
-		writeJSON(w, http.StatusCreated, map[string]any{"schema": "uiai.evidence_artifact_commit_result.v1", "commit": commit, "registry": indexed})
+		status := http.StatusAccepted
+		if deliveryErr == nil && delivery.State == epwadelivery.StateReady && response["registry_state"] == "projected" {
+			status = http.StatusCreated
+		}
+		writeJSON(w, status, response)
 	})
 
 	r.Post("/rebuild", func(w http.ResponseWriter, req *http.Request) {
@@ -80,7 +107,47 @@ func MountEvidenceArtifacts(r chi.Router, artifacts *evidenceartifact.Store, reg
 			writeRegistryError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, result)
+		cursor, _ := strconv.Atoi(req.URL.Query().Get("epwa_cursor"))
+		if cursor < 0 {
+			cursor = 0
+		}
+		limit, _ := strconv.Atoi(req.URL.Query().Get("epwa_limit"))
+		if limit <= 0 || limit > 100 {
+			limit = 25
+		}
+		entries := artifacts.List()
+		if cursor > len(entries) {
+			cursor = len(entries)
+		}
+		end := cursor + limit
+		if end > len(entries) {
+			end = len(entries)
+		}
+		deliveries := make([]epwadelivery.Delivery, 0, end-cursor)
+		failures := make([]map[string]any, 0)
+		allReady := true
+		for _, entry := range entries[cursor:end] {
+			delivery, deliveryErr := publishStoredArtifactEPWA(req, cfg, artifacts, entry.ArtifactID, entry.Revision, "artifact:"+entry.CommitID)
+			if deliveryErr != nil {
+				allReady = false
+				failures = append(failures, map[string]any{"artifact_ref": entry.ArtifactID, "revision": entry.Revision, "error": deliveryErr.Error(), "recovery_ref": "reconcile:evidence-artifact-epwa-publication"})
+				continue
+			}
+			deliveries = append(deliveries, delivery)
+			if delivery.State != epwadelivery.StateReady {
+				allReady = false
+			}
+		}
+		backfill := map[string]any{"schema": "uiai.epwa_backfill_result.v1", "cursor": cursor, "processed": end - cursor, "total": len(entries), "deliveries": deliveries, "failures": failures}
+		if end < len(entries) {
+			backfill["next_cursor"] = end
+			allReady = false
+		}
+		status := http.StatusAccepted
+		if allReady {
+			status = http.StatusOK
+		}
+		writeJSON(w, status, map[string]any{"schema": "uiai.evidence_artifact_rebuild_result.v2", "registry": result, "epwa_backfill": backfill})
 	})
 
 	r.Get("/manifest", func(w http.ResponseWriter, req *http.Request) {

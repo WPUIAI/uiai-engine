@@ -6,20 +6,26 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceregistry"
 	"github.com/go-chi/chi/v5"
 )
 
 func TestEvidenceArtifactCommitReadAndRebuildRoutes(t *testing.T) {
+	dataRoot := t.TempDir()
 	artifacts, _, err := evidenceartifact.OpenStore(evidenceartifact.StoreConfig{
 		Root: t.TempDir(), MaxStoreBytes: 64 << 20, MaxArtifacts: 100, MaxAssetBytes: 8 << 20,
 		StagingQuarantineAge: time.Hour, GCGrace: time.Hour,
@@ -38,6 +44,8 @@ func TestEvidenceArtifactCommitReadAndRebuildRoutes(t *testing.T) {
 	manifest.Assets[0].SHA256 = hex.EncodeToString(digest[:])
 	manifest.Assets[0].ByteSize = int64(len(payload))
 	manifest.Assets[0].MediaType = "text/plain"
+	manifest.Policy.AccessClass = evidenceartifact.AccessPublicSafe
+	manifest.Scope.ContinuityRef = "continuity:artifact-route"
 	manifest.Integrity.ManifestSHA256 = ""
 	manifest, err = evidenceartifact.Seal(manifest)
 	if err != nil {
@@ -62,14 +70,32 @@ func TestEvidenceArtifactCommitReadAndRebuildRoutes(t *testing.T) {
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
+	cfg := &config.Config{Storage: config.StorageConfig{DataDir: dataRoot}}
 	router := chi.NewRouter()
-	router.Route("/api/evidence/artifacts", func(r chi.Router) { MountEvidenceArtifacts(r, artifacts, registry) })
-	request := httptest.NewRequest(http.MethodPost, "/api/evidence/artifacts/commit", &body)
+	router.Route("/api/evidence/artifacts", func(r chi.Router) { MountEvidenceArtifacts(r, cfg, artifacts, registry) })
+	router.Route("/api/screenshot", func(r chi.Router) { mountEvidenceShare(r, cfg) })
+	multipartBytes := append([]byte(nil), body.Bytes()...)
+	request := httptest.NewRequest(http.MethodPost, "https://evidence.example/api/evidence/artifacts/commit", &body)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
-	if response.Code != http.StatusCreated || !strings.Contains(response.Body.String(), `"registry"`) {
+	if response.Code != http.StatusCreated || !strings.Contains(response.Body.String(), `"registry"`) || !strings.Contains(response.Body.String(), `"schema":"uiai.epwa_delivery.v1"`) {
 		t.Fatalf("commit status=%d body=%s", response.Code, response.Body.String())
+	}
+	var commitResponse map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &commitResponse); err != nil {
+		t.Fatal(err)
+	}
+	if commitResponse["artifact_ref"] != manifest.ArtifactID || commitResponse["delivery_state"] != "ready" || commitResponse["artifact_url"] == nil || commitResponse["portable_url"] == nil || commitResponse["epwa_delivery"] == nil {
+		t.Fatalf("commit omitted mandatory EPWA delivery binding: %#v", commitResponse)
+	}
+	for _, key := range []string{"artifact_url", "portable_url"} {
+		target := commitResponse[key].(string)
+		served := httptest.NewRecorder()
+		router.ServeHTTP(served, httptest.NewRequest(http.MethodGet, mustPath(t, target), nil))
+		if served.Code != http.StatusOK {
+			t.Fatalf("%s was not served: status=%d body=%s", key, served.Code, served.Body.String())
+		}
 	}
 
 	manifestPath := "/api/evidence/artifacts/manifest?artifact_id=" + url.QueryEscape(manifest.ArtifactID) + "&revision=1"
@@ -86,9 +112,38 @@ func TestEvidenceArtifactCommitReadAndRebuildRoutes(t *testing.T) {
 	}
 
 	response = httptest.NewRecorder()
-	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/evidence/artifacts/rebuild", nil))
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/evidence/artifacts/rebuild?epwa_cursor=0&epwa_limit=1", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"artifacts":1`) {
 		t.Fatalf("rebuild status=%d body=%s", response.Code, response.Body.String())
+	}
+	var firstRebuild map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &firstRebuild); err != nil {
+		t.Fatal(err)
+	}
+	backfill, ok := firstRebuild["epwa_backfill"].(map[string]any)
+	if !ok || backfill["cursor"] != float64(0) || backfill["processed"] != float64(1) || backfill["total"] != float64(1) {
+		t.Fatalf("unexpected bounded backfill projection: %#v", firstRebuild)
+	}
+	deliveries, ok := backfill["deliveries"].([]any)
+	if !ok || len(deliveries) != 1 {
+		t.Fatalf("missing backfill delivery: %#v", backfill)
+	}
+	firstDelivery := deliveries[0].(map[string]any)
+	firstDeliveryID := firstDelivery["delivery_id"]
+	firstPackageID := firstDelivery["epwa"].(map[string]any)["package_id"]
+
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/evidence/artifacts/rebuild?epwa_cursor=0&epwa_limit=1", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("idempotent rebuild status=%d body=%s", response.Code, response.Body.String())
+	}
+	var retryRebuild map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &retryRebuild); err != nil {
+		t.Fatal(err)
+	}
+	retryDelivery := retryRebuild["epwa_backfill"].(map[string]any)["deliveries"].([]any)[0].(map[string]any)
+	if retryDelivery["delivery_id"] != firstDeliveryID || retryDelivery["epwa"].(map[string]any)["package_id"] != firstPackageID {
+		t.Fatalf("backfill retry changed stable identity: first=%#v retry=%#v", firstDelivery, retryDelivery)
 	}
 
 	project, err := registry.Project(context.Background(), manifest.Scope.Project.ProjectRef)
@@ -98,5 +153,74 @@ func TestEvidenceArtifactCommitReadAndRebuildRoutes(t *testing.T) {
 	page, err := project.List(context.Background(), evidenceregistry.Query{ProjectRef: manifest.Scope.Project.ProjectRef, PageSize: 10})
 	if err != nil || len(page.Rows) != 1 {
 		t.Fatalf("page=%#v err=%v", page, err)
+	}
+	blockedRoot := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blockedRoot, []byte("block package publication"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", blockedRoot)
+	retry := httptest.NewRequest(http.MethodPost, "https://evidence.example/api/evidence/artifacts/commit", bytes.NewReader(multipartBytes))
+	retry.Header.Set("Content-Type", writer.FormDataContentType())
+	failed := httptest.NewRecorder()
+	router.ServeHTTP(failed, retry)
+	var failedBody map[string]any
+	if err := json.Unmarshal(failed.Body.Bytes(), &failedBody); err != nil {
+		t.Fatal(err)
+	}
+	if failed.Code != http.StatusAccepted || failedBody["schema"] != "uiai.evidence_artifact_commit_delivery_error.v1" || failedBody["artifact_ref"] != manifest.ArtifactID || failedBody["commit"] == nil || failedBody["epwa_delivery_error"] == nil {
+		t.Fatalf("publication failure lost committed identity or error contract: status=%d body=%#v", failed.Code, failedBody)
+	}
+	for _, key := range []string{"artifact_url", "portable_url", "epwa_delivery"} {
+		if _, ok := failedBody[key]; ok {
+			t.Fatalf("publication failure fabricated %s", key)
+		}
+	}
+}
+
+func TestPublishStoredArtifactEPWARecordFailureReturnsPendingDelivery(t *testing.T) {
+	artifacts, _, err := evidenceartifact.OpenStore(evidenceartifact.StoreConfig{
+		Root: t.TempDir(), MaxStoreBytes: 64 << 20, MaxArtifacts: 10, MaxAssetBytes: 8 << 20,
+		StagingQuarantineAge: time.Hour, GCGrace: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := routeGoldenManifest(t)
+	payload := []byte("pending delivery evidence")
+	digest := sha256.Sum256(payload)
+	manifest.Assets[0].SHA256 = hex.EncodeToString(digest[:])
+	manifest.Assets[0].ByteSize = int64(len(payload))
+	manifest.Assets[0].MediaType = "text/plain"
+	manifest.Policy.AccessClass = evidenceartifact.AccessPublicSafe
+	manifest.Scope.ContinuityRef = "continuity:pending-delivery"
+	manifest.Integrity.ManifestSHA256 = ""
+	manifest, err = evidenceartifact.Seal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, err := artifacts.Commit(context.Background(), manifest, map[string]io.Reader{
+		manifest.Assets[0].AssetID: bytes.NewReader(payload),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", t.TempDir())
+	invalidRoot := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(invalidRoot, []byte("blocks delivery ledger directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "https://evidence.example/api/evidence/artifacts", nil)
+	delivery, publishErr := publishStoredArtifactEPWA(request, &config.Config{Storage: config.StorageConfig{DataDir: invalidRoot}}, artifacts, commit.ArtifactID, commit.Revision, "artifact:"+commit.CommitID)
+	if publishErr == nil {
+		t.Fatal("delivery ledger failure unexpectedly succeeded")
+	}
+	if delivery.Schema != epwadelivery.Schema || delivery.State != epwadelivery.StatePendingReconcile || delivery.RecoveryRef != "reconcile:epwa-delivery-record" {
+		t.Fatalf("invalid pending delivery: %#v err=%v", delivery, publishErr)
+	}
+	if delivery.EPWA.RecordURL != "" || delivery.EPWA.PortableURL != "" || delivery.EPWA.PackageID == "" || delivery.EPWA.PackageSHA256 == "" {
+		t.Fatalf("pending delivery leaked URLs or lost package identity: %#v", delivery)
+	}
+	if err := epwadelivery.Validate(delivery); err != nil {
+		t.Fatalf("pending delivery contract invalid: %v", err)
 	}
 }

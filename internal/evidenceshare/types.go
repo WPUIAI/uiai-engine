@@ -67,8 +67,15 @@ type Manifest struct {
 }
 
 type Result struct {
-	ArtifactRef    string
-	ArtifactSHA256 string
-	RelativePath   string
-	Directory      string
+	PackageID            string
+	ArtifactRef          string
+	ArtifactSHA256       string
+	ManifestSHA256       string
+	ProjectionRef        string
+	ProjectionSHA256     string
+	OutputSHA256         string
+	PackageSHA256        string
+	RelativePath         string
+	PortableRelativePath string
+	Directory            string
 }
