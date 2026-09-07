@@ -131,6 +131,7 @@ type Scope struct {
 	Autonomy       AutonomyBinding   `json:"autonomy"`
 	WorkItems      []WorkItemBinding `json:"work_items"`
 	TrajectoryRef  string            `json:"trajectory_ref,omitempty"`
+	ContinuityRef  string            `json:"continuity_ref,omitempty"`
 	AssignmentRefs []string          `json:"assignment_refs"`
 	OperationRefs  []string          `json:"operation_refs"`
 	OntologyRefs   []string          `json:"ontology_refs"`

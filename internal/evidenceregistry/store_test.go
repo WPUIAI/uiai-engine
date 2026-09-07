@@ -3,10 +3,29 @@ package evidenceregistry
 import (
 	"context"
 	"errors"
+	"net/url"
 	"path/filepath"
 	"testing"
 	"time"
 )
+
+func TestRegistryDSNHasNoDriveAuthority(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "spaces and #hash", "registry.sqlite")
+	uri, err := url.Parse(registryDSN(path, time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uri.Scheme != "file" || uri.Host != "" || uri.Fragment != "" {
+		t.Fatalf("invalid SQLite file URI: %s", uri)
+	}
+	want := filepath.ToSlash(path)
+	if filepath.VolumeName(path) != "" {
+		want = "/" + want
+	}
+	if uri.Path != want {
+		t.Fatalf("path=%q want=%q", uri.Path, want)
+	}
+}
 
 func TestOpenCreatesProjectLockedWALRegistry(t *testing.T) {
 	ctx := context.Background()

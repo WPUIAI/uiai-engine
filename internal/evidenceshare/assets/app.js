@@ -378,6 +378,11 @@ async function renderRecord() {
   const status = byId("status");
   try {
     const manifest = await fetchJSON("./artifact.json");
+    if (manifest.schema === "uiai.evidence_artifact_manifest.v1" || manifest.schema === "uiai.epwa_generic_artifact.v1") {
+      if (typeof window.renderGenericEvidenceRecord !== "function") throw new Error("Generic artifact renderer is unavailable");
+      await window.renderGenericEvidenceRecord(manifest);
+      return;
+    }
     if (manifest.schema !== "uiai.screenshot_evidence_share.v1") throw new Error("Artifact manifest contract is unsupported");
     if (manifest.availability !== "ready" || !safeRef(manifest.projection_ref)) {
       const state = availabilityStates.has(manifest.availability) ? manifest.availability : "corrupt";

@@ -63,7 +63,7 @@ func fakeRBW(t *testing.T) string {
 	path := filepath.Join(dir, name)
 	var script string
 	if runtime.GOOS == "windows" {
-		script = "@echo off\nsetlocal enabledelayedexpansion\nset field=\nset item=\n:loop\nif \"%1\"==\"\" goto done\nif \"%1\"==\"--field\" (set field=%2& shift& shift& goto loop)\nif \"%1\"==\"get\" (shift& goto loop)\nset item=%1\nshift\ngoto loop\n:done\nif not \"%field%\"==\"\" (echo rbw-field-%field%-for-%item%) else (echo rbw-password-for-%item%)\n"
+		script = "@echo off\r\nsetlocal enabledelayedexpansion\r\nset field=\r\nset item=\r\n:loop\r\nif \"%~1\"==\"\" goto done\r\nif \"%~1\"==\"--field\" (set \"field=%~2\"& shift& shift& goto loop)\r\nif \"%~1\"==\"get\" (shift& goto loop)\r\nset \"item=%~1\"\r\nshift\r\ngoto loop\r\n:done\r\nif not \"%field%\"==\"\" (echo rbw-field-%field%-for-%item%) else (echo rbw-password-for-%item%)\r\n"
 	} else {
 		script = `#!/usr/bin/env sh
 set -eu

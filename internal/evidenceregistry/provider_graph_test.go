@@ -2,10 +2,12 @@ package evidenceregistry
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -22,7 +24,19 @@ case "$1" in
   graph) printf '%s' '{"components":[{"edges":[["focusa-task","focusa-epic"]]}]}' ;;
   *) exit 2 ;;
 esac`
+	if runtime.GOOS == "windows" {
+		brPath += ".cmd"
+		// The fixed JSON fixture contains no batch metacharacters other than the
+		// echo payload. Reuse the Unix vectors rather than creating divergent data.
+		listJSON := strings.Split(strings.Split(script, "list) printf '%s' '")[1], "' ;;")[0]
+		graphJSON := strings.Split(strings.Split(script, "graph) printf '%s' '")[1], "' ;;")[0]
+		script = "@echo off\r\nif \"%~1\"==\"list\" (\r\necho " + listJSON + "\r\nexit /b 0\r\n)\r\nif \"%~1\"==\"graph\" (\r\necho " + graphJSON + "\r\nexit /b 0\r\n)\r\nexit /b 2\r\n"
+	}
 	if err := os.WriteFile(brPath, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rootJSON, err := json.Marshal(projectRoot)
+	if err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -31,7 +45,7 @@ esac`
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"schema":"focusa.project_dashboard.v1","projects":[{"project_id":"focusa","canonical_name":"Focusa","project_root":"` + projectRoot + `","fingerprint":"project-fingerprint:abc","workspace_kind":"rust-monorepo","scope_safety":"safe","last_verified_at":"2026-09-01T00:00:00Z"}]}`))
+		_, _ = w.Write([]byte(`{"schema":"focusa.project_dashboard.v1","projects":[{"project_id":"focusa","canonical_name":"Focusa","project_root":` + string(rootJSON) + `,"fingerprint":"project-fingerprint:abc","workspace_kind":"rust-monorepo","scope_safety":"safe","last_verified_at":"2026-09-01T00:00:00Z"}]}`))
 	}))
 	defer server.Close()
 	manager, err := NewManager(t.TempDir())

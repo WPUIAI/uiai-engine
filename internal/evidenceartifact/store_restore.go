@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/WPUIAI/uiai-engine/internal/durablefile"
 )
 
 // RestoreBackup atomically materializes a verified backup into a store root that
@@ -79,7 +81,7 @@ func RestoreBackup(backupRoot string, cfg StoreConfig, manifest BackupManifest) 
 	if err := syncDir(stage); err != nil {
 		return nil, StoreHealth{}, storeError(ErrStoreUnavailable, "sync restore staging")
 	}
-	if err := os.Rename(stage, targetRoot); err != nil {
+	if err := durablefile.Rename(stage, targetRoot); err != nil {
 		return nil, StoreHealth{}, storeError(ErrStoreUnavailable, "promote restore")
 	}
 	promoted = true

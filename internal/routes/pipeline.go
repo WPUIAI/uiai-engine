@@ -81,12 +81,11 @@ Sources: ` + toJSON(body.Sources)
 			CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		})
 
-		writeJSON(w, 200, map[string]any{
-			"design_system": resp.Content,
-			"model":         resp.Model, "inputTokens": resp.InputTokens,
-			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD,
-			"duration_ms": time.Since(start).Milliseconds(),
-		})
+		result := map[string]any{
+			"design_system": resp.Content, "model": resp.Model, "inputTokens": resp.InputTokens,
+			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD, "duration_ms": time.Since(start).Milliseconds(),
+		}
+		writeJSONArtifactEPWA(w, req, d.cfg, evidenceScopeFromRequest(req), "", "Generated design system", "generated_report", result, http.StatusOK)
 	})
 }
 
@@ -145,12 +144,11 @@ Blueprint: ` + toJSON(body.Blueprint)
 			CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		})
 
-		writeJSON(w, 200, map[string]any{
-			"content_map": resp.Content,
-			"model":       resp.Model, "inputTokens": resp.InputTokens,
-			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD,
-			"duration_ms": time.Since(start).Milliseconds(),
-		})
+		result := map[string]any{
+			"content_map": resp.Content, "model": resp.Model, "inputTokens": resp.InputTokens,
+			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD, "duration_ms": time.Since(start).Milliseconds(),
+		}
+		writeJSONArtifactEPWA(w, req, d.cfg, evidenceScopeFromRequest(req), "", "Generated content map", "generated_report", result, http.StatusOK)
 	})
 }
 
@@ -213,12 +211,11 @@ Content: ` + toJSON(body.ContentMap)
 			CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		})
 
-		writeJSON(w, 200, map[string]any{
-			"blocks": resp.Content,
-			"model":  resp.Model, "inputTokens": resp.InputTokens,
-			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD,
-			"duration_ms": time.Since(start).Milliseconds(),
-		})
+		result := map[string]any{
+			"blocks": resp.Content, "model": resp.Model, "inputTokens": resp.InputTokens,
+			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD, "duration_ms": time.Since(start).Milliseconds(),
+		}
+		writeJSONArtifactEPWA(w, req, d.cfg, evidenceScopeFromRequest(req), "", "Generated block recipes", "generated_report", result, http.StatusOK)
 	})
 }
 
@@ -287,11 +284,10 @@ Components: ` + toJSON(body.ReferenceComponents)
 			CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		})
 
-		writeJSON(w, 200, map[string]any{
-			"comparison": resp.Content,
-			"model":      resp.Model, "inputTokens": resp.InputTokens,
-			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD,
-			"duration_ms": time.Since(start).Milliseconds(),
-		})
+		result := map[string]any{
+			"comparison": resp.Content, "model": resp.Model, "inputTokens": resp.InputTokens,
+			"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD, "duration_ms": time.Since(start).Milliseconds(),
+		}
+		writeJSONArtifactEPWA(w, req, d.cfg, evidenceScopeFromRequest(req), "", "Generated five-way comparison", "generated_report", result, http.StatusOK)
 	})
 }

@@ -1,6 +1,9 @@
 package evidenceshare
 
 import (
+	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,8 +23,44 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(result.ArtifactRef, "uiai-evidence-share:sha256:") || !strings.HasPrefix(result.RelativePath, "./") {
+	if !strings.HasPrefix(result.ArtifactRef, "uiai-evidence-share:sha256:") || !strings.HasPrefix(result.RelativePath, "./") || !strings.HasSuffix(result.PortableRelativePath, "/portable.zip") {
 		t.Fatal("invalid portable identity")
+	}
+	projectionBody, err := os.ReadFile(filepath.Join(result.Directory, "projection.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var projectionIdentity struct {
+		ProjectionID string `json:"projection_id"`
+	}
+	if err := json.Unmarshal(projectionBody, &projectionIdentity); err != nil {
+		t.Fatal(err)
+	}
+	projectionDigest := sha256.Sum256(projectionBody)
+	if result.ProjectionRef != projectionIdentity.ProjectionID || result.ProjectionRef == result.ArtifactRef || result.ProjectionSHA256 != hex.EncodeToString(projectionDigest[:]) {
+		t.Fatal("delivery projection identity or digest differs from packaged projection")
+	}
+	archivePath := filepath.Join(root, result.PackageID+".zip")
+	archiveBody, err := os.ReadFile(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archiveDigest := sha256.Sum256(archiveBody)
+	if result.PackageSHA256 != hex.EncodeToString(archiveDigest[:]) || len(result.ManifestSHA256) != 64 || len(result.ProjectionSHA256) != 64 || len(result.OutputSHA256) != 64 {
+		t.Fatalf("portable digest bindings missing: %#v", result)
+	}
+	archive, err := zip.OpenReader(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	if len(archive.File) != len(packagedAssetNames)+4 {
+		t.Fatalf("portable archive entries=%d want=%d", len(archive.File), len(packagedAssetNames)+4)
+	}
+	for i := 1; i < len(archive.File); i++ {
+		if archive.File[i-1].Name >= archive.File[i].Name {
+			t.Fatal("portable archive entries are not deterministic and sorted")
+		}
 	}
 	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "work-items.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"} {
 		if info, err := os.Stat(filepath.Join(result.Directory, name)); err != nil || info.Size() == 0 {
@@ -50,7 +89,6 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if manifest.Interaction != "read_only" || manifest.Availability != "ready" || manifest.ProjectionRef != "./projection.json" {
 		t.Fatal("truth posture drift")
 	}
-	projectionBody, _ := os.ReadFile(filepath.Join(result.Directory, "projection.json"))
 	var projection evidencepwa.Projection
 	if err := json.Unmarshal(projectionBody, &projection); err != nil || evidencepwa.ValidateProjection(projection) != nil {
 		t.Fatal("canonical evidence PWA projection missing or invalid")

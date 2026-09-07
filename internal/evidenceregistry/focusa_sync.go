@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -87,10 +86,10 @@ func (m *Manager) SyncFocusa(ctx context.Context, cfg FocusaSyncConfig) (FocusaS
 	if cfg.MaxItems <= 0 {
 		cfg.MaxItems = 100000
 	}
-	if cfg.MaxProjects > 1000 || cfg.MaxItems > 100000 || strings.TrimSpace(cfg.BRPath) == "" || !strings.HasPrefix(cfg.BRPath, "/") {
+	if cfg.MaxProjects > 1000 || cfg.MaxItems > 100000 || strings.TrimSpace(cfg.BRPath) == "" || !filepath.IsAbs(cfg.BRPath) {
 		return FocusaSyncResult{}, ErrConfig
 	}
-	if info, err := os.Stat(cfg.BRPath); err != nil || info.IsDir() || info.Mode()&0o111 == 0 {
+	if _, err := exec.LookPath(cfg.BRPath); err != nil {
 		return FocusaSyncResult{}, ErrConfig
 	}
 	base, err := url.Parse(strings.TrimRight(cfg.BaseURL, "/"))

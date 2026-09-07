@@ -7,6 +7,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 )
 
 var ErrDeliveryConflict = errors.New("evidence derivative delivery idempotency conflict")
@@ -16,6 +18,7 @@ type DeliveryCommand struct {
 	DerivativeRef, DerivativeSHA256, DestinationRef, IdempotencyKey string
 	Payload                                                         []byte
 	EmailPolicy                                                     *EmailDeliveryPolicy
+	EPWADelivery                                                    epwadelivery.Delivery
 }
 type ProviderDeliveryResult struct {
 	State              DeliveryState
@@ -40,6 +43,9 @@ func NewDeliveryRuntime() *DeliveryRuntime {
 }
 func (r *DeliveryRuntime) Deliver(ctx context.Context, c DeliveryCommand, t DeliveryTransport) (DeliveryReceipt, error) {
 	if t == nil || c.DerivativeRef == "" || c.DestinationRef == "" || c.IdempotencyKey == "" || len(c.Payload) == 0 || c.EmailPolicy == nil {
+		return DeliveryReceipt{}, ErrDerivativeContractInvalid
+	}
+	if err := epwadelivery.Validate(c.EPWADelivery); err != nil || c.EPWADelivery.Producer != epwadelivery.ProducerDerivative || c.EPWADelivery.State != epwadelivery.StateReady || c.EPWADelivery.Artifact.ArtifactRef != c.DerivativeRef || c.EPWADelivery.Artifact.OutputSHA256 != c.DerivativeSHA256 {
 		return DeliveryReceipt{}, ErrDerivativeContractInvalid
 	}
 	if err := ValidateEmailDeliveryPolicy(*c.EmailPolicy); err != nil || uint64(len(c.Payload)) > c.EmailPolicy.MaxMessageBytes {

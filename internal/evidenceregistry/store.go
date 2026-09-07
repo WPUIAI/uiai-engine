@@ -68,7 +68,11 @@ func Open(ctx context.Context, cfg Config) (*Store, error) {
 }
 
 func registryDSN(path string, busyTimeout time.Duration) string {
-	uri := url.URL{Scheme: "file", Path: filepath.ToSlash(path)}
+	uriPath := filepath.ToSlash(path)
+	if filepath.VolumeName(path) != "" {
+		uriPath = "/" + uriPath
+	}
+	uri := url.URL{Scheme: "file", Path: uriPath}
 	query := url.Values{}
 	query.Set("_defensive", "1")
 	query.Set("_journal_mode", "WAL")
