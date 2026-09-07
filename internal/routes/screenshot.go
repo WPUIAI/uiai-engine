@@ -508,7 +508,7 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 			http.NotFound(w, req)
 			return
 		}
-		allowed := map[string]string{"index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "work-items.js": "application/javascript; charset=utf-8", "generic-record.js": "application/javascript; charset=utf-8", "pwa.js": "application/javascript; charset=utf-8", "app.js": "application/javascript; charset=utf-8", "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml", "sw.js": "application/javascript; charset=utf-8", "artifact.json": "application/json; charset=utf-8", "projection.json": "application/json; charset=utf-8", "inspection.json": "application/json; charset=utf-8", "screenshot.png": "image/png", "screenshot.jpg": "image/jpeg", "screenshot.webp": "image/webp"}
+		allowed := map[string]string{"index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "work-items.js": "application/javascript; charset=utf-8", "generic-record.js": "application/javascript; charset=utf-8", "locale.js": "application/javascript; charset=utf-8", "pwa.js": "application/javascript; charset=utf-8", "app.js": "application/javascript; charset=utf-8", "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml", "sw.js": "application/javascript; charset=utf-8", "artifact.json": "application/json; charset=utf-8", "projection.json": "application/json; charset=utf-8", "inspection.json": "application/json; charset=utf-8", "screenshot.png": "image/png", "screenshot.jpg": "image/jpeg", "screenshot.webp": "image/webp"}
 		mediaType, static := allowed[name]
 		asset, artifactAsset := descriptor.Assets[name]
 		if !static && !artifactAsset {

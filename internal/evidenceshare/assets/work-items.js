@@ -1,5 +1,7 @@
 "use strict";
 
+const workItemTranslate = (key, values = {}) => globalThis.EvidenceLocale?.t?.(key, values) ?? key;
+
 function normalizeWorkItem(item) {
   const authority = item.authority || {
     acceptance_atom_refs: item.acceptance_atom_refs,
@@ -16,40 +18,41 @@ function scopeWorkItems(scope) {
 }
 
 function workItemSummary(item) {
-  const descriptor = item.title || item.work_item_ref || "Work item unavailable";
+  const descriptor = item.title || item.work_item_ref || workItemTranslate("work_item_unavailable");
   const identity = item.item_id || item.work_item_ref || "unknown";
-  const revision = item.revision || "revision unavailable";
+  const revision = item.revision || workItemTranslate("revision_unavailable");
   const state = item.revision_state || "unknown";
-  const status = item.status_at_capture || item.status || "status unavailable";
+  const status = item.status_at_capture || item.status || workItemTranslate("status_unavailable");
   return `${descriptor} · ${identity} · ${revision} · ${state} · ${status}`;
 }
 
 function workItemRefs(values) {
-  return Array.isArray(values) && values.length > 0 ? values.join(", ") : "None";
+  return Array.isArray(values) && values.length > 0 ? values.join(", ") : workItemTranslate("none");
 }
 
 function workItemInspectData(scope) {
   return scopeWorkItems(scope).flatMap((item, index) => {
     const authority = item.authority || {};
-    const position = index + 1;
+    const position = globalThis.EvidenceLocale.number(index + 1);
+    const label = `${workItemTranslate("kind_work_item")} ${position}`;
     return [
-      datum(`Work item ${position} · ${item.item_type || "item"}`, workItemSummary(item)),
-      datum(`Work item ${position} · description`, `${item.description_state || "unavailable"}${item.description ? ` · ${item.description}` : ""}`),
-      datum(`Work item ${position} · relationships`, `parents: ${workItemRefs(item.parent_refs)} · dependencies: ${workItemRefs(item.dependency_refs)} · blockers: ${workItemRefs(item.blocker_refs)}`),
-      datum(`Work item ${position} · requirements`, `acceptance: ${workItemRefs(authority.acceptance_atom_refs)} · evidence: ${workItemRefs(authority.evidence_requirement_refs)} · review: ${workItemRefs(authority.review_requirement_refs)}`),
-      datum(`Work item ${position} · closure`, `posture: ${item.closure_posture || "unknown"} · case: ${authority.completion_case_ref || "none"} · decision: ${authority.completion_decision_ref || "none"} · provider close: ${authority.provider_close_receipt_ref || "none"} · reopen: ${authority.reopen_ref || "none"} · settlement: ${authority.settlement_posture || "unknown"}`),
+      datum(`${label} · ${item.item_type || workItemTranslate("item")}`, workItemSummary(item)),
+      datum(`${label} · ${workItemTranslate("description")}`, `${item.description_state || "unavailable"}${item.description ? ` · ${item.description}` : ""}`),
+      datum(`${label} · ${workItemTranslate("relationships_label")}`, `${workItemTranslate("parents")}: ${workItemRefs(item.parent_refs)} · ${workItemTranslate("dependencies")}: ${workItemRefs(item.dependency_refs)} · ${workItemTranslate("blockers")}: ${workItemRefs(item.blocker_refs)}`),
+      datum(`${label} · ${workItemTranslate("requirements")}`, `${workItemTranslate("acceptance")}: ${workItemRefs(authority.acceptance_atom_refs)} · ${workItemTranslate("evidence")}: ${workItemRefs(authority.evidence_requirement_refs)} · ${workItemTranslate("review")}: ${workItemRefs(authority.review_requirement_refs)}`),
+      datum(`${label} · ${workItemTranslate("closure")}`, `${workItemTranslate("record_posture")}: ${item.closure_posture || "unknown"} · ${workItemTranslate("case_label")}: ${authority.completion_case_ref || workItemTranslate("none")} · ${workItemTranslate("decision")}: ${authority.completion_decision_ref || workItemTranslate("none")} · ${workItemTranslate("provider_close")}: ${authority.provider_close_receipt_ref || workItemTranslate("none")} · ${workItemTranslate("reopen")}: ${authority.reopen_ref || workItemTranslate("none")} · ${workItemTranslate("settlement")}: ${authority.settlement_posture || "unknown"}`),
     ];
   });
 }
 
 function renderLineage(scope) {
   const lineage = [
-    lineageItem("Project", scope.project_ref),
-    lineageItem("Workstream", scope.workstream_ref),
-    lineageItem("Workset", scope.workset_ref),
-    lineageItem("CallGraph", scope.callgraph_ref),
-    lineageItem("Workpoint", scope.workpoint_ref),
+    lineageItem(workItemTranslate("project_label"), scope.project_ref),
+    lineageItem(workItemTranslate("workstream"), scope.workstream_ref),
+    lineageItem(workItemTranslate("workset"), scope.workset_ref),
+    lineageItem(workItemTranslate("callgraph"), scope.callgraph_ref),
+    lineageItem(workItemTranslate("workpoint"), scope.workpoint_ref),
   ];
-  scopeWorkItems(scope).forEach((item) => lineage.push(lineageItem(item.item_type || "Work item", workItemSummary(item))));
+  scopeWorkItems(scope).forEach((item) => lineage.push(lineageItem(item.item_type || workItemTranslate("kind_work_item"), workItemSummary(item))));
   byId("lineage-list").replaceChildren(...lineage);
 }

@@ -93,7 +93,7 @@ func MountPublicEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager
 			writeRegistryError(w, err)
 			return
 		}
-		page, err := store.List(req.Context(), evidenceregistry.Query{ProjectRef: projectRef, Text: req.URL.Query().Get("q"), WorkItemRef: req.URL.Query().Get("work_item_ref"), WorkItemType: req.URL.Query().Get("work_item_type"), Verification: req.URL.Query().Get("verification"), Access: "public_safe", Closure: req.URL.Query().Get("closure"), Cursor: req.URL.Query().Get("cursor"), PageSize: uint32(pageSize)})
+		page, err := store.List(req.Context(), evidenceregistry.Query{ProjectRef: projectRef, Text: req.URL.Query().Get("q"), WorkItemRef: req.URL.Query().Get("work_item_ref"), WorkItemType: req.URL.Query().Get("work_item_type"), Verification: req.URL.Query().Get("verification"), Access: "public_safe", Closure: req.URL.Query().Get("closure"), Cursor: req.URL.Query().Get("cursor"), PageSize: uint32(pageSize), ResourceProfile: evidenceregistry.ResourceProfile(req.URL.Query().Get("resource_profile"))})
 		if err != nil {
 			writeRegistryError(w, err)
 			return
@@ -103,7 +103,7 @@ func MountPublicEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager
 				page.Rows[i].PWAPath = ""
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"schema": "uiai.public_evidence_artifacts.v1", "project_ref": projectRef, "interaction": "read_only", "rows": page.Rows, "next_cursor": page.NextCursor, "page_size": page.PageSize, "index_revision": page.IndexRevision, "index_state": page.IndexState, "observed_at": page.ObservedAt})
+		writeJSON(w, http.StatusOK, map[string]any{"schema": "uiai.public_evidence_artifacts.v1", "project_ref": projectRef, "interaction": "read_only", "rows": page.Rows, "next_cursor": page.NextCursor, "page_size": page.PageSize, "index_revision": page.IndexRevision, "index_state": page.IndexState, "resource_profile": page.ResourceProfile, "media_posture": page.MediaPosture, "observed_at": page.ObservedAt})
 	})
 
 	r.Get("/work-items", func(w http.ResponseWriter, req *http.Request) {
@@ -121,7 +121,7 @@ func MountPublicEvidenceRegistry(r chi.Router, manager *evidenceregistry.Manager
 			writeRegistryError(w, err)
 			return
 		}
-		page, err := store.ListProviderWorkItems(req.Context(), evidenceregistry.ProviderWorkItemQuery{ProjectRef: projectRef, Text: req.URL.Query().Get("q"), Status: req.URL.Query().Get("status"), ItemType: req.URL.Query().Get("item_type"), Limit: uint32(limit), Cursor: req.URL.Query().Get("cursor")})
+		page, err := store.ListProviderWorkItems(req.Context(), evidenceregistry.ProviderWorkItemQuery{ProjectRef: projectRef, Text: req.URL.Query().Get("q"), Status: req.URL.Query().Get("status"), ItemType: req.URL.Query().Get("item_type"), Limit: uint32(limit), Cursor: req.URL.Query().Get("cursor"), ResourceProfile: evidenceregistry.ResourceProfile(req.URL.Query().Get("resource_profile"))})
 		if err != nil {
 			writeRegistryError(w, err)
 			return

@@ -28,12 +28,11 @@ func (s *Store) List(ctx context.Context, query Query) (Page, error) {
 	if query.ProjectRef != s.projectRef || utf8.RuneCountInString(query.Text) > MaxQueryRunes {
 		return Page{}, ErrInputInvalid
 	}
-	if query.PageSize == 0 {
-		query.PageSize = 50
+	profile, pageSize, mediaPosture, err := resourcePage(query.ResourceProfile, query.PageSize, 50)
+	if err != nil {
+		return Page{}, err
 	}
-	if query.PageSize > MaxPageSize {
-		return Page{}, ErrInputInvalid
-	}
+	query.PageSize = pageSize
 	cursor, err := decodeCursor(query.Cursor)
 	if err != nil {
 		return Page{}, err
@@ -103,7 +102,7 @@ func (s *Store) List(ctx context.Context, query Query) (Page, error) {
 	if err := rows.Err(); err != nil {
 		return Page{}, fmt.Errorf("%w: iterate artifacts: %v", ErrIndexUnavailable, err)
 	}
-	page := Page{Schema: PageSchemaV1, ProjectRef: s.projectRef, Rows: items, PageSize: query.PageSize, TotalPosture: "omitted", ObservedAt: s.now().UTC()}
+	page := Page{Schema: PageSchemaV1, ProjectRef: s.projectRef, Rows: items, PageSize: query.PageSize, TotalPosture: "omitted", ResourceProfile: profile, MediaPosture: mediaPosture, ObservedAt: s.now().UTC()}
 	status, err := s.Status(ctx)
 	if err != nil {
 		return Page{}, err
