@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -95,11 +96,19 @@ func scopeWorkstream(scope *vision.FocusaScope) string {
 }
 
 func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore) {
-	settingsStore, _ := evidenceshare.NewSettingsStore(cfg.Storage.DataDir)
-	if settingsStore != nil {
+	settingsStore, settingsErr := evidenceshare.NewSettingsStore(cfg.Storage.DataDir)
+	if settingsErr == nil {
 		mountEvidenceShareSettings(r, settingsStore)
+	} else {
+		slog.Error("canonical evidence settings unavailable", "error", settingsErr)
+		r.HandleFunc("/settings", func(w http.ResponseWriter, _ *http.Request) { writeSettingsUnavailable(w) })
+		r.HandleFunc("/settings/*", func(w http.ResponseWriter, _ *http.Request) { writeSettingsUnavailable(w) })
 	}
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
+		if settingsErr != nil {
+			writeSettingsUnavailable(w)
+			return
+		}
 		var body struct {
 			URL           string               `json:"url"`
 			Width         int                  `json:"width"`

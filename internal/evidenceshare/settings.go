@@ -19,7 +19,10 @@ var (
 	ErrSettingsInvalid  = errors.New("invalid evidence share settings")
 )
 
-type SettingsScope struct{ ProjectRef, WorkstreamRef string }
+type SettingsScope struct {
+	ProjectRef    string `json:"project_ref"`
+	WorkstreamRef string `json:"workstream_ref"`
+}
 type SettingsRecord struct {
 	Scope     SettingsScope  `json:"scope"`
 	Revision  uint64         `json:"revision"`
@@ -74,8 +77,19 @@ func NewSettingsStore(dataDir string) (*SettingsStore, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.doc = SettingsDocument{}
 	if err := json.Unmarshal(data, &s.doc); err != nil || s.doc.Schema != SettingsSchema {
 		return nil, fmt.Errorf("%w: malformed settings document", ErrSettingsInvalid)
+	}
+	seen := make(map[SettingsScope]bool)
+	for _, record := range s.doc.Records {
+		if record.Revision == 0 || seen[record.Scope] {
+			return nil, fmt.Errorf("%w: invalid or duplicate settings record", ErrSettingsInvalid)
+		}
+		seen[record.Scope] = true
+		if err := validatePatch(record.Values); err != nil {
+			return nil, err
+		}
 	}
 	return s, nil
 }
@@ -86,13 +100,13 @@ func (s *SettingsStore) Effective(scope SettingsScope) SettingsResponse {
 	values := cloneMap(DefaultSettings())
 	sources := []string{"defaults"}
 	for _, r := range s.doc.Records {
-		if r.Scope.ProjectRef == "" && r.Scope.WorkstreamRef == "" {
+		if r.Scope.ProjectRef == "" && r.Scope.WorkstreamRef == "" && len(r.Values) > 0 {
 			values = mergeMap(values, r.Values)
 			sources = append(sources, "global")
 		}
 	}
 	for _, r := range s.doc.Records {
-		if r.Scope.ProjectRef == scope.ProjectRef && scope.ProjectRef != "" && r.Scope.WorkstreamRef == "" {
+		if r.Scope.ProjectRef == scope.ProjectRef && scope.ProjectRef != "" && r.Scope.WorkstreamRef == "" && len(r.Values) > 0 {
 			values = mergeMap(values, r.Values)
 			sources = append(sources, "project")
 		}
@@ -100,15 +114,20 @@ func (s *SettingsStore) Effective(scope SettingsScope) SettingsResponse {
 	var revision uint64
 	for _, r := range s.doc.Records {
 		if r.Scope == scope {
-			values = mergeMap(values, r.Values)
 			revision = r.Revision
-			sources = append(sources, "workstream")
+			if scope.WorkstreamRef != "" && len(r.Values) > 0 {
+				values = mergeMap(values, r.Values)
+				sources = append(sources, "workstream")
+			}
 		}
 	}
 	return SettingsResponse{Schema: SettingsSchema, Scope: scope, Revision: revision, Sources: sources, Values: values}
 }
 
 func (s *SettingsStore) Preview(scope SettingsScope, patch map[string]any) (SettingsResponse, error) {
+	if err := scope.Validate(); err != nil {
+		return SettingsResponse{}, err
+	}
 	if err := validatePatch(patch); err != nil {
 		return SettingsResponse{}, err
 	}
@@ -118,6 +137,9 @@ func (s *SettingsStore) Preview(scope SettingsScope, patch map[string]any) (Sett
 	return r, nil
 }
 func (s *SettingsStore) Update(scope SettingsScope, expected uint64, patch map[string]any) (SettingsResponse, error) {
+	if err := scope.Validate(); err != nil {
+		return SettingsResponse{}, err
+	}
 	if err := validatePatch(patch); err != nil {
 		return SettingsResponse{}, err
 	}
@@ -137,6 +159,7 @@ func (s *SettingsStore) Update(scope SettingsScope, expected uint64, patch map[s
 		s.mu.Unlock()
 		return SettingsResponse{}, ErrSettingsConflict
 	}
+	previous := append([]SettingsRecord(nil), s.doc.Records...)
 	if idx < 0 {
 		s.doc.Records = append(s.doc.Records, SettingsRecord{Scope: scope, Values: map[string]any{}})
 		idx = len(s.doc.Records) - 1
@@ -145,6 +168,7 @@ func (s *SettingsStore) Update(scope SettingsScope, expected uint64, patch map[s
 	s.doc.Records[idx].Revision++
 	s.doc.Records[idx].UpdatedAt = time.Now().UTC()
 	if err := s.persistLocked(); err != nil {
+		s.doc.Records = previous
 		s.mu.Unlock()
 		return SettingsResponse{}, err
 	}
@@ -152,6 +176,9 @@ func (s *SettingsStore) Update(scope SettingsScope, expected uint64, patch map[s
 	return s.Effective(scope), nil
 }
 func (s *SettingsStore) Reset(scope SettingsScope, expected uint64) error {
+	if err := scope.Validate(); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i, r := range s.doc.Records {
@@ -159,8 +186,15 @@ func (s *SettingsStore) Reset(scope SettingsScope, expected uint64) error {
 			if r.Revision != expected {
 				return ErrSettingsConflict
 			}
-			s.doc.Records = append(s.doc.Records[:i], s.doc.Records[i+1:]...)
-			return s.persistLocked()
+			previous := s.doc.Records[i]
+			s.doc.Records[i].Values = map[string]any{}
+			s.doc.Records[i].Revision++
+			s.doc.Records[i].UpdatedAt = time.Now().UTC()
+			if err := s.persistLocked(); err != nil {
+				s.doc.Records[i] = previous
+				return err
+			}
+			return nil
 		}
 	}
 	if expected != 0 {
@@ -185,23 +219,10 @@ func SettingsDigest(values map[string]any) string {
 	return hex.EncodeToString(h[:])
 }
 
-func validatePatch(p map[string]any) error {
-	allowed := map[string]bool{"enablement": true, "lifecycle": true, "storage": true, "image": true, "video": true, "presentation": true, "access": true, "verification": true, "performance": true, "integrations": true}
-	for k, v := range p {
-		if !allowed[k] {
-			return fmt.Errorf("%w: unknown field %q", ErrSettingsInvalid, k)
-		}
-		m, ok := v.(map[string]any)
-		if !ok || len(m) == 0 {
-			return fmt.Errorf("%w: %s must be a non-empty object", ErrSettingsInvalid, k)
-		}
-	}
-	return nil
-}
 func warnings(v map[string]any) []string {
 	var out []string
 	if m, ok := v["lifecycle"].(map[string]any); ok {
-		if n, ok := m["retention_days"].(float64); ok && n > 0 && n < 7 {
+		if n, ok := settingNumber(m["retention_days"]); ok && n > 0 && n < 7 {
 			out = append(out, "retention under seven days requires explicit lifecycle review")
 		}
 	}
