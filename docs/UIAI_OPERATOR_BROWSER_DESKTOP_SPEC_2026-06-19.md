@@ -2277,7 +2277,7 @@ The desktop direction is feasible because major primitives already exist.
 
 - browser sessions;
 - browser read / snapshot / click / fill / press / eval / screenshot / diagnostics;
-- FPV share surfaces (`mirror_url`, `status_url`, `screenshot_url`);
+- FPV operational mirror surfaces (`mirror_url`, `status_url`, `screenshot_url`) explicitly marked `ephemeral_non_evidence`; durable evidence delivery uses the identity-bound HTTPS EPWA viewer and portable package;
 - health / metrics / session APIs;
 - agent-facing tooling already used in Pi.
 

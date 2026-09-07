@@ -6,6 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${UIAI_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+export UIAI_EPWA_CONTRACT_DIR="$SCRIPT_DIR"
 ENGINE_PORT="${ENGINE_PORT:-7468}"
 SITE_PORT="${SITE_PORT:-7469}"
 SESSIONS="${SESSIONS:-4}"
@@ -14,6 +15,13 @@ WIDTH="${WIDTH:-800}"
 HEIGHT="${HEIGHT:-600}"
 OUT="${OUT:-/tmp/uiai-browser-diagnostics-stress.json}"
 ENGINE_BIN="${ENGINE_BIN:-/tmp/uiai-engine-diag-stress}"
+
+: "${UIAI_EVIDENCE_SCOPE_JSON:?UIAI_EVIDENCE_SCOPE_JSON is required for EPWA-producing diagnostics stress runs}"
+: "${UIAI_EPWA_PUBLIC_BASE_URL:?UIAI_EPWA_PUBLIC_BASE_URL is required for EPWA-producing diagnostics stress runs}"
+command -v jq >/dev/null || { echo "jq is required" >&2; exit 2; }
+jq -e 'type == "object"' >/dev/null <<<"$UIAI_EVIDENCE_SCOPE_JSON" || { echo "UIAI_EVIDENCE_SCOPE_JSON must be a JSON object" >&2; exit 2; }
+[[ "$UIAI_EPWA_PUBLIC_BASE_URL" == https://* ]] || { echo "UIAI_EPWA_PUBLIC_BASE_URL must use HTTPS" >&2; exit 2; }
+export UIAI_EVIDENCE_SCOPE_JSON UIAI_EPWA_PUBLIC_BASE_URL
 
 cd "$ROOT_DIR"
 
@@ -89,9 +97,12 @@ if ! curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null; then
   exit 7
 fi
 
-export ENGINE_PORT SITE_PORT WIDTH HEIGHT FOCUSA_WORKPOINT_ID="${FOCUSA_WORKPOINT_ID:-}" FOCUSA_CONTINUITY_ID="${FOCUSA_CONTINUITY_ID:-}" FOCUSA_PROJECT_ROOT="${FOCUSA_PROJECT_ROOT:-}" FOCUSA_EVIDENCE_REF="${FOCUSA_EVIDENCE_REF:-uiai-browser-diagnostics-stress:$OUT}"
+export ENGINE_PORT SITE_PORT WIDTH HEIGHT UIAI_EVIDENCE_SCOPE_JSON
 python3 - "$SESSIONS" "$ROUNDS" "$OUT" <<'PY'
 import concurrent.futures, json, os, subprocess, sys, time, urllib.request
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.environ['UIAI_EPWA_CONTRACT_DIR'])
+from epwa_raw_contract import find_raw
 
 sessions = int(sys.argv[1])
 rounds = int(sys.argv[2])
@@ -100,18 +111,24 @@ engine = f"http://127.0.0.1:{os.environ['ENGINE_PORT']}"
 site = f"http://127.0.0.1:{os.environ['SITE_PORT']}"
 width = int(os.environ['WIDTH'])
 height = int(os.environ['HEIGHT'])
-focusa_scope = {k: v for k, v in {
-    'workpoint_id': os.environ.get('FOCUSA_WORKPOINT_ID', ''),
-    'continuity_id': os.environ.get('FOCUSA_CONTINUITY_ID', ''),
-    'project_root': os.environ.get('FOCUSA_PROJECT_ROOT', ''),
-    'evidence_ref': os.environ.get('FOCUSA_EVIDENCE_REF', ''),
-}.items() if v}
+focusa_scope = json.loads(os.environ['UIAI_EVIDENCE_SCOPE_JSON'])
 
 def http_json(method, url, body=None):
     data = None if body is None else json.dumps(body).encode()
     req = urllib.request.Request(url, data=data, method=method, headers={'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=45) as res:
         return json.loads(res.read().decode())
+
+def require_delivery(body, operation):
+    delivery = body.get('epwa_delivery') or {}
+    epwa = delivery.get('epwa') or {}
+    if delivery.get('schema') != 'uiai.epwa_delivery.v1' or delivery.get('state') != 'ready' or body.get('delivery_state') != 'ready' or (delivery.get('artifact') or {}).get('artifact_ref') != body.get('artifact_ref'):
+        raise AssertionError(f'{operation}: EPWA delivery not ready and identity-bound')
+    if not str(epwa.get('record_url', '')).startswith('https://') or not str(epwa.get('portable_url', '')).startswith('https://') or body.get('artifact_url') != epwa.get('record_url') or body.get('portable_url') != epwa.get('portable_url'):
+        raise AssertionError(f'{operation}: canonical HTTPS EPWA URLs missing')
+    leaked = find_raw(body)
+    if leaked:
+        raise AssertionError(f'{operation}: raw artifact field returned at {leaked}')
 
 def run_one(round_idx, idx):
     label = f"r{round_idx}s{idx}"
@@ -124,9 +141,11 @@ def run_one(round_idx, idx):
         opened = http_json('POST', f"{engine}/api/session", open_body)
     except Exception as exc:
         raise RuntimeError(f"open_session failed label={label} target={target} error={type(exc).__name__}: {exc}") from exc
+    require_delivery(opened, 'session open')
     sid = opened['session']['id']
     time.sleep(0.35)
     diag = http_json('GET', f"{engine}/api/session/{sid}/diagnostics?limit=50")
+    require_delivery(diag, 'diagnostics')
     http_json('POST', f"{engine}/api/session/{sid}/diagnostics/clear")
     http_json('DELETE', f"{engine}/api/session/{sid}")
     elapsed_ms = round((time.time() - start) * 1000)
@@ -160,7 +179,7 @@ for r in range(rounds):
 
 total_ms = round((time.time() - started) * 1000)
 passed = sum(1 for r in results if r['ok'])
-evidence_ref = os.environ.get('FOCUSA_EVIDENCE_REF', f'uiai-browser-diagnostics-stress:{out_path}')
+evidence_ref = focusa_scope.get('evidence_ref', f'uiai-browser-diagnostics-stress:{out_path}')
 report = {
     'ok': passed == len(results),
     'sessions': sessions,

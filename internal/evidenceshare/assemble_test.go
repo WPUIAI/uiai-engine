@@ -1,6 +1,9 @@
 package evidenceshare
 
 import (
+	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,10 +24,46 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(result.ArtifactRef, "uiai-evidence-share:sha256:") || !strings.HasPrefix(result.RelativePath, "./") {
+	if !strings.HasPrefix(result.ArtifactRef, "uiai-evidence-share:sha256:") || !strings.HasPrefix(result.RelativePath, "./") || !strings.HasSuffix(result.PortableRelativePath, "/portable.zip") {
 		t.Fatal("invalid portable identity")
 	}
-	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "work-items.js", "locale.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"} {
+	projectionBody, err := os.ReadFile(filepath.Join(result.Directory, "projection.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var projectionIdentity struct {
+		ProjectionID string `json:"projection_id"`
+	}
+	if err := json.Unmarshal(projectionBody, &projectionIdentity); err != nil {
+		t.Fatal(err)
+	}
+	projectionDigest := sha256.Sum256(projectionBody)
+	if result.ProjectionRef != projectionIdentity.ProjectionID || result.ProjectionRef == result.ArtifactRef || result.ProjectionSHA256 != hex.EncodeToString(projectionDigest[:]) {
+		t.Fatal("delivery projection identity or digest differs from packaged projection")
+	}
+	archivePath := filepath.Join(root, result.PackageID+".zip")
+	archiveBody, err := os.ReadFile(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archiveDigest := sha256.Sum256(archiveBody)
+	if result.PackageSHA256 != hex.EncodeToString(archiveDigest[:]) || len(result.ManifestSHA256) != 64 || len(result.ProjectionSHA256) != 64 || len(result.OutputSHA256) != 64 {
+		t.Fatalf("portable digest bindings missing: %#v", result)
+	}
+	archive, err := zip.OpenReader(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	if len(archive.File) != len(packagedAssetNames)+4 {
+		t.Fatalf("portable archive entries=%d want=%d", len(archive.File), len(packagedAssetNames)+4)
+	}
+	for i := 1; i < len(archive.File); i++ {
+		if archive.File[i-1].Name >= archive.File[i].Name {
+			t.Fatal("portable archive entries are not deterministic and sorted")
+		}
+	}
+	for _, name := range []string{"artifact.json", "projection.json", "inspection.json", "screenshot.png", "index.html", "styles.css", "work-items.js", "locale.js", "generic-record.js", "pwa.js", "app.js", "manifest.webmanifest", "icon.svg", "sw.js"} {
 		if info, err := os.Stat(filepath.Join(result.Directory, name)); err != nil || info.Size() == 0 {
 			t.Fatalf("missing %s: %v", name, err)
 		}
@@ -51,7 +90,6 @@ func TestAssemblePortableSharePackage(t *testing.T) {
 	if manifest.Interaction != "read_only" || manifest.Availability != "ready" || manifest.ProjectionRef != "./projection.json" {
 		t.Fatal("truth posture drift")
 	}
-	projectionBody, _ := os.ReadFile(filepath.Join(result.Directory, "projection.json"))
 	var projection evidencepwa.Projection
 	if err := json.Unmarshal(projectionBody, &projection); err != nil || evidencepwa.ValidateProjection(projection) != nil {
 		t.Fatal("canonical evidence PWA projection missing or invalid")
@@ -217,18 +255,23 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 		t.Fatal("renderer must not collapse validity layers into a success badge")
 	}
 	app, _ := assets.ReadFile("assets/app.js")
-	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", `tr("offline_snapshot")`, "locale.number", `dd.dir = "auto"`, `code.dir = "ltr"`, `aria-busy", "true"`, "event.preventDefault()", `byId("registry-back").hidden = true`, `focus({ preventScroll: true })`} {
+	for _, required := range []string{"api/evidence/registry/public", "deploymentBase", "/projects", "/artifacts", "/work-items", "/edges", "/sync-status", "/events", "EventSource", "sessionStorage", "uiai.public_evidence_artifact_detail.v1", "artifactViewURL", "renderPublicRecord", "document.body.dataset.defaultView", `defaultView === "record"`, "navigator.onLine === false", `tr("offline_snapshot")`, "resource_profile", "media_posture", "snapshot_cursor", "AbortController", "controller.signal", "registryOverscan", "registryHistoryLimit = lowMemory ? 32 : 64", ".slice(-registryHistoryLimit)", "registrySpacer", "indexes.add(focusedIndex)", `focused.closest("tr")`, "focused.focus({ preventScroll: true })", `matchMedia("(min-width: 601px)")`, "cursorHistory", `loadRegistry({ previous: true })`, `registryState.artifacts = (artifacts.rows || []).slice(0, registryPageSize)`, `registryState.workItems = (workItems.work_items || []).slice(0, registryPageSize)`, "uiai.epwa_registry_snapshot.v1", "registrySnapshotLimit", "localStorage", "visibilitychange", "paused_lowmem", "paused_hidden", "paused_offline", "locale.number", `dd.dir = "auto"`, `code.dir = "ltr"`, `aria-busy", "true"`, "event.preventDefault()", `byId("registry-back").hidden = true`, `focus({ preventScroll: true })`} {
 		if !strings.Contains(string(app), required) {
 			t.Fatalf("registry consumer missing %s", required)
 		}
 	}
-	for _, forbidden := range []string{`const registryAPI = "/`, "/api/evidence/registry/closure", "/api/evidence/registry/sync?"} {
+	for _, forbidden := range []string{"registryState.artifacts.push(", "registryState.workItems.push(", `matchMedia("(min-width: 769px)")`} {
+		if strings.Contains(string(app), forbidden) {
+			t.Fatalf("registry consumer retains unbounded or mismatched behavior %s", forbidden)
+		}
+	}
+	for _, forbidden := range []string{`const registryAPI = "/`, "/api/evidence/registry/closure", "/api/evidence/registry/sync?", `const tr = document.createElement("tr")`} {
 		if strings.Contains(string(app), forbidden) {
 			t.Fatalf("public consumer references private authority endpoint %s", forbidden)
 		}
 	}
 	css, _ := assets.ReadFile("assets/styles.css")
-	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "forced-colors:active", `[hidden]{display:none!important}`, "overflow-x:hidden", "border-inline-start", "inset-inline-start", "text-align:start", "unicode-bidi:embed", "content:attr(data-label)", `html[dir="rtl"]`, `.registry-table td:nth-child(2){grid-column:1/-1`, ".record-navigation"} {
+	for _, required := range []string{"clamp(", "grid-template-columns:repeat(4", "prefers-color-scheme:dark", "prefers-reduced-motion:reduce", "forced-colors:active", `[hidden]{display:none!important}`, "overflow-x:hidden", "border-inline-start", "inset-inline-start", "text-align:start", "unicode-bidi:embed", "content:attr(data-label)", `html[dir="rtl"]`, `.registry-table td:nth-child(2){grid-column:1/-1`, ".registry-spacer", `.registry-table tbody tr:not(.registry-spacer)`, ".record-navigation"} {
 		if !strings.Contains(string(css), required) {
 			t.Fatalf("responsive CSS missing %s", required)
 		}
@@ -240,13 +283,41 @@ func TestEmbeddedPageIsSafePortableAndResponsive(t *testing.T) {
 	}
 }
 
+func TestRegistryVirtualizationBreakpointAndScrollBatching(t *testing.T) {
+	css, err := assets.ReadFile("assets/styles.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(css), "@media(min-width:601px)") || strings.Contains(string(css), "@media(min-width:769px)") {
+		t.Fatal("fixed row heights must match the JavaScript virtualization breakpoint")
+	}
+	app, err := assets.ReadFile("assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(app)
+	if !strings.Contains(text, "3.5 * parseFloat(getComputedStyle(document.documentElement).fontSize)") {
+		t.Fatal("virtualized row heights must track rem sizing")
+	}
+	start := strings.Index(text, `tableWrap.addEventListener("scroll"`)
+	if start < 0 {
+		t.Fatal("scroll element must be cached")
+	}
+	text = text[start:]
+	frame := strings.Index(text, "requestAnimationFrame")
+	storage := strings.Index(text, "sessionStorage.setItem")
+	if frame < 0 || storage < frame {
+		t.Fatal("scroll persistence must run inside the scheduled frame")
+	}
+}
+
 func TestEmbeddedAccessibilityAndLocalizationContract(t *testing.T) {
 	localeBody, err := assets.ReadFile("assets/locale.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	localeText := string(localeBody)
-	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`, `.replace(/_/g, "-")`} {
+	for _, required := range []string{`en: {`, `es: {`, `ar: {`, `ar: "rtl"`, `document.documentElement.lang = locale`, `document.documentElement.dir = directions[locale]`, `route.searchParams.get("lang")`, `const recordView =`, `skip.href = "#title"`, `new Intl.DateTimeFormat(locale`, `node.textContent = translate`, `data-i18n-placeholder`, `data-i18n-aria-label`, `.replace(/_/g, "-")`, `resource_profile:`, `media_posture:`, `snapshot_cursor:`} {
 		if !strings.Contains(localeText, required) {
 			t.Fatalf("locale runtime missing %s", required)
 		}

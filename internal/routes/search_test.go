@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/config"
 )
 
 func TestNormalizeSearchLimit(t *testing.T) {
@@ -235,7 +237,9 @@ func TestWriteSearchResponseIncludesFocusaMetadata(t *testing.T) {
 	results[0] = sanitizeSearchResult(results[0])
 
 	res := httptest.NewRecorder()
-	writeSearchResponse(res, "brave", "agent browser", results, false, time.Minute)
+	req := httptest.NewRequest(http.MethodGet, "https://evidence.example/api/search?q=agent+browser", nil)
+	setCompleteEvidenceScopeHeaders(req, completeEvidenceScope())
+	writeSearchResponse(res, req, &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}, "brave", "agent browser", results, false, time.Minute)
 	if res.Code != http.StatusOK {
 		t.Fatalf("status=%d", res.Code)
 	}
