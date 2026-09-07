@@ -6,6 +6,18 @@ import { humanBytes, normalizeEvidenceShareManifest, packageThumbnailURL, packet
 const manifest = { scope: { workpoint_ref: "workpoint:homepage", continuity_ref: "focusa-dev-homepage-main" } } as EvidenceShareManifest;
 
 describe("Evidence Share progressive disclosure", () => {
+  it("displays bounded captured requirement references without inventing live status", () => {
+    const result = normalizeEvidenceShareManifest({ schema: "uiai.evidence_artifact_manifest.v1", scope: { work_items: [
+      { evidence_requirement_refs: ["capture:one", "capture:one"], review_requirement_refs: ["review:one"] },
+      { evidence_requirement_refs: Array.from({ length: 30 }, (_, i) => `capture:${i}`), review_requirement_refs: ["bad\nref"] },
+    ] } });
+    expect(result.captured_requirements?.evidence).toHaveLength(24);
+    expect(result.captured_requirements?.review).toEqual(["review:one"]);
+    expect(result.captured_requirements?.truncated).toBe(true);
+    expect(result.captured_requirements).not.toHaveProperty("status");
+    expect(normalizeEvidenceShareManifest({ schema: "uiai.epwa_generic_artifact.v1" }).captured_requirements).toBeUndefined();
+    expect(normalizeEvidenceShareManifest({ schema: "uiai.evidence_artifact_manifest.v1", scope: { work_items: [] } }).captured_requirements).toEqual({ evidence: [], review: [], truncated: false });
+  });
   it("confines thumbnail URLs to the canonical evidence package", () => {
     const packet = { packet_id: "one", descriptor: "Screenshot", artifact_ref: "artifact:one", artifact_url: "https://evidence.example/share/one/", captured_at: "", availability: "ready" };
     expect(packageThumbnailURL({ ...packet, thumbnail_url: packet.artifact_url + "screenshot.png" })).toBe(packet.artifact_url + "screenshot.png");

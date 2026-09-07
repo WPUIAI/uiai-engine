@@ -21,6 +21,18 @@
     {#if expanded}<div class="details" aria-live="polite">
       {#if detailLoading}<p>Loading packet details…</p>{:else if manifest}
         <dl><div><dt>Dimensions</dt><dd>{manifest.width && manifest.height ? `${manifest.width} × ${manifest.height}` : "Not an image"}</dd></div><div><dt>Format</dt><dd>{manifest.format.toUpperCase()} · {humanBytes(manifest.bytes)}</dd></div><div><dt>Workpoint</dt><dd>{manifest.scope?.workpoint_ref || "Not bound"}</dd></div><div><dt>{manifest.digest_label || "Artifact SHA-256"}</dt><dd><code>{manifest.artifact_sha256 || "Not reported"}</code></dd></div></dl>
+        {#if manifest.captured_requirements}
+          <section aria-label="Captured requirement references">
+            <h3>Requirements recorded at capture</h3>
+            <p class="truth">References only—not current capture needs, review acceptance, or completion status.</p>
+            {#each [["Evidence", manifest.captured_requirements.evidence], ["Review", manifest.captured_requirements.review]] as [label, refs]}
+              <h4>{label}</h4>
+              {#if Array.isArray(refs) && refs.length}<ul>{#each refs as ref}<li class="requirement-ref">{ref}</li>{/each}</ul>
+              {:else}<p class="truth">No references recorded in this snapshot; current requirements remain unknown.</p>{/if}
+            {/each}
+            {#if manifest.captured_requirements.truncated}<p class="truth">This is a bounded subset. Open the complete record to inspect its captured bindings.</p>{/if}
+          </section>
+        {/if}
         <p class="truth">{manifest.truth_notice}</p>
       {:else}<p>Packet details are unavailable. The visual link remains read-only.</p>{/if}
     </div>{/if}
@@ -28,6 +40,7 @@
 </article>
 
 <style>
+  .requirement-ref { overflow-wrap: anywhere; font-size: 12px; }
   .preview img { display: block; width: 100%; height: 220px; object-fit: contain; }
 
 .share-card{display:grid;grid-template-columns:minmax(220px,38%) 1fr;overflow:hidden;border:1px solid var(--color-border);border-radius:16px;background:var(--color-surface);box-shadow:0 18px 50px color-mix(in srgb,var(--color-text) 8%,transparent)}.preview{display:flex;flex-direction:column;justify-content:center;min-height:220px;padding:24px;background:#141712;color:#f4f6ef;overflow-wrap:anywhere}.preview p{font-size:13px;line-height:1.6}.body{padding:clamp(18px,3vw,30px);min-width:0}.topline,.actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.topline time,.source{font-size:12px;color:var(--color-text-muted)}.status{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:750;text-transform:uppercase;letter-spacing:.08em}.status i{width:8px;height:8px;border-radius:50%;background:#d79d25}.status.valid i{background:#48a749}.body h2{margin:18px 0 5px;font-size:clamp(20px,3vw,30px);letter-spacing:-.04em}.source{margin:0 0 22px}.actions{justify-content:flex-start;flex-wrap:wrap}.actions a,.actions button{border:1px solid var(--color-border);border-radius:9px;padding:9px 12px;background:transparent;color:var(--color-text);font:inherit;font-size:12px;text-decoration:none;cursor:pointer}.actions .primary{background:var(--color-text);color:var(--color-bg);font-weight:700}.details{margin-top:20px;padding-top:18px;border-top:1px solid var(--color-border)}dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--color-border)}dl div{padding:10px;background:var(--color-surface)}dt{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--color-text-muted)}dd{margin:5px 0 0;font-size:12px;overflow-wrap:anywhere}.truth{font-size:12px;line-height:1.55;color:var(--color-text-muted)}@media(max-width:680px){.share-card{grid-template-columns:1fr}.preview{min-height:180px;max-height:58vh}.topline{align-items:flex-start;flex-direction:column}dl{grid-template-columns:1fr}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
