@@ -4,12 +4,23 @@ export type EvidenceSharePacket = {
   artifact_ref: string;
   artifact_url: string;
   portable_url?: string;
+  thumbnail_url?: string;
   captured_at: string;
   source_url?: string;
   availability: string;
   workpoint_ref?: string;
   continuity_ref?: string;
 };
+export function packageThumbnailURL(packet: EvidenceSharePacket): string | null {
+  const record = secureEvidenceURL(packet.artifact_url), preview = secureEvidenceURL(packet.thumbnail_url);
+  if (!record || !preview) return null;
+  const base = new URL(record), image = new URL(preview);
+  if (!base.pathname.endsWith("/") || base.origin !== image.origin || !image.pathname.startsWith(base.pathname) || image.pathname === base.pathname) return null;
+  // Reject encoded separators and traversal before any server-side decoding.
+  if (/%(?:2e|2f|5c|25)/i.test(image.pathname)) return null;
+  return preview;
+}
+
 export type EvidenceShareList = { packets: EvidenceSharePacket[]; count: number };
 export type EvidenceShareManifest = {
   schema: string; artifact_ref: string; artifact_sha256: string; digest_label?: string;

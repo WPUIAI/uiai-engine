@@ -244,6 +244,22 @@ func TestLegacyVisualProducerUsesMandatoryEPWAEnvelope(t *testing.T) {
 	}
 }
 
+func TestShareThumbnailConfinesRasterPreview(t *testing.T) {
+	t.Setenv("UIAI_EPWA_PUBLIC_BASE_URL", "https://evidence.example/engine/")
+	req := httptest.NewRequest(http.MethodGet, "https://evidence.example/share", nil)
+	for _, ref := range []string{"../secret.png", "/private/file.png", "a/../../secret.png", "https://other.example/image.png", "a\\b.png"} {
+		if got := shareThumbnailURL(req, "/api/screenshot/share/package/", ref, "image/png"); got != "" {
+			t.Errorf("unsafe preview %q: %s", ref, got)
+		}
+	}
+	if got := shareThumbnailURL(req, "/api/screenshot/share/package/", "./image.svg", "image/svg+xml"); got != "" {
+		t.Fatal("active image type exposed as thumbnail")
+	}
+	if got := shareThumbnailURL(req, "/api/screenshot/share/package/", "./image.png", "image/png"); got != "https://evidence.example/engine/api/screenshot/share/package/image.png" {
+		t.Fatalf("preview is not package-bound: %s", got)
+	}
+}
+
 func TestEvidenceShareRouteServesPortablePackage(t *testing.T) {
 	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", "")
 	dataDir := t.TempDir()
@@ -284,6 +300,19 @@ func TestEvidenceShareRouteServesPortablePackage(t *testing.T) {
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, requestTarget, nil))
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("packet API %s status=%d", path, recorder.Code)
+		}
+		if path == "/share" {
+			var list struct {
+				Packets []struct {
+					ThumbnailURL string `json:"thumbnail_url"`
+				} `json:"packets"`
+			}
+			if err := json.Unmarshal(recorder.Body.Bytes(), &list); err != nil || len(list.Packets) != 1 {
+				t.Fatalf("invalid packet index: %s", recorder.Body.String())
+			}
+			if !strings.HasSuffix(list.Packets[0].ThumbnailURL, "/"+id+"/screenshot.png") || !strings.HasPrefix(list.Packets[0].ThumbnailURL, "https://") {
+				t.Fatalf("missing canonical thumbnail: %s", list.Packets[0].ThumbnailURL)
+			}
 		}
 		if !strings.Contains(recorder.Body.String(), id) {
 			t.Fatalf("packet API %s omitted ID + descriptor payload", path)
