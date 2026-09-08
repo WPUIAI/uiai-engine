@@ -121,7 +121,7 @@ echo "health_http_code=$http_code"
 case "$http_code" in 200|401) ;; *) echo "unexpected health status: $http_code" >&2; exit 4 ;; esac
 for extra in $extra_services; do
   systemctl restart "$extra"
-  sleep 2
+  sleep 12
   systemctl is-active "$extra"
   echo "extra_service_active=$extra"
 done
