@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -95,11 +96,19 @@ func scopeWorkstream(scope *vision.FocusaScope) string {
 }
 
 func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore) {
-	settingsStore, _ := evidenceshare.NewSettingsStore(cfg.Storage.DataDir)
-	if settingsStore != nil {
+	settingsStore, settingsErr := evidenceshare.NewSettingsStore(cfg.Storage.DataDir)
+	if settingsErr == nil {
 		mountEvidenceShareSettings(r, settingsStore)
+	} else {
+		slog.Error("canonical evidence settings unavailable", "error", settingsErr)
+		r.HandleFunc("/settings", func(w http.ResponseWriter, _ *http.Request) { writeSettingsUnavailable(w) })
+		r.HandleFunc("/settings/*", func(w http.ResponseWriter, _ *http.Request) { writeSettingsUnavailable(w) })
 	}
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
+		if settingsErr != nil {
+			writeSettingsUnavailable(w)
+			return
+		}
 		var body struct {
 			URL           string               `json:"url"`
 			Width         int                  `json:"width"`
@@ -346,6 +355,17 @@ func safeShareAssetPath(value string) bool {
 	return value != "" && !strings.ContainsAny(value, "\\\r\n\x00") && !strings.HasPrefix(value, "/") && path.Clean(value) == value && value != "." && value != ".." && !strings.HasPrefix(value, "../")
 }
 
+func shareThumbnailURL(req *http.Request, packagePath, assetRef, mediaType string) string {
+	switch mediaType {
+	case "image/png", "image/jpeg", "image/webp", "image/gif", "image/avif":
+		assetPath := strings.TrimPrefix(assetRef, "./")
+		if safeShareAssetPath(assetPath) {
+			return requestArtifactURL(req, packagePath+assetPath)
+		}
+	}
+	return ""
+}
+
 func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 	r.Get("/share", func(w http.ResponseWriter, req *http.Request) {
 		if _, err := canonicalEPWABase(req); err != nil {
@@ -373,6 +393,7 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 				continue
 			}
 			artifactPath := "/api/screenshot/share/" + entry.Name() + "/"
+			thumbnailURL := ""
 			packet := map[string]any{"packet_id": entry.Name(), "artifact_url": requestArtifactURL(req, artifactPath), "portable_url": requestArtifactURL(req, artifactPath+"portable.zip"), "availability": "ready"}
 			switch descriptor.Schema {
 			case evidenceshare.Schema:
@@ -382,6 +403,7 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 				}
 				packet["descriptor"], packet["artifact_ref"], packet["captured_at"] = "Screenshot evidence · "+manifest.CapturedAt.Format(time.RFC3339), manifest.ArtifactRef, manifest.CapturedAt
 				packet["source_url"], packet["workpoint_ref"], packet["continuity_ref"] = manifest.SourceURL, manifest.Scope.WorkpointRef, manifest.Scope.ContinuityRef
+				thumbnailURL = shareThumbnailURL(req, artifactPath, manifest.ScreenshotRef, manifest.MIME)
 			case evidenceartifact.SchemaManifestV1:
 				var manifest evidenceartifact.Manifest
 				if json.Unmarshal(body, &manifest) != nil {
@@ -390,6 +412,11 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 				packet["descriptor"], packet["artifact_ref"], packet["captured_at"] = manifest.Title, manifest.ArtifactID, manifest.CapturedAt
 				packet["workpoint_ref"] = manifest.Scope.Workpoint.WorkpointRef
 				packet["continuity_ref"] = manifest.Scope.ContinuityRef
+				for _, asset := range manifest.Assets {
+					if thumbnailURL = shareThumbnailURL(req, artifactPath, asset.Path, asset.MediaType); thumbnailURL != "" {
+						break
+					}
+				}
 			case evidenceshare.GenericArtifactSchema:
 				var manifest evidenceshare.GenericManifest
 				if json.Unmarshal(body, &manifest) != nil {
@@ -397,6 +424,10 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 				}
 				packet["descriptor"], packet["artifact_ref"], packet["captured_at"] = manifest.Title, manifest.ArtifactRef, manifest.CapturedAt
 				packet["workpoint_ref"], packet["continuity_ref"] = manifest.Scope.WorkpointRef, manifest.Scope.ContinuityRef
+				thumbnailURL = shareThumbnailURL(req, artifactPath, manifest.AssetRef, manifest.MediaType)
+			}
+			if thumbnailURL != "" {
+				packet["thumbnail_url"] = thumbnailURL
 			}
 			packets = append(packets, packet)
 			if len(packets) == 100 {

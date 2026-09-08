@@ -3,6 +3,10 @@
 (() => {
   const catalogues = {
     en: {
+      artifact_preview: "Artifact preview", availability: "Availability", bound_bytes_only: "Bound bytes only", bound_portable_summary: "Bound portable artifact.",
+      bundle_digest: "Bundle SHA-256", bytes: "Bytes", child_artifacts: "Child artifacts", completion_authority: "Completion authority",
+      digest_recorded_commit: "Digest recorded by commit", evidence_asset: "Evidence asset {id}", invalid: "Invalid", manifest_digest: "Manifest SHA-256",
+      media_type: "Media type", parent_artifact: "Parent artifact", payload_digest: "Payload SHA-256", portable_artifact_record: "Portable artifact record",
       language: "Language", skip_registry: "Skip to evidence registry", skip_record: "Skip to evidence record", registry_label: "Evidence registry", evidence: "Evidence", loading_registry: "Loading registry",
       project_scoped: "Project-scoped evidence", registry_title: "Evidence registry", registry_loading: "Loading public-safe project, artifact, and Work Item projections.", freshness: "Freshness", index_revision: "Index revision",
       project: "Project", search: "Search", search_placeholder: "Artifact, digest, task, epic, description", status: "Status", all_states: "All states", state_open: "Open", state_in_progress: "In progress", state_blocked: "Blocked", state_closed: "Closed",
@@ -19,6 +23,10 @@
       artifact_limitations: "This immutable artifact is a bounded evidence input. Its existence does not independently establish completeness, review acceptance, task completion, provider closure, settlement, or legal admissibility.", record_limitations: "This is one bounded visual observation with digest and inspection bindings. It does not independently establish completeness, absence of contrary evidence, review acceptance, task completion, provider closure, settlement, or legal admissibility. Legal use depends on jurisdiction, authentication, relevance, custody, applicable evidentiary rules, and independent challenge."
     },
     es: {
+      artifact_preview: "Vista previa del artefacto", availability: "Disponibilidad", bound_bytes_only: "Solo bytes vinculados", bound_portable_summary: "Artefacto portátil vinculado.",
+      bundle_digest: "SHA-256 del paquete", bytes: "Bytes", child_artifacts: "Artefactos secundarios", completion_authority: "Autoridad de finalización",
+      digest_recorded_commit: "Resumen registrado al confirmar", evidence_asset: "Recurso de evidencia {id}", invalid: "No válido", manifest_digest: "SHA-256 del manifiesto",
+      media_type: "Tipo de medio", parent_artifact: "Artefacto principal", payload_digest: "SHA-256 del contenido", portable_artifact_record: "Registro de artefacto portátil",
       language: "Idioma", skip_registry: "Saltar al registro de evidencias", skip_record: "Saltar al registro de evidencia", registry_label: "Registro de evidencias", evidence: "Evidencia", loading_registry: "Cargando registro",
       project_scoped: "Evidencia del proyecto", registry_title: "Registro de evidencias", registry_loading: "Cargando proyecciones públicas y seguras del proyecto, artefactos y elementos de trabajo.", freshness: "Actualidad", index_revision: "Revisión del índice",
       project: "Proyecto", search: "Buscar", search_placeholder: "Artefacto, resumen, tarea, épica, descripción", status: "Estado", all_states: "Todos los estados", state_open: "Abierto", state_in_progress: "En curso", state_blocked: "Bloqueado", state_closed: "Cerrado",
@@ -35,6 +43,10 @@
       artifact_limitations: "Este artefacto inmutable es una entrada de evidencia acotada. Su existencia no establece por sí sola exhaustividad, aceptación de revisión, finalización de tareas, cierre del proveedor, liquidación ni admisibilidad legal.", record_limitations: "Esta es una observación visual acotada con vínculos de resumen e inspección. No establece por sí sola exhaustividad, ausencia de evidencia contraria, aceptación de revisión, finalización de tareas, cierre del proveedor, liquidación ni admisibilidad legal. El uso legal depende de la jurisdicción, autenticación, pertinencia, custodia, normas aplicables e impugnación independiente."
     },
     ar: {
+      artifact_preview: "معاينة القطعة", availability: "التوفر", bound_bytes_only: "البايتات المرتبطة فقط", bound_portable_summary: "قطعة محمولة مرتبطة.",
+      bundle_digest: "SHA-256 للحزمة", bytes: "بايت", child_artifacts: "القطع التابعة", completion_authority: "سلطة الإكمال",
+      digest_recorded_commit: "بصمة مسجلة عند الحفظ", evidence_asset: "عنصر دليل {id}", invalid: "غير صالح", manifest_digest: "SHA-256 للبيان",
+      media_type: "نوع الوسائط", parent_artifact: "القطعة الأصلية", payload_digest: "SHA-256 للمحتوى", portable_artifact_record: "سجل قطعة محمولة",
       language: "اللغة", skip_registry: "تخطَّ إلى سجل الأدلة", skip_record: "تخطَّ إلى سجل الدليل", registry_label: "سجل الأدلة", evidence: "الأدلة", loading_registry: "جارٍ تحميل السجل",
       project_scoped: "أدلة ضمن نطاق المشروع", registry_title: "سجل الأدلة", registry_loading: "جارٍ تحميل إسقاطات المشروع والقطع وعناصر العمل الآمنة للنشر.", freshness: "الحداثة", index_revision: "مراجعة الفهرس",
       project: "المشروع", search: "بحث", search_placeholder: "قطعة، بصمة، مهمة، ملحمة، وصف", status: "الحالة", all_states: "كل الحالات", state_open: "مفتوح", state_in_progress: "قيد التنفيذ", state_blocked: "محظور", state_closed: "مغلق",

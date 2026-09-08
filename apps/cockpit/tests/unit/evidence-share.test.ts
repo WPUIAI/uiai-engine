@@ -1,11 +1,30 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { engineClient } from "../../src/lib/engine-client";
 afterEach(() => vi.unstubAllGlobals());
-import { humanBytes, normalizeEvidenceShareManifest, packetMatchesWorkpoint, secureEvidenceURL, sourceHost, type EvidenceShareManifest } from "../../src/lib/evidence-share";
+import { humanBytes, normalizeEvidenceShareManifest, packageThumbnailURL, packetMatchesWorkpoint, secureEvidenceURL, sourceHost, type EvidenceShareManifest } from "../../src/lib/evidence-share";
 
 const manifest = { scope: { workpoint_ref: "workpoint:homepage", continuity_ref: "focusa-dev-homepage-main" } } as EvidenceShareManifest;
 
 describe("Evidence Share progressive disclosure", () => {
+  it("displays bounded captured requirement references without inventing live status", () => {
+    const result = normalizeEvidenceShareManifest({ schema: "uiai.evidence_artifact_manifest.v1", scope: { work_items: [
+      { evidence_requirement_refs: ["capture:one", "capture:one"], review_requirement_refs: ["review:one"] },
+      { evidence_requirement_refs: Array.from({ length: 30 }, (_, i) => `capture:${i}`), review_requirement_refs: ["bad\nref"] },
+    ] } });
+    expect(result.captured_requirements?.evidence).toHaveLength(24);
+    expect(result.captured_requirements?.review).toEqual(["review:one"]);
+    expect(result.captured_requirements?.truncated).toBe(true);
+    expect(result.captured_requirements).not.toHaveProperty("status");
+    expect(normalizeEvidenceShareManifest({ schema: "uiai.epwa_generic_artifact.v1" }).captured_requirements).toBeUndefined();
+    expect(normalizeEvidenceShareManifest({ schema: "uiai.evidence_artifact_manifest.v1", scope: { work_items: [] } }).captured_requirements).toEqual({ evidence: [], review: [], truncated: false });
+  });
+  it("confines thumbnail URLs to the canonical evidence package", () => {
+    const packet = { packet_id: "one", descriptor: "Screenshot", artifact_ref: "artifact:one", artifact_url: "https://evidence.example/share/one/", captured_at: "", availability: "ready" };
+    expect(packageThumbnailURL({ ...packet, thumbnail_url: packet.artifact_url + "screenshot.png" })).toBe(packet.artifact_url + "screenshot.png");
+    for (const thumbnail_url of ["https://other.example/image.png", "http://evidence.example/share/one/image.png", "https://evidence.example/share/two/image.png", packet.artifact_url + "../secret.png", packet.artifact_url + "%252e%252e/secret.png", "javascript:alert(1)"]) {
+      expect(packageThumbnailURL({ ...packet, thumbnail_url })).toBeNull();
+    }
+  });
   it("uses explicit settings scope and revision-bound update/reset operations", async () => {
     vi.stubGlobal("window", { localStorage: { getItem: () => null }, setTimeout, clearTimeout });
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ schema: "settings", scope: {}, revision: 3, sources: [], values: {}, reset: true }), { status: 200 }));

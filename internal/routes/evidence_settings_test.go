@@ -4,12 +4,96 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 	"github.com/go-chi/chi/v5"
 )
+
+func TestSettingsRoutesPreserveScopeAndRejectInvalidBodies(t *testing.T) {
+	store, err := evidenceshare.NewSettingsStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	router := chi.NewRouter()
+	mountEvidenceShareSettings(router, store)
+	request := func(method, body string) *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(method, "/settings", strings.NewReader(body)))
+		return response
+	}
+	response := request(http.MethodPut, `{"project_ref":"project:one","workstream_ref":"workstream:one","expected_revision":0,"values":{"image":{"quality":61}}}`)
+	if response.Code != 200 {
+		t.Fatal(response.Body.String())
+	}
+	var result map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	scope := result["scope"].(map[string]any)
+	if scope["project_ref"] != "project:one" || scope["workstream_ref"] != "workstream:one" {
+		t.Fatalf("wrong wire scope: %v", scope)
+	}
+	reset := request(http.MethodDelete, `{"project_ref":"project:one","workstream_ref":"workstream:one","expected_revision":1}`)
+	if reset.Code != 200 {
+		t.Fatal(reset.Body.String())
+	}
+	if err := json.Unmarshal(reset.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["revision"] != float64(2) || result["scope"].(map[string]any)["workstream_ref"] != "workstream:one" {
+		t.Fatal("reset lost revision or scope")
+	}
+	for _, body := range []string{`{"ProjectRef":"wrong","values":{"image":{"quality":61}}}`, `{"values":{"image":{"quality":"bad"}}}`, `{"values":{}} {}`, `{"workstream_ref":"orphan","values":{}}`} {
+		if got := request(http.MethodPut, body); got.Code != 400 {
+			t.Fatalf("bad request accepted: %s", body)
+		}
+	}
+	if result := store.Effective(evidenceshare.SettingsScope{}); result.Revision != 0 {
+		t.Fatal("project operations changed global settings")
+	}
+}
+
+func TestSettingsPublicationFailureIsServerErrorWithoutPathLeak(t *testing.T) {
+	dir := t.TempDir()
+	store, err := evidenceshare.NewSettingsStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "evidence-share-settings.json.tmp"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	router := chi.NewRouter()
+	mountEvidenceShareSettings(router, store)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/settings", strings.NewReader(`{"project_ref":"project:one","values":{"image":{"quality":61}}}`)))
+	if response.Code != 500 || strings.Contains(response.Body.String(), dir) {
+		t.Fatalf("wrong storage error boundary: %d %s", response.Code, response.Body.String())
+	}
+	if store.Effective(evidenceshare.SettingsScope{ProjectRef: "project:one"}).Revision != 0 {
+		t.Fatal("failed save changed revision")
+	}
+}
+
+func TestUnavailableSettingsBlockCaptureRatherThanFallback(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "evidence-share-settings.json"), []byte("malformed"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	router := chi.NewRouter()
+	MountScreenshotReal(router, &config.Config{Storage: config.StorageConfig{DataDir: dir}}, nil, nil)
+	for _, path := range []string{"/settings", "/settings/preview", "/"} {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"url":"https://example.com"}`)))
+		if response.Code != 503 || !strings.Contains(response.Body.String(), "evidence_settings_unavailable") {
+			t.Fatalf("silent settings fallback: %d %s", response.Code, response.Body.String())
+		}
+	}
+}
 
 func TestEvidenceShareSettingsRoutesPreviewUpdateConflict(t *testing.T) {
 	store, err := evidenceshare.NewSettingsStore(t.TempDir())
