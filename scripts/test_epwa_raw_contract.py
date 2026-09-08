@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parent
 
 class RawContractTests(unittest.TestCase):
     def test_boundary_vocabulary_parity(self):
-        mcp = (ROOT.parent / 'mcp/epwa-contract.mjs').read_text()
+        mcp = (ROOT.parent / '.pi/extensions/uiai/epwa-contract.mjs').read_text()
         fields = re.search(r'RAW_ARTIFACT_FIELDS = new Set\(\[(.*?)\]\)', mcp, re.S)[1]
         self.assertEqual(RAW_FIELDS, set(re.findall(r'"(.*?)"', fields)))
         cli = (ROOT / 'uiai-open-result.sh').read_text()

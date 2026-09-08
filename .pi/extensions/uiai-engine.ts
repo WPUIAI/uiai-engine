@@ -2,6 +2,10 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { keyHint } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { assertEvidenceDelivery, evidenceRecoveryHint, evidenceScopeHeaders } from "./uiai/epwa-contract.mjs";
+
+const evidenceRequestScope = new AsyncLocalStorage<unknown>();
 
 const DEFAULT_ENGINE_URL = "http://localhost:7456";
 const REQUEST_TIMEOUT_MS = Number(process.env.UIAI_PI_TIMEOUT_MS || 30000);
@@ -88,14 +92,14 @@ function authHeaders(): Record<string, string> {
 	return headers;
 }
 
-async function callEngine(path: string, init?: RequestInit): Promise<any> {
+async function callEngine(path: string, init?: RequestInit, requiresEvidence = false): Promise<any> {
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 	try {
 		const res = await fetch(`${engineUrl()}${path}`, {
 			...init,
 			signal: controller.signal,
-			headers: { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers || {}) },
+			headers: { "Content-Type": "application/json", ...authHeaders(), ...evidenceScopeHeaders(evidenceRequestScope.getStore()), ...(init?.headers || {}) },
 		});
 		const text = await res.text();
 		let data: any = text;
@@ -107,6 +111,7 @@ async function callEngine(path: string, init?: RequestInit): Promise<any> {
 		if (!res.ok) {
 			throw new Error(formatEngineError(data, res.status, path));
 		}
+		assertEvidenceDelivery(data, requiresEvidence);
 		return data;
 	} finally {
 		clearTimeout(timeout);
@@ -115,11 +120,13 @@ async function callEngine(path: string, init?: RequestInit): Promise<any> {
 
 function formatEngineError(data: any, status: number, path: string) {
 	if (typeof data === "string") return `UIAI ${status} ${path}: ${data}`;
-	const message = data?.message || data?.error || "request failed";
+	const message = data?.message || data?.error?.message || data?.error || "request failed";
 	const parts = [`UIAI ${status}`, path];
 	if (data?.error_id) parts.push(`id=${data.error_id}`);
 	if (data?.error_class) parts.push(`class=${data.error_class}`);
 	let out = `${parts.join(" ")}: ${message}`;
+	const recovery = evidenceRecoveryHint(data);
+	if (recovery) out += `\nReconcile: ${recovery}`;
 	if (data?.suggested_next_action) out += `\nNext: ${data.suggested_next_action}`;
 	if (data?.diagnostics) out += `\nDiagnostics: run uiai_errors or GET ${data.diagnostics}`;
 	return out;
@@ -142,16 +149,13 @@ function cleanBody(body: Record<string, any>) {
 	return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
 }
 
-function post(path: string, body: Record<string, any>) {
-	return callEngine(path, { method: "POST", body: JSON.stringify(cleanBody(body)) });
+function post(path: string, body: Record<string, any>, requiresEvidence = false) {
+	return callEngine(path, { method: "POST", body: JSON.stringify(cleanBody(body)), headers: evidenceScopeHeaders(body.focusa_scope) }, requiresEvidence);
 }
 
 async function runGuidedPacketWorkflow(mode: PacketMode, input: string, ctx: any) {
-	const focusa_scope = {
-		project_root: "/home/wpuiai/uiai-engine",
-		continuity_id: "focusa-cont-uiai-engine-82afe24f-90ce-4d6e-b5f2-1b431b7773fc",
-		evidence_ref: `pi-uiai-${mode}-packet`,
-	};
+	// Missing scope remains missing; never bind another installation to this checkout.
+	const focusa_scope = evidenceRequestScope.getStore();
 	const responses: any[] = [];
 	let selectedUrl = input.trim();
 	let sessionId = "";
@@ -397,6 +401,13 @@ function latestWidgetVisibility(ctx: any): boolean | undefined {
 
 function compactSummary(data: any, details: Record<string, any> = {}) {
 	const endpoint = details.endpoint ? `${details.endpoint}` : "UIAI";
+	if (typeof data === "string") return data;
+	try {
+		const links = assertEvidenceDelivery(data);
+		if (links) return `Evidence ready · ${links.recordURL}\nPortable copy · ${links.portableURL}`;
+	} catch {
+		return `${endpoint} evidence delivery unavailable — inspect result for reconciliation`;
+	}
 	if (data?.error || data?.error_class) {
 		const id = data.error_id ? ` id=${data.error_id}` : "";
 		const next = data.suggested_next_action ? ` → ${data.suggested_next_action}` : "";
@@ -421,14 +432,14 @@ function compactSummary(data: any, details: Record<string, any> = {}) {
 	return `${endpoint} ok`;
 }
 
-function compactRenderResult(result: any, { expanded, isPartial }: { expanded?: boolean; isPartial?: boolean }, theme: any) {
+function compactRenderResult(result: any, { expanded, isPartial }: { expanded?: boolean; isPartial?: boolean }, theme: any, context?: { isError?: boolean }) {
 	if (isPartial) return new Text(theme.fg("warning", "UIAI running…"), 0, 0);
 	const textContent = result?.content?.find?.((c: any) => c.type === "text");
 	const raw = textContent?.type === "text" ? textContent.text : "";
 	let data: any = raw;
 	try { data = raw ? JSON.parse(raw) : {}; } catch { /* keep raw */ }
 	const details = result?.details || {};
-	const isError = Boolean(data?.error || data?.error_class || result?.isError);
+	const isError = Boolean(context?.isError || data?.error || data?.error_class || result?.isError);
 	let line = isError ? theme.fg("error", compactSummary(data, details)) : theme.fg("success", compactSummary(data, details));
 	if (!expanded) {
 		line += theme.fg("muted", ` (${keyHint("app.tools.expand", "expand")})`);
@@ -446,6 +457,11 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	const registerTool = pi.registerTool.bind(pi);
 	pi.registerTool = ((definition: any) => registerTool({
 		...definition,
+		parameters: { ...definition.parameters, properties: {
+			...definition.parameters.properties,
+			focusa_scope: definition.parameters.properties.focusa_scope || Type.Optional(Type.Any({ description: "Exact permitted evidence scope; forwarded without inventing authority or missing references" })),
+		} },
+		execute: (...args: any[]) => evidenceRequestScope.run(args[1]?.focusa_scope, () => definition.execute(...args)),
 		renderResult: definition.renderResult || compactRenderResult,
 	})) as typeof pi.registerTool;
 
@@ -664,18 +680,17 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_browser_screenshot",
 		label: "UIAI Browser Screenshot",
-		description: "Capture the current session view without navigation. Use diagnostics if the page is blank or broken.",
+		description: "Capture the current session view and automatically yield durable HTTPS EPWA evidence, or explicit delivery failure. No separate export step.",
 		parameters: Type.Object({
 			session_id: Type.String({ description: "UIAI browser session id" }),
 			format: Type.Optional(Type.String({ description: "Image format, jpeg or png" })),
 			quality: Type.Optional(Type.Number({ description: "JPEG quality 1-100" })),
 			fullPage: Type.Optional(Type.Boolean({ description: "Capture entire page" })),
-			output: Type.Optional(Type.String({ description: "Return mode: json (base64), file (artifact_path), or url (artifact_url)" })),
 		}),
 		async execute(_toolCallId, params) {
 			const { session_id, ...body } = params;
-			const data = await post(`/api/session/${session_id}/screenshot`, body);
-			return textResult(withoutScreenshot(data), { endpoint: "/api/session/{id}/screenshot", has_screenshot: Boolean(data.screenshot), artifact_path: data.artifact_path, artifact_url: data.artifact_url });
+			const data = await post(`/api/session/${session_id}/screenshot`, body, true);
+			return textResult(withoutScreenshot(data), { endpoint: "/api/session/{id}/screenshot", artifact_url: data.artifact_url });
 		},
 	});
 
@@ -977,12 +992,11 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 			fullPage: Type.Optional(Type.Boolean({ description: "Full page capture" })),
 		}),
 		async execute(_toolCallId, params) {
-			const data = await post("/api/screenshot", params);
+			const data = await post("/api/screenshot", params, true);
 			return textResult({
 				descriptor: "Screenshot Evidence Share Packet",
 				artifact_url: data.artifact_url,
 				artifact_ref: data.artifact_ref,
-				artifact_path: data.artifact_path,
 				...withoutScreenshot(data),
 			}, { endpoint: "/api/screenshot", has_screenshot: Boolean(data.screenshot) });
 		},

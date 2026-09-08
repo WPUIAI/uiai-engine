@@ -23,7 +23,7 @@
  */
 
 import { createInterface } from "readline";
-import { evidenceScopeHeaders, findNonReadyArtifactDelivery, findRawArtifactField } from "./epwa-contract.mjs";
+import { evidenceScopeHeaders, assertEvidenceDelivery } from "./epwa-contract.mjs";
 
 const ENGINE = (process.env.UIAI_ENGINE_URL || "http://localhost:7456").replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = Number(process.env.UIAI_MCP_TIMEOUT_MS || 60000);
@@ -575,20 +575,10 @@ async function toolsCall(name, args) {
     };
   }
 
-  // Raw visual bytes are a contract violation; MCP exposes only EPWA metadata.
-  const rawArtifactField = findRawArtifactField(data);
-  if (rawArtifactField) {
-    return {
-      content: [{ type: "text", text: `UIAI contract violation at ${rawArtifactField}: raw artifact output was withheld; retry after EPWA producer reconciliation` }],
-      isError: true,
-    };
-  }
-  const nonReadyDelivery = findNonReadyArtifactDelivery(data);
-  if (nonReadyDelivery) {
-    return {
-      content: [{ type: "text", text: `UIAI delivery unavailable at ${nonReadyDelivery}: EPWA delivery is not ready; reconcile before use` }],
-      isError: true,
-    };
+  try {
+    assertEvidenceDelivery(data, name === "screenshot" || name === "browser_screenshot");
+  } catch (error) {
+    return { content: [{ type: "text", text: error.message }], isError: true };
   }
   const content = [];
   const summary = { ...data };
