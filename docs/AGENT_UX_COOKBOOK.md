@@ -17,9 +17,15 @@ The helper also accepts `--search-json <file>` when a prior search response alre
 
 ### Pi
 
+Evidence-producing calls automatically compile and yield a durable HTTPS EPWA link when the producer returns a ready delivery. No separate export/share command is needed. Supply the existing verified `focusa_scope` (project, workstream, workset, CallGraph, Workpoint, work item and continuity refs); the adapter forwards it per request without account-specific defaults or invented bindings. Missing scope or publication remains an explicit delivery failure.
+
+The collapsed result shows the evidence page and portable-copy URLs. Raw-only responses, missing required capture envelopes, invalid HTTPS links and non-ready deliveries are rejected; committed artifact/session/job reconciliation handles are retained. Dispatch acknowledgement is not completed delivery. This adapter surfaces returned terminal evidence; it does not manufacture evidence for unrelated background jobs.
+
+Use `scripts/install-agent-integrations.sh` to install the adapter and its shared `uiai/epwa-contract.mjs` dependency together. `UIAI_PI_EXTENSION_DEST` and `UIAI_MCP_CONFIG_DEST` select arbitrary installation paths. Pi and MCP use the same validator. Reload the affected Pi session or start a fresh normal session after approved installation; source changes alone do not activate it. A legacy engine without EPWA publication must be upgraded/configured through the approved delivery path, not accommodated by silently dropping evidence.
+
 ```text
 uiai_search query="<topic>" limit=3
-uiai_browser_open url="<selected result url>" focusa_scope={project_root,continuity_id,evidence_ref}
+uiai_browser_open url="<selected result url>" focusa_scope={<existing verified scope refs>}
 uiai_browser_read session_id="<sid>" max_chars=2000 include_links=true
 uiai_browser_close session_id="<sid>"
 ```
