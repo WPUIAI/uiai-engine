@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -377,4 +379,80 @@ func mustPath(t *testing.T, value string) string {
 		t.Fatal(err)
 	}
 	return request.URL.Path
+}
+
+// These TLS servers prove package portability, not production HTTPS delivery.
+func TestEvidenceShareRelocatesAcrossHTTPSOrigins(t *testing.T) {
+	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", "")
+	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
+	originalRouter := chi.NewRouter()
+	originalRouter.Route("/api/screenshot", func(r chi.Router) { mountEvidenceShare(r, cfg) })
+	original := httptest.NewTLSServer(originalRouter)
+	defer original.Close()
+	t.Setenv("UIAI_EPWA_PUBLIC_BASE_URL", original.URL) // no trailing slash
+	delivery, err := publishScreenshotEPWA(nil, cfg, evidenceshare.Input{
+		Screenshot: append([]byte("\x89PNG\r\n\x1a\n"), []byte("portable-fixture-pixels")...),
+		Format:     "png", Width: 375, Height: 812, SourceURL: "https://example.com/source",
+		CapturedAt: time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC), Scope: completeEvidenceScope(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(delivery.EPWA.RecordURL, original.URL+"/api/screenshot/share/") {
+		t.Fatalf("publication did not use configured HTTPS origin: %q", delivery.EPWA.RecordURL)
+	}
+	readResource := func(client *http.Client, target string) []byte {
+		t.Helper()
+		response, err := client.Get(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		body, err := io.ReadAll(io.LimitReader(response.Body, 8<<20))
+		if err != nil || response.StatusCode != http.StatusOK {
+			t.Fatalf("resource %s: status=%d read=%v", target, response.StatusCode, err)
+		}
+		return body
+	}
+	resources := []string{"", "artifact.json", "inspection.json", "screenshot.png", "portable.zip",
+		"app.js", "styles.css", "locale.js", "work-items.js", "generic-record.js", "pwa.js", "sw.js", "manifest.webmanifest", "icon.svg"}
+	baseline := make(map[string][]byte, len(resources))
+	for _, resource := range resources {
+		baseline[resource] = readResource(original.Client(), delivery.EPWA.RecordURL+resource)
+		if bytes.Contains(baseline[resource], []byte(original.URL)) {
+			t.Fatalf("package embeds installation origin in %q", resource)
+		}
+	}
+	copyCfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
+	if err := os.CopyFS(evidenceShareDir(copyCfg), os.DirFS(evidenceShareDir(cfg))); err != nil {
+		t.Fatal(err)
+	}
+	copyRouter := chi.NewRouter()
+	for _, prefix := range []string{"", "/tenant/deep/install"} {
+		copyRouter.Route(prefix+"/api/screenshot", func(r chi.Router) { mountEvidenceShare(r, copyCfg) })
+	}
+	copied := httptest.NewTLSServer(copyRouter)
+	defer copied.Close()
+	if copied.URL == original.URL {
+		t.Fatal("test requires distinct HTTPS origins")
+	}
+	original.Close() // relocated resources must not depend on the publishing server
+	for _, prefix := range []string{"", "/tenant/deep/install"} {
+		for _, slash := range []string{"", "/"} {
+			t.Setenv("UIAI_EPWA_PUBLIC_BASE_URL", copied.URL+prefix+slash)
+			base, err := canonicalEPWABase(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			recordURL := base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + delivery.EPWA.PackageID + "/"}).String()
+			if !strings.HasPrefix(recordURL, copied.URL+prefix+"/api/screenshot/share/") {
+				t.Fatalf("configured subpath lost: %s", recordURL)
+			}
+			for _, resource := range resources {
+				if got := readResource(copied.Client(), recordURL+resource); !bytes.Equal(got, baseline[resource]) {
+					t.Fatalf("relocated resource changed: prefix=%q slash=%q resource=%q", prefix, slash, resource)
+				}
+			}
+		}
+	}
 }
