@@ -18,7 +18,7 @@ set -euo pipefail
 : "${REMOTE_EVIDENCE_SCOPE_JSON:=}"
 : "${REMOTE_UIAI_EPWA_PUBLIC_BASE_URL:=}"
 : "${REMOTE_EXTRA_SERVICES:=}"
-: "${REMOTE_SMOKE_BASE_URLS:=http://127.0.0.1:7456}"
+: "${REMOTE_SMOKE_BASE_URLS:=http://127.0.0.1:7460}"
 : "${RELEASE_TAG:=manual}"
 
 if [[ ! -f "$ASSET_PATH" ]]; then
@@ -159,7 +159,19 @@ for base in sys.argv[2:]:
         if sid:
             subprocess.run(["curl", "-sS", "-m", "15", "-X", "DELETE", base + "/api/session/" + sid], check=False)
         if ready:
-            break
+            # Recipient-facing check: the emitted HTTPS record and portable copy must be publicly fetchable.
+            try:
+                with urllib.request.urlopen(epwa.get("record_url"), timeout=30) as rr:
+                    page_ok = rr.status == 200 and len(rr.read()) > 500
+                with urllib.request.urlopen(epwa.get("portable_url"), timeout=30) as rp:
+                    zip_ok = rp.status == 200 and rp.read(2) == b"PK"
+                print(json.dumps({"smoke_base": base, "attempt": attempt, "public_fetch": page_ok and zip_ok}, sort_keys=True), flush=True)
+                ready = page_ok and zip_ok
+            except Exception as exc:
+                print(json.dumps({"smoke_base": base, "attempt": attempt, "public_fetch": False, "error": str(exc)[:140]}, sort_keys=True), flush=True)
+                ready = False
+            if ready:
+                break
         if attempt < 4:
             time.sleep(20)
     if not ready:
