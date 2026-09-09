@@ -120,6 +120,12 @@ echo
 echo "health_http_code=$http_code"
 case "$http_code" in 200|401) ;; *) echo "unexpected health status: $http_code" >&2; exit 4 ;; esac
 for extra in $extra_services; do
+  if [[ -n "$epwa_base_url" ]]; then
+    extra_dropin="/etc/systemd/system/${extra}.d"
+    mkdir -p "$extra_dropin"
+    printf "[Service]\nEnvironment=UIAI_EPWA_PUBLIC_BASE_URL=%s\n" "$epwa_base_url" > "$extra_dropin/epwa-public-base-url.conf"
+  fi
+  systemctl daemon-reload
   systemctl restart "$extra"
   sleep 12
   systemctl is-active "$extra"
