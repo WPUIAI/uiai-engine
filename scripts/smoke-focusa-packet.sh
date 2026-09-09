@@ -61,7 +61,17 @@ scope={
 
 def req(method,path,body=None):
     data=None
-    headers={'Content-Type':'application/json'}
+    # Canonical adapter contract: evidence scope travels as X-UIAI-* headers on every capture.
+    headers={'Content-Type':'application/json',
+        'X-UIAI-Project-Ref':scope['project_ref'],
+        'X-UIAI-Workstream-Ref':scope['workstream_ref'],
+        'X-UIAI-Workset-Ref':scope['workset_ref'],
+        'X-UIAI-CallGraph-Ref':scope['callgraph_ref'],
+        'X-UIAI-Workpoint-Ref':scope['workpoint_id'],
+        'X-UIAI-Work-Item-Ref':scope['work_item_ref'],
+        'X-UIAI-Continuity-Ref':scope['continuity_id'],
+        'X-UIAI-Work-Items':json.dumps(scope['work_items']),
+    }
     if body is not None:
         data=json.dumps(body).encode()
     r=urllib.request.Request(engine+path, data=data, method=method, headers=headers)
