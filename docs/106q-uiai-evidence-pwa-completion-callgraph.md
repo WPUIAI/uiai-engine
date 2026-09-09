@@ -62,11 +62,11 @@ EPWA-CG-ROOT
 | CG-26 — T10 neutral connectors | CG-11,15,22 | UIAI + Focusa | issue/document/chat adapters, exact destination authority, idempotency/dead-letter/webhook/safe-unfurl | three live consumer proofs |
 | CG-27 — T11 generated API parity | CG-08..26 | UIAI | one contract drives REST/OpenAPI/CLI/MCP/Pi clients, jobs/cancel/resume/cursors/content negotiation | cross-harness conformance |
 | CG-28 — T12 operations/migration/reliability | CG-24,25,27 | UIAI ops | SLO/doctor/telemetry, legacy migration, fuzz/chaos/power-loss/load/backup/rollback/release | production-consistency five proofs |
-| CG-33 — Operator disposition step (approve/reject for closure) | CG-16,18 | Operator via browser | Evidence records carry typed append-only approve/reject dispositions (authority ref, required reason on rejection, task/work-item refs, supersede chain); disposition state visible on every record surface (record page, envelope, portable zip); task closure consumes the disposition as browser-verified operator evidence; public record page stays read-only, mutations require authenticated authority | disposition receipts + record UI visual proof + route tests |
-| CG-29 — Focusa completion integration | CG-09,11,13,15,22,26..28 | Focusa | Project→Workpoint lineage, Verification, Completion Receipt, provider sync and reopen remain separate and exact | consumer-side authority E2E |
+| CG-33 — Operator disposition and truthful-proof closure gate | CG-16,18 | Operator via browser + model completion authority | Before approval, the model must supply a typed, scope-matched proof bundle for every required step. Evidence records carry append-only approve/reject/returned-to-model dispositions (authority ref, required reason on rejection, task/work-item refs, supersede chain); disposition state is visible on every record surface (record page, envelope, portable zip). Missing, stale, contradictory, withheld, or unverifiable proof forces pending/returned-to-model, keeps or reopens the task, emits exact proof gaps, and forbids Completion or provider-close receipts; only a proof-gated operator approval may permit closure; public record page stays read-only and mutations require authenticated authority | proof-gap/return receipts + disposition receipts + record UI visual proof + route tests |
+| CG-29 — Focusa completion integration | CG-09,11,13,15,22,26..28,33 | Focusa | Project→Workpoint lineage, truthful proof, proof-gated operator disposition, Completion Receipt, provider sync and reopen remain separate and exact; failed or missing proof keeps/reopens the task and returns exact gaps to the responsible model | consumer-side authority E2E |
 | CG-30 — Installed dogfood | CG-29 | independent team | publish→restart→judge→action/reproof→derive/connect→export/import→revoke/reopen→settle across environments | installed binary + live E2E packet |
 | CG-31 — Standards/public claim governance | CG-30 | external/independent | standards matrix, corpus, interop implementation, security/privacy/accessibility review, dated claim packet and expiry | external reports + challenge flow |
-| CG-32 — Final closure join | CG-31 | Focusa Completion Authority | all required artifacts valid/current/scope-matched; no open blocker; provider synchronization reconciled | Completion Receipt; provider receipt |
+| CG-32 — Final closure join | CG-31,33 | Focusa Completion Authority | all required artifacts and every required step have valid/current/scope-matched truthful proof plus an approved CG-33 disposition; otherwise no Completion Receipt or provider receipt is emitted, the task remains/reopens, and a typed return-to-model receipt names the exact gaps | Completion Receipt only after proof-gated approval; provider receipt; return-to-model receipt |
 
 ## Dependency-safe execution waves
 
@@ -76,9 +76,19 @@ EPWA-CG-ROOT
 4. **Wave D:** CG-26..28 connector/parity/operations convergence.
 5. **Wave E:** CG-29 Focusa authority integration.
 6. **Wave F:** CG-30 installed dogfood.
-7. **Wave F2:** CG-33 operator disposition step (parallel with Wave F once CG-16/18 land).
-8. **Wave G:** CG-31 standards and CG-32 closure (requires CG-33 for operator-directed work).
+7. **Wave F2:** CG-33 proof-gated operator disposition (after CG-16/18; before CG-29/32).
+8. **Wave G:** CG-31 standards and CG-32 closure (requires truthful proof plus CG-33 approval for operator-directed work).
 
 ## Global gates
 
-Every candidate requires versioned contract, exact allowlist, stable identity/idempotency, deterministic producer tests, consumer-side tests, cross-version proof, immutable evidence, independent verification, rollback, and no secret/private-path leakage. HTTP 200, green tests, PR publication, visual state, artifact existence, or an unattended review approval alone never closes a node. Closure of operator-directed work additionally requires the CG-33 operator disposition step (typed approve/reject in the browser) or an explicit operator command recorded as equivalent evidence.
+Every candidate requires versioned contract, exact allowlist, stable identity/idempotency, deterministic producer tests, consumer-side tests, cross-version proof, immutable evidence, independent verification, rollback, and no secret/private-path leakage. HTTP 200, green tests, PR publication, visual state, artifact existence, or an unattended review approval alone never closes a node. Closure of operator-directed work requires CG-33's truthful-proof gate followed by an approved browser disposition; operator direction cannot substitute for missing, stale, contradictory, withheld, or unverifiable model proof.
+
+### Truthful-proof closure failure path
+
+This path is mandatory, not advisory:
+
+1. The model submits one typed proof reference for each required step, with exact scope, target, result, freshness, and consumer-verification evidence.
+2. The EPWA closure gate validates completeness, provenance, scope, freshness, consistency, and consumer-visible truth. A missing, stale, contradictory, withheld, or unverifiable proof reference is a failed gate, not an inferred pass.
+3. On failure, the record stays `pending_proof` or becomes `returned_to_model`; the operator cannot approve closure, and neither a Completion Receipt nor provider-close receipt may be emitted.
+4. The task provider keeps the task open or reopens it and emits a durable return-to-model receipt naming the responsible model, exact missing proof, and next required evidence.
+5. Only a fresh proof bundle that passes the gate can return to the browser for operator approval or rejection. Rejection also returns the task to the model with the operator's reason; it never silently closes the task.
