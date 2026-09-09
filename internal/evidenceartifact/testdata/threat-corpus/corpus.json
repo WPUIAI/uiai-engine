@@ -1,0 +1,226 @@
+{
+  "schema": "uiai.threat_corpus.v1",
+  "policy_ref": "uiai.evidence_security.strict.v1",
+  "entries": [
+    {
+      "class": "metadata_asymmetry",
+      "id": "threat:gif-comment-metadata",
+      "description": "GIF comment extension carrying a private address; magic check passes, metadata persists (G-1)",
+      "media_type": "image/gif",
+      "fixture": "fixtures/gif-comment-metadata.bin",
+      "fixture_sha256": "ecdf139a2c7b4f7a05d5827926f62fd2f899dad9780e50701b781ef890fd976d",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening"
+    },
+    {
+      "class": "active_content",
+      "id": "threat:html-script-injection",
+      "description": "HTML with script tag requires sanitizer",
+      "media_type": "text/html",
+      "fixture": "fixtures/html-script-injection.bin",
+      "fixture_sha256": "1e88fe5a73e9700a27597a02ed7ec3c4cc1eb8e0d6ca580cd4473a5e7e6dc194",
+      "expected_outcome": "rejected:sanitizer_required",
+      "defense_state": "defended"
+    },
+    {
+      "class": "sanitizer_gateway",
+      "id": "threat:jpeg-exif-gps",
+      "description": "JPEG EXIF APP1 segment with GPS text",
+      "media_type": "image/jpeg",
+      "fixture": "fixtures/jpeg-exif-gps.bin",
+      "fixture_sha256": "6c9c1c1905b0e07f5b383cbe0525fc0334f03ac532c5248aea44b96c08342b4d",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended"
+    },
+    {
+      "class": "metadata_asymmetry",
+      "id": "threat:mp3-id3-geo",
+      "description": "MP3 ID3 TXXX frame with geotag (G-1)",
+      "media_type": "audio/mpeg",
+      "fixture": "fixtures/mp3-id3-geo.bin",
+      "fixture_sha256": "aa0db85d605a59668f801780dec908445bae40c2ead778750f42ed3b7f6f28df",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening"
+    },
+    {
+      "class": "metadata_asymmetry",
+      "id": "threat:mp4-udta-gps",
+      "description": "MP4 udta atom with location metadata; only ftyp magic is verified (G-1)",
+      "media_type": "video/mp4",
+      "fixture": "fixtures/mp4-udta-gps.bin",
+      "fixture_sha256": "b69cdce45a3373bd582464a470a4c0ac76de453dac978861290e1d621736929d",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening"
+    },
+    {
+      "class": "metadata_asymmetry",
+      "id": "threat:ogg-vorbis-location",
+      "description": "OGG vorbis comment with location tag (G-1)",
+      "media_type": "audio/ogg",
+      "fixture": "fixtures/ogg-vorbis-location.bin",
+      "fixture_sha256": "c58df88b19d44a9b8e10406c8a551b1d9ab4087681699660e0d58c83eda65e3d",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening"
+    },
+    {
+      "class": "sanitizer_gateway",
+      "id": "threat:png-clean-minimal",
+      "description": "Clean minimal PNG with no metadata chunks",
+      "media_type": "image/png",
+      "fixture": "fixtures/png-clean-minimal.bin",
+      "fixture_sha256": "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96",
+      "expected_outcome": "passed",
+      "defense_state": "defended"
+    },
+    {
+      "class": "sanitizer_gateway",
+      "id": "threat:png-exif-gps",
+      "description": "PNG eXIf chunk carrying GPS coordinates",
+      "media_type": "image/png",
+      "fixture": "fixtures/png-exif-gps.bin",
+      "fixture_sha256": "ca0d7884236f7950e655023ce362b7918eff63aee6f44a2d12f97fcc14f705df",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended"
+    },
+    {
+      "class": "media_sniffing",
+      "id": "threat:png-magic-mismatch",
+      "description": "Declared PNG without PNG magic",
+      "media_type": "image/png",
+      "fixture": "fixtures/png-magic-mismatch.bin",
+      "fixture_sha256": "ce32161d31b193d1b0b9347c36152f76ea1425426af53ea2fc3d6d5f2db661c6",
+      "expected_outcome": "rejected:mime_mismatch",
+      "defense_state": "defended"
+    },
+    {
+      "class": "sanitizer_gateway",
+      "id": "threat:png-text-location",
+      "description": "PNG tEXt metadata carrying location",
+      "media_type": "image/png",
+      "fixture": "fixtures/png-text-location.bin",
+      "fixture_sha256": "0dbaed338ce7ca2161ce3d436c80375f094bcf808a0832af84d4ecd41e8e95dc",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended"
+    },
+    {
+      "class": "active_content",
+      "id": "threat:svg-active-content",
+      "description": "SVG with script requires sanitizer",
+      "media_type": "image/svg+xml",
+      "fixture": "fixtures/svg-active-content.bin",
+      "fixture_sha256": "3f67c8be987aa1db0ef99ce330286efe1929e729f5f9d1695b5fd0b987246244",
+      "expected_outcome": "rejected:sanitizer_required",
+      "defense_state": "defended"
+    },
+    {
+      "class": "active_content",
+      "id": "threat:text-active-untrusted-private",
+      "description": "Prompt-injection text under private-team policy: passes with typed findings",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-active-untrusted-private.bin",
+      "fixture_sha256": "605f4663b18fe677559362d87af532e382bdd9a28c214322f4b2077299d02b75",
+      "expected_outcome": "passed_with_findings",
+      "defense_state": "defended"
+    },
+    {
+      "class": "sanitizer_gateway",
+      "id": "threat:text-clean",
+      "description": "Clean text asset",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-clean.bin",
+      "fixture_sha256": "22c8fc79ed1886b83a53f996b3601684dc9acbf66f6a37671509571f2e9b7f1c",
+      "expected_outcome": "passed",
+      "defense_state": "defended"
+    },
+    {
+      "class": "pii",
+      "id": "threat:text-pii-email-public",
+      "description": "PII email in public-safe policy",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-pii-email-public.bin",
+      "fixture_sha256": "de1a67e8111b6d91f1cc9ee2d54fdaa144473cd85b2775dbc2b005d981dd9fb1",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended"
+    },
+    {
+      "class": "secrets",
+      "id": "threat:text-secret-api-key",
+      "description": "text/plain with embedded API key",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-secret-api-key.bin",
+      "fixture_sha256": "2c66730fbffaa076361f7c3d291251c8243143bbd4c2e462e0386a026cc295df",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended"
+    },
+    {
+      "class": "secrets",
+      "id": "threat:text-secret-bearer",
+      "description": "text/plain with bearer credential header",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-secret-bearer.bin",
+      "fixture_sha256": "2b31671188e697b7cf66066fa0f5768cffc9f28c27400bc0613f72ab3fb31c3d",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended"
+    },
+    {
+      "class": "secrets",
+      "id": "threat:text-secret-private-key",
+      "description": "text/plain with PEM private key block",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-secret-private-key.bin",
+      "fixture_sha256": "1bb7c8b981b9830a7b0098d5a4cb2283ef2eda3ee31926f4de50db96fba1e585",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended"
+    },
+    {
+      "class": "media_sniffing",
+      "id": "threat:unknown-octet-stream",
+      "description": "Unknown binary type without policy",
+      "media_type": "application/octet-stream",
+      "fixture": "fixtures/unknown-octet-stream.bin",
+      "fixture_sha256": "74f81fe167d99b4cb41d6d0ccda82278caee9f3e2f25d5e5a3936ff3dcec60d0",
+      "expected_outcome": "rejected:unsafe_media",
+      "defense_state": "defended"
+    },
+    {
+      "class": "metadata_asymmetry",
+      "id": "threat:wav-list-comment",
+      "description": "WAV LIST INFO comment with private location (G-1)",
+      "media_type": "audio/wav",
+      "fixture": "fixtures/wav-list-comment.bin",
+      "fixture_sha256": "7a25eab9e7400f2c62bedca853687ad7f007949875fe300046e111ac509ac4ac",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening"
+    },
+    {
+      "class": "metadata_asymmetry",
+      "id": "threat:webm-ebml-tags",
+      "description": "WebM EBML segment carrying a private location string (G-1)",
+      "media_type": "video/webm",
+      "fixture": "fixtures/webm-ebml-tags.bin",
+      "fixture_sha256": "cdc9fb42b744ac152265a9b4feeea3ff8de84f6825148892d58a26d611d79e3b",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening"
+    },
+    {
+      "class": "sanitizer_gateway",
+      "id": "threat:webp-exif-metadata",
+      "description": "WebP EXIF chunk with GPS coordinates",
+      "media_type": "image/webp",
+      "fixture": "fixtures/webp-exif-metadata.bin",
+      "fixture_sha256": "5cc334e1efcf0fae761d03735bb6f0b51edd9a395bba1e5460be3a8ca9a255bc",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended"
+    },
+    {
+      "class": "sanitizer_gateway",
+      "id": "threat:zip-polyglot",
+      "description": "Archive/zip requires sanitizer before acceptance",
+      "media_type": "application/zip",
+      "fixture": "fixtures/zip-polyglot.bin",
+      "fixture_sha256": "3d2cf2492a6475c87dbec5dd2ba8bdb2670350e80a5f7047d9e32007691079aa",
+      "expected_outcome": "rejected:sanitizer_required",
+      "defense_state": "defended"
+    }
+  ]
+}
