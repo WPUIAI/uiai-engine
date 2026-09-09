@@ -7,12 +7,14 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 	"github.com/go-chi/chi/v5"
 )
 
-func mountEvidenceShareSettings(r chi.Router, store *evidenceshare.SettingsStore) {
+func mountEvidenceShareSettings(r chi.Router, store *evidenceshare.SettingsStore, artifacts *evidenceartifact.Store) {
 	r.Get("/settings", func(w http.ResponseWriter, req *http.Request) {
 		scope := settingsScope(req)
 		if err := scope.Validate(); err != nil {
@@ -44,6 +46,41 @@ func mountEvidenceShareSettings(r chi.Router, store *evidenceshare.SettingsStore
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
+	})
+	r.Post("/settings/retention", func(w http.ResponseWriter, req *http.Request) {
+		if artifacts == nil {
+			writeSettingsUnavailable(w)
+			return
+		}
+		var body struct {
+			ProjectRef    string `json:"project_ref"`
+			WorkstreamRef string `json:"workstream_ref"`
+			AuthorityRef  string `json:"authority_ref"`
+		}
+		if !decodeSettingsRequest(w, req, &body) {
+			return
+		}
+		scope := evidenceshare.SettingsScope{ProjectRef: body.ProjectRef, WorkstreamRef: body.WorkstreamRef}
+		if err := scope.Validate(); err != nil {
+			writeSettingsError(w, err)
+			return
+		}
+		if authorityRef := strings.TrimSpace(body.AuthorityRef); authorityRef == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "authority_ref required"})
+			return
+		}
+		effective := store.Effective(scope)
+		policy, err := evidenceshare.MapLifecycleSettings(effective.Values)
+		if err != nil {
+			writeSettingsError(w, err)
+			return
+		}
+		receipt, err := evidenceshare.Sweep(artifacts, policy, scope, body.AuthorityRef, time.Now().UTC())
+		if err != nil {
+			writeSettingsError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, receipt)
 	})
 	r.Delete("/settings", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {

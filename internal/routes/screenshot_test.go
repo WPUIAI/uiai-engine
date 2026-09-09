@@ -41,7 +41,7 @@ func TestScreenshotAutomaticallyReturnsHumanViewableEvidenceShare(t *testing.T) 
 	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", "")
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
-	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil) })
+	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	requestBody, err := json.Marshal(map[string]any{
 		"url": "https://focusa.dev/", "width": 375, "height": 812, "format": "png",
 		"focusa_scope": map[string]string{"workpoint_id": "workpoint:homepage", "continuity_id": "focusa-dev-homepage-main"},
@@ -111,7 +111,7 @@ func TestScreenshotEPWADeliveryCannotBeDisabledAndMissingScopeIsBlocked(t *testi
 		t.Fatal(err)
 	}
 	router := chi.NewRouter()
-	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil) })
+	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	body, _ := json.Marshal(map[string]any{"url": "https://example.test", "format": "png", "inline": true})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "https://engine.example/api/screenshot/", bytes.NewReader(body))
@@ -140,7 +140,7 @@ func TestScreenshotEPWADeliveryCannotBeDisabledAndMissingScopeIsBlocked(t *testi
 func TestScreenshotFailsClosedWithoutCanonicalHTTPSBase(t *testing.T) {
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
-	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil) })
+	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	body, _ := json.Marshal(map[string]any{"url": "https://example.test", "format": "png", "evidence_scope": completeEvidenceScope()})
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/screenshot/", bytes.NewReader(body))
@@ -158,7 +158,7 @@ func TestScreenshotFailsClosedWithoutCanonicalHTTPSBase(t *testing.T) {
 func TestPendingEPWADeliveryReconcilesToStableHTTPSIdentity(t *testing.T) {
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
-	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil) })
+	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	body, _ := json.Marshal(map[string]any{"url": "https://example.test", "format": "png", "evidence_scope": completeEvidenceScope()})
 	capture := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/screenshot/", bytes.NewReader(body))
@@ -201,7 +201,7 @@ func TestPendingEPWADeliveryReconcilesToStableHTTPSIdentity(t *testing.T) {
 func TestEPWAReconcileDetectsCorruptPortablePackage(t *testing.T) {
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
-	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil) })
+	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	body, _ := json.Marshal(map[string]any{"url": "https://example.test", "format": "png", "evidence_scope": completeEvidenceScope()})
 	capture := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "https://evidence.example/api/screenshot/", bytes.NewReader(body))
