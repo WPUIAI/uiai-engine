@@ -60,4 +60,24 @@ The repaired graph is not accepted until every normative source row above has:
 5. producer, consumer, cross-surface, independent-review, and installed proof;
 6. a reverse citation from the node back to the source requirement.
 
+## Coverage ledger (amendment state)
+
+Status per row after the merged closure-governance amendment (`5bf38da7`) and the residual-repairs amendment of 2026-09-09. Each repaired row now carries the source reference, explicit acceptance clause, negative atoms, and typed unknown/reopen semantics inside its node row; the graph remains the sole execution authority.
+
+| Source row | Repair location | Status |
+|---|---|---|
+| `106k` Review Case | CG-33 (partial/quorum/dispute/lease enumerated) | covered |
+| `106l` human-optional policy | CG-33 | covered |
+| `106m` registry closure | CG-36 | covered |
+| `106n` closure awareness | CG-34 (ten typed failure fixtures) | covered |
+| `106o` autonomous work-state | CG-35 | covered |
+| `106s` bidirectional index | CG-36 | covered |
+| `106i` validity/claim governance | CG-31 | covered |
+| `106h` evidence integrity | CG-04/05/06/28 | covered |
+| `106b` publication semantics | CG-16/17/22 | covered (CG-17 delivery-result fixtures added) |
+| `106d` Action Deck operations | CG-10/11/29 | covered (export op added) |
+| `106a` portability matrix | CG-12/13/21/22 | covered (viewport/relative-route/reverse-proxy/survival added) |
+| `106e` distribution governance | CG-14/15/26/27 | covered (audience/redaction/retention-warning/negative-delivery added) |
+| `106f` Judge View parity | CG-08/09/27 | covered (freeze/mismatch/citation/no-write added) |
+
 Until that matrix is green, no EPWA task may be represented as fully closed or settled.
