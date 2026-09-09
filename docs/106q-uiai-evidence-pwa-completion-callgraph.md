@@ -62,6 +62,7 @@ EPWA-CG-ROOT
 | CG-26 — T10 neutral connectors | CG-11,15,22 | UIAI + Focusa | issue/document/chat adapters, exact destination authority, idempotency/dead-letter/webhook/safe-unfurl | three live consumer proofs |
 | CG-27 — T11 generated API parity | CG-08..26 | UIAI | one contract drives REST/OpenAPI/CLI/MCP/Pi clients, jobs/cancel/resume/cursors/content negotiation | cross-harness conformance |
 | CG-28 — T12 operations/migration/reliability | CG-24,25,27 | UIAI ops | SLO/doctor/telemetry, legacy migration, fuzz/chaos/power-loss/load/backup/rollback/release | production-consistency five proofs |
+| CG-33 — Operator disposition step (approve/reject for closure) | CG-16,18 | Operator via browser | Evidence records carry typed append-only approve/reject dispositions (authority ref, required reason on rejection, task/work-item refs, supersede chain); disposition state visible on every record surface (record page, envelope, portable zip); task closure consumes the disposition as browser-verified operator evidence; public record page stays read-only, mutations require authenticated authority | disposition receipts + record UI visual proof + route tests |
 | CG-29 — Focusa completion integration | CG-09,11,13,15,22,26..28 | Focusa | Project→Workpoint lineage, Verification, Completion Receipt, provider sync and reopen remain separate and exact | consumer-side authority E2E |
 | CG-30 — Installed dogfood | CG-29 | independent team | publish→restart→judge→action/reproof→derive/connect→export/import→revoke/reopen→settle across environments | installed binary + live E2E packet |
 | CG-31 — Standards/public claim governance | CG-30 | external/independent | standards matrix, corpus, interop implementation, security/privacy/accessibility review, dated claim packet and expiry | external reports + challenge flow |
@@ -75,8 +76,9 @@ EPWA-CG-ROOT
 4. **Wave D:** CG-26..28 connector/parity/operations convergence.
 5. **Wave E:** CG-29 Focusa authority integration.
 6. **Wave F:** CG-30 installed dogfood.
-7. **Wave G:** CG-31 standards and CG-32 closure.
+7. **Wave F2:** CG-33 operator disposition step (parallel with Wave F once CG-16/18 land).
+8. **Wave G:** CG-31 standards and CG-32 closure (requires CG-33 for operator-directed work).
 
 ## Global gates
 
-Every candidate requires versioned contract, exact allowlist, stable identity/idempotency, deterministic producer tests, consumer-side tests, cross-version proof, immutable evidence, independent verification, rollback, and no secret/private-path leakage. HTTP 200, green tests, PR publication, visual state, review approval, or artifact existence alone never closes a node.
+Every candidate requires versioned contract, exact allowlist, stable identity/idempotency, deterministic producer tests, consumer-side tests, cross-version proof, immutable evidence, independent verification, rollback, and no secret/private-path leakage. HTTP 200, green tests, PR publication, visual state, artifact existence, or an unattended review approval alone never closes a node. Closure of operator-directed work additionally requires the CG-33 operator disposition step (typed approve/reject in the browser) or an explicit operator command recorded as equivalent evidence.
