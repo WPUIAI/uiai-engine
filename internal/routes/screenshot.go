@@ -367,6 +367,7 @@ func shareThumbnailURL(req *http.Request, packagePath, assetRef, mediaType strin
 }
 
 func mountEvidenceShare(r chi.Router, cfg *config.Config) {
+	mountEvidenceReview(r, cfg)
 	r.Get("/share", func(w http.ResponseWriter, req *http.Request) {
 		if _, err := canonicalEPWABase(req); err != nil {
 			writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_https_unavailable", err, "", "", "configure:UIAI_EPWA_PUBLIC_BASE_URL")

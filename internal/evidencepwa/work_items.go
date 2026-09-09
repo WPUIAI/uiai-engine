@@ -35,6 +35,13 @@ type WorkItemAuthorityState struct {
 	ProviderCloseReceiptRef string   `json:"provider_close_receipt_ref,omitempty"`
 	ReopenRef               string   `json:"reopen_ref,omitempty"`
 	SettlementPosture       string   `json:"settlement_posture,omitempty"`
+	ReviewCaseRef           string   `json:"review_case_ref,omitempty"`
+	ReviewerAssignmentRef   string   `json:"reviewer_assignment_ref,omitempty"`
+	ReviewerRef             string   `json:"reviewer_ref,omitempty"`
+	ReviewerKind            string   `json:"reviewer_kind,omitempty"`
+	ReviewPosture           string   `json:"review_posture,omitempty"`
+	ReviewDecisionRef       string   `json:"review_decision_ref,omitempty"`
+	ReviewReceiptRef        string   `json:"review_receipt_ref,omitempty"`
 }
 
 type WorkItemProjection struct {

@@ -33,6 +33,13 @@ func FromContext(ctx context.Context) *Identity {
 	return id
 }
 
+// ContextWithIdentity attaches a verified identity to a context. It is the
+// typed injection point for adapters and tests; it never fabricates trust —
+// callers must supply only identities verified by Authenticate.
+func ContextWithIdentity(ctx context.Context, identity *Identity) context.Context {
+	return context.WithValue(ctx, ctxKey{}, identity)
+}
+
 type cachedResult struct {
 	identity *Identity
 	err      error

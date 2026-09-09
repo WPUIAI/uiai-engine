@@ -85,6 +85,26 @@
           </dl>
         </section>
 
+        <section id="review-panel" class="review-panel" aria-labelledby="review-title" data-review-gated="true">
+          <div class="subhead-row"><h2 id="review-title" data-i18n="review_title">Operator review and closure</h2><p data-i18n="review_gate">Proof-gated</p></div>
+          <p id="review-truth" class="lede" data-i18n="review_loading">Loading the canonical review case and completion gate.</p>
+          <dl id="review-summary" class="review-summary">
+            <div><dt data-i18n="review_posture">Review posture</dt><dd id="review-posture" data-i18n="loading">Loading</dd></div>
+            <div><dt data-i18n="review_case">Review case</dt><dd id="review-case" dir="ltr">—</dd></div>
+            <div><dt data-i18n="review_assignment">Reviewer assignment</dt><dd id="review-assignment" dir="ltr">—</dd></div>
+            <div><dt data-i18n="review_next_action">Next action</dt><dd id="review-next-action">—</dd></div>
+          </dl>
+          <p id="review-gaps" class="review-gaps" role="status" aria-live="polite"></p>
+          <form id="review-decision-form" class="review-decision-form" hidden>
+            <label><span data-i18n="review_reason">Decision reason</span><textarea id="review-reason" name="reason" rows="3" maxlength="4000"></textarea></label>
+            <label><span data-i18n="review_proof_refs">Canonical proof references, one per line</span><textarea id="review-proof-refs" name="proof_refs" rows="4" maxlength="12000"></textarea></label>
+            <div class="button-row">
+              <button type="submit" name="decision" value="approved" class="button button-primary" data-i18n="review_approve">Approve closure</button>
+              <button type="submit" name="decision" value="changes_requested" class="button button-secondary" data-i18n="review_return">Reject and return to model</button>
+            </div>
+          </form>
+        </section>
+
         <dl id="facts" class="facts" aria-label="Record facts"></dl>
 
         <aside class="limitations" aria-labelledby="limitations-title">
