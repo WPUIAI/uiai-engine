@@ -116,6 +116,127 @@ async function fetchJSON(ref, init = {}) {
   return response.json();
 }
 
+let activeReviewCase = null;
+
+function reviewMessage(value) {
+  return typeof value === "string" && value.trim() ? value : "—";
+}
+
+function reviewDecisionIdempotencyKey() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `review-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function renderReviewCase() {
+  const panel = byId("review-panel");
+  if (!panel) return;
+  const form = byId("review-decision-form");
+  panel.dataset.state = "loading";
+  activeReviewCase = null;
+  form.hidden = true;
+  text(byId("review-truth"), tr("review_loading"));
+  try {
+    const payload = await fetchJSON("./review");
+    const reviewCase = payload.review_case;
+    if (!reviewCase || reviewCase.schema !== "uiai.review_case.v1") throw new Error(tr("review_invalid"));
+    activeReviewCase = reviewCase;
+    text(byId("review-posture"), reviewMessage(reviewCase.posture));
+    text(byId("review-case"), reviewMessage(reviewCase.case_ref));
+    text(byId("review-assignment"), reviewMessage(reviewCase.reviewer_assignment_ref || tr("review_unassigned")));
+    text(byId("review-next-action"), reviewMessage(reviewCase.next_action));
+    const gaps = Array.isArray(reviewCase.proof_gaps) ? reviewCase.proof_gaps.filter(Boolean) : [];
+    text(byId("review-gaps"), gaps.length ? `${tr("review_missing_proof")}: ${gaps.join(", ")}` : "");
+    const required = Array.isArray(reviewCase.review_requirement_refs) && reviewCase.review_requirement_refs.length > 0;
+    const assigned = Boolean(reviewCase.reviewer_assignment_ref && reviewCase.reviewer_ref);
+    const terminal = reviewCase.posture === "accepted";
+    const eligible = required && assigned && !terminal;
+    form.hidden = !eligible;
+    form.querySelectorAll("button").forEach((button) => { button.disabled = !eligible; });
+    if (!required) text(byId("review-truth"), tr("review_not_required"));
+    else if (!assigned) text(byId("review-truth"), tr("review_unassigned"));
+    else if (terminal) text(byId("review-truth"), tr("review_accepted"));
+    else text(byId("review-truth"), tr("review_ready"));
+    panel.dataset.state = terminal ? "accepted" : (eligible ? "ready" : "blocked");
+  } catch (error) {
+    try {
+      const offline = await fetchJSON("./review.json");
+      if (!offline || offline.schema !== "uiai.review_state.v1") throw new Error(tr("review_invalid"));
+      activeReviewCase = activeReviewCase || { case_ref: offline.case_ref, artifact_ref: offline.artifact_ref, posture: offline.posture, reviewer_assignment_ref: "", reviewer_ref: "", scope: null, review_requirement_refs: [] };
+      text(byId("review-posture"), reviewMessage(offline.posture));
+      text(byId("review-case"), reviewMessage(offline.case_ref));
+      text(byId("review-assignment"), tr("review_unassigned"));
+      text(byId("review-next-action"), reviewMessage(offline.next_action));
+      const gaps = Array.isArray(offline.dispositions) ? (offline.dispositions[offline.dispositions.length - 1]?.proof_gaps || []) : [];
+      text(byId("review-gaps"), gaps.length ? `${tr("review_missing_proof")}: ${gaps.join(", ")}` : "");
+      text(byId("review-truth"), offline.posture === "accepted" ? tr("review_accepted") : tr("review_offline"));
+      panel.dataset.state = offline.posture === "accepted" ? "accepted" : "blocked";
+      form.hidden = true;
+      return;
+    } catch (offlineError) {
+      panel.dataset.state = "blocked";
+      text(byId("review-truth"), `${tr("review_unavailable")}: ${error instanceof Error ? error.message : tr("unavailable_value")}`);
+      text(byId("review-posture"), tr("not_determined"));
+      text(byId("review-assignment"), tr("review_unassigned"));
+      form.hidden = true;
+    }
+  }
+}
+
+async function submitReviewDecision(event) {
+  event.preventDefault();
+  if (!activeReviewCase) return;
+  const form = event.currentTarget;
+  const decision = event.submitter?.value || "";
+  const reason = byId("review-reason").value.trim();
+  const proofRefs = byId("review-proof-refs").value.split("\\n").map((value) => value.trim()).filter(Boolean);
+  const buttons = [...form.querySelectorAll("button")];
+  buttons.forEach((button) => { button.disabled = true; });
+  text(byId("review-truth"), tr("review_submitting"));
+  try {
+    const response = await fetch("./review/decision", {
+      method: "POST",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({
+        schema: "uiai.review_decision.v1",
+        case_ref: activeReviewCase.case_ref,
+        scope: activeReviewCase.scope,
+        artifact_ref: activeReviewCase.artifact_ref,
+        artifact_sha256: activeReviewCase.artifact_sha256,
+        work_item_ref: activeReviewCase.work_item_ref,
+        decision,
+        reviewer_assignment_ref: activeReviewCase.reviewer_assignment_ref,
+        proof_refs: proofRefs,
+        reason,
+        idempotency_key: reviewDecisionIdempotencyKey(),
+        submitted_at: new Date().toISOString(),
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.next_action || payload.message || tr("review_unavailable"));
+    const receipt = payload.review_receipt || {};
+    text(byId("review-posture"), reviewMessage(receipt.posture || payload.state));
+    text(byId("review-next-action"), reviewMessage(payload.next_action || receipt.next_action));
+    const gaps = Array.isArray(payload.proof_gaps) ? payload.proof_gaps.filter(Boolean) : [];
+    text(byId("review-gaps"), gaps.length ? `${tr("review_missing_proof")}: ${gaps.join(", ")}` : "");
+    text(byId("review-truth"), payload.state === "returned_to_model" ? tr("review_returned") : tr("review_accepted"));
+    form.hidden = true;
+    byId("review-panel").dataset.state = payload.state === "returned_to_model" ? "blocked" : "accepted";
+  } catch (error) {
+    text(byId("review-truth"), `${tr("review_submit_failed")}: ${error instanceof Error ? error.message : tr("unavailable_value")}`);
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
+function wireReviewControls() {
+  const form = byId("review-decision-form");
+  if (form && !form.dataset.bound) {
+    form.addEventListener("submit", submitReviewDecision);
+    form.dataset.bound = "true";
+  }
+}
+
 function renderTimeline(entries) {
   const events = byId("events");
   const rows = (entries || []).map((entry) => {
@@ -618,6 +739,7 @@ async function renderRecord() {
     if (manifest.schema === "uiai.evidence_artifact_manifest.v1" || manifest.schema === "uiai.epwa_generic_artifact.v1") {
       if (typeof window.renderGenericEvidenceRecord !== "function") throw new Error(tr("record_unsupported"));
       await window.renderGenericEvidenceRecord(manifest);
+      await renderReviewCase();
       return;
     }
     if (manifest.schema !== "uiai.screenshot_evidence_share.v1") throw new Error(tr("record_unsupported"));
@@ -704,6 +826,7 @@ async function renderRecord() {
       datum(tr("provenance"), projection.federation_posture),
       datum(tr("redaction"), projection.redaction.state),
     );
+    await renderReviewCase();
     setReadyStatus(status, tr("record_loaded"));
     byId("title").focus({ preventScroll: true });
   } catch (error) {
@@ -715,6 +838,7 @@ async function renderRecord() {
 }
 
 wireRegistryControls();
+wireReviewControls();
 const defaultView = document.body.dataset.defaultView || "registry";
 if (route.searchParams.get("artifact")) {
   byId("registry").hidden = true;

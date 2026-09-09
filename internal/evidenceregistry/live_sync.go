@@ -305,6 +305,12 @@ func queueTrigger(triggers chan<- string, trigger string) {
 	}
 }
 
+// NewFocusaHTTPClient returns the configured bearer-token transport used by
+// Focusa adapters. It never returns or logs the token value.
+func NewFocusaHTTPClient(tokenFile string) *http.Client {
+	return syncHTTPClient(FocusaSyncConfig{TokenFile: tokenFile})
+}
+
 func syncHTTPClient(cfg FocusaSyncConfig) *http.Client {
 	client := &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
 	if cfg.HTTPClient != nil {

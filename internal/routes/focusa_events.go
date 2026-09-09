@@ -73,4 +73,5 @@ func FocusaEventsRaw(w http.ResponseWriter, req *http.Request) {
 // MountFocusaEvents retained for parity; raw mux is the served path.
 func MountFocusaEvents(r interface {
 	Get(pattern string, h http.HandlerFunc)
-}) {}
+}) {
+}
