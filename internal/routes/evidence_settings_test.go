@@ -1,15 +1,20 @@
 package routes
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 	"github.com/go-chi/chi/v5"
 )
@@ -20,7 +25,7 @@ func TestSettingsRoutesPreserveScopeAndRejectInvalidBodies(t *testing.T) {
 		t.Fatal(err)
 	}
 	router := chi.NewRouter()
-	mountEvidenceShareSettings(router, store)
+	mountEvidenceShareSettings(router, store, nil)
 	request := func(method, body string) *httptest.ResponseRecorder {
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, httptest.NewRequest(method, "/settings", strings.NewReader(body)))
@@ -68,7 +73,7 @@ func TestSettingsPublicationFailureIsServerErrorWithoutPathLeak(t *testing.T) {
 		t.Fatal(err)
 	}
 	router := chi.NewRouter()
-	mountEvidenceShareSettings(router, store)
+	mountEvidenceShareSettings(router, store, nil)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/settings", strings.NewReader(`{"project_ref":"project:one","values":{"image":{"quality":61}}}`)))
 	if response.Code != 500 || strings.Contains(response.Body.String(), dir) {
@@ -85,7 +90,7 @@ func TestUnavailableSettingsBlockCaptureRatherThanFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	router := chi.NewRouter()
-	MountScreenshotReal(router, &config.Config{Storage: config.StorageConfig{DataDir: dir}}, nil, nil)
+	MountScreenshotReal(router, &config.Config{Storage: config.StorageConfig{DataDir: dir}}, nil, nil, nil)
 	for _, path := range []string{"/settings", "/settings/preview", "/"} {
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"url":"https://example.com"}`)))
@@ -101,7 +106,7 @@ func TestEvidenceShareSettingsRoutesPreviewUpdateConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := chi.NewRouter()
-	mountEvidenceShareSettings(r, store)
+	mountEvidenceShareSettings(r, store, nil)
 	preview := httptest.NewRecorder()
 	r.ServeHTTP(preview, httptest.NewRequest(http.MethodPost, "/settings/preview", strings.NewReader(`{"project_ref":"project:homepage","values":{"presentation":{"theme":"dark"}}}`)))
 	if preview.Code != http.StatusOK {
@@ -124,4 +129,37 @@ func TestEvidenceShareSettingsRoutesPreviewUpdateConflict(t *testing.T) {
 	if body["schema"] != evidenceshare.SettingsSchema {
 		t.Fatalf("schema=%v", body["schema"])
 	}
+}
+
+// openRetentionTestStore commits one live artifact into a temp immutable store
+// for the governed retention route test.
+func openRetentionTestStore(t *testing.T) (*evidenceartifact.Store, func(), error) {
+	t.Helper()
+	root := t.TempDir()
+	store, _, err := evidenceartifact.OpenStore(evidenceartifact.StoreConfig{
+		Root: root, MaxStoreBytes: 64 << 20, MaxArtifacts: 100, MaxAssetBytes: 8 << 20,
+		StagingQuarantineAge: time.Hour, GCGrace: time.Hour,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := os.ReadFile(filepath.Join("..", "evidenceartifact", "testdata", "manifest.golden.json"))
+	if err != nil {
+		return nil, nil, err
+	}
+	var manifest evidenceartifact.Manifest
+	if err := json.Unmarshal(body, &manifest); err != nil {
+		return nil, nil, err
+	}
+	manifest.Assets[0].Path = "assets/proof.json"
+	manifest.Integrity.ManifestSHA256 = ""
+	manifest.Integrity.ManifestSHA256, err = evidenceartifact.ComputeManifestSHA256(manifest)
+	if err != nil {
+		return nil, nil, err
+	}
+	payload := []byte(`{"probe":"route-retention"}`)
+	if _, err := store.Commit(context.Background(), manifest, map[string]io.Reader{manifest.Assets[0].AssetID: bytes.NewReader(payload)}); err != nil {
+		return nil, nil, err
+	}
+	return store, func() {}, nil
 }

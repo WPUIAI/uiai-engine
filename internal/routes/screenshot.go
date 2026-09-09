@@ -95,10 +95,10 @@ func scopeWorkstream(scope *vision.FocusaScope) string {
 	return scope.DerivedWorkstreamKey()
 }
 
-func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore) {
+func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore, artifacts *evidenceartifact.Store) {
 	settingsStore, settingsErr := evidenceshare.NewSettingsStore(cfg.Storage.DataDir)
 	if settingsErr == nil {
-		mountEvidenceShareSettings(r, settingsStore)
+		mountEvidenceShareSettings(r, settingsStore, artifacts)
 	} else {
 		slog.Error("canonical evidence settings unavailable", "error", settingsErr)
 		r.HandleFunc("/settings", func(w http.ResponseWriter, _ *http.Request) { writeSettingsUnavailable(w) })

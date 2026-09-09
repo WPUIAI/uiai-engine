@@ -360,7 +360,7 @@ func (e *Engine) mountRoutes() {
 	// Screenshot & Share (Rod vision pool — Phase A8)
 	r.Route("/api/screenshot", func(r chi.Router) {
 		r.Use(routes.WithDeadline(45 * time.Second)) // C-010-04
-		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage)
+		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage, e.evidenceArtifacts)
 		routes.MountScreenshotCompare(r, e.cfg, e.vision, e.ai, e.credits, e.limiter, e.usage)
 	})
 	if e.evidenceRegistry != nil && e.evidenceArtifacts != nil {
