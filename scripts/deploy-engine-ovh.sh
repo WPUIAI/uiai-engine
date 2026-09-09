@@ -134,24 +134,30 @@ if [[ "$RUN_BROWSER_SMOKE" == "1" || "$RUN_BROWSER_SMOKE" == "true" ]]; then
 import base64, json, subprocess, sys, urllib.request, time
 scope = json.loads(base64.b64decode(sys.argv[1]))
 for base in sys.argv[2:]:
-    body = json.dumps({"url":"https://example.com", "width":800, "height":600, "focusa_scope":scope}).encode()
-    req = urllib.request.Request(base + "/api/session", data=body, headers={"Content-Type":"application/json"}, method="POST")
-    t0 = time.perf_counter()
-    sid = None
-    with urllib.request.urlopen(req, timeout=75) as resp:
-        raw = resp.read().decode(errors="replace")
-        ms = (time.perf_counter() - t0) * 1000
-        js = json.loads(raw)
-        session = js.get("session") or {}
-        sid = js.get("session_id") or js.get("id") or session.get("session_id") or session.get("id")
-        delivery = js.get("epwa_delivery") or {}
-        epwa = delivery.get("epwa") or {}
-        valid = (delivery.get("schema") == "uiai.epwa_delivery.v1" and delivery.get("state") == "ready" and js.get("delivery_state") == "ready" and str(epwa.get("record_url", "")).startswith("https://") and str(epwa.get("portable_url", "")).startswith("https://") and js.get("artifact_url") == epwa.get("record_url") and js.get("portable_url") == epwa.get("portable_url") and not any(key in js for key in ("screenshot", "imageBase64", "image_base64", "artifact_path", "result_path", "result_url")))
-        print(json.dumps({"smoke_base": base, "status": resp.status, "ms": round(ms, 2), "session_id_present": bool(sid), "epwa_delivery_ready": valid, "delivery_id": delivery.get("delivery_id")}, sort_keys=True), flush=True)
-        if not valid:
-            raise SystemExit("browser smoke did not return a ready HTTPS EPWA delivery")
-    if sid:
-        subprocess.run(["curl", "-sS", "-m", "15", "-X", "DELETE", base + "/api/session/" + sid], check=False)
+    ready = False
+    for attempt in (1, 2, 3, 4):
+        body = json.dumps({"url":"https://example.com", "width":800, "height":600, "focusa_scope":scope}).encode()
+        req = urllib.request.Request(base + "/api/session", data=body, headers={"Content-Type":"application/json"}, method="POST")
+        t0 = time.perf_counter()
+        sid = None
+        with urllib.request.urlopen(req, timeout=75) as resp:
+            raw = resp.read().decode(errors="replace")
+            ms = (time.perf_counter() - t0) * 1000
+            js = json.loads(raw)
+            session = js.get("session") or {}
+            sid = js.get("session_id") or js.get("id") or session.get("session_id") or session.get("id")
+            delivery = js.get("epwa_delivery") or {}
+            epwa = delivery.get("epwa") or {}
+            ready = (delivery.get("schema") == "uiai.epwa_delivery.v1" and delivery.get("state") == "ready" and js.get("delivery_state") == "ready" and str(epwa.get("record_url", "")).startswith("https://") and str(epwa.get("portable_url", "")).startswith("https://") and js.get("artifact_url") == epwa.get("record_url") and js.get("portable_url") == epwa.get("portable_url") and not any(key in js for key in ("screenshot", "imageBase64", "image_base64", "artifact_path", "result_path", "result_url")))
+            print(json.dumps({"smoke_base": base, "attempt": attempt, "status": resp.status, "ms": round(ms, 2), "session_id_present": bool(sid), "epwa_delivery_ready": ready, "delivery_state": delivery.get("state"), "delivery_id": delivery.get("delivery_id")}, sort_keys=True), flush=True)
+        if sid:
+            subprocess.run(["curl", "-sS", "-m", "15", "-X", "DELETE", base + "/api/session/" + sid], check=False)
+        if ready:
+            break
+        if attempt < 4:
+            time.sleep(20)
+    if not ready:
+        raise SystemExit("browser smoke did not return a ready HTTPS EPWA delivery")
 PY
 fi
 
