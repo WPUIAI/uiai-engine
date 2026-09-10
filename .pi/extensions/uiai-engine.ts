@@ -3,7 +3,7 @@ import { keyHint } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { assertEvidenceDelivery, evidenceRecoveryHint, evidenceScopeHeaders } from "./uiai/epwa-contract.mjs";
+import { assertEvidenceDelivery, evidenceRecoveryHint, evidenceScopeHeaders, findNonReadyArtifactDelivery } from "./uiai/epwa-contract.mjs";
 
 const evidenceRequestScope = new AsyncLocalStorage<unknown>();
 
@@ -405,6 +405,11 @@ function compactSummary(data: any, details: Record<string, any> = {}) {
 	try {
 		const links = assertEvidenceDelivery(data);
 		if (links) return `Evidence ready · ${links.recordURL}\nPortable copy · ${links.portableURL}`;
+		const pending = findNonReadyArtifactDelivery(data);
+		if (pending) {
+			const recovery = evidenceRecoveryHint(data);
+			return `${endpoint} evidence pending: ${pending}${recovery ? ` · ${recovery}` : ""} — pending reconciliation is not delivery`;
+		}
 	} catch {
 		return `${endpoint} evidence delivery unavailable — inspect result for reconciliation`;
 	}
