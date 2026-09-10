@@ -1,0 +1,254 @@
+{
+  "schema": "uiai.threat_scan_report.v1",
+  "corpus_sha256": "3e5d3b3a1ce7cea1b3afa6e6b8367fc84198ab7ba0d0b73a0c6ba3bbbb1d0102",
+  "code_ref": "docs/106v-reproof",
+  "entries": [
+    {
+      "id": "threat:gif-comment-metadata",
+      "class": "metadata_asymmetry",
+      "media_type": "image/gif",
+      "fixture_sha256": "ecdf139a2c7b4f7a05d5827926f62fd2f899dad9780e50701b781ef890fd976d",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "accepted_uncovered",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:html-script-injection",
+      "class": "active_content",
+      "media_type": "text/html",
+      "fixture_sha256": "1e88fe5a73e9700a27597a02ed7ec3c4cc1eb8e0d6ca580cd4473a5e7e6dc194",
+      "expected_outcome": "rejected:sanitizer_required",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sanitizer_required",
+      "match": true
+    },
+    {
+      "id": "threat:jpeg-exif-gps",
+      "class": "sanitizer_gateway",
+      "media_type": "image/jpeg",
+      "fixture_sha256": "6c9c1c1905b0e07f5b383cbe0525fc0334f03ac532c5248aea44b96c08342b4d",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:mp3-id3-geo",
+      "class": "metadata_asymmetry",
+      "media_type": "audio/mpeg",
+      "fixture_sha256": "aa0db85d605a59668f801780dec908445bae40c2ead778750f42ed3b7f6f28df",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "accepted_uncovered",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:mp4-udta-gps",
+      "class": "metadata_asymmetry",
+      "media_type": "video/mp4",
+      "fixture_sha256": "b69cdce45a3373bd582464a470a4c0ac76de453dac978861290e1d621736929d",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "accepted_uncovered",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:ogg-vorbis-location",
+      "class": "metadata_asymmetry",
+      "media_type": "audio/ogg",
+      "fixture_sha256": "c58df88b19d44a9b8e10406c8a551b1d9ab4087681699660e0d58c83eda65e3d",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "accepted_uncovered",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:png-clean-minimal",
+      "class": "sanitizer_gateway",
+      "media_type": "image/png",
+      "fixture_sha256": "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96",
+      "expected_outcome": "passed",
+      "defense_state": "defended",
+      "observed_outcome": "passed",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:png-exif-gps",
+      "class": "sanitizer_gateway",
+      "media_type": "image/png",
+      "fixture_sha256": "ca0d7884236f7950e655023ce362b7918eff63aee6f44a2d12f97fcc14f705df",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:png-magic-mismatch",
+      "class": "media_sniffing",
+      "media_type": "image/png",
+      "fixture_sha256": "ce32161d31b193d1b0b9347c36152f76ea1425426af53ea2fc3d6d5f2db661c6",
+      "expected_outcome": "rejected:mime_mismatch",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:mime_mismatch",
+      "match": true
+    },
+    {
+      "id": "threat:png-text-location",
+      "class": "sanitizer_gateway",
+      "media_type": "image/png",
+      "fixture_sha256": "0dbaed338ce7ca2161ce3d436c80375f094bcf808a0832af84d4ecd41e8e95dc",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:svg-active-content",
+      "class": "active_content",
+      "media_type": "image/svg+xml",
+      "fixture_sha256": "3f67c8be987aa1db0ef99ce330286efe1929e729f5f9d1695b5fd0b987246244",
+      "expected_outcome": "rejected:sanitizer_required",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sanitizer_required",
+      "match": true
+    },
+    {
+      "id": "threat:text-active-untrusted-private",
+      "class": "active_content",
+      "media_type": "text/plain",
+      "fixture_sha256": "605f4663b18fe677559362d87af532e382bdd9a28c214322f4b2077299d02b75",
+      "expected_outcome": "passed_with_findings",
+      "defense_state": "defended",
+      "observed_outcome": "passed_with_findings",
+      "observed_status": "passed_with_findings",
+      "observed_findings": [
+        "active_text_untrusted",
+        "pii_detected"
+      ],
+      "match": true
+    },
+    {
+      "id": "threat:text-clean",
+      "class": "sanitizer_gateway",
+      "media_type": "text/plain",
+      "fixture_sha256": "22c8fc79ed1886b83a53f996b3601684dc9acbf66f6a37671509571f2e9b7f1c",
+      "expected_outcome": "passed",
+      "defense_state": "defended",
+      "observed_outcome": "passed",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:text-pii-email-public",
+      "class": "pii",
+      "media_type": "text/plain",
+      "fixture_sha256": "de1a67e8111b6d91f1cc9ee2d54fdaa144473cd85b2775dbc2b005d981dd9fb1",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:text-secret-api-key",
+      "class": "secrets",
+      "media_type": "text/plain",
+      "fixture_sha256": "2c66730fbffaa076361f7c3d291251c8243143bbd4c2e462e0386a026cc295df",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:text-secret-bearer",
+      "class": "secrets",
+      "media_type": "text/plain",
+      "fixture_sha256": "2b31671188e697b7cf66066fa0f5768cffc9f28c27400bc0613f72ab3fb31c3d",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:text-secret-private-key",
+      "class": "secrets",
+      "media_type": "text/plain",
+      "fixture_sha256": "1bb7c8b981b9830a7b0098d5a4cb2283ef2eda3ee31926f4de50db96fba1e585",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:unknown-octet-stream",
+      "class": "media_sniffing",
+      "media_type": "application/octet-stream",
+      "fixture_sha256": "74f81fe167d99b4cb41d6d0ccda82278caee9f3e2f25d5e5a3936ff3dcec60d0",
+      "expected_outcome": "rejected:unsafe_media",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:unsafe_media",
+      "match": true
+    },
+    {
+      "id": "threat:wav-list-comment",
+      "class": "metadata_asymmetry",
+      "media_type": "audio/wav",
+      "fixture_sha256": "7a25eab9e7400f2c62bedca853687ad7f007949875fe300046e111ac509ac4ac",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "accepted_uncovered",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:webm-ebml-tags",
+      "class": "metadata_asymmetry",
+      "media_type": "video/webm",
+      "fixture_sha256": "cdc9fb42b744ac152265a9b4feeea3ff8de84f6825148892d58a26d611d79e3b",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "accepted_uncovered",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:webp-exif-metadata",
+      "class": "sanitizer_gateway",
+      "media_type": "image/webp",
+      "fixture_sha256": "5cc334e1efcf0fae761d03735bb6f0b51edd9a395bba1e5460be3a8ca9a255bc",
+      "expected_outcome": "rejected:sensitive_content",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:zip-polyglot",
+      "class": "sanitizer_gateway",
+      "media_type": "application/zip",
+      "fixture_sha256": "3d2cf2492a6475c87dbec5dd2ba8bdb2670350e80a5f7047d9e32007691079aa",
+      "expected_outcome": "rejected:sanitizer_required",
+      "defense_state": "defended",
+      "observed_outcome": "rejected:sanitizer_required",
+      "match": true
+    }
+  ],
+  "uncovered_ids": [
+    "threat:gif-comment-metadata",
+    "threat:mp3-id3-geo",
+    "threat:mp4-udta-gps",
+    "threat:ogg-vorbis-location",
+    "threat:wav-list-comment",
+    "threat:webm-ebml-tags"
+  ],
+  "summary": {
+    "total": 22,
+    "matched": 22,
+    "uncovered": 6,
+    "unexpected": 0
+  }
+}
