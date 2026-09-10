@@ -74,6 +74,7 @@ Status per row after the merged closure-governance amendment (`5bf38da7`) and th
 | `106s` bidirectional index | CG-36 | covered |
 | `106i` validity/claim governance | CG-31 | covered |
 | `106h` evidence integrity | CG-04/05/06/28 | covered |
+| CG-04 independent join | CG-04 | **accepted** — `106x` cycle-3 re-review VERDICT: PASS at `21c67290` (corpus artifact-byte binding + G-1..G-8 fixtures; two-cycle budget exhausted); hardening test additions tracked in `106x` |
 | `106b` publication semantics | CG-16/17/22 | covered (CG-17 delivery-result fixtures added) |
 | `106d` Action Deck operations | CG-10/11/29 | covered (export op added) |
 | `106a` portability matrix | CG-12/13/21/22 | covered (viewport/relative-route/reverse-proxy/survival added) |
