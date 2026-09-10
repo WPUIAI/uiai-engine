@@ -87,8 +87,13 @@ export function evidenceRecoveryHint(value) {
 }
 
 // One delivery boundary for MCP and native Pi. A ready label alone is not delivery.
+// Raw artifact payload fields always fail closed. Non-ready delivery state fails
+// closed for artifact consumers (required=true) and surfaces truthfully for
+// read-only callers (required=false): pending reconciliation never becomes
+// success, but it also no longer blocks record-page navigation or status reads.
 export function assertEvidenceDelivery(value, required = false) {
-  const problem = findRawArtifactField(value) || findNonReadyArtifactDelivery(value);
+  const rawProblem = findRawArtifactField(value);
+  const problem = rawProblem || (required ? findNonReadyArtifactDelivery(value) : "");
   const recovery = evidenceRecoveryHint(value);
   const fail = (reason) => {
     const error = new Error(`EPWA delivery unavailable: ${reason}${recovery ? `; ${recovery}` : ""}`);
@@ -99,18 +104,24 @@ export function assertEvidenceDelivery(value, required = false) {
   if (required && value?.schema !== "uiai.epwa_delivery.v1" && !value?.epwa_delivery) {
     fail("required evidence envelope missing; producer reconciliation required");
   }
-  const visit = (entry) => {
+  const visit = (entry, required) => {
     if (!entry || typeof entry !== "object") return null;
     const envelope = entry.schema === "uiai.epwa_delivery.v1" ? entry : entry.epwa_delivery;
     if (!envelope) {
       let first = null;
       for (const child of Object.values(entry)) {
-        const links = visit(child);
-        if (!first) first = links;
+        const links = visit(child, required);
+      if (!first) first = links;
       }
       return first;
     }
-    if (envelope.schema !== "uiai.epwa_delivery.v1" || envelope.state !== "ready" ||
+    if (envelope.state !== "ready") {
+      // Pending/blocked envelopes are truthful state, not delivery claims; only
+      // artifact consumers (required=true) fail on them.
+      if (required) fail("malformed ready evidence envelope");
+      return null;
+    }
+    if (envelope.schema !== "uiai.epwa_delivery.v1" ||
         typeof envelope.artifact?.artifact_ref !== "string" || !envelope.artifact.artifact_ref.trim()) {
       fail("malformed ready evidence envelope");
     }

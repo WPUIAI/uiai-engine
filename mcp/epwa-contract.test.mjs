@@ -86,6 +86,13 @@ test("pending publication retains reconciliation without returning raw evidence"
     error => error.message.includes("$.screenshot") && !error.message.includes("private-bytes"));
 });
 
+test("non-ready delivery blocks artifact consumers but truthfully surfaces for read-only callers", () => {
+  const pending = { session: { id: "view-session" }, epwa_delivery: { state: "pending_reconcile" }, recovery_ref: "reconcile:epwa-scope-required" };
+  assert.throws(() => assertEvidenceDelivery(pending, true), /\$\.delivery_state/);
+  assert.equal(assertEvidenceDelivery(pending), null);
+  assert.throws(() => assertEvidenceDelivery({ session: { id: "view" }, screenshot: "raw-pixels" }), /\$\.screenshot/);
+});
+
 test("failed session publication retains a cleanup handle without raw pixels", () => {
   assert.throws(() => assertEvidenceDelivery({ session: { id: "created-session" }, screenshot: "private-bytes" }),
     error => error.message.includes('session_id="created-session"') && !error.message.includes("private-bytes"));
