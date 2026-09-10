@@ -3,6 +3,18 @@
   "policy_ref": "uiai.evidence_security.strict.v1",
   "entries": [
     {
+      "class": "formula_injection",
+      "id": "threat:csv-formula-injection",
+      "description": "CSV formula injection activates in spreadsheet consumers (G-7)",
+      "media_type": "text/csv",
+      "fixture": "fixtures/csv-formula-injection.bin",
+      "fixture_sha256": "b2e3f28e1969d3bff994e72905a8f012156ccd22f63b623935105b335258e2a8",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
+      "access_class": "private_team",
+      "redaction_state": "none"
+    },
+    {
       "class": "metadata_asymmetry",
       "id": "threat:gif-comment-metadata",
       "description": "GIF comment extension carrying a private address; magic check passes, metadata persists (G-1)",
@@ -21,6 +33,18 @@
       "fixture_sha256": "1e88fe5a73e9700a27597a02ed7ec3c4cc1eb8e0d6ca580cd4473a5e7e6dc194",
       "expected_outcome": "rejected:sanitizer_required",
       "defense_state": "defended"
+    },
+    {
+      "class": "metadata_asymmetry",
+      "id": "threat:jpeg-com-icc-metadata",
+      "description": "JPEG COM comment and APP2 ICC profile carry device metadata; only APP1 Exif and XMP are rejected (G-2)",
+      "media_type": "image/jpeg",
+      "fixture": "fixtures/jpeg-com-icc-metadata.bin",
+      "fixture_sha256": "60486d3801270a4131203a8528dd62007969d97aef67ce2dd1d22a01374d5ae2",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "access_class": "private_team",
+      "redaction_state": "none"
     },
     {
       "class": "sanitizer_gateway",
@@ -63,6 +87,18 @@
       "defense_state": "uncovered_hardening"
     },
     {
+      "class": "content_mislabeling",
+      "id": "threat:pdf-shape-as-text",
+      "description": "Binary document magic re-declared as text/plain passes; text classes have no magic rejection (G-4)",
+      "media_type": "text/plain",
+      "fixture": "fixtures/pdf-shape-as-text.bin",
+      "fixture_sha256": "8ce19ae58a0951bf6f8823a76db3ed7baabbb987bf331832db5e5ce946ab12a0",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
+      "access_class": "private_team",
+      "redaction_state": "none"
+    },
+    {
       "class": "sanitizer_gateway",
       "id": "threat:png-clean-minimal",
       "description": "Clean minimal PNG with no metadata chunks",
@@ -91,6 +127,18 @@
       "fixture_sha256": "ce32161d31b193d1b0b9347c36152f76ea1425426af53ea2fc3d6d5f2db661c6",
       "expected_outcome": "rejected:mime_mismatch",
       "defense_state": "defended"
+    },
+    {
+      "class": "polyglot",
+      "id": "threat:png-polyglot-script",
+      "description": "PNG body embeds HTML/script and a secret; binary containers skip content scanning (G-3)",
+      "media_type": "image/png",
+      "fixture": "fixtures/png-polyglot-script.bin",
+      "fixture_sha256": "68a9fed8db27f45fc19c76832ddc882dd482b97148fb6503a09a29d8023c3308",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "access_class": "private_team",
+      "redaction_state": "none"
     },
     {
       "class": "sanitizer_gateway",
@@ -123,6 +171,18 @@
       "defense_state": "defended"
     },
     {
+      "class": "prompt_injection",
+      "id": "threat:text-active-untrusted-public",
+      "description": "Public-safe policy accepts untrusted instruction-like text as typed findings without raw exposure",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-active-untrusted-public.bin",
+      "fixture_sha256": "d116fc2eca114927254dee139884aa24e3492fae432afc898faa4b13ed4a0a10",
+      "expected_outcome": "passed_with_findings",
+      "defense_state": "defended",
+      "access_class": "public_safe",
+      "redaction_state": "none"
+    },
+    {
       "class": "sanitizer_gateway",
       "id": "threat:text-clean",
       "description": "Clean text asset",
@@ -133,6 +193,18 @@
       "defense_state": "defended"
     },
     {
+      "class": "prompt_injection",
+      "id": "threat:text-injection-paraphrase",
+      "description": "Paraphrased prompt injection bypasses the two literal active-text patterns (G-5)",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-injection-paraphrase.bin",
+      "fixture_sha256": "9e835d8aa2023df0c1511d8fa4331d9b383227b972236c3e731edcb0068b1919",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
+      "access_class": "private_team",
+      "redaction_state": "none"
+    },
+    {
       "class": "pii",
       "id": "threat:text-pii-email-public",
       "description": "PII email in public-safe policy",
@@ -140,7 +212,20 @@
       "fixture": "fixtures/text-pii-email-public.bin",
       "fixture_sha256": "de1a67e8111b6d91f1cc9ee2d54fdaa144473cd85b2775dbc2b005d981dd9fb1",
       "expected_outcome": "rejected:sensitive_content",
-      "defense_state": "defended"
+      "defense_state": "defended",
+      "access_class": "public_safe"
+    },
+    {
+      "class": "redaction_proof",
+      "id": "threat:text-pii-redacted-claim",
+      "description": "Redacted-claim asset still containing PII passes with pii_detected only - content-level redaction is not proven (G-8)",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-pii-redacted-claim.bin",
+      "fixture_sha256": "bfb880125e5cc8b5abe8caeea6b73679e37c39bc2cb2d4a46f3d0aa7a670ec91",
+      "expected_outcome": "passed_with_findings",
+      "defense_state": "uncovered_hardening",
+      "access_class": "private_team",
+      "redaction_state": "redacted"
     },
     {
       "class": "secrets",
@@ -161,6 +246,30 @@
       "fixture_sha256": "2b31671188e697b7cf66066fa0f5768cffc9f28c27400bc0613f72ab3fb31c3d",
       "expected_outcome": "rejected:sensitive_content",
       "defense_state": "defended"
+    },
+    {
+      "class": "secrets",
+      "id": "threat:text-secret-gcp-service-account",
+      "description": "GCP service-account JSON without a PEM body passes secret scanning (G-6)",
+      "media_type": "application/json",
+      "fixture": "fixtures/text-secret-gcp-service-account.json.bin",
+      "fixture_sha256": "97c5b7d780c7eb16fcd5e3bc71af0e4d3b6c4cb8359c1ef94bbac3a207a843ac",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
+      "access_class": "private_team",
+      "redaction_state": "none"
+    },
+    {
+      "class": "secrets",
+      "id": "threat:text-secret-jwt",
+      "description": "JWT session token not matched by secret patterns (G-6)",
+      "media_type": "text/plain",
+      "fixture": "fixtures/text-secret-jwt.bin",
+      "fixture_sha256": "ced2fa87574497c08127acba3f5cc326b4a3d1bd80d549df23bda02268514969",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
+      "access_class": "private_team",
+      "redaction_state": "none"
     },
     {
       "class": "secrets",

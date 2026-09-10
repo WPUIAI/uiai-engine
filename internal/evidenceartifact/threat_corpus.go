@@ -34,12 +34,18 @@ type ThreatCorpusEntry struct {
 	FixtureSHA256   string             `json:"fixture_sha256"`
 	ExpectedOutcome string             `json:"expected_outcome"`
 	DefenseState    ThreatDefenseState `json:"defense_state"`
+	AccessClass     AccessClass        `json:"access_class,omitempty"`
+	RedactionState  RedactionState     `json:"redaction_state,omitempty"`
 }
 
 type ThreatCorpus struct {
 	Schema    string              `json:"schema"`
 	PolicyRef string              `json:"policy_ref"`
 	Entries   []ThreatCorpusEntry `json:"entries"`
+
+	// FileSHA256 binds the report to the committed corpus.json artifact bytes,
+	// not an in-memory re-marshal. It is empty for structs not loaded from disk.
+	FileSHA256 string `json:"-"`
 }
 
 // ThreatScanReport is the deterministic, hash-bound producer artifact for the
@@ -87,6 +93,7 @@ func LoadThreatCorpus(path string) (ThreatCorpus, error) {
 	if err := corpus.Validate(); err != nil {
 		return ThreatCorpus{}, err
 	}
+	corpus.FileSHA256 = textSHA256(string(body))
 	return corpus, nil
 }
 
@@ -112,10 +119,26 @@ func (c ThreatCorpus) Validate() error {
 		if entry.ExpectedOutcome == "" {
 			return fmt.Errorf("threat corpus entry %s expected outcome: %w", entry.ID, ErrUnsafeContent)
 		}
+		switch entry.AccessClass {
+		case AccessPrivateTeam, AccessPublicSafe, AccessLocal, AccessLAN, AccessTailnet, AccessUnlisted, "":
+		default:
+			return fmt.Errorf("threat corpus entry %s access class: %w", entry.ID, ErrUnsafeContent)
+		}
+		switch entry.RedactionState {
+		case RedactionNone, RedactionRedacted, RedactionBlocked, RedactionPublicSafe, "":
+		default:
+			return fmt.Errorf("threat corpus entry %s redaction state: %w", entry.ID, ErrUnsafeContent)
+		}
+		if entry.AccessClass == "" {
+			entry.AccessClass = AccessPrivateTeam
+		}
+		if entry.RedactionState == "" {
+			entry.RedactionState = RedactionNone
+		}
 		if entry.DefenseState != DefenseDefended && entry.DefenseState != DefenseUncoveredHardening {
 			return fmt.Errorf("threat corpus entry %s defense state %q: %w", entry.ID, entry.DefenseState, ErrUnsafeContent)
 		}
-		if entry.DefenseState == DefenseUncoveredHardening && !strings.HasPrefix(entry.ExpectedOutcome, "accepted") {
+		if entry.DefenseState == DefenseUncoveredHardening && !strings.HasPrefix(entry.ExpectedOutcome, "accepted") && !strings.HasPrefix(entry.ExpectedOutcome, "passed") {
 			return fmt.Errorf("threat corpus entry %s uncovered defense must expect acceptance: %w", entry.ID, ErrUnsafeContent)
 		}
 	}
@@ -207,15 +230,14 @@ func RunThreatScan(corpus ThreatCorpus, fixturesDir string, inspector AssetInspe
 	if inspector == nil || strings.TrimSpace(codeRef) == "" {
 		return ThreatScanReport{}, ErrInspectionUnavailable
 	}
-	corpusBody, err := json.Marshal(corpus)
-	if err != nil {
-		return ThreatScanReport{}, err
+	if corpus.FileSHA256 == "" {
+		return ThreatScanReport{}, fmt.Errorf("threat corpus must be loaded from its committed artifact: %w", ErrUnsafeContent)
 	}
 	entries := append([]ThreatCorpusEntry(nil), corpus.Entries...)
 	sort.Slice(entries, func(left, right int) bool { return entries[left].ID < entries[right].ID })
 	report := ThreatScanReport{
 		Schema:       ThreatScanReportSchema,
-		CorpusSHA256: textSHA256(string(corpusBody)),
+		CorpusSHA256: corpus.FileSHA256,
 		CodeRef:      codeRef,
 		Entries:      make([]ThreatScanEntry, 0, len(entries)),
 	}
@@ -251,7 +273,7 @@ func scanCorpusEntry(entry ThreatCorpusEntry, fixturesDir string, inspector Asse
 		Path:     path,
 		Asset:    Asset{AssetID: entry.ID, MediaType: entry.MediaType, ByteSize: size, SHA256: assetSHA},
 		Security: Security{PolicyRef: StrictSecurityPolicyV1},
-		Policy:   Policy{AccessClass: policyClassFor(entry.ID), RedactionState: RedactionNone},
+		Policy:   Policy{AccessClass: entry.AccessClass, RedactionState: entry.RedactionState},
 	}
 	inspection, inspectErr := inspector.Inspect(context.Background(), request)
 	switch {
@@ -259,7 +281,7 @@ func scanCorpusEntry(entry ThreatCorpusEntry, fixturesDir string, inspector Asse
 		record.ObservedStatus = inspection.Status
 		record.ObservedFindings = append([]string(nil), inspection.FindingCodes...)
 		record.ObservedOutcome = string(inspection.Status)
-		if entry.DefenseState == DefenseUncoveredHardening && (record.ObservedOutcome == "passed" || record.ObservedOutcome == "passed_with_findings") {
+		if entry.DefenseState == DefenseUncoveredHardening && (record.ObservedOutcome == "passed" || record.ObservedOutcome == "passed_with_findings") && entry.ExpectedOutcome == "accepted_uncovered" {
 			record.ObservedOutcome = "accepted_uncovered"
 		}
 	case errors.Is(inspectErr, ErrSensitiveContent):
@@ -275,13 +297,6 @@ func scanCorpusEntry(entry ThreatCorpusEntry, fixturesDir string, inspector Asse
 	}
 	record.Match = record.ObservedOutcome == entry.ExpectedOutcome
 	return record
-}
-
-func policyClassFor(id string) AccessClass {
-	if id == "threat:text-pii-email-public" {
-		return AccessPublicSafe
-	}
-	return AccessPrivateTeam
 }
 
 func stageFixture(path, expectedSHA string) (string, int64, error) {

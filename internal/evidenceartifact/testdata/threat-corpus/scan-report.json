@@ -1,8 +1,19 @@
 {
   "schema": "uiai.threat_scan_report.v1",
-  "corpus_sha256": "3e5d3b3a1ce7cea1b3afa6e6b8367fc84198ab7ba0d0b73a0c6ba3bbbb1d0102",
-  "code_ref": "docs/106v-reproof",
+  "corpus_sha256": "15e64d01069d3a967dd0b35971f5646f9511906f6518f75f357a4ce3da18e186",
+  "code_ref": "cg04-cycle2",
   "entries": [
+    {
+      "id": "threat:csv-formula-injection",
+      "class": "formula_injection",
+      "media_type": "text/csv",
+      "fixture_sha256": "b2e3f28e1969d3bff994e72905a8f012156ccd22f63b623935105b335258e2a8",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "passed",
+      "observed_status": "passed",
+      "match": true
+    },
     {
       "id": "threat:gif-comment-metadata",
       "class": "metadata_asymmetry",
@@ -22,6 +33,17 @@
       "expected_outcome": "rejected:sanitizer_required",
       "defense_state": "defended",
       "observed_outcome": "rejected:sanitizer_required",
+      "match": true
+    },
+    {
+      "id": "threat:jpeg-com-icc-metadata",
+      "class": "metadata_asymmetry",
+      "media_type": "image/jpeg",
+      "fixture_sha256": "60486d3801270a4131203a8528dd62007969d97aef67ce2dd1d22a01374d5ae2",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "accepted_uncovered",
+      "observed_status": "passed",
       "match": true
     },
     {
@@ -68,6 +90,17 @@
       "match": true
     },
     {
+      "id": "threat:pdf-shape-as-text",
+      "class": "content_mislabeling",
+      "media_type": "text/plain",
+      "fixture_sha256": "8ce19ae58a0951bf6f8823a76db3ed7baabbb987bf331832db5e5ce946ab12a0",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "passed",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
       "id": "threat:png-clean-minimal",
       "class": "sanitizer_gateway",
       "media_type": "image/png",
@@ -96,6 +129,17 @@
       "expected_outcome": "rejected:mime_mismatch",
       "defense_state": "defended",
       "observed_outcome": "rejected:mime_mismatch",
+      "match": true
+    },
+    {
+      "id": "threat:png-polyglot-script",
+      "class": "polyglot",
+      "media_type": "image/png",
+      "fixture_sha256": "68a9fed8db27f45fc19c76832ddc882dd482b97148fb6503a09a29d8023c3308",
+      "expected_outcome": "accepted_uncovered",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "accepted_uncovered",
+      "observed_status": "passed",
       "match": true
     },
     {
@@ -134,12 +178,37 @@
       "match": true
     },
     {
+      "id": "threat:text-active-untrusted-public",
+      "class": "prompt_injection",
+      "media_type": "text/plain",
+      "fixture_sha256": "d116fc2eca114927254dee139884aa24e3492fae432afc898faa4b13ed4a0a10",
+      "expected_outcome": "passed_with_findings",
+      "defense_state": "defended",
+      "observed_outcome": "passed_with_findings",
+      "observed_status": "passed_with_findings",
+      "observed_findings": [
+        "active_text_untrusted"
+      ],
+      "match": true
+    },
+    {
       "id": "threat:text-clean",
       "class": "sanitizer_gateway",
       "media_type": "text/plain",
       "fixture_sha256": "22c8fc79ed1886b83a53f996b3601684dc9acbf66f6a37671509571f2e9b7f1c",
       "expected_outcome": "passed",
       "defense_state": "defended",
+      "observed_outcome": "passed",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:text-injection-paraphrase",
+      "class": "prompt_injection",
+      "media_type": "text/plain",
+      "fixture_sha256": "9e835d8aa2023df0c1511d8fa4331d9b383227b972236c3e731edcb0068b1919",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
       "observed_outcome": "passed",
       "observed_status": "passed",
       "match": true
@@ -152,6 +221,20 @@
       "expected_outcome": "rejected:sensitive_content",
       "defense_state": "defended",
       "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:text-pii-redacted-claim",
+      "class": "redaction_proof",
+      "media_type": "text/plain",
+      "fixture_sha256": "bfb880125e5cc8b5abe8caeea6b73679e37c39bc2cb2d4a46f3d0aa7a670ec91",
+      "expected_outcome": "passed_with_findings",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "passed_with_findings",
+      "observed_status": "passed_with_findings",
+      "observed_findings": [
+        "pii_detected"
+      ],
       "match": true
     },
     {
@@ -172,6 +255,28 @@
       "expected_outcome": "rejected:sensitive_content",
       "defense_state": "defended",
       "observed_outcome": "rejected:sensitive_content",
+      "match": true
+    },
+    {
+      "id": "threat:text-secret-gcp-service-account",
+      "class": "secrets",
+      "media_type": "application/json",
+      "fixture_sha256": "97c5b7d780c7eb16fcd5e3bc71af0e4d3b6c4cb8359c1ef94bbac3a207a843ac",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "passed",
+      "observed_status": "passed",
+      "match": true
+    },
+    {
+      "id": "threat:text-secret-jwt",
+      "class": "secrets",
+      "media_type": "text/plain",
+      "fixture_sha256": "ced2fa87574497c08127acba3f5cc326b4a3d1bd80d549df23bda02268514969",
+      "expected_outcome": "passed",
+      "defense_state": "uncovered_hardening",
+      "observed_outcome": "passed",
+      "observed_status": "passed",
       "match": true
     },
     {
@@ -238,17 +343,25 @@
     }
   ],
   "uncovered_ids": [
+    "threat:csv-formula-injection",
     "threat:gif-comment-metadata",
+    "threat:jpeg-com-icc-metadata",
     "threat:mp3-id3-geo",
     "threat:mp4-udta-gps",
     "threat:ogg-vorbis-location",
+    "threat:pdf-shape-as-text",
+    "threat:png-polyglot-script",
+    "threat:text-injection-paraphrase",
+    "threat:text-pii-redacted-claim",
+    "threat:text-secret-gcp-service-account",
+    "threat:text-secret-jwt",
     "threat:wav-list-comment",
     "threat:webm-ebml-tags"
   ],
   "summary": {
-    "total": 22,
-    "matched": 22,
-    "uncovered": 6,
+    "total": 31,
+    "matched": 31,
+    "uncovered": 14,
     "unexpected": 0
   }
 }
