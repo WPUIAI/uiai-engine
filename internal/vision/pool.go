@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -198,8 +199,15 @@ drained:
 		}
 	}
 
+	// Dedicated per-process profile: a shared default profile makes the
+	// second engine instance fail every relaunch on chromium's SingletonLock
+	// while the first instance's browser is alive (2026-09-11 OVH wedge:
+	// w2 relaunches hit ErrLaunchTimeout for the entire main-engine browser
+	// lifetime). Each process gets its own user-data-dir under os.TempDir().
+	profileDir := filepath.Join(os.TempDir(), fmt.Sprintf("uiai-engine-chromium-%d", os.Getpid()))
 	l := launcher.New().
 		Headless(true).
+		UserDataDir(profileDir).
 		// Flags NOT in Rod defaults — add explicitly
 		Set("disable-gpu").
 		Set("no-sandbox").
