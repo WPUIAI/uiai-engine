@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,9 @@ import (
 // TestSessionPressDispatchesKeydown exercises the full engine session path
 // (SessionManager.Open → Session.Press) — the same path the HTTP route uses.
 func TestSessionPressDispatchesKeydown(t *testing.T) {
+	if os.Getenv("UIAI_INPUT_TESTS") == "" {
+		t.Skip("input-delivery test requires a reliable local browser; set UIAI_INPUT_TESTS=1")
+	}
 	pool, err := NewPoolWithConfig(PoolConfig{MaxPages: 2, AllowPrivateURLs: true})
 	if err != nil {
 		t.Fatalf("pool: %v", err)

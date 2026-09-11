@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -40,6 +41,9 @@ func acquirePageWithTimeout(t *testing.T, p *Pool, d time.Duration) *rod.Page {
 // engine's pool/session path: if Press works, the page-level keydown listener
 // must see the event. (Regression harness for the #225/#226 turn.)
 func TestPressDispatchesKeydown(t *testing.T) {
+	if os.Getenv("UIAI_INPUT_TESTS") == "" {
+		t.Skip("input-delivery test requires a reliable local browser; set UIAI_INPUT_TESTS=1")
+	}
 	p, err := NewPoolWithConfig(PoolConfig{MaxPages: 2, AllowPrivateURLs: true})
 	if err != nil {
 		t.Fatalf("pool: %v", err)
