@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-rod/rod/lib/input"
@@ -121,7 +122,44 @@ func (s *Session) Select(selector string, values []string) (*SnapResult, error) 
 	return s.snap(start)
 }
 
-// Press sends a keyboard key (Enter, Tab, Escape, ArrowDown, etc).
+// modifierKeys maps accepted modifier names (case-insensitive) to Rod keys.
+var modifierKeys = map[string]input.Key{
+	"shift":   input.ShiftLeft,
+	"ctrl":    input.ControlLeft,
+	"control": input.ControlLeft,
+	"alt":     input.AltLeft,
+	"meta":    input.MetaLeft,
+	"super":   input.MetaLeft,
+	"cmd":     input.MetaLeft,
+	"command": input.MetaLeft,
+	"win":     input.MetaLeft,
+}
+
+const pressSupportedKeys = "Enter, Tab, Escape, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Backspace, Delete, Space, Home, End, PageUp, PageDown, single characters like a/5/?, modifiers shift/ctrl/alt/meta, and combos like ctrl+shift+t"
+
+// resolvePressPart maps one press/combo part to a Rod key and reports whether
+// it is a modifier: named navigation keys, named modifiers, or a single
+// printable character (a-z, 0-9, punctuation).
+func resolvePressPart(part string) (input.Key, bool, bool) {
+	if k, ok := keyMap[part]; ok {
+		return k, false, true
+	}
+	if k, ok := modifierKeys[strings.ToLower(part)]; ok {
+		return k, true, true
+	}
+	if len(part) == 1 {
+		k := input.Key(part[0])
+		if k.Info().KeyCode != 0 {
+			return k, false, true
+		}
+	}
+	return 0, false, false
+}
+
+// Press sends a keyboard key or modifier combo (canvas/remote-desktop control):
+// named navigation keys (Enter, Tab, Escape, ArrowDown, ...), modifiers
+// (shift, ctrl, alt, meta/super/cmd), single characters ("a", "5", "?"), and
+// combinations joined by "+" ("ctrl+a", "ctrl+shift+t", "meta").
 func (s *Session) Press(key string) (*SnapResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -131,12 +169,57 @@ func (s *Session) Press(key string) (*SnapResult, error) {
 
 	start := time.Now()
 
-	k, ok := keyMap[key]
-	if !ok {
-		return nil, fmt.Errorf("unknown key: %s (supported: Enter, Tab, Escape, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Backspace, Delete, Space, Home, End, PageUp, PageDown)", key)
+	trimmed := strings.TrimSpace(key)
+	if trimmed == "" {
+		return nil, fmt.Errorf("unknown key: %q (supported: %s)", key, pressSupportedKeys)
 	}
 
-	s.page.Keyboard.Press(k)
+	if k, ok := keyMap[trimmed]; ok {
+		if err := s.page.Keyboard.Press(k); err != nil {
+			return nil, fmt.Errorf("press %s failed: %w", trimmed, err)
+		}
+	} else {
+		parts := strings.Split(trimmed, "+")
+		var mods []input.Key
+		var main input.Key
+		haveMain := false
+		for _, part := range parts {
+			if part == "" {
+				continue
+			}
+			k, isMod, ok := resolvePressPart(part)
+			if !ok {
+				return nil, fmt.Errorf("unknown key: %s (supported: %s)", key, pressSupportedKeys)
+			}
+			if isMod {
+				mods = append(mods, k)
+				continue
+			}
+			if haveMain {
+				return nil, fmt.Errorf("unknown key: %s (combos accept at most one non-modifier key, e.g. ctrl+a or ctrl+shift+t)", key)
+			}
+			main, haveMain = k, true
+		}
+		if !haveMain && len(mods) == 0 {
+			return nil, fmt.Errorf("unknown key: %s (supported: %s)", key, pressSupportedKeys)
+		}
+		// Hold modifiers, press the main key, then release in reverse order.
+		for _, m := range mods {
+			if err := s.page.Keyboard.Press(m); err != nil {
+				return nil, fmt.Errorf("press %s failed: %w", trimmed, err)
+			}
+		}
+		if haveMain {
+			if err := s.page.Keyboard.Type(main); err != nil {
+				return nil, fmt.Errorf("press %s failed: %w", trimmed, err)
+			}
+		}
+		for i := len(mods) - 1; i >= 0; i-- {
+			if err := s.page.Keyboard.Release(mods[i]); err != nil {
+				return nil, fmt.Errorf("press %s failed: %w", trimmed, err)
+			}
+		}
+	}
 	time.Sleep(200 * time.Millisecond)
 	s.page.Timeout(2*time.Second).WaitDOMStable(100*time.Millisecond, 0.2)
 
@@ -145,7 +228,6 @@ func (s *Session) Press(key string) (*SnapResult, error) {
 
 	return s.snap(start)
 }
-
 // Back navigates browser history back.
 func (s *Session) Back() (*SnapResult, error) {
 	s.mu.Lock()

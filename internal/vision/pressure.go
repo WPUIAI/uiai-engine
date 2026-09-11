@@ -118,10 +118,17 @@ func (p *Pool) scheduleDrainRestart(reason string) {
 			time.Sleep(time.Second)
 		}
 		p.mu.Lock()
-		if p.active == 0 {
-			log.Printf("[vision] Recycling Chrome (%s)", reason)
-			p.restartBrowser()
-		}
+		zero := p.active == 0
 		p.mu.Unlock()
+		// restartBrowser takes p.mu internally; never call it while holding
+		// p.mu — sync.Mutex is not reentrant and this deadlocked the pool
+		// (2026-09-11 OVH outage: every session open blocked forever after
+		// an RSS-pressure recycle with zero active pages).
+		if zero {
+			log.Printf("[vision] Recycling Chrome (%s)", reason)
+			if err := p.restartBrowser(); err != nil {
+				log.Printf("[vision] Browser restart after recycle (%s) failed: %v", reason, err)
+			}
+		}
 	}()
 }

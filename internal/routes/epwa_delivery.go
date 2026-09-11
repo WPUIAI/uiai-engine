@@ -259,11 +259,14 @@ func epwaDeliveryRoot(cfg *config.Config) string {
 	return screenshotStoreDir()
 }
 
-func writeSessionSnapshot(w http.ResponseWriter, req *http.Request, cfg *config.Config, sess *vision.Session, snap *vision.SnapResult, successStatus int, extra map[string]any) {
+// writeSessionSnapshot returns false only when it wrote an EPWA publication
+// error instead of a successful snapshot response; session-opening routes use
+// that to close a session the caller never saw (#45 session-cap leak class).
+func writeSessionSnapshot(w http.ResponseWriter, req *http.Request, cfg *config.Config, sess *vision.Session, snap *vision.SnapResult, successStatus int, extra map[string]any) bool {
 	delivery, err := publishSessionSnapshotEPWA(req, cfg, sess, snap, epwadelivery.ProducerSessionVisual)
 	if err != nil {
 		writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_publication_failed", err, "", "", "reconcile:session-snapshot-epwa-publication")
-		return
+		return false
 	}
 	response := map[string]any{
 		"schema": "uiai.session_visual_result.v2", "width": snap.Width, "height": snap.Height,
@@ -287,6 +290,7 @@ func writeSessionSnapshot(w http.ResponseWriter, req *http.Request, cfg *config.
 		successStatus = http.StatusAccepted
 	}
 	writeJSON(w, successStatus, response)
+	return true
 }
 
 func publishSessionSnapshotEPWA(req *http.Request, cfg *config.Config, sess *vision.Session, snap *vision.SnapResult, producers ...epwadelivery.ProducerID) (epwadelivery.Delivery, error) {
