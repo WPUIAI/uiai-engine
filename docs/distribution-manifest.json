@@ -1,11 +1,11 @@
 {
   "schema": "uiai.distribution_manifest.v2",
-  "release_version": "2.0.12",
+  "release_version": "2.0.14",
   "artifacts": {},
   "compatibility_status": "compatible",
-  "source_commit": "21c03ec",
-  "generated_at": "2026-09-11T06:37:43.494939Z",
-  "engine_version": "2.0.12",
+  "source_commit": "fc05db2",
+  "generated_at": "2026-09-11T08:41:10.468223Z",
+  "engine_version": "2.0.14",
   "cockpit_version": "0.1.0-dev",
   "release_track": "engine"
 }
