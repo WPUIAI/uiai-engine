@@ -2,6 +2,7 @@ package vision
 
 import (
 	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -16,6 +17,9 @@ import (
 //  2. afterwards p.mu is releasable — with the old code the recycle
 //     goroutine self-deadlocks holding p.mu forever.
 func TestPressureRecycleDoesNotDeadlockPool(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("recycle path uses POSIX process control (kill -9); Windows browser lifecycle is tracked separately")
+	}
 	p := &Pool{}
 
 	// Simulate a live managed browser process that the recycle must kill.
