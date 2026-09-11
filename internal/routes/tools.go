@@ -804,7 +804,7 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_press",
-			"description": "Press a keyboard key: Enter, Tab, Escape, ArrowDown, ArrowUp, Backspace, Delete, Space, Home, End, PageUp, PageDown.",
+			"description": "Press a keyboard key or combo: navigation keys (Enter, Tab, Escape, ArrowDown/Up/Left/Right, Backspace, Delete, Space, Home, End, PageUp, PageDown), single characters (a, 5, ?), modifiers (shift, ctrl, alt, meta/super/cmd), and + combos (ctrl+a, ctrl+shift+t, meta) for canvas/remote-desktop control.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{

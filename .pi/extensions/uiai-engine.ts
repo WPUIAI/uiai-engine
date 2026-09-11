@@ -806,8 +806,8 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_browser_press",
 		label: "UIAI Browser Press",
-		description: "Press a keyboard key such as Enter, Tab, Escape, ArrowDown, or Backspace in the current session.",
-		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), key: Type.String({ description: "Keyboard key name" }) }),
+		description: "Press a keyboard key or combo: navigation keys (Enter, Tab, Escape, ArrowDown/Up/Left/Right, Backspace, Delete, Space, Home, End, PageUp, PageDown), single characters (a, 5, ?), modifiers (shift, ctrl, alt, meta/super/cmd), and + combos (ctrl+a, ctrl+shift+t, meta) for canvas/remote-desktop control.",
+		parameters: Type.Object({ session_id: Type.String({ description: "UIAI browser session id" }), key: Type.String({ description: "Key name, single character, or + combo (e.g. Enter, a, ctrl+shift+t, meta)" }) }),
 		async execute(_toolCallId, params) {
 			return textResult(withoutScreenshot(await post(`/api/session/${params.session_id}/press`, { key: params.key })), { endpoint: "/api/session/{id}/press" });
 		},

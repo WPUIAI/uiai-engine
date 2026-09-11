@@ -64,7 +64,11 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		}
 		sess.SetFocusaScope(resolveFocusaScope(body.FocusaScope, body.WorkpointID, body.ContinuityID, body.ProjectRoot, body.EvidenceRef))
 
-		writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusCreated, map[string]any{"session": sessionInfoPayload(sess)})
+		if !writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusCreated, map[string]any{"session": sessionInfoPayload(sess)}) {
+			// The caller never received a session id, so the session would
+			// leak until TTL and hold a per-scope slot; close it now.
+			sm.Close(sess.ID)
+		}
 	})
 
 	// Session-scoped routes
@@ -802,8 +806,21 @@ func resolveFocusaScope(scope *vision.FocusaScope, workpointID, continuityID, pr
 }
 
 func writeSessionError(w http.ResponseWriter, status int, class string, err error, sess *vision.Session, context ...map[string]any) {
-	if class == "url_not_allowed" && status >= 500 {
-		status = http.StatusBadRequest
+	// Caller-input failures are 4xx, not 500: retry/alert logic must not treat
+	// a bad selector/key or a full session scope as an engine outage (#226).
+	switch class {
+	case "selector_not_found":
+		if status >= 500 {
+			status = http.StatusNotFound
+		}
+	case "unknown_key", "url_not_allowed":
+		if status >= 500 {
+			status = http.StatusBadRequest
+		}
+	case "session_capacity":
+		if status >= 500 {
+			status = http.StatusTooManyRequests
+		}
 	}
 	details := map[string]any{}
 	for _, ctx := range context {
@@ -898,6 +915,10 @@ func classifySessionError(err error) string {
 		return "selector_not_found"
 	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline") || strings.Contains(msg, "timed out"):
 		return "timeout"
+	case strings.Contains(msg, "unknown key"):
+		return "unknown_key"
+	case strings.Contains(msg, "max sessions"):
+		return "session_capacity"
 	case strings.Contains(msg, "url scheme not allowed") || strings.Contains(msg, "url not allowed"):
 		return "url_not_allowed"
 	case strings.Contains(msg, "navigation") || strings.Contains(msg, "navigate"):
