@@ -450,7 +450,7 @@ func (r AuthenticityDigestReport) Validate() error {
 		return ErrAuthenticityDigestInvalid
 	}
 	for _, run := range r.PerRun {
-		if !validSHA256(run) {
+		if !validSHA256(run) || run != r.DigestSHA256 {
 			return ErrAuthenticityDigestInvalid
 		}
 	}

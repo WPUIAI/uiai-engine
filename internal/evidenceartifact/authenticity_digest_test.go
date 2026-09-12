@@ -108,6 +108,12 @@ func TestAuthenticityDigestDeterministicAndVerifiable(t *testing.T) {
 		t.Fatal("runs out of range accepted")
 	}
 	bad := first
+	bad.PerRun = append([]string(nil), first.PerRun...)
+	bad.PerRun[1] = "0000000000000000000000000000000000000000000000000000000000000000"
+	if err := VerifyAuthenticityDigestReport(bad, 2); err == nil {
+		t.Fatal("divergent later run accepted despite all_identical claim")
+	}
+	bad = first
 	bad.DigestSHA256 = ""
 	if err := VerifyAuthenticityDigestReport(bad, 2); err == nil {
 		t.Fatal("empty digest accepted")
