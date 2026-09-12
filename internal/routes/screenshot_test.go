@@ -41,6 +41,7 @@ func TestScreenshotAutomaticallyReturnsHumanViewableEvidenceShare(t *testing.T) 
 	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", "")
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
+	MountShortShare(router, cfg)
 	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	requestBody, err := json.Marshal(map[string]any{
 		"url": "https://focusa.dev/", "width": 375, "height": 812, "format": "png",
@@ -80,12 +81,12 @@ func TestScreenshotAutomaticallyReturnsHumanViewableEvidenceShare(t *testing.T) 
 		t.Fatalf("raw-only delivery fields escaped the EPWA gate: %#v", response)
 	}
 	viewerURL := response["artifact_url"].(string)
-	if !strings.HasPrefix(viewerURL, "https://engine.example/api/screenshot/share/") || !strings.HasSuffix(viewerURL, "/") {
-		t.Fatalf("artifact URL is not a canonical HTTPS EPWA viewer: %v", viewerURL)
+	if !strings.HasPrefix(viewerURL, "https://engine.example/e/") || !strings.HasSuffix(viewerURL, "/") {
+		t.Fatalf("artifact URL is not a friendly HTTPS EPWA webpage: %v", viewerURL)
 	}
 	portableURL := response["portable_url"].(string)
-	if !strings.HasPrefix(portableURL, viewerURL) || !strings.HasSuffix(portableURL, "/portable.zip") {
-		t.Fatalf("portable EPWA URL missing: %v", portableURL)
+	if !strings.HasSuffix(portableURL, ".zip") || strings.TrimSuffix(portableURL, ".zip") != strings.TrimSuffix(viewerURL, "/") {
+		t.Fatalf("portable EPWA URL missing: %v (viewer %v)", portableURL, viewerURL)
 	}
 	view := httptest.NewRecorder()
 	router.ServeHTTP(view, httptest.NewRequest(http.MethodGet, mustPath(t, viewerURL), nil))
@@ -111,6 +112,7 @@ func TestScreenshotEPWADeliveryCannotBeDisabledAndMissingScopeIsBlocked(t *testi
 		t.Fatal(err)
 	}
 	router := chi.NewRouter()
+	MountShortShare(router, cfg)
 	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	body, _ := json.Marshal(map[string]any{"url": "https://example.test", "format": "png", "inline": true})
 	recorder := httptest.NewRecorder()
@@ -131,7 +133,7 @@ func TestScreenshotEPWADeliveryCannotBeDisabledAndMissingScopeIsBlocked(t *testi
 	binding := delivery["epwa"].(map[string]any)
 	packageID := binding["package_id"].(string)
 	blockedViewer := httptest.NewRecorder()
-	router.ServeHTTP(blockedViewer, httptest.NewRequest(http.MethodGet, "/api/screenshot/share/"+packageID+"/", nil))
+	router.ServeHTTP(blockedViewer, httptest.NewRequest(http.MethodGet, "/e/"+packageID[:shortShareIDLength]+"/", nil))
 	if blockedViewer.Code != http.StatusNotFound {
 		t.Fatalf("unscoped package was exposed: status=%d", blockedViewer.Code)
 	}
@@ -140,6 +142,7 @@ func TestScreenshotEPWADeliveryCannotBeDisabledAndMissingScopeIsBlocked(t *testi
 func TestScreenshotFailsClosedWithoutCanonicalHTTPSBase(t *testing.T) {
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
+	MountShortShare(router, cfg)
 	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	body, _ := json.Marshal(map[string]any{"url": "https://example.test", "format": "png", "evidence_scope": completeEvidenceScope()})
 	recorder := httptest.NewRecorder()
@@ -158,6 +161,7 @@ func TestScreenshotFailsClosedWithoutCanonicalHTTPSBase(t *testing.T) {
 func TestPendingEPWADeliveryReconcilesToStableHTTPSIdentity(t *testing.T) {
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
+	MountShortShare(router, cfg)
 	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	body, _ := json.Marshal(map[string]any{"url": "https://example.test", "format": "png", "evidence_scope": completeEvidenceScope()})
 	capture := httptest.NewRecorder()
@@ -188,7 +192,7 @@ func TestPendingEPWADeliveryReconcilesToStableHTTPSIdentity(t *testing.T) {
 		t.Fatalf("reconciliation changed identity or missed revision: %#v", ready)
 	}
 	epwa := ready["epwa"].(map[string]any)
-	if !strings.HasPrefix(epwa["record_url"].(string), "https://evidence.example/engine/api/screenshot/share/") || !strings.HasSuffix(epwa["portable_url"].(string), "/portable.zip") {
+	if !strings.HasPrefix(epwa["record_url"].(string), "https://evidence.example/engine/e/") || !strings.HasSuffix(epwa["portable_url"].(string), ".zip") {
 		t.Fatalf("reconciliation omitted canonical HTTPS EPWA URLs: %#v", epwa)
 	}
 	replayed := httptest.NewRecorder()
@@ -201,6 +205,7 @@ func TestPendingEPWADeliveryReconcilesToStableHTTPSIdentity(t *testing.T) {
 func TestEPWAReconcileDetectsCorruptPortablePackage(t *testing.T) {
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
+	MountShortShare(router, cfg)
 	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 	body, _ := json.Marshal(map[string]any{"url": "https://example.test", "format": "png", "evidence_scope": completeEvidenceScope()})
 	capture := httptest.NewRecorder()
@@ -312,8 +317,8 @@ func TestEvidenceShareRouteServesPortablePackage(t *testing.T) {
 			if err := json.Unmarshal(recorder.Body.Bytes(), &list); err != nil || len(list.Packets) != 1 {
 				t.Fatalf("invalid packet index: %s", recorder.Body.String())
 			}
-			if !strings.HasSuffix(list.Packets[0].ThumbnailURL, "/"+id+"/screenshot.png") || !strings.HasPrefix(list.Packets[0].ThumbnailURL, "https://") {
-				t.Fatalf("missing canonical thumbnail: %s", list.Packets[0].ThumbnailURL)
+			if !strings.HasSuffix(list.Packets[0].ThumbnailURL, "/screenshot.png") || !strings.HasPrefix(list.Packets[0].ThumbnailURL, "https://") || !strings.Contains(list.Packets[0].ThumbnailURL, "/e/") {
+				t.Fatalf("missing friendly thumbnail: %s", list.Packets[0].ThumbnailURL)
 			}
 		}
 		if !strings.Contains(recorder.Body.String(), id) {
@@ -386,6 +391,7 @@ func TestEvidenceShareRelocatesAcrossHTTPSOrigins(t *testing.T) {
 	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", "")
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	originalRouter := chi.NewRouter()
+	MountShortShare(originalRouter, cfg)
 	originalRouter.Route("/api/screenshot", func(r chi.Router) { mountEvidenceShare(r, cfg) })
 	original := httptest.NewTLSServer(originalRouter)
 	defer original.Close()
@@ -398,7 +404,7 @@ func TestEvidenceShareRelocatesAcrossHTTPSOrigins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(delivery.EPWA.RecordURL, original.URL+"/api/screenshot/share/") {
+	if !strings.HasPrefix(delivery.EPWA.RecordURL, original.URL+"/e/") {
 		t.Fatalf("publication did not use configured HTTPS origin: %q", delivery.EPWA.RecordURL)
 	}
 	readResource := func(client *http.Client, target string) []byte {
@@ -428,6 +434,7 @@ func TestEvidenceShareRelocatesAcrossHTTPSOrigins(t *testing.T) {
 		t.Fatal(err)
 	}
 	copyRouter := chi.NewRouter()
+	MountShortShare(copyRouter, copyCfg)
 	for _, prefix := range []string{"", "/tenant/deep/install"} {
 		copyRouter.Route(prefix+"/api/screenshot", func(r chi.Router) { mountEvidenceShare(r, copyCfg) })
 	}
@@ -444,6 +451,9 @@ func TestEvidenceShareRelocatesAcrossHTTPSOrigins(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Friendly URLs live at the host root (/e/{short}/); subpath
+			// deployments keep the canonical share path, which is what this
+			// half of the test proves (configured base + subpath preservation).
 			recordURL := base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + delivery.EPWA.PackageID + "/"}).String()
 			if !strings.HasPrefix(recordURL, copied.URL+prefix+"/api/screenshot/share/") {
 				t.Fatalf("configured subpath lost: %s", recordURL)

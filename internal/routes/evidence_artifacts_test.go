@@ -72,6 +72,7 @@ func TestEvidenceArtifactCommitReadAndRebuildRoutes(t *testing.T) {
 	}
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: dataRoot}}
 	router := chi.NewRouter()
+	MountShortShare(router, cfg)
 	router.Route("/api/evidence/artifacts", func(r chi.Router) { MountEvidenceArtifacts(r, cfg, artifacts, registry) })
 	router.Route("/api/screenshot", func(r chi.Router) { mountEvidenceShare(r, cfg) })
 	multipartBytes := append([]byte(nil), body.Bytes()...)

@@ -357,6 +357,9 @@ func (e *Engine) mountRoutes() {
 		routes.MountMediaReal(r, e.cfg, e.credits, e.limiter, e.usage, e.mediaJobs)
 	})
 
+	// Friendly EPWA share URLs at the host root (/e/{short}/)
+	routes.MountShortShare(r, e.cfg)
+
 	// Screenshot & Share (Rod vision pool — Phase A8)
 	r.Route("/api/screenshot", func(r chi.Router) {
 		r.Use(routes.WithDeadline(45 * time.Second)) // C-010-04

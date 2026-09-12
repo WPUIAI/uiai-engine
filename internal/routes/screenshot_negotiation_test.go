@@ -22,6 +22,7 @@ func TestShareRecordContentNegotiation(t *testing.T) {
 	t.Setenv("UIAI_EVIDENCE_SHARE_DIR", "")
 	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
 	router := chi.NewRouter()
+	MountShortShare(router, cfg)
 	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
 
 	requestBody, err := json.Marshal(map[string]any{
@@ -63,13 +64,18 @@ func TestShareRecordContentNegotiation(t *testing.T) {
 	// Canonical no-slash record path exercises the negotiated handler itself.
 	recordPath := strings.TrimSuffix(mustPath(t, recordURL), "/")
 
-	// Browser negotiation: Accept: text/html → the EPWA viewer webpage.
+	// Browser negotiation: Accept: text/html → 302 to the EPWA viewer webpage.
 	browser := httptest.NewRecorder()
 	browserReq := httptest.NewRequest(http.MethodGet, recordPath, nil)
 	browserReq.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	router.ServeHTTP(browser, browserReq)
-	if browser.Code != http.StatusOK || browser.Header().Get("Content-Type") != "text/html; charset=utf-8" {
-		t.Fatalf("browser negotiation: %d %s", browser.Code, browser.Header().Get("Content-Type"))
+	if browser.Code != http.StatusFound || browser.Header().Get("Location") != recordPath+"/" {
+		t.Fatalf("browser negotiation: %d %s", browser.Code, browser.Header().Get("Location"))
+	}
+	viewer := httptest.NewRecorder()
+	router.ServeHTTP(viewer, httptest.NewRequest(http.MethodGet, recordPath+"/", nil))
+	if viewer.Code != http.StatusOK || viewer.Header().Get("Content-Type") != "text/html; charset=utf-8" {
+		t.Fatalf("viewer webpage: %d %s", viewer.Code, viewer.Header().Get("Content-Type"))
 	}
 
 	// Agent negotiation: default */* → durable JSON record.
