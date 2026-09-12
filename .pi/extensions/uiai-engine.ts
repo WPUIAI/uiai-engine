@@ -408,7 +408,7 @@ function compactSummary(data: any, details: Record<string, any> = {}) {
 		const pending = findNonReadyArtifactDelivery(data);
 		if (pending) {
 			const recovery = evidenceRecoveryHint(data);
-			return `${endpoint} evidence pending: ${pending}${recovery ? ` · ${recovery}` : ""} — pending reconciliation is not delivery`;
+			return `${endpoint} evidence pending: ${pending}${recovery ? ` · ${recovery}` : ""} — pending reconciliation is not delivery; attach a complete focusa_scope (project/workstream/workset/callgraph/workpoint/work-item/continuity) to publish and release the payload`;
 		}
 	} catch {
 		return `${endpoint} evidence delivery unavailable — inspect result for reconciliation`;
@@ -1020,9 +1020,20 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_evidence_share_inspect",
 		label: "UIAI Evidence Share Inspect",
-		description: "Inspect one immutable Screenshot Evidence Share Packet manifest by exact packet id.",
+		description: "Inspect one immutable Screenshot Evidence Share Packet manifest by exact packet id, or resolve any uiai-artifact:sha256 ref the engine issued to its EPWA linkage.",
 		parameters: sharePacketParameters,
-		async execute(_toolCallId, params) { return textResult(await callEngine(`/api/screenshot/share/${params.packet_id}`), { endpoint: "/api/screenshot/share/{id}" }); },
+		async execute(_toolCallId, params) {
+			const ref = String(params.packet_id || "");
+			if (ref.startsWith("uiai-artifact:sha256:") || /^[0-9a-f]{64}$/i.test(ref)) {
+				try {
+					const resolved = await callEngine(`/api/screenshot/artifact/${encodeURIComponent(ref)}`);
+					return textResult(resolved, { endpoint: "/api/screenshot/artifact/{ref}" });
+				} catch {
+					// Fall through to the share-packet path below.
+				}
+			}
+			return textResult(await callEngine(`/api/screenshot/share/${params.packet_id}`), { endpoint: "/api/screenshot/share/{id}" });
+		},
 	});
 	pi.registerTool({
 		name: "uiai_evidence_share_verify",

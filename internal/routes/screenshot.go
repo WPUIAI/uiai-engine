@@ -231,7 +231,7 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 		writeJSON(w, status, response)
 	})
 
-	mountScreenshotArtifact(r) // C-010-09 retrieval surface
+	mountScreenshotArtifact(r, cfg) // C-010-09 retrieval surface
 	mountEvidenceShare(r, cfg)
 	mountEPWADelivery(r, cfg)
 
@@ -256,15 +256,116 @@ func screenshotStoreDir() string {
 	return dir
 }
 
-// mountScreenshotArtifact preserves the legacy route only as an explicit fail-closed tombstone.
-func mountScreenshotArtifact(r chi.Router) {
+// mountScreenshotArtifact resolves artifacts the engine issued without ever
+// serving raw bytes: the legacy raw-artifact route stays a fail-closed
+// tombstone for unknown digests, but any digest the engine already published
+// as an EPWA package resolves to its typed EPWA linkage (record/portable
+// URLs) so callers can inspect what they hold (issue #224 acceptance).
+func mountScreenshotArtifact(r chi.Router, cfg *config.Config) {
 	r.Get("/artifact/{sha}", func(w http.ResponseWriter, req *http.Request) {
+		requested := normalizeArtifactRef(chi.URLParam(req, "sha"))
+		if packet, ok := findPublishedArtifactPacket(cfg, req, requested); ok {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"schema":         "uiai.evidence_artifact_resolve.v1",
+				"artifact_ref":   requested,
+				"delivery_state": "ready",
+				"epwa":           packet,
+				"posture":        "raw_bytes_never_served",
+				"note":           "raw screenshots are available only through an EPWA viewer and portable package",
+			})
+			return
+		}
 		writeJSON(w, http.StatusGone, map[string]any{
 			"schema": "uiai.epwa_delivery_error.v1", "code": "legacy_raw_artifact_removed",
 			"artifact_ref": chi.URLParam(req, "sha"),
 			"message":      "raw screenshots are available only through an EPWA viewer and portable package",
 		})
 	})
+}
+
+// normalizeArtifactRef accepts either the full typed ref or a bare 64-hex digest.
+func normalizeArtifactRef(ref string) string {
+	ref = strings.TrimSpace(ref)
+	if len(ref) == 64 && validShareID(ref) {
+		return "uiai-artifact:sha256:" + ref
+	}
+	return ref
+}
+
+// findPublishedArtifactPacket scans the share store for a package whose
+// artifact_ref matches, reusing the bounded listing walk (max 100 packets).
+func findPublishedArtifactPacket(cfg *config.Config, req *http.Request, artifactRef string) (map[string]any, bool) {
+	if artifactRef == "" {
+		return nil, false
+	}
+	entries, err := os.ReadDir(evidenceShareDir(cfg))
+	if err != nil {
+		return nil, false
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() > entries[j].Name() })
+	scanned := 0
+	for _, entry := range entries {
+		if !entry.IsDir() || !validShareID(entry.Name()) {
+			continue
+		}
+		if scanned >= 100 {
+			break
+		}
+		scanned++
+		directory := filepath.Join(evidenceShareDir(cfg), entry.Name())
+		body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
+		if err != nil {
+			continue
+		}
+		var ref string
+		var descriptor struct {
+			Schema string `json:"schema"`
+		}
+		if json.Unmarshal(body, &descriptor) != nil {
+			continue
+		}
+		switch descriptor.Schema {
+		case evidenceshare.Schema:
+			var manifest evidenceshare.Manifest
+			if json.Unmarshal(body, &manifest) == nil {
+				ref = manifest.ArtifactRef
+			}
+		case evidenceartifact.SchemaManifestV1:
+			var manifest evidenceartifact.Manifest
+			if json.Unmarshal(body, &manifest) == nil {
+				ref = manifest.ArtifactID
+			}
+		case evidenceshare.GenericArtifactSchema:
+			var manifest evidenceshare.GenericManifest
+			if json.Unmarshal(body, &manifest) == nil {
+				ref = manifest.ArtifactRef
+			}
+		}
+		if ref == "" || ref != artifactRef {
+			continue
+		}
+		shortID := entry.Name()
+		if len(shortID) > shortShareIDLength {
+			shortID = shortID[:shortShareIDLength]
+		}
+		// Absolute URLs when the canonical base resolves (env/proxy/TLS);
+		// otherwise fall back to stable relative paths so the resolver is
+		// still useful on plain-http callers without failing the lookup.
+		recordURL := requestArtifactURL(req, "/e/"+shortID+"/")
+		if recordURL == "" {
+			recordURL = "/e/" + shortID + "/"
+		}
+		portableURL := requestArtifactURL(req, "/e/"+shortID+".zip")
+		if portableURL == "" {
+			portableURL = "/e/" + shortID + ".zip"
+		}
+		return map[string]any{
+			"package_id":   entry.Name(),
+			"record_url":   recordURL,
+			"portable_url": portableURL,
+		}, true
+	}
+	return nil, false
 }
 
 func evidenceShareDir(cfg *config.Config) string {
@@ -513,7 +614,6 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 	})
 }
 
-
 // serveShareRecord delivers the durable record for a published package:
 // browsers asking for text/html get the EPWA viewer webpage; agents (default
 // */* or explicit JSON) get the durable JSON record.
@@ -665,11 +765,10 @@ func serveShareAsset(w http.ResponseWriter, req *http.Request, cfg *config.Confi
 	_, _ = w.Write(data)
 }
 
-
 var (
-	errShortShareIDInvalid    = errors.New("invalid short EPWA share id")
-	errShortShareIDUnknown    = errors.New("EPWA package not found")
-	errShortShareIDAmbiguous  = errors.New("ambiguous short EPWA share id")
+	errShortShareIDInvalid   = errors.New("invalid short EPWA share id")
+	errShortShareIDUnknown   = errors.New("EPWA package not found")
+	errShortShareIDAmbiguous = errors.New("ambiguous short EPWA share id")
 )
 
 // shortShareIDLength is the default short-form share id length used in
@@ -714,6 +813,7 @@ func resolveShortShareID(cfg *config.Config, short string) (string, error) {
 //	GET /e/{short}/       -> EPWA viewer webpage
 //	GET /e/{short}/verify -> deterministic integrity verification
 //	GET /e/{short}/*      -> package assets (same-origin relative)
+//
 // MountShortShare mounts the friendly EPWA URL surface at the host root.
 func MountShortShare(r chi.Router, cfg *config.Config) {
 	resolve := func(w http.ResponseWriter, req *http.Request, tail string) (string, bool) {
