@@ -104,6 +104,49 @@ test("collapsed rendering preserves thrown delivery failures rather than showing
   expect(colors).toContain("error");
 });
 
+test("inspect admits typed artifact references and preserves packet lookup", async () => {
+  const tool = (await tools()).get("uiai_evidence_share_inspect");
+  const digest = "ab".repeat(32);
+  const ref = "uiai-artifact:sha256:" + digest;
+  const pattern = new RegExp(tool.parameters.properties.packet_id.pattern);
+  expect(pattern.test(ref)).toBe(true);
+  expect(pattern.test(digest)).toBe(true);
+  expect(pattern.test("../private")).toBe(false);
+  const seen: string[] = [];
+  globalThis.fetch = (async (url: any) => {
+    seen.push(String(url));
+    return Response.json({ schema: "uiai.evidence_artifact_resolve.v1", package_id: digest });
+  }) as any;
+  await tool.execute("inspect", { packet_id: ref });
+  expect(seen[0]).toContain("/api/screenshot/artifact/" + encodeURIComponent(ref));
+  await tool.execute("inspect", { packet_id: digest });
+  expect(seen[1]).toContain("/api/screenshot/share/" + digest);
+});
+
+test("inspect falls back only on missing packets, preserving operational failures", async () => {
+  const tool = (await tools()).get("uiai_evidence_share_inspect");
+  const digest = "ab".repeat(32);
+  for (const status of [401, 403, 500, 503]) {
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return Response.json({ error: { message: "upstream unavailable" } }, { status });
+    }) as any;
+    await expect(tool.execute("inspect", { packet_id: digest })).rejects.toThrow("UIAI " + status);
+    expect(calls).toBe(1);
+  }
+  const seen: string[] = [];
+  globalThis.fetch = (async (url: any) => {
+    seen.push(String(url));
+    return seen.length === 1
+      ? Response.json({ error: { message: "missing" } }, { status: 404 })
+      : Response.json({ schema: "uiai.evidence_artifact_resolve.v1", package_id: digest });
+  }) as any;
+  await tool.execute("inspect", { packet_id: digest });
+  expect(seen.length).toBe(2);
+  expect(seen[1]).toContain("/api/screenshot/artifact/" + digest);
+});
+
 test("canonical installer ships a self-contained adapter at an arbitrary location", async () => {
   const directory = mkdtempSync(join(tmpdir(), "epwa-install-"));
   try {

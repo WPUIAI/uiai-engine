@@ -109,7 +109,7 @@ async function callEngine(path: string, init?: RequestInit, requiresEvidence = f
 			// Keep raw text for non-JSON responses.
 		}
 		if (!res.ok) {
-			throw new Error(formatEngineError(data, res.status, path));
+			throw Object.assign(new Error(formatEngineError(data, res.status, path)), { status: res.status });
 		}
 		assertEvidenceDelivery(data, requiresEvidence);
 		return data;
@@ -408,7 +408,7 @@ function compactSummary(data: any, details: Record<string, any> = {}) {
 		const pending = findNonReadyArtifactDelivery(data);
 		if (pending) {
 			const recovery = evidenceRecoveryHint(data);
-			return `${endpoint} evidence pending: ${pending}${recovery ? ` · ${recovery}` : ""} — pending reconciliation is not delivery; attach a complete focusa_scope (project/workstream/workset/callgraph/workpoint/work-item/continuity) to publish and release the payload`;
+			return `${endpoint} evidence pending: ${pending}${recovery ? ` · ${recovery}` : ""} — pending reconciliation is not delivery${recovery?.includes("reconcile:epwa-scope-required") ? "; supply the verified complete focusa_scope and required work-item projections; never invent references" : ""}`;
 		}
 	} catch {
 		return `${endpoint} evidence delivery unavailable — inspect result for reconciliation`;
@@ -1020,19 +1020,22 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_evidence_share_inspect",
 		label: "UIAI Evidence Share Inspect",
-		description: "Inspect one immutable Screenshot Evidence Share Packet manifest by exact packet id, or resolve any uiai-artifact:sha256 ref the engine issued to its EPWA linkage.",
-		parameters: sharePacketParameters,
+		description: "Inspect a published Evidence Share Packet by exact id, or resolve a published artifact reference to verified EPWA linkage.",
+		parameters: Type.Object({
+			packet_id: Type.String({ description: "Exact packet id, artifact digest, or uiai-artifact:sha256 reference", pattern: "^(?:uiai-artifact:sha256:)?[a-f0-9]{64}$" }),
+		}),
 		async execute(_toolCallId, params) {
 			const ref = String(params.packet_id || "");
-			if (ref.startsWith("uiai-artifact:sha256:") || /^[0-9a-f]{64}$/i.test(ref)) {
+			if (!ref.startsWith("uiai-artifact:sha256:")) {
 				try {
-					const resolved = await callEngine(`/api/screenshot/artifact/${encodeURIComponent(ref)}`);
-					return textResult(resolved, { endpoint: "/api/screenshot/artifact/{ref}" });
-				} catch {
-					// Fall through to the share-packet path below.
+					return textResult(await callEngine(`/api/screenshot/share/${encodeURIComponent(ref)}`), { endpoint: "/api/screenshot/share/{id}" });
+				} catch (error) {
+					// Only a missing packet warrants interpreting a bare id as an
+					// artifact digest. Preserve authorization and server failures.
+					if ((error as { status?: number }).status !== 404) throw error;
 				}
 			}
-			return textResult(await callEngine(`/api/screenshot/share/${params.packet_id}`), { endpoint: "/api/screenshot/share/{id}" });
+			return textResult(await callEngine(`/api/screenshot/artifact/${encodeURIComponent(ref)}`), { endpoint: "/api/screenshot/artifact/{ref}" });
 		},
 	});
 	pi.registerTool({

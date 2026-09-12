@@ -33,6 +33,15 @@ portable `.zip` that renders offline on any host, any domain, forever — with
 
 ### 1.1 Endpoints
 
+Artifact lookup (`GET /api/screenshot/artifact/{ref}`) resolves a published
+artifact reference, not raw bytes. Lookup is not limited to the first 100
+packages. A match must pass the same public-readiness and payload-integrity
+verification as the package verification endpoint before returning `ready`.
+Friendly links use a short prefix only when it uniquely resolves to that
+package; ambiguous prefixes use the full package identity. Invalid or
+unpublished packages remain unavailable. Lookup readiness is not independent
+review, task completion, or settlement.
+
 ### Friendly URLs (default publish shape — host root)
 
 | Method | Path | Purpose | Notes |

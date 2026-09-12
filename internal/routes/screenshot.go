@@ -303,15 +303,10 @@ func findPublishedArtifactPacket(cfg *config.Config, req *http.Request, artifact
 		return nil, false
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() > entries[j].Name() })
-	scanned := 0
 	for _, entry := range entries {
 		if !entry.IsDir() || !validShareID(entry.Name()) {
 			continue
 		}
-		if scanned >= 100 {
-			break
-		}
-		scanned++
 		directory := filepath.Join(evidenceShareDir(cfg), entry.Name())
 		body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
 		if err != nil {
@@ -344,9 +339,15 @@ func findPublishedArtifactPacket(cfg *config.Config, req *http.Request, artifact
 		if ref == "" || ref != artifactRef {
 			continue
 		}
+		if issues := verifySharePackage(cfg, entry.Name()); len(issues) != 0 {
+			continue
+		}
+		// Preserve friendly links only when the canonical prefix resolver
+		// confirms that they identify this exact package unambiguously.
 		shortID := entry.Name()
-		if len(shortID) > shortShareIDLength {
-			shortID = shortID[:shortShareIDLength]
+		prefix := shortID[:shortShareIDLength]
+		if resolved, err := resolveShortShareID(cfg, prefix); err == nil && resolved == shortID {
+			shortID = prefix
 		}
 		// Absolute URLs when the canonical base resolves (env/proxy/TLS);
 		// otherwise fall back to stable relative paths so the resolver is
@@ -665,6 +666,12 @@ func serveShareZip(w http.ResponseWriter, req *http.Request, cfg *config.Config,
 
 func serveShareVerify(w http.ResponseWriter, cfg *config.Config, id string) {
 	id = strings.ToLower(id)
+	issues := verifySharePackage(cfg, id)
+	writeJSON(w, http.StatusOK, map[string]any{"packet_id": id, "descriptor": "EPWA evidence package", "valid": len(issues) == 0, "issues": issues})
+}
+
+// verifySharePackage is the shared public-readiness and payload-integrity gate.
+func verifySharePackage(cfg *config.Config, id string) []string {
 	issues := []string{}
 	if !validShareID(id) {
 		issues = append(issues, "invalid_packet_id")
@@ -700,7 +707,7 @@ func serveShareVerify(w http.ResponseWriter, cfg *config.Config, id string) {
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"packet_id": id, "descriptor": "EPWA evidence package", "valid": len(issues) == 0, "issues": issues})
+	return issues
 }
 
 func serveShareAsset(w http.ResponseWriter, req *http.Request, cfg *config.Config, id string, assetName string) {
