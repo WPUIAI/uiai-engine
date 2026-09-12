@@ -20,8 +20,8 @@ import (
 //
 // Clauses (matching the amended CG-06 row):
 //
-//	key_rotation      — retired signing key cannot sign forward; old
-//	                    attestations within their window still verify
+//	key_rotation      — new-key signatures verify under the rotated bundle;
+//	                    old attestations within their window still verify
 //	key_revocation    — revoked key rejects post-revocation signatures;
 //	                    retroactive revocation invalidates even earlier ones
 //	import_distrust   — mirror/import/offline_copy sources require import
@@ -33,12 +33,12 @@ import (
 //	                    issued/outside-uncertainty attestations are rejected
 //	proof_of_absence  — a complete window with an actual JSON asset and no
 //	                    omissions assembles; omissions break the absence claim
-//	air_gap           — offline materials verify; any remote URL surface in
-//	                    manifest/attestation/bundle is rejected first
+//	air_gap           — local schema/signature/pinned-trust verification;
+//	                    source citations are never fetched; current state unknown
 //	human_identity    — identity proof derives from bundle key bytes and
 //	                    rejects any edited reprint
 
-const AuthenticityDigestSchema = "uiai.authenticity_digest_report.v1"
+const AuthenticityDigestSchema = "uiai.authenticity_digest_report.v2"
 
 var (
 	ErrAuthenticityDigestInvalid = errors.New("authenticity digest report invalid")
@@ -46,10 +46,11 @@ var (
 )
 
 type AuthenticityDigestReport struct {
-	Schema  string   `json:"schema"`
-	CodeRef string   `json:"code_ref"`
-	Runs    int      `json:"runs"`
-	Clauses []string `json:"clauses"`
+	Schema  string                     `json:"schema"`
+	CodeRef string                     `json:"code_ref"`
+	Runs    int                        `json:"runs"`
+	Clauses []string                   `json:"clauses"`
+	Results []authenticityClauseResult `json:"results"`
 
 	// DigestSHA256 is the hash of the canonical clause-result JSON shared by
 	// every run.
@@ -65,18 +66,25 @@ type authenticityClauseResult struct {
 	Clause string `json:"clause"`
 	Pass   bool   `json:"pass"`
 	Note   string `json:"note"`
+	// Public fixture inputs and outputs, never signing secrets.
+	Materials json.RawMessage `json:"materials"`
 }
 
-// AuthenticityDigestClauses is the frozen clause list for the join.
-var AuthenticityDigestClauses = []string{
-	"key_rotation",
-	"key_revocation",
-	"import_distrust",
-	"custody_chain",
-	"time_confidence",
-	"proof_of_absence",
-	"air_gap",
-	"human_identity",
+// AuthenticityDigestClauses is a compatibility snapshot, not validation authority.
+// Deprecated: callers should use report.Clauses; mutation cannot change the battery.
+var AuthenticityDigestClauses = authenticityDigestClauseNames()
+
+func authenticityDigestClauseNames() []string {
+	return []string{
+		"key_rotation",
+		"key_revocation",
+		"import_distrust",
+		"custody_chain",
+		"time_confidence",
+		"proof_of_absence",
+		"air_gap",
+		"human_identity",
+	}
 }
 
 type authenticityDigestMaterials struct {
@@ -140,10 +148,11 @@ func bytesFill(value byte, count int) []byte {
 // RunAuthenticityDigest executes the clause battery runs times and returns
 // the digest report. Any clause failure aborts the run loudly.
 func RunAuthenticityDigest(runs int, codeRef string) (AuthenticityDigestReport, error) {
-	if runs < 1 || runs > 1000 {
-		return AuthenticityDigestReport{}, fmt.Errorf("runs must be 1..1000: %w", ErrAuthenticityDigestInvalid)
+	if runs < 1 || runs > 1000 || !validRef(codeRef, true) {
+		return AuthenticityDigestReport{}, fmt.Errorf("runs must be 1..1000 and code_ref is required: %w", ErrAuthenticityDigestInvalid)
 	}
 	perRun := make([]string, 0, runs)
+	var evidence []authenticityClauseResult
 	for i := 0; i < runs; i++ {
 		results, err := runAuthenticityClauses()
 		if err != nil {
@@ -155,6 +164,9 @@ func RunAuthenticityDigest(runs int, codeRef string) (AuthenticityDigestReport, 
 		}
 		sum := sha256.Sum256(encoded)
 		perRun = append(perRun, hex.EncodeToString(sum[:]))
+		if i == 0 {
+			evidence = results
+		}
 	}
 	for _, h := range perRun {
 		if h != perRun[0] {
@@ -165,7 +177,8 @@ func RunAuthenticityDigest(runs int, codeRef string) (AuthenticityDigestReport, 
 		Schema:       AuthenticityDigestSchema,
 		CodeRef:      codeRef,
 		Runs:         runs,
-		Clauses:      append([]string(nil), AuthenticityDigestClauses...),
+		Clauses:      authenticityDigestClauseNames(),
+		Results:      evidence,
 		DigestSHA256: perRun[0],
 		AllIdentical: true,
 		PerRun:       perRun,
@@ -175,7 +188,19 @@ func RunAuthenticityDigest(runs int, codeRef string) (AuthenticityDigestReport, 
 // runAuthenticityClauses executes one full pass of the clause battery and
 // returns deterministic pass results. Any unexpected outcome is an error.
 func runAuthenticityClauses() ([]authenticityClauseResult, error) {
-	results := make([]authenticityClauseResult, 0, len(AuthenticityDigestClauses))
+	results := make([]authenticityClauseResult, 0, len(authenticityDigestClauseNames()))
+	record := func(clause string, materials ...any) error {
+		body, err := json.Marshal(materials)
+		if err != nil {
+			return err
+		}
+		result := authenticityClauseResult{Clause: clause, Pass: true, Materials: body}
+		if clause == "air_gap" {
+			result.Note = OfflineVerificationNotice
+		}
+		results = append(results, result)
+		return nil
+	}
 
 	// --- key_rotation ---------------------------------------------------
 	manifest, template, bundle, privateKey, options, err := AuthenticityDigestFixture()
@@ -221,7 +246,9 @@ func runAuthenticityClauses() ([]authenticityClauseResult, error) {
 	if err := VerifyAttestation(manifest, attestationTwo, bundle, options); !errors.Is(err, ErrKeyUntrusted) {
 		return nil, fmt.Errorf("rotation cross-era verify: %w", err)
 	}
-	results = append(results, authenticityClauseResult{Clause: "key_rotation", Pass: true})
+	if err := record("key_rotation", manifest, attestationOne, attestationTwo, rotated, rotatedOptions); err != nil {
+		return nil, err
+	}
 
 	// --- key_revocation -------------------------------------------------
 	revoked := bundle
@@ -263,7 +290,9 @@ func runAuthenticityClauses() ([]authenticityClauseResult, error) {
 	if err := VerifyAttestation(manifest, attestationOne, retro, retroOptions); !errors.Is(err, ErrKeyRevoked) {
 		return nil, fmt.Errorf("retroactive revocation verify: %w", err)
 	}
-	results = append(results, authenticityClauseResult{Clause: "key_revocation", Pass: true})
+	if err := record("key_revocation", manifest, attestationOne, lateSigned, revoked, retro, lateOptions, retroOptions); err != nil {
+		return nil, err
+	}
 
 	// --- import_distrust ------------------------------------------------
 	imported := template
@@ -294,7 +323,9 @@ func runAuthenticityClauses() ([]authenticityClauseResult, error) {
 	} else if !errors.Is(err, ErrAttestationInvalid) {
 		return nil, fmt.Errorf("origin with import provenance sign: %w", err)
 	}
-	results = append(results, authenticityClauseResult{Clause: "import_distrust", Pass: true})
+	if err := record("import_distrust", importedSigned, noReceipt, pollutedOrigin, bundle, options); err != nil {
+		return nil, err
+	}
 
 	// --- custody_chain ---------------------------------------------------
 	if err := Validate(manifest); err != nil {
@@ -310,7 +341,9 @@ func runAuthenticityClauses() ([]authenticityClauseResult, error) {
 	if err := Validate(duplicated); !errors.Is(err, ErrInvalidIntegrity) {
 		return nil, fmt.Errorf("custody duplicate validate: %w", err)
 	}
-	results = append(results, authenticityClauseResult{Clause: "custody_chain", Pass: true})
+	if err := record("custody_chain", manifest, reordered, duplicated); err != nil {
+		return nil, err
+	}
 
 	// --- time_confidence -------------------------------------------------
 	unknownTime := template
@@ -333,7 +366,9 @@ func runAuthenticityClauses() ([]authenticityClauseResult, error) {
 	if err := VerifyAttestation(manifest, driftedSigned, bundle, options); !errors.Is(err, ErrTimeUntrusted) {
 		return nil, fmt.Errorf("time drift verify: %w", err)
 	}
-	results = append(results, authenticityClauseResult{Clause: "time_confidence", Pass: true})
+	if err := record("time_confidence", unknownTime, anchorless, driftedSigned, bundle, options); err != nil {
+		return nil, err
+	}
 
 	// --- proof_of_absence ------------------------------------------------
 	scenario, err := CaptureDigestScenario()
@@ -361,7 +396,8 @@ func runAuthenticityClauses() ([]authenticityClauseResult, error) {
 			absent.Requirements[i].Kind = RequirementProofOfAbsence
 		}
 	}
-	if _, err := AssembleCapture(absent); err != nil {
+	absenceManifest, err := AssembleCapture(absent)
+	if err != nil {
 		return nil, fmt.Errorf("absence assemble: %w", err)
 	}
 	withOmission := absent
@@ -383,7 +419,9 @@ func runAuthenticityClauses() ([]authenticityClauseResult, error) {
 	if _, err := AssembleCapture(withOmission); !errors.Is(err, ErrCoverageIncomplete) {
 		return nil, fmt.Errorf("absence with omission: %w", err)
 	}
-	results = append(results, authenticityClauseResult{Clause: "proof_of_absence", Pass: true})
+	if err := record("proof_of_absence", absenceManifest, withOmission); err != nil {
+		return nil, err
+	}
 
 	// --- air_gap ---------------------------------------------------------
 	if err := ValidateAirGapMaterials(manifest, attestationOne, bundle, options); err != nil {
@@ -396,10 +434,23 @@ func runAuthenticityClauses() ([]authenticityClauseResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("air-gap contaminated seal: %w", err)
 	}
-	if err := ValidateAirGapMaterials(sealedContaminated, attestationOne, bundle, options); !errors.Is(err, ErrAirGapContaminated) {
-		return nil, fmt.Errorf("air-gap contaminated verify: %w", err)
+	linkedTemplate := template
+	linkedTemplate.Federation.SourceManifestSHA256 = sealedContaminated.Integrity.ManifestSHA256
+	linkedAttestation, err := SignAttestation(sealedContaminated, linkedTemplate, privateKey)
+	if err != nil {
+		return nil, err
 	}
-	results = append(results, authenticityClauseResult{Clause: "air_gap", Pass: true})
+	if err := ValidateAirGapMaterials(sealedContaminated, linkedAttestation, bundle, options); err != nil {
+		return nil, fmt.Errorf("offline source-citation verify: %w", err)
+	}
+	untrustedOptions := options
+	untrustedOptions.TrustedBundleSHA256 = ""
+	if err := ValidateAirGapMaterials(manifest, attestationOne, bundle, untrustedOptions); !errors.Is(err, ErrTrustBundleInvalid) {
+		return nil, fmt.Errorf("offline missing trust pin: %w", err)
+	}
+	if err := record("air_gap", manifest, attestationOne, bundle, options, sealedContaminated, linkedAttestation, untrustedOptions); err != nil {
+		return nil, err
+	}
 
 	// --- human_identity --------------------------------------------------
 	proof, err := HumanIdentityProofFor(bundle, template.KeyID)
@@ -414,7 +465,9 @@ func runAuthenticityClauses() ([]authenticityClauseResult, error) {
 	if err := VerifyHumanIdentityProof(bundle, tampered); !errors.Is(err, ErrHumanIdentityProofInvalid) {
 		return nil, fmt.Errorf("human identity tampered: %w", err)
 	}
-	results = append(results, authenticityClauseResult{Clause: "human_identity", Pass: true})
+	if err := record("human_identity", bundle, proof, tampered); err != nil {
+		return nil, err
+	}
 
 	return results, nil
 }
@@ -431,10 +484,10 @@ func flipHex(in string) string {
 
 // Validate checks report internal consistency for independent verification.
 func (r AuthenticityDigestReport) Validate() error {
-	if r.Schema != AuthenticityDigestSchema || r.Runs < 1 || r.Runs > 1000 || len(r.PerRun) != r.Runs || !r.AllIdentical {
+	if r.Schema != AuthenticityDigestSchema || !validRef(r.CodeRef, true) || r.Runs < 1 || r.Runs > 1000 || len(r.PerRun) != r.Runs || !r.AllIdentical {
 		return ErrAuthenticityDigestInvalid
 	}
-	for _, clause := range AuthenticityDigestClauses {
+	for _, clause := range authenticityDigestClauseNames() {
 		found := false
 		for _, listed := range r.Clauses {
 			if listed == clause {
@@ -446,7 +499,24 @@ func (r AuthenticityDigestReport) Validate() error {
 			return ErrAuthenticityDigestInvalid
 		}
 	}
-	if len(r.Clauses) != len(AuthenticityDigestClauses) {
+	if len(r.Clauses) != len(authenticityDigestClauseNames()) {
+		return ErrAuthenticityDigestInvalid
+	}
+	if len(r.Results) != len(r.Clauses) {
+		return ErrAuthenticityDigestInvalid
+	}
+	for i, result := range r.Results {
+		var materials []json.RawMessage
+		if result.Clause != r.Clauses[i] || !result.Pass || json.Unmarshal(result.Materials, &materials) != nil || len(materials) == 0 {
+			return ErrAuthenticityDigestInvalid
+		}
+	}
+	body, err := json.Marshal(r.Results)
+	if err != nil {
+		return ErrAuthenticityDigestInvalid
+	}
+	sum := sha256.Sum256(body)
+	if hex.EncodeToString(sum[:]) != r.DigestSHA256 {
 		return ErrAuthenticityDigestInvalid
 	}
 	for _, run := range r.PerRun {

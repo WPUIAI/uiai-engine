@@ -8,16 +8,12 @@ import (
 	"strings"
 )
 
-// Air-gap verification contract (CG-06 clause: air-gapped / link-rot
-// resistance): an attestation is verifiable offline only when every byte
-// needed to verify it is embedded in the provided materials. Any remote
-// surface (network URL) in the canonical JSON of the manifest, attestation,
-// or trust bundle means the "offline" verify could silently depend on a
-// fetchable resource that can rot, move, or be attacker-controlled.
-//
-// VerifyAttestation is already a pure function over provided bytes; this
-// check makes the air-gap guarantee explicit and rejects contaminated
-// materials before verification.
+// Offline attestation verification uses only the supplied manifest, signature,
+// trust bundle and pinned verification options. Source URLs are citations, not
+// dependencies: their presence or absence cannot prove offline completeness.
+// Packaging assets/tools and current revocation are separate acceptance checks.
+
+const OfflineVerificationNotice = "Verified only against supplied trust state; current revocation, supersession and live-source availability are not checked offline."
 
 var ErrAirGapContaminated = errors.New("air-gapped verification materials contain remote surfaces")
 
@@ -25,8 +21,8 @@ var remoteSurfaceNeedles = []string{"http://", "https://", "ftp://", "wss://", "
 
 // AttestationRemoteSurfaces scans the canonical JSON of the manifest,
 // attestation, and trust bundle for network URL surfaces and returns the
-// material names where they occur. An empty result means all materials are
-// self-contained and safe for air-gapped verification.
+// material names where they occur. This is diagnostic metadata only; neither
+// an empty nor a nonempty result establishes offline verification readiness.
 func AttestationRemoteSurfaces(manifest Manifest, attestation Attestation, bundle TrustBundle) ([]string, error) {
 	canonicalManifest, err := CanonicalBytes(manifest)
 	if err != nil {
@@ -58,16 +54,12 @@ func AttestationRemoteSurfaces(manifest Manifest, attestation Attestation, bundl
 	return surfaces, nil
 }
 
-// ValidateAirGapMaterials rejects materials containing any remote surface,
-// then runs the full offline attestation verification. All inputs must be
-// locally provided bytes; the function performs no network access.
+// ValidateAirGapMaterials validates the manifest and verifies its attestation
+// against locally supplied, explicitly pinned trust state without network access.
+// It does not certify portable asset completeness or current revocation status.
 func ValidateAirGapMaterials(manifest Manifest, attestation Attestation, bundle TrustBundle, options VerifyAttestationOptions) error {
-	surfaces, err := AttestationRemoteSurfaces(manifest, attestation, bundle)
-	if err != nil {
+	if err := Validate(manifest); err != nil {
 		return err
-	}
-	if len(surfaces) != 0 {
-		return ErrAirGapContaminated
 	}
 	return VerifyAttestation(manifest, attestation, bundle, options)
 }

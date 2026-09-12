@@ -3,6 +3,10 @@
   "generated_at": "2026-08-20T02:20:00Z",
   "schemas": [
     {
+      "id": "uiai.authenticity_digest_report.v2",
+      "src": "contracts/schemas/uiai.authenticity_digest_report.v2.schema.json"
+    },
+    {
       "id": "uiai.desktop_presentation_request.v1",
       "src": "contracts/schemas/uiai.desktop_presentation_request.v1.schema.json"
     },

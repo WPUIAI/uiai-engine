@@ -4,6 +4,26 @@
 **Audit date:** 2026-09-09  
 **Scope:** canonical EPWA specification family (`106a`–`106s`) versus `106q` Completion CallGraph
 
+## Producer remediation — acceptance remains pending
+
+The CG-06 producer now emits `uiai.authenticity_digest_report.v2`: each
+clause carries its public fixture materials and outputs, and the digest binds
+those materials rather than constant pass labels alone. Report verification
+rejects changed materials, contradictory per-run hashes, missing code references,
+and legacy v1 reports. Historical v1 digest matches do not establish v2 proof.
+
+Offline verification validates schema and signatures against the supplied pinned
+trust bundle. URLs in source citations are not fetched and are not themselves
+verification dependencies. Its report explicitly states that current revocation,
+supersession and live-source availability cannot be checked offline. Portable
+asset/tool completeness and full gap-136/137 acceptance remain separate work.
+Human fingerprint construction uses the existing trust-bundle structural validator;
+it does not authenticate a bundle's claimed authority by itself.
+
+These are producer changes, not independent acceptance, deployment proof, or
+closure of CG-06/CG-07. The remaining gap-by-gap evidence and frozen independent
+review are still required.
+
 ## Finding
 
 The decomposition did not preserve bidirectional traceability. The original `106q` graph compressed later normative amendments into broad T06/T07/T08/T11/T13 rows without carrying their exact state machines, reviewer authority, acceptance conditions, evidence atoms, and failure/reopen paths. The operator approval/rejection requirement was therefore present in planning but absent as an executable closure node.

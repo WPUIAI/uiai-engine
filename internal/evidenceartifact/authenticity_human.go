@@ -34,7 +34,12 @@ const HumanIdentityProofSchema = "uiai.evidence.human_identity_proof.v1"
 // HumanIdentityProofFor derives the proof for one key of the bundle. The
 // fingerprint is computed from the bundle's own public key bytes, so any
 // bundle change that swaps the key invalidates the previously printed proof.
+// Structural validation does not authenticate the supplied bundle's authority;
+// callers must establish trust independently before treating a fingerprint as identity.
 func HumanIdentityProofFor(bundle TrustBundle, keyID string) (HumanIdentityProof, error) {
+	if err := validateTrustBundle(bundle); err != nil {
+		return HumanIdentityProof{}, err
+	}
 	var matched *TrustKey
 	for i := range bundle.Keys {
 		if bundle.Keys[i].KeyID == keyID {

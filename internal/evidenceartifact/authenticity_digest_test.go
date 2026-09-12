@@ -1,6 +1,7 @@
 package evidenceartifact
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 )
@@ -28,7 +29,7 @@ func TestAirGapValidationAcceptsCleanMaterials(t *testing.T) {
 	}
 }
 
-func TestAirGapValidationRejectsRemoteSurfaces(t *testing.T) {
+func TestAirGapValidationAllowsCitationsButRequiresPinnedTrust(t *testing.T) {
 	_, template, bundle, privateKey, options, err := AuthenticityDigestFixture()
 	if err != nil {
 		t.Fatal(err)
@@ -48,8 +49,12 @@ func TestAirGapValidationRejectsRemoteSurfaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ValidateAirGapMaterials(manifest, attestation, bundle, options); !errors.Is(err, ErrAirGapContaminated) {
-		t.Fatalf("contaminated err=%v", err)
+	if err := ValidateAirGapMaterials(manifest, attestation, bundle, options); err != nil {
+		t.Fatalf("offline citation verification: %v", err)
+	}
+	options.TrustedBundleSHA256 = ""
+	if err := ValidateAirGapMaterials(manifest, attestation, bundle, options); !errors.Is(err, ErrTrustBundleInvalid) {
+		t.Fatalf("missing trust pin accepted: %v", err)
 	}
 	surfaces, err := AttestationRemoteSurfaces(manifest, attestation, bundle)
 	if err != nil || len(surfaces) != 1 || surfaces[0] != "manifest" {
@@ -86,6 +91,26 @@ func TestHumanIdentityProofRoundTripAndTamper(t *testing.T) {
 	}
 }
 
+func TestHumanIdentityProofRejectsInvalidTrustBundle(t *testing.T) {
+	_, _, original, _, _, err := AuthenticityDigestFixture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []func(*TrustBundle){
+		func(b *TrustBundle) { b.Keys[0].PublicKey = "YQ" },
+		func(b *TrustBundle) { b.Keys = append(b.Keys, b.Keys[0]) },
+		func(b *TrustBundle) { b.AuthorityRef = "" },
+		func(b *TrustBundle) { b.Keys[0].Algorithm = "unknown" },
+	} {
+		bundle := original
+		bundle.Keys = append([]TrustKey(nil), original.Keys...)
+		change(&bundle)
+		if _, err := HumanIdentityProofFor(bundle, original.Keys[0].KeyID); !errors.Is(err, ErrTrustBundleInvalid) {
+			t.Fatalf("invalid bundle accepted: %v", err)
+		}
+	}
+}
+
 func TestAuthenticityDigestDeterministicAndVerifiable(t *testing.T) {
 	first, err := RunAuthenticityDigest(3, "test-cg06")
 	if err != nil {
@@ -101,6 +126,20 @@ func TestAuthenticityDigestDeterministicAndVerifiable(t *testing.T) {
 	if len(first.Clauses) != len(AuthenticityDigestClauses) || first.Runs != 3 || len(first.PerRun) != 3 {
 		t.Fatalf("report shape: %+v", first)
 	}
+	body, err := json.Marshal(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roundTrip AuthenticityDigestReport
+	if err := json.Unmarshal(body, &roundTrip); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyAuthenticityDigestReport(roundTrip, 2); err != nil {
+		t.Fatalf("evidence report round trip: %v", err)
+	}
+	if _, err := RunAuthenticityDigest(1, ""); err == nil {
+		t.Fatal("missing code reference accepted")
+	}
 	if err := VerifyAuthenticityDigestReport(first, 2); err != nil {
 		t.Fatalf("verify: %v", err)
 	}
@@ -112,6 +151,17 @@ func TestAuthenticityDigestDeterministicAndVerifiable(t *testing.T) {
 	bad.PerRun[1] = "0000000000000000000000000000000000000000000000000000000000000000"
 	if err := VerifyAuthenticityDigestReport(bad, 2); err == nil {
 		t.Fatal("divergent later run accepted despite all_identical claim")
+	}
+	bad = first
+	bad.Results = append([]authenticityClauseResult(nil), first.Results...)
+	bad.Results[0].Materials = []byte(`["substituted evidence"]`)
+	if err := VerifyAuthenticityDigestReport(bad, 2); err == nil {
+		t.Fatal("substituted evidence accepted with unchanged digest")
+	}
+	bad = first
+	bad.Schema = "uiai.authenticity_digest_report.v1"
+	if err := VerifyAuthenticityDigestReport(bad, 2); err == nil {
+		t.Fatal("legacy pass-label report accepted as evidence-bound v2")
 	}
 	bad = first
 	bad.DigestSHA256 = ""
