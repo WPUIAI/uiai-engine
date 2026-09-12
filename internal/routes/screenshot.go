@@ -277,6 +277,44 @@ func evidenceShareDir(cfg *config.Config) string {
 	return filepath.Join(screenshotStoreDir(), "evidence-share")
 }
 
+// acceptPrefersHTML reports whether the request's Accept header explicitly
+// prefers text/html over application/json (browser-style negotiation).
+// Agents and curl ("*/*" or no header) keep receiving the JSON record.
+func acceptPrefersHTML(accept string) bool {
+	htmlQ := acceptQ(accept, "text/html")
+	if htmlQ <= 0 {
+		return false
+	}
+	return htmlQ >= acceptQ(accept, "application/json")
+}
+
+func acceptQ(accept, mediaType string) float64 {
+	if accept == "" {
+		return 0
+	}
+	for _, part := range strings.Split(accept, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		fields := strings.Split(part, ";")
+		if !strings.EqualFold(strings.TrimSpace(fields[0]), mediaType) {
+			continue
+		}
+		q := 1.0
+		for _, param := range fields[1:] {
+			param = strings.TrimSpace(param)
+			if strings.HasPrefix(param, "q=") {
+				if parsed, err := strconv.ParseFloat(strings.TrimPrefix(param, "q="), 64); err == nil {
+					q = parsed
+				}
+			}
+		}
+		return q
+	}
+	return 0
+}
+
 func requestArtifactURL(req *http.Request, artifactPath string) string {
 	base, err := canonicalEPWABase(req)
 	if err != nil {
@@ -447,6 +485,18 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 		if _, err := loadPublicPackage(directory, id); err != nil {
 			http.NotFound(w, req)
 			return
+		}
+		// One canonical URL, two audiences: browsers that ask for text/html get
+		// the EPWA viewer webpage; agents (default */* or explicit JSON) get the
+		// durable JSON record. Same URL, agent-first with a human-friendly face.
+		if acceptPrefersHTML(req.Header.Get("Accept")) {
+			page, pageErr := os.ReadFile(filepath.Join(directory, "index.html"))
+			if pageErr == nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Header().Set("X-Content-Type-Options", "nosniff")
+				_, _ = w.Write(page)
+				return
+			}
 		}
 		body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
 		if err != nil {

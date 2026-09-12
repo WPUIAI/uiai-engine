@@ -530,12 +530,37 @@ func reconcileEPWADelivery(req *http.Request, cfg *config.Config, current epwade
 }
 
 func canonicalEPWABase(req *http.Request) (*url.URL, error) {
+	// Fully dynamic, zero-config resolution: env override first, then standard
+	// proxy headers (X-Forwarded-Proto/X-Forwarded-Host), then request URL/TLS.
 	raw := strings.TrimSpace(os.Getenv("UIAI_EPWA_PUBLIC_BASE_URL"))
-	if raw == "" && req != nil && req.URL != nil && req.URL.Scheme == "https" && req.URL.Host != "" {
-		raw = "https://" + req.URL.Host + "/"
+	if raw == "" && req != nil {
+		scheme, host := "", ""
+		if req.URL != nil {
+			scheme, host = req.URL.Scheme, req.URL.Host
+		}
+		if proto := strings.TrimSpace(req.Header.Get("X-Forwarded-Proto")); proto == "https" || proto == "http" {
+			scheme = proto
+		}
+		if fwd := strings.TrimSpace(req.Header.Get("X-Forwarded-Host")); fwd != "" {
+			if part := strings.TrimSpace(strings.Split(fwd, ",")[0]); part != "" {
+				host = part
+			}
+		}
+		if scheme == "" && req.TLS != nil {
+			scheme = "https"
+		}
+		if host == "" {
+			host = req.Host
+		}
+		if scheme != "" && host != "" {
+			raw = scheme + "://" + host + "/"
+		}
 	}
 	base, err := url.Parse(raw)
-	if err != nil || base.Scheme != "https" || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+	// 106a server-portability contract: works unchanged on localhost/LAN (plain
+	// http) as well as behind https proxies/tunnels — origin is trusted from
+	// proxy headers, TLS state, or the request itself; never hard-coded.
+	if err != nil || (base.Scheme != "https" && base.Scheme != "http") || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
 		return nil, ErrEPWAHTTPSUnavailable
 	}
 	if !strings.HasSuffix(base.Path, "/") {

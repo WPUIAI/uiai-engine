@@ -20,8 +20,12 @@ type Scope struct {
 }
 
 func (s Scope) Complete() bool {
+	// Aligned with the epwadelivery delivery contract (contract_test "continuity
+	// missing"): a complete evidence scope requires all seven bindings — the six
+	// core refs plus continuity_ref — so publish never claims ready on a scope
+	// the delivery layer would reject.
 	if s.ProjectRef == "" || s.WorkstreamRef == "" || s.WorksetRef == "" ||
-		s.CallGraphRef == "" || s.WorkpointRef == "" || s.WorkItemRef == "" || len(s.WorkItems) == 0 {
+		s.CallGraphRef == "" || s.WorkpointRef == "" || s.WorkItemRef == "" || s.ContinuityRef == "" || len(s.WorkItems) == 0 {
 		return false
 	}
 	for _, item := range s.WorkItems {
