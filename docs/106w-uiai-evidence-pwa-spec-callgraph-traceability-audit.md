@@ -102,3 +102,15 @@ Status per row after the merged closure-governance amendment (`5bf38da7`) and th
 | `106f` Judge View parity | CG-08/09/27 | covered (freeze/mismatch/citation/no-write added) |
 
 Until that matrix is green, no EPWA task may be represented as fully closed or settled.
+
+## Verified delivery repair — 2026-09-12
+
+Issue #224 remains open; earlier blanket completion claims are superseded.
+
+- Frozen repair `2ea3f10a9643d3564dfef0453cd21cb3fa9087fe` received a separate OpenRouter `anthropic/claude-fable-5` static review: **PASS**, no blocking introduced bugs found. Review SHA-256: `f0ac1a598a242c7c29ffd183de93fbe610321f596269d7b23bae214c084478ee`. Local receipt: `/tmp/epwa-repair-review-S1xuuP/03-epwa-repair-review.md`.
+- Review scope was resolver/native transport only: lookup coverage, integrity gating, collision-safe links, typed-reference schema, exact-once URL decoding, and preservation of authorization/server errors. The reviewer did not execute tests; omitted dependencies, concurrency, other consumers, CG06 and full-spec acceptance remain unverified. Nonblocking observations: linear lookup cost, uppercase-input compatibility tightening and raw reference formatting in tombstone errors.
+- [v2.0.21 release/deploy](https://github.com/WPUIAI/uiai-engine/actions/runs/34711609650) succeeded. Both running workers matched SHA-256 `83f11e7caced357f9736be86119e4f25841f9ad104be660d3346af1005f6d5b2` and returned healthy HTTP 200. Local receipt: `/tmp/epwa-v2021-worker-proof.txt`.
+- A fresh installed Pi process successfully resolved a typed artifact reference to [its verified evidence page](https://ai.wpuiai.com/e/89a4641e7991/). Receipt: `/tmp/focusa-bg-01a096f0-d18d-7ab0-8590-c0388e5353f4.log`. This proves the consumer path, not actual canonical task binding or refresh of an already-running session.
+- Source isolation `816f885` moves adapter development files into `integrations/pi/`, updates existing consumers/installer and prevents automatic loading of test files or a duplicate adapter. Verification: 18 native tests, 11 MCP tests, 3 Python contract tests, delivery inventory test and fresh normal checkout registration passed. This later packaging change is outside the frozen static review.
+
+These results do not accept CG06, complete the specification, or authorize provider settlement. Remaining cryptographic identity, canonical snapshot, correction/retraction and offline-proof coverage must be traced individually.
