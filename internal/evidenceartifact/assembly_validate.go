@@ -56,6 +56,20 @@ func validateAssemblyCoverage(base Manifest, observations []CaptureObservation, 
 		if !validRef(omission.ObservationRef, true) || !validText(omission.Reason, 500, true) || !validRef(omission.PolicyRef, true) {
 			return ErrAssemblyInvalid
 		}
+		switch omission.Outcome {
+		case "": // Legacy omission; not an explicit unknown-proof claim.
+		case "unavailable", "unknown", "denied":
+			if !validRef(omission.ProofRef, true) {
+				return ErrAssemblyInvalid
+			}
+			// A permission-denied or unknown capture result never proves
+			// absence; neither posture can support a complete-window claim.
+			if (omission.Outcome == "unknown" || omission.Outcome == "denied") && windowComplete {
+				return ErrCoverageIncomplete
+			}
+		default:
+			return ErrAssemblyInvalid
+		}
 		if _, duplicate := omissionByRef[omission.ObservationRef]; duplicate {
 			return ErrOmissionConflict
 		}

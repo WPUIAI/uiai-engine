@@ -72,6 +72,9 @@ type CaptureOmission struct {
 	ObservationRef string
 	Reason         string
 	PolicyRef      string
+	// Empty preserves legacy omission semantics; unknown/denied never prove absence.
+	Outcome  string `json:"outcome,omitempty"`
+	ProofRef string `json:"proof_ref,omitempty"`
 }
 
 type CaptureAnnotation struct {
