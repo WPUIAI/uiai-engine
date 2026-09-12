@@ -131,4 +131,6 @@ Inspected at `1398f1c`; references below describe observed source and tests, not
 
 Signed-binding regression now exists in `authenticity_binding_test.go`: six cases alter target/account/runtime, workset revision, Workpoint revision and graph generation in a valid captured manifest, recompute its hash, and require the original attestation to fail. The evidenceartifact suite and vet passed. This proves immutable binding of supplied values, not real account authentication or current external state.
 
-Next proof slice: trace downstream correction and offline package consumers. No missing implementation is inferred solely from an identifier search.
+Consumer trace found a concrete stale-state defect: `renderReviewCase` displayed a cached accepted review as current acceptance after a live-request failure. The repair preserves the historical posture, labels the snapshot stale/read-only, and explains that current revocation/supersession cannot be checked (English, Spanish and Arabic). Five direct shipped-function regressions cover accepted/rejected/pending snapshots, live acceptance and unavailable evidence; CI runs them. All 22 combined JavaScript tests and affected Go packages passed. This repair is source-verified only until separately delivered and consumer-checked; existing immutable packages are not rewritten.
+
+Next proof slice: independent review and delivery of the offline-status repair, then downstream correction propagation and portable verification completeness. No missing implementation is inferred solely from an identifier search.

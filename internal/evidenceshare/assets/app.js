@@ -162,14 +162,14 @@ async function renderReviewCase() {
       const offline = await fetchJSON("./review.json");
       if (!offline || offline.schema !== "uiai.review_state.v1") throw new Error(tr("review_invalid"));
       activeReviewCase = activeReviewCase || { case_ref: offline.case_ref, artifact_ref: offline.artifact_ref, posture: offline.posture, reviewer_assignment_ref: "", reviewer_ref: "", scope: null, review_requirement_refs: [] };
-      text(byId("review-posture"), reviewMessage(offline.posture));
+      text(byId("review-posture"), `${reviewMessage(offline.posture)} · ${tr("offline_snapshot")}`);
       text(byId("review-case"), reviewMessage(offline.case_ref));
       text(byId("review-assignment"), tr("review_unassigned"));
       text(byId("review-next-action"), reviewMessage(offline.next_action));
       const gaps = Array.isArray(offline.dispositions) ? (offline.dispositions[offline.dispositions.length - 1]?.proof_gaps || []) : [];
       text(byId("review-gaps"), gaps.length ? `${tr("review_missing_proof")}: ${gaps.join(", ")}` : "");
-      text(byId("review-truth"), offline.posture === "accepted" ? tr("review_accepted") : tr("review_offline"));
-      panel.dataset.state = offline.posture === "accepted" ? "accepted" : "blocked";
+      text(byId("review-truth"), `${tr("review_offline")} · ${tr("offline_snapshot")}`);
+      panel.dataset.state = "stale";
       form.hidden = true;
       return;
     } catch (offlineError) {

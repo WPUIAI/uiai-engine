@@ -48,7 +48,7 @@ jobs:
         run: scripts/check-tool-parity.sh
       - name: MCP and CLI EPWA contract checks
         run: |
-          node --test mcp/epwa-contract.test.mjs internal/evidenceshare/generic_record_locale.test.mjs
+          node --test mcp/epwa-contract.test.mjs internal/evidenceshare/generic_record_locale.test.mjs internal/evidenceshare/review_snapshot.test.mjs
           scripts/test-uiai-open-result-contract.sh
       - name: Focusa packet endpoint smoke
         env:
