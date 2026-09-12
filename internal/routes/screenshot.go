@@ -431,9 +431,13 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 			if err != nil {
 				continue
 			}
-			artifactPath := "/api/screenshot/share/" + entry.Name() + "/"
+			shortID := entry.Name()
+			if len(shortID) > shortShareIDLength {
+				shortID = shortID[:shortShareIDLength]
+			}
+			artifactPath := "/e/" + shortID + "/"
 			thumbnailURL := ""
-			packet := map[string]any{"packet_id": entry.Name(), "artifact_url": requestArtifactURL(req, artifactPath), "portable_url": requestArtifactURL(req, artifactPath+"portable.zip"), "availability": "ready"}
+			packet := map[string]any{"packet_id": entry.Name(), "artifact_url": requestArtifactURL(req, artifactPath), "portable_url": requestArtifactURL(req, "/e/"+shortID+".zip"), "availability": "ready"}
 			switch descriptor.Schema {
 			case evidenceshare.Schema:
 				var manifest evidenceshare.Manifest
@@ -481,31 +485,7 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 			http.NotFound(w, req)
 			return
 		}
-		directory := filepath.Join(evidenceShareDir(cfg), id)
-		if _, err := loadPublicPackage(directory, id); err != nil {
-			http.NotFound(w, req)
-			return
-		}
-		// One canonical URL, two audiences: browsers that ask for text/html get
-		// the EPWA viewer webpage; agents (default */* or explicit JSON) get the
-		// durable JSON record. Same URL, agent-first with a human-friendly face.
-		if acceptPrefersHTML(req.Header.Get("Accept")) {
-			page, pageErr := os.ReadFile(filepath.Join(directory, "index.html"))
-			if pageErr == nil {
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				w.Header().Set("X-Content-Type-Options", "nosniff")
-				_, _ = w.Write(page)
-				return
-			}
-		}
-		body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
-		if err != nil {
-			http.NotFound(w, req)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		_, _ = w.Write(body)
+		serveShareRecord(w, req, cfg, id)
 	})
 	r.Get("/share/{id}/portable.zip", func(w http.ResponseWriter, req *http.Request) {
 		id := chi.URLParam(req, "id")
@@ -513,62 +493,15 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 			http.NotFound(w, req)
 			return
 		}
-		directory := filepath.Join(evidenceShareDir(cfg), id)
-		if _, err := loadPublicPackage(directory, id); err != nil {
-			http.NotFound(w, req)
-			return
-		}
-		digest, err := evidenceshare.EnsurePortableArchive(evidenceShareDir(cfg), id)
-		if err != nil {
-			http.NotFound(w, req)
-			return
-		}
-		archivePath := filepath.Join(evidenceShareDir(cfg), id+".zip")
-		w.Header().Set("Content-Type", "application/zip")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Content-Disposition", `attachment; filename="`+id+`.epwa.zip"`)
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		w.Header().Set("ETag", `"sha256:`+digest+`"`)
-		http.ServeFile(w, req, archivePath)
+		serveShareZip(w, req, cfg, id)
 	})
 	r.Get("/share/{id}/verify", func(w http.ResponseWriter, req *http.Request) {
 		id := chi.URLParam(req, "id")
-		issues := []string{}
 		if !validShareID(id) {
-			issues = append(issues, "invalid_packet_id")
-		} else {
-			directory := filepath.Join(evidenceShareDir(cfg), id)
-			descriptor, err := loadPublicPackage(directory, id)
-			if err != nil {
-				issues = append(issues, "package_not_public_ready")
-			} else {
-				switch descriptor.Schema {
-				case evidenceshare.Schema:
-					var manifest evidenceshare.Manifest
-					body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
-					if err != nil || json.Unmarshal(body, &manifest) != nil {
-						issues = append(issues, "manifest_unavailable")
-					} else if shot, err := os.ReadFile(filepath.Join(directory, strings.TrimPrefix(manifest.ScreenshotRef, "./"))); err != nil {
-						issues = append(issues, "screenshot_unavailable")
-					} else if sum := sha256.Sum256(shot); hex.EncodeToString(sum[:]) != manifest.ScreenshotSHA256 {
-						issues = append(issues, "screenshot_digest_mismatch")
-					}
-				case evidenceartifact.SchemaManifestV1, evidenceshare.GenericArtifactSchema:
-					for assetPath, asset := range descriptor.Assets {
-						data, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(assetPath)))
-						if err != nil {
-							issues = append(issues, "asset_unavailable:"+asset.AssetID)
-							continue
-						}
-						sum := sha256.Sum256(data)
-						if int64(len(data)) != asset.ByteSize || hex.EncodeToString(sum[:]) != asset.SHA256 {
-							issues = append(issues, "asset_digest_mismatch:"+asset.AssetID)
-						}
-					}
-				}
-			}
+			http.NotFound(w, req)
+			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"packet_id": id, "descriptor": "EPWA evidence package", "valid": len(issues) == 0, "issues": issues})
+		serveShareVerify(w, cfg, id)
 	})
 	r.Get("/share/{id}/*", func(w http.ResponseWriter, req *http.Request) {
 		id := chi.URLParam(req, "id")
@@ -576,60 +509,258 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 			http.NotFound(w, req)
 			return
 		}
+		serveShareAsset(w, req, cfg, id, chi.URLParam(req, "*"))
+	})
+}
+
+
+// serveShareRecord delivers the durable record for a published package:
+// browsers asking for text/html get the EPWA viewer webpage; agents (default
+// */* or explicit JSON) get the durable JSON record.
+func serveShareRecord(w http.ResponseWriter, req *http.Request, cfg *config.Config, id string) {
+	directory := filepath.Join(evidenceShareDir(cfg), id)
+	if _, err := loadPublicPackage(directory, id); err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	if acceptPrefersHTML(req.Header.Get("Accept")) {
+		// Friendly default for humans: land on the viewer webpage, where the
+		// package's same-origin relative assets resolve correctly.
+		http.Redirect(w, req, req.URL.Path+"/", http.StatusFound)
+		return
+	}
+	body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write(body)
+}
+
+func serveShareZip(w http.ResponseWriter, req *http.Request, cfg *config.Config, id string) {
+	directory := filepath.Join(evidenceShareDir(cfg), id)
+	if _, err := loadPublicPackage(directory, id); err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	if !validShareID(id) {
+		http.NotFound(w, req)
+		return
+	}
+	digest, err := evidenceshare.EnsurePortableArchive(evidenceShareDir(cfg), id)
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	archivePath := filepath.Join(evidenceShareDir(cfg), id+".zip")
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+id+`.epwa.zip"`)
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("ETag", `"sha256:`+digest+`"`)
+	http.ServeFile(w, req, archivePath)
+}
+
+func serveShareVerify(w http.ResponseWriter, cfg *config.Config, id string) {
+	id = strings.ToLower(id)
+	issues := []string{}
+	if !validShareID(id) {
+		issues = append(issues, "invalid_packet_id")
+	} else {
 		directory := filepath.Join(evidenceShareDir(cfg), id)
 		descriptor, err := loadPublicPackage(directory, id)
 		if err != nil {
-			http.NotFound(w, req)
-			return
-		}
-		name := chi.URLParam(req, "*")
-		if name == "" {
-			name = "index.html"
-		}
-		if !safeShareAssetPath(name) {
-			http.NotFound(w, req)
-			return
-		}
-		allowed := map[string]string{"index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "work-items.js": "application/javascript; charset=utf-8", "generic-record.js": "application/javascript; charset=utf-8", "locale.js": "application/javascript; charset=utf-8", "pwa.js": "application/javascript; charset=utf-8", "app.js": "application/javascript; charset=utf-8", "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml", "sw.js": "application/javascript; charset=utf-8", "artifact.json": "application/json; charset=utf-8", "projection.json": "application/json; charset=utf-8", "inspection.json": "application/json; charset=utf-8", "screenshot.png": "image/png", "screenshot.jpg": "image/jpeg", "screenshot.webp": "image/webp"}
-		mediaType, static := allowed[name]
-		asset, artifactAsset := descriptor.Assets[name]
-		if !static && !artifactAsset {
-			http.NotFound(w, req)
-			return
-		}
-		if artifactAsset {
-			mediaType = asset.MediaType
-			w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(name)+`"`)
-			if strings.HasPrefix(strings.ToLower(mediaType), "text/html") || strings.HasPrefix(strings.ToLower(mediaType), "image/svg+xml") {
-				w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
+			issues = append(issues, "package_not_public_ready")
+		} else {
+			switch descriptor.Schema {
+			case evidenceshare.Schema:
+				var manifest evidenceshare.Manifest
+				body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
+				if err != nil || json.Unmarshal(body, &manifest) != nil {
+					issues = append(issues, "manifest_unavailable")
+				} else if shot, err := os.ReadFile(filepath.Join(directory, strings.TrimPrefix(manifest.ScreenshotRef, "./"))); err != nil {
+					issues = append(issues, "screenshot_unavailable")
+				} else if sum := sha256.Sum256(shot); hex.EncodeToString(sum[:]) != manifest.ScreenshotSHA256 {
+					issues = append(issues, "screenshot_digest_mismatch")
+				}
+			case evidenceartifact.SchemaManifestV1, evidenceshare.GenericArtifactSchema:
+				for assetPath, asset := range descriptor.Assets {
+					data, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(assetPath)))
+					if err != nil {
+						issues = append(issues, "asset_unavailable:"+asset.AssetID)
+						continue
+					}
+					sum := sha256.Sum256(data)
+					if int64(len(data)) != asset.ByteSize || hex.EncodeToString(sum[:]) != asset.SHA256 {
+						issues = append(issues, "asset_digest_mismatch:"+asset.AssetID)
+					}
+				}
 			}
 		}
-		data, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(name)))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"packet_id": id, "descriptor": "EPWA evidence package", "valid": len(issues) == 0, "issues": issues})
+}
+
+func serveShareAsset(w http.ResponseWriter, req *http.Request, cfg *config.Config, id string, assetName string) {
+	id = strings.ToLower(id)
+	name := assetName
+	if !validShareID(id) {
+		http.NotFound(w, req)
+		return
+	}
+	directory := filepath.Join(evidenceShareDir(cfg), id)
+	descriptor, err := loadPublicPackage(directory, id)
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	if name == "" {
+		name = "index.html"
+	}
+	if !safeShareAssetPath(name) {
+		http.NotFound(w, req)
+		return
+	}
+	allowed := map[string]string{"index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "work-items.js": "application/javascript; charset=utf-8", "generic-record.js": "application/javascript; charset=utf-8", "locale.js": "application/javascript; charset=utf-8", "pwa.js": "application/javascript; charset=utf-8", "app.js": "application/javascript; charset=utf-8", "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml", "sw.js": "application/javascript; charset=utf-8", "artifact.json": "application/json; charset=utf-8", "projection.json": "application/json; charset=utf-8", "inspection.json": "application/json; charset=utf-8", "screenshot.png": "image/png", "screenshot.jpg": "image/jpeg", "screenshot.webp": "image/webp"}
+	mediaType, static := allowed[name]
+	asset, artifactAsset := descriptor.Assets[name]
+	if !static && !artifactAsset {
+		http.NotFound(w, req)
+		return
+	}
+	if artifactAsset {
+		mediaType = asset.MediaType
+		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(name)+`"`)
+		if strings.HasPrefix(strings.ToLower(mediaType), "text/html") || strings.HasPrefix(strings.ToLower(mediaType), "image/svg+xml") {
+			w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(name)))
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	if artifactAsset {
+		sum := sha256.Sum256(data)
+		if int64(len(data)) != asset.ByteSize || hex.EncodeToString(sum[:]) != asset.SHA256 {
+			http.Error(w, "EPWA asset corrupt", http.StatusConflict)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", mediaType)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if name == "index.html" {
+		w.Header().Set("Content-Security-Policy", evidenceShareCSP)
+	}
+	switch {
+	case name == "sw.js":
+		w.Header().Set("Cache-Control", "no-cache")
+	case name == "artifact.json" || name == "projection.json" || name == "inspection.json" || strings.HasPrefix(name, "screenshot.") || artifactAsset:
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	default:
+		w.Header().Set("Cache-Control", "public, max-age=300")
+	}
+	_, _ = w.Write(data)
+}
+
+
+var (
+	errShortShareIDInvalid    = errors.New("invalid short EPWA share id")
+	errShortShareIDUnknown    = errors.New("EPWA package not found")
+	errShortShareIDAmbiguous  = errors.New("ambiguous short EPWA share id")
+)
+
+// shortShareIDLength is the default short-form share id length used in
+// friendly EPWA URLs (https://<host>/e/<short12>/). It is a strict prefix of
+// the content-addressed 64-hex package id, so it stays deterministic.
+const shortShareIDLength = 12
+
+// resolveShortShareID resolves a short share-id prefix to the unique
+// content-addressed package id. Ambiguous or unknown prefixes fail closed.
+func resolveShortShareID(cfg *config.Config, short string) (string, error) {
+	if len(short) < 6 || len(short) > 64 {
+		return "", errShortShareIDInvalid
+	}
+	if _, err := hex.DecodeString(strings.ToLower(short)); err != nil {
+		return "", errShortShareIDInvalid
+	}
+	entries, err := os.ReadDir(evidenceShareDir(cfg))
+	if err != nil {
+		return "", errShortShareIDUnknown
+	}
+	match := ""
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() || !validShareID(name) || !strings.HasPrefix(name, strings.ToLower(short)) {
+			continue
+		}
+		if match != "" {
+			return "", errShortShareIDAmbiguous
+		}
+		match = name
+	}
+	if match == "" {
+		return "", errShortShareIDUnknown
+	}
+	return match, nil
+}
+
+// mountShortShareRoutes exposes the friendly EPWA URL surface:
+//
+//	GET /e/{short}.zip    -> portable package (download)
+//	GET /e/{short}        -> browsers: 302 to the viewer webpage; agents: JSON record
+//	GET /e/{short}/       -> EPWA viewer webpage
+//	GET /e/{short}/verify -> deterministic integrity verification
+//	GET /e/{short}/*      -> package assets (same-origin relative)
+// MountShortShare mounts the friendly EPWA URL surface at the host root.
+func MountShortShare(r chi.Router, cfg *config.Config) {
+	resolve := func(w http.ResponseWriter, req *http.Request, tail string) (string, bool) {
+		id, err := resolveShortShareID(cfg, tail)
 		if err != nil {
 			http.NotFound(w, req)
-			return
+			return "", false
 		}
-		if artifactAsset {
-			sum := sha256.Sum256(data)
-			if int64(len(data)) != asset.ByteSize || hex.EncodeToString(sum[:]) != asset.SHA256 {
-				http.Error(w, "EPWA asset corrupt", http.StatusConflict)
+		return id, true
+	}
+	r.Get("/e/{tail}", func(w http.ResponseWriter, req *http.Request) {
+		tail := chi.URLParam(req, "tail")
+		if strings.HasSuffix(tail, ".zip") {
+			id, ok := resolve(w, req, strings.TrimSuffix(tail, ".zip"))
+			if !ok {
 				return
 			}
+			serveShareZip(w, req, cfg, id)
+			return
 		}
-		w.Header().Set("Content-Type", mediaType)
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if name == "index.html" {
-			w.Header().Set("Content-Security-Policy", evidenceShareCSP)
+		id, ok := resolve(w, req, tail)
+		if !ok {
+			return
 		}
-		switch {
-		case name == "sw.js":
-			w.Header().Set("Cache-Control", "no-cache")
-		case name == "artifact.json" || name == "projection.json" || name == "inspection.json" || strings.HasPrefix(name, "screenshot.") || artifactAsset:
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		default:
-			w.Header().Set("Cache-Control", "public, max-age=300")
+		if acceptPrefersHTML(req.Header.Get("Accept")) {
+			// Friendly default for humans: land on the actual EPWA webpage.
+			http.Redirect(w, req, "/e/"+tail+"/", http.StatusFound)
+			return
 		}
-		_, _ = w.Write(data)
+		serveShareRecord(w, req, cfg, id)
+	})
+	r.Get("/e/{tail}/*", func(w http.ResponseWriter, req *http.Request) {
+		tail := chi.URLParam(req, "tail")
+		rest := chi.URLParam(req, "*")
+		id, ok := resolve(w, req, strings.TrimSuffix(tail, ".zip"))
+		if !ok {
+			return
+		}
+		if rest == "verify" {
+			serveShareVerify(w, cfg, id)
+			return
+		}
+		if rest == "portable.zip" {
+			serveShareZip(w, req, cfg, id)
+			return
+		}
+		serveShareAsset(w, req, cfg, id, rest)
 	})
 }
 

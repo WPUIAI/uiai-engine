@@ -39,7 +39,7 @@ func TestSessionScreenshotOutputIsOnlyHTTPSPortableEPWA(t *testing.T) {
 	}
 	for _, key := range []string{"artifact_url", "portable_url"} {
 		value, _ := response[key].(string)
-		if !strings.HasPrefix(value, "https://engine.example/api/screenshot/share/") {
+		if !strings.HasPrefix(value, "https://engine.example/e/") {
 			t.Fatalf("%s is not an HTTPS EPWA link: %q", key, value)
 		}
 	}

@@ -65,8 +65,7 @@ func publishScreenshotEPWA(req *http.Request, cfg *config.Config, input evidence
 		state = epwadelivery.StatePendingReconcile
 		recoveryRef = "reconcile:epwa-https-required"
 	} else {
-		recordURL = base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + share.PackageID + "/"}).String()
-		portableURL = base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + share.PackageID + "/portable.zip"}).String()
+		recordURL, portableURL = shortShareURLs(base, share.PackageID)
 	}
 	createdAt := input.CapturedAt.UTC()
 	if createdAt.IsZero() {
@@ -116,8 +115,7 @@ func publishGenericEPWAAtBase(cfg *config.Config, input evidenceshare.GenericInp
 		recoveryRef = "reconcile:epwa-scope-required"
 	} else if base != nil && base.Scheme == "https" && base.Host != "" {
 		state, recoveryRef = epwadelivery.StateReady, ""
-		recordURL = base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + share.PackageID + "/"}).String()
-		portableURL = base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + share.PackageID + "/portable.zip"}).String()
+		recordURL, portableURL = shortShareURLs(base, share.PackageID)
 	}
 	createdAt := input.CapturedAt.UTC()
 	revision := input.Revision
@@ -197,8 +195,7 @@ func publishStoredArtifactEPWA(req *http.Request, cfg *config.Config, artifacts 
 			state, recoveryRef = epwadelivery.StatePendingReconcile, "reconcile:epwa-https-required"
 		} else {
 			state, recoveryRef = epwadelivery.StateReady, ""
-			recordURL = base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + share.PackageID + "/"}).String()
-			portableURL = base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + share.PackageID + "/portable.zip"}).String()
+			recordURL, portableURL = shortShareURLs(base, share.PackageID)
 		}
 	}
 	createdAt, err := time.Parse(time.RFC3339Nano, manifest.CreatedAt)
@@ -524,9 +521,22 @@ func reconcileEPWADelivery(req *http.Request, cfg *config.Config, current epwade
 		return current, nil
 	}
 	next.State, next.RecoveryRef = epwadelivery.StateReady, ""
-	next.EPWA.RecordURL = base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + current.EPWA.PackageID + "/"}).String()
-	next.EPWA.PortableURL = base.ResolveReference(&url.URL{Path: "api/screenshot/share/" + current.EPWA.PackageID + "/portable.zip"}).String()
+	next.EPWA.RecordURL, next.EPWA.PortableURL = shortShareURLs(base, current.EPWA.PackageID)
 	return epwadelivery.Record(epwaDeliveryRoot(cfg), next)
+}
+
+
+// shortShareURLs builds the friendly EPWA URLs for a package: the viewer
+// webpage (trailing slash) and the portable download — the default publish
+// shape, per 106r ("shorter, easier, cleaner URLs by default").
+func shortShareURLs(base *url.URL, packageID string) (string, string) {
+	short := packageID
+	if len(short) > shortShareIDLength {
+		short = short[:shortShareIDLength]
+	}
+	recordURL := base.ResolveReference(&url.URL{Path: "e/" + short + "/"}).String()
+	portableURL := base.ResolveReference(&url.URL{Path: "e/" + short + ".zip"}).String()
+	return recordURL, portableURL
 }
 
 func canonicalEPWABase(req *http.Request) (*url.URL, error) {

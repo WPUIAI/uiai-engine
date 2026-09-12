@@ -60,7 +60,9 @@ func TestMediaOutputDeliveryIsReadyOnlyWithHTTPSAndCompleteScope(t *testing.T) {
 	if delivery.State != epwadelivery.StateReady {
 		t.Fatalf("state=%s recovery=%s", delivery.State, delivery.RecoveryRef)
 	}
-	if !strings.HasPrefix(delivery.EPWA.RecordURL, "https://evidence.example/") || !strings.HasSuffix(delivery.EPWA.PortableURL, "/portable.zip") {
+	if !strings.HasPrefix(delivery.EPWA.RecordURL, "https://evidence.example/") ||
+		!strings.HasSuffix(delivery.EPWA.RecordURL, "/") ||
+		!strings.HasSuffix(delivery.EPWA.PortableURL, ".zip") {
 		t.Fatalf("unexpected EPWA URLs: %#v", delivery.EPWA)
 	}
 

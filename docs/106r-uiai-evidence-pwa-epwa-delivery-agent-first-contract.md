@@ -31,7 +31,22 @@ portable `.zip` that renders offline on any host, any domain, forever — with
 
 ## 1. Agent contract (machine-first — this is the primary interface)
 
-### 1.1 Endpoints (all mounted under `/api/screenshot`)
+### 1.1 Endpoints
+
+### Friendly URLs (default publish shape — host root)
+
+| Method | Path | Purpose | Notes |
+|---|---|---|---|
+| `GET` | `/e/{short}/` | **The EPWA webpage** | Default publish target. Viewer at a short URL (`{short}` = 12-hex prefix of the content-addressed package id). |
+| `GET` | `/e/{short}.zip` | **Portable package** | Immutable, `ETag: "sha256:<digest>"`, attachment download. |
+| `GET` | `/e/{short}` | Negotiated entry | Browsers → 302 to the viewer webpage; agents → durable JSON record. |
+| `GET` | `/e/{short}/verify` | **Integrity verification** | Same checks as the canonical path. |
+| `GET` | `/e/{short}/*` | Package assets | Same-origin relative serving (viewer shell, JS, manifest, icon). |
+
+Short ids resolve by unique prefix against the content-addressed package store;
+unknown or ambiguous prefixes fail closed (404).
+
+### Canonical API paths (agent-first, under `/api/screenshot`)
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
@@ -46,8 +61,8 @@ portable `.zip` that renders offline on any host, any domain, forever — with
 
 Session-flow routes (`POST .../sessions`, `POST .../sessions/{id}/screenshot`,
 navigate/type/hover/etc.) publish through the same EPWA path via
-`writeSessionSnapshot` and embed `artifact_url` + `portable_url` in the
-response when delivery state is `ready`.
+`writeSessionSnapshot` and embed `artifact_url` (the friendly `/e/{short}/`
+webpage) + `portable_url` in the response when delivery state is `ready`.
 
 ### 1.2 Success response schema — `uiai.session_visual_result.v2`
 
