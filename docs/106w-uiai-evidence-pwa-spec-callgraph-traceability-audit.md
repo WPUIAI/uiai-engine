@@ -113,4 +113,22 @@ Issue #224 remains open; earlier blanket completion claims are superseded.
 - A fresh installed Pi process successfully resolved a typed artifact reference to [its verified evidence page](https://ai.wpuiai.com/e/89a4641e7991/). Receipt: `/tmp/focusa-bg-01a096f0-d18d-7ab0-8590-c0388e5353f4.log`. This proves the consumer path, not actual canonical task binding or refresh of an already-running session.
 - Source isolation `816f885` moves adapter development files into `integrations/pi/`, updates existing consumers/installer and prevents automatic loading of test files or a duplicate adapter. Verification: 18 native tests, 11 MCP tests, 3 Python contract tests, delivery inventory test and fresh normal checkout registration passed. This later packaging change is outside the frozen static review.
 
-These results do not accept CG06, complete the specification, or authorize provider settlement. Remaining cryptographic identity, canonical snapshot, correction/retraction and offline-proof coverage must be traced individually.
+These results do not accept CG06, complete the specification, or authorize provider settlement.
+
+### CG06 requirement trace — preliminary, not acceptance
+
+Inspected at `1398f1c`; references below describe observed source and tests, not installed acceptance. The eight-clause authenticity digest is not the entire amended CG06 contract.
+
+| Required proof | Existing authoritative implementation | Exact remaining gap |
+|---|---|---|
+| Target/account identity | `assembly_validate.go:validateAssemblyIdentity` requires capture target/account/runtime references; `assembly_test.go` exercises missing identity. `VerifyAttestation` binds the manifest hash. | Required references and signed bytes do not independently prove the observed account/target. Trace the trusted runtime identity source and its consumer; add explicit signed-binding regression without calling it identity authentication. |
+| Actor/delegation | `authenticity.go:VerifyAttestation` verifies the signature, pinned trust-bundle digest and delegation; `authenticity_test.go` covers actor tampering. | Full amended independent acceptance and installed authority provenance remain open. |
+| Canonical-state snapshot | Existing `Scope` carries workset revision/digest, Workpoint revision/checkpoint, graph definition revision/generation and provider-item revision/digest. These are inside the signed manifest. | Trace actual action/judge readers and stale-state handling; add explicit snapshot-tampering proof. Reuse these bindings, not a parallel state authority. |
+| Corrections/retractions | `FederationState` contains correction/retraction/previous-attestation refs. `VerifyAttestation` rejects retraction and conflict; existing tests allow a signed correction. | A valid correction reference alone does not prove affected claims, derivatives and judge results are invalidated or publicly updated. Trace downstream propagation and preservation of prior lineage. |
+| Signing/time/federation/custody/import distrust/absence | Existing authenticity verifier, tests and digest clauses exercise key rotation/revocation, time, custody and import/absence behavior. | Producer proofs exist; full independent acceptance at an exact revision remains open. |
+| Offline/link-rot | `ValidateAirGapMaterials` validates the supplied manifest and attestation against pinned supplied trust without fetching citations. `OfflineVerificationNotice` explicitly excludes current revocation, supersession and live-source checks. | The helper does not prove portable bundle completeness, embedded executable/instructions, disconnected consumer behavior or source-loss labeling. Its named callers found under `internal/` are the digest battery, not a delivered viewer verification path. |
+| Human-readable identity | `HumanIdentityProofFor` validates bundle structure and derives a full grouped public-key fingerprint; it explicitly does not authenticate the supplied authority. | Printed artifact/revision identity, verification instructions and derivative presentation must be traced; a key fingerprint helper is not printed-output acceptance. |
+
+Signed-binding regression now exists in `authenticity_binding_test.go`: six cases alter target/account/runtime, workset revision, Workpoint revision and graph generation in a valid captured manifest, recompute its hash, and require the original attestation to fail. The evidenceartifact suite and vet passed. This proves immutable binding of supplied values, not real account authentication or current external state.
+
+Next proof slice: trace downstream correction and offline package consumers. No missing implementation is inferred solely from an identifier search.
