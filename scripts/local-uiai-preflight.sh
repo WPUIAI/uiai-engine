@@ -12,6 +12,9 @@ if git -c core.quotepath=false ls-files | grep -q ":"; then echo "FAIL Windows l
 if git -c core.quotepath=false ls-files | grep -q '[?*"<>|]'; then echo "FAIL Windows illegal char"; git -c core.quotepath=false ls-files | grep -E '[?*"<>|]'; exit 1; fi
 echo "Windows lint: PASS"
 
+echo "=== UIAI preflight: deployment readiness regression ==="
+python3 scripts/test_deploy_health.py
+
 echo "=== UIAI preflight: version surfaces ==="
 # Dual-track: engine (Go) and cockpit (Tauri) have independent semvers.
 ENG_V="$(grep -E 'version\s*=\s*"' cmd/uiai-engine/main.go | head -1 | sed -E 's/.*"(.*)"/\1/')"

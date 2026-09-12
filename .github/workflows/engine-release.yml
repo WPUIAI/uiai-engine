@@ -258,7 +258,7 @@ jobs:
         run: |
           export REMOTE_INSTALL_ROOT="${REMOTE_INSTALL_ROOT:-/home/wpuiai/uiai-engine}"
           export REMOTE_SERVICE_NAME="${REMOTE_SERVICE_NAME:-uiai-engine-ovh.service}"
-          export REMOTE_HEALTH_URL="${REMOTE_HEALTH_URL:-http://127.0.0.1:7456/v1/health}"
+          export REMOTE_HEALTH_URL="${REMOTE_HEALTH_URL:-http://127.0.0.1:7456/health}"
           export REMOTE_EXTRA_SERVICES="${REMOTE_EXTRA_SERVICES:-uiai-engine-ovh-w2.service}"
           export REMOTE_SMOKE_BASE_URLS="${REMOTE_SMOKE_BASE_URLS:-http://127.0.0.1:7460}"
           if [[ "${WORKFLOW_DRY_RUN:-false}" == "true" ]]; then export DRY_RUN=1; else export DRY_RUN=0; fi

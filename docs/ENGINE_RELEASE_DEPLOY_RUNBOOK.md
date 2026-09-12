@@ -41,7 +41,7 @@ Default target values:
 - User: root by default in the workflow SSH config.
 - Install root: `/home/wpuiai/uiai-engine`.
 - Service: `uiai-engine-ovh.service`.
-- Health URL: `http://127.0.0.1:7456/v1/health`.
+- Health URL: `http://127.0.0.1:7456/health` (public, HTTP 200 required).
 
 Optional repository/environment variables:
 
@@ -91,7 +91,9 @@ The deploy script verifies:
 - Previous binary is backed up under `backups/`.
 - `systemctl restart uiai-engine-ovh.service` succeeds.
 - Installed binary hash is printed.
-- Protected local health returns HTTP `200` or expected protected `401`.
+- Public local health returns HTTP `200`; `401` is not readiness proof. The deploy script makes at most 20 attempts, with three-second request limits and one-second intervals, and preserves the final response on failure.
+- Every configured worker's running `/proc/<MainPID>/exe` digest matches the released binary. An updated file on disk with an old failover process is not a completed deployment.
+- `python3 scripts/test_deploy_health.py` exercises the exact readiness gate for delayed startup, persistent connection failure, and unauthorized responses; canonical preflight runs it.
 - Local OVH browser smoke opens `https://example.com`, confirms screenshot presence, and closes the session.
 
 ## Public domains

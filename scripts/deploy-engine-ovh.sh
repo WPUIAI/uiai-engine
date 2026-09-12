@@ -10,7 +10,7 @@ set -euo pipefail
 : "${REMOTE_PORT:=22}"
 : "${REMOTE_INSTALL_ROOT:=/home/wpuiai/uiai-engine}"
 : "${REMOTE_SERVICE_NAME:=uiai-engine-ovh.service}"
-: "${REMOTE_HEALTH_URL:=http://127.0.0.1:7456/v1/health}"
+: "${REMOTE_HEALTH_URL:=http://127.0.0.1:7456/health}"
 : "${REMOTE_OWNER:=wpuiai}"
 : "${REMOTE_GROUP:=wpuiai}"
 : "${DRY_RUN:=0}"
@@ -110,15 +110,30 @@ if [[ -n "$epwa_base_url" ]]; then
   systemctl daemon-reload
 fi
 systemctl restart "$service_name"
-sleep 3
-systemctl is-active "$service_name"
-"$binary_path" -version || true
+"$binary_path" -version
 sha256sum "$binary_path"
-http_code=$(curl -sS -m 10 -o /tmp/uiai-engine-health.out -w "%{http_code}" "$health_url" || true)
-cat /tmp/uiai-engine-health.out || true
+# BEGIN HEALTH READINESS GATE (exercised directly by test_deploy_health.py)
+health_output=$(mktemp)
+healthy=0
+for attempt in {1..20}; do
+  : > "$health_output"
+  if http_code=$(curl -sS -m 3 -o "$health_output" -w "%{http_code}" "$health_url") && [[ "$http_code" == 200 ]]; then
+    healthy=1
+    break
+  fi
+  echo "waiting_for_health attempt=$attempt status=${http_code:-transport_error}" >&2
+  if (( attempt < 20 )); then sleep 1; fi
+done
+cat "$health_output"
 echo
-echo "health_http_code=$http_code"
-case "$http_code" in 200|401) ;; *) echo "unexpected health status: $http_code" >&2; exit 4 ;; esac
+echo "health_http_code=${http_code:-transport_error}"
+if (( healthy != 1 )); then
+  echo "health readiness failed; response retained at $health_output" >&2
+  exit 4
+fi
+rm -- "$health_output"
+# END HEALTH READINESS GATE
+systemctl is-active "$service_name"
 for extra in $extra_services; do
   if [[ -n "$epwa_base_url" ]]; then
     extra_dropin="/etc/systemd/system/${extra}.d"
@@ -130,6 +145,14 @@ for extra in $extra_services; do
   sleep 12
   systemctl is-active "$extra"
   echo "extra_service_active=$extra"
+done
+# Check the running processes, not merely the replacement file on disk.
+for running_service in "$service_name" $extra_services; do
+  pid=$(systemctl show -p MainPID --value "$running_service")
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || { echo "missing live pid: $running_service" >&2; exit 4; }
+  running_sha=$(sha256sum "/proc/$pid/exe" | awk '{print $1}')
+  [[ "$running_sha" == "$expected_sha" ]] || { echo "running binary mismatch: $running_service" >&2; exit 4; }
+  echo "running_binary_verified=$running_service sha256=$running_sha"
 done
 REMOTE_DEPLOY
 
