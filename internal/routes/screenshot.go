@@ -263,7 +263,18 @@ func screenshotStoreDir() string {
 // URLs) so callers can inspect what they hold (issue #224 acceptance).
 func mountScreenshotArtifact(r chi.Router, cfg *config.Config) {
 	r.Get("/artifact/{sha}", func(w http.ResponseWriter, req *http.Request) {
-		requested := normalizeArtifactRef(chi.URLParam(req, "sha"))
+		// Chi may select RawPath for escaped segments. Decode exactly once,
+		// as browser/native clients percent-encode typed reference colons.
+		ref := chi.URLParam(req, "sha")
+		if req.URL.RawPath != "" {
+			var err error
+			ref, err = url.PathUnescape(ref)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid artifact reference encoding"})
+				return
+			}
+		}
+		requested := normalizeArtifactRef(ref)
 		if packet, ok := findPublishedArtifactPacket(cfg, req, requested); ok {
 			writeJSON(w, http.StatusOK, map[string]any{
 				"schema":         "uiai.evidence_artifact_resolve.v1",

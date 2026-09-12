@@ -87,6 +87,28 @@ func TestArtifactResolverResolvesIssuedArtifactRef(t *testing.T) {
 		t.Fatalf("bare digest status=%d", recorder.Code)
 	}
 
+	// Native encodeURIComponent transport percent-encodes typed-ref colons.
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/artifact/uiai-artifact%3Asha256%3A"+digest, nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("escaped typed reference rejected: %d %s", recorder.Code, recorder.Body.String())
+	}
+	server := httptest.NewServer(router)
+	defer server.Close()
+	response, err := server.Client().Get(server.URL + "/artifact/uiai-artifact%3Asha256%3A" + digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("escaped reference over real HTTP: %d", response.StatusCode)
+	}
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/artifact/uiai-artifact%253Asha256%253A"+digest, nil))
+	if recorder.Code == http.StatusOK {
+		t.Fatal("double-encoded reference was decoded more than once")
+	}
+
 	// An ambiguous short prefix must fall back to exact package identity.
 	collision := packet.PackageID[:shortShareIDLength] + strings.Repeat("0", 64-shortShareIDLength)
 	if err := os.MkdirAll(filepath.Join(shareDir, collision), 0o750); err != nil {
