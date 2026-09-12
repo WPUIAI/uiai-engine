@@ -52,7 +52,7 @@ If a new agent-facing surface is added, also update:
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && go test ./...'
-as-user wpuiai 'cd /home/wpuiai/uiai-engine && bun test ./.pi/extensions/uiai-engine.packet-builder.test.ts'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && bun test ./integrations/pi/uiai-engine.packet-builder.test.ts'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-registration.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-mcp-tool-routes.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-mcp-structured-failure.sh'

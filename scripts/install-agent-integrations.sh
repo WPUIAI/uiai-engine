@@ -3,9 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINE_URL="${UIAI_ENGINE_URL:-http://localhost:7456}"
-PI_EXT_SRC="$ROOT_DIR/.pi/extensions/uiai-engine.ts"
+PI_EXT_SRC="$ROOT_DIR/integrations/pi/uiai-engine.ts"
 PI_EXT_DEST="${UIAI_PI_EXTENSION_DEST:-$HOME/.pi/agent/extensions/uiai-engine.ts}"
-PI_CONTRACT_SRC="$ROOT_DIR/.pi/extensions/uiai/epwa-contract.mjs"
+PI_CONTRACT_SRC="$ROOT_DIR/integrations/pi/uiai/epwa-contract.mjs"
 PI_CONTRACT_DEST="$(dirname "$PI_EXT_DEST")/uiai/epwa-contract.mjs"
 MCP_CONFIG_DEST="${UIAI_MCP_CONFIG_DEST:-$HOME/.pi/agent/mcp.json}"
 MCP_SERVER_NAME="${UIAI_MCP_SERVER_NAME:-uiai-browser}"

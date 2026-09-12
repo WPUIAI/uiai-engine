@@ -257,7 +257,7 @@ Use when changes are ready to ship.
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh && go test ./...'
-as-user wpuiai 'cd /home/wpuiai/uiai-engine && bun test ./.pi/extensions/uiai-engine.packet-builder.test.ts'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && bun test ./integrations/pi/uiai-engine.packet-builder.test.ts'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-registration.sh && scripts/smoke-agent-integrations.sh && scripts/smoke-mcp-tool-routes.sh'
 ```
 

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINE_URL="${UIAI_ENGINE_URL:-http://localhost:7456}"
 TIMEOUT_SECONDS="${UIAI_SMOKE_TIMEOUT_SECONDS:-20}"
-PI_EXT="$ROOT_DIR/.pi/extensions/uiai-engine.ts"
+PI_EXT="$ROOT_DIR/integrations/pi/uiai-engine.ts"
 AUTH_ARGS=()
 if [[ -n "${UIAI_API_KEY:-}" ]]; then
   AUTH_ARGS=(-H "X-API-Key: ${UIAI_API_KEY}")

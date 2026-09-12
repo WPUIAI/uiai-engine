@@ -95,7 +95,7 @@ Main entry points:
 - `internal/auth/auth.go`
 - `internal/license/entitlements.go`
 - `internal/config/config.go`
-- `.pi/extensions/uiai-engine.ts`
+- `integrations/pi/uiai-engine.ts` (install with `scripts/install-agent-integrations.sh`; source/tests stay outside Pi's auto-discovery directory to avoid duplicate tools)
 - `mcp/browser-session-mcp.mjs`
 - `scripts/uiai`
 

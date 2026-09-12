@@ -45,7 +45,7 @@ A feature is considered agent-discoverable when the appropriate rows are complet
 2. **Auth mode** documented in `docs/ENDPOINT_AUTH_MATRIX.md`.
 3. **Tool definition** added to `internal/routes/tools.go` when it is a public agent surface.
 4. **Agent card/search/graph/docs** updated when the feature changes workflow routing.
-5. **Pi exposure** added in `.pi/extensions/uiai-engine.ts` or an explicit omission documented.
+5. **Pi exposure** added in `integrations/pi/uiai-engine.ts` or an explicit omission documented.
 6. **MCP exposure** added in `mcp/browser-session-mcp.mjs` or an explicit omission documented.
 7. **CLI exposure** added in `scripts/uiai` when useful for operators/headless agents.
 8. **Parity row** added in `docs/PUBLIC_API_PARITY_MATRIX.md`.

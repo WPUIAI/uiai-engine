@@ -23,7 +23,7 @@ This spec defines interoperability contracts, implementation tracks, acceptance 
 |---|---|---|---|
 | Go engine HTTP API | `/api/*` | Canonical capability implementation. | Endpoint behavior drifts from agent/plugin wrappers. |
 | WordPress plugin | PHP/UI/REST consumer | Product UI and customer workflow. | Opaque errors, auth mismatch, route parity gaps. |
-| Pi plugin | `.pi/extensions/uiai-engine.ts` | Direct Pi tool surface and compact UI. | Missing tools, stale extension reload, poor rendering. |
+| Pi plugin | `integrations/pi/uiai-engine.ts` | Direct Pi tool surface and compact UI. | Missing tools, stale extension reload, poor rendering. |
 | MCP bridge | `mcp/browser-session-mcp.mjs` | Stdio bridge for MCP clients. | Advertised tools missing call routes; metadata cache confusion. |
 | Focusa | `focusa_scope`, diagnostics intake | Evidence/workpoint linkage. | Scope loss or raw blob evidence instead of stable handles. |
 | Browser/session API | `/api/session/*` | Persistent browser automation. | Failures not actionable; diagnostics not linked to errors. |

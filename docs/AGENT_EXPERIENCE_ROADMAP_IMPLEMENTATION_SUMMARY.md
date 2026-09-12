@@ -17,7 +17,7 @@ This public summary translates the completed `uiai-engine-ove` roadmap beads int
 | `uiai-engine-ove.13` | Repo-local `uiai-ci-debug` skill for failed run discovery, log/artifact inspection, failure classification, local repro, and rerun watch. | `.pi/skills/uiai-ci-debug/SKILL.md`; commit `c7cc054`. |
 | `uiai-engine-ove.16` | Repo-local `uiai-browser-debug` skill for diagnostics-first browser/session failure triage and Focusa intake. | `.pi/skills/uiai-browser-debug/SKILL.md`; commit `cafcb76`. |
 | `uiai-engine-ove.18` | One-command CLI packet workflow: `scripts/uiai research packet --url|--query ...`. | `scripts/uiai`; `/tmp/uiai-research-packet-cli.json`; commit `56a9d3e`. |
-| `uiai-engine-ove.19` | Executable Pi `/uiai research <query>`, `/uiai proof <url>`, and `/uiai diagnose <session_id>` guided workflows. | `.pi/extensions/uiai-engine.ts`; `scripts/smoke-pi-extension-registration.sh`; commit `cc5a0d4`. |
+| `uiai-engine-ove.19` | Executable Pi `/uiai research <query>`, `/uiai proof <url>`, and `/uiai diagnose <session_id>` guided workflows. | `integrations/pi/uiai-engine.ts`; `scripts/smoke-pi-extension-registration.sh`; commit `cc5a0d4`. |
 | `uiai-engine-ove.21` | Cross-surface tool parity checker for MCP advertised tools, Pi mirrors, MCP call routes, CLI commands, docs mentions, and `/uiai` packet shortcuts. | `scripts/check-tool-parity.sh`; commit `6f199ec`. |
 | `uiai-engine-ove.23` | CI log summarizer for failed GitHub Actions logs/artifacts, redaction, failure classification, and recommended fixes. | `scripts/ci-log-summary.py`; `/tmp/uiai-ci-summary.json`; commit `892f5ab`. |
 | `uiai-engine-ove.24` | Release service smoke bundle with `--dry-run`, `--check-only`, root/systemctl boundary, health, packet, agent, MCP, Pi, parity, and docs proof handles. | `scripts/release-service-smoke.sh`; `/tmp/uiai-release-smoke-check-only.txt`; commit `d984e87`. |
@@ -85,7 +85,7 @@ scripts/smoke-pi-extension-registration.sh
 scripts/smoke-mcp-tool-routes.sh
 scripts/smoke-focusa-packet-ci.sh
 go test ./...
-bun test ./.pi/extensions/uiai-engine.packet-builder.test.ts
+bun test ./integrations/pi/uiai-engine.packet-builder.test.ts
 ```
 
 For current-service proof without restart:

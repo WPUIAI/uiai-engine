@@ -274,7 +274,7 @@ Cause:
 
 Fix:
 
-- Add the Pi tool under `.pi/extensions/uiai-engine.ts` or document a deliberate omission.
+- Add the Pi tool under `integrations/pi/uiai-engine.ts` or document a deliberate omission.
 - Re-run:
 
 ```bash

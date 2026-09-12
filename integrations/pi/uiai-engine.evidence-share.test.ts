@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -7,6 +7,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const source = readFileSync(new URL("./uiai-engine.ts", import.meta.url), "utf8");
 
 describe("Evidence Share Packet Pi toolset", () => {
+	test("development adapter and tests stay outside automatic extension discovery", () => {
+		const discovery = new URL("../../.pi/extensions/", import.meta.url);
+		const names = existsSync(discovery) ? readdirSync(discovery) : [];
+		expect(names).not.toContain("uiai-engine.ts");
+		expect(names.filter(name => name.endsWith(".test.ts"))).toEqual([]);
+	});
 	test("registers progressive-disclosure tools and canonical endpoints", () => {
 		for (const value of [
 			'uiai_screenshot',
