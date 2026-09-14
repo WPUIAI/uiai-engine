@@ -108,12 +108,16 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			var body struct {
-				Format   string `json:"format"`
-				Quality  int    `json:"quality"`
-				FullPage bool   `json:"fullPage"`
-				Output   string `json:"output"`
+				Format      string              `json:"format"`
+				Quality     int                 `json:"quality"`
+				FullPage    bool                `json:"fullPage"`
+				Output      string              `json:"output"`
+				FocusaScope *vision.FocusaScope `json:"focusa_scope"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
+			if body.FocusaScope != nil {
+				sess.SetFocusaScope(mergeFocusaScope(sess.FocusaScope, body.FocusaScope))
+			}
 
 			var snap *vision.SnapResult
 			var err error
@@ -803,6 +807,55 @@ func resolveFocusaScope(scope *vision.FocusaScope, workpointID, continuityID, pr
 		return nil
 	}
 	return &vision.FocusaScope{WorkpointID: workpointID, ContinuityID: continuityID, ProjectRoot: projectRoot, EvidenceRef: evidenceRef}
+}
+
+// mergeFocusaScope preserves the session's existing binding while allowing a
+// capture caller to complete or refresh its evidence scope. Scope is evidence
+// metadata, not browser-action authority.
+func mergeFocusaScope(current, incoming *vision.FocusaScope) *vision.FocusaScope {
+	if incoming == nil {
+		return current
+	}
+	if current == nil {
+		return incoming
+	}
+	merged := *current
+	if incoming.WorkpointID != "" {
+		merged.WorkpointID = incoming.WorkpointID
+	}
+	if incoming.ContinuityID != "" {
+		merged.ContinuityID = incoming.ContinuityID
+	}
+	if incoming.ProjectRoot != "" {
+		merged.ProjectRoot = incoming.ProjectRoot
+	}
+	if incoming.WorkstreamKey != "" {
+		merged.WorkstreamKey = incoming.WorkstreamKey
+	} else if incoming.ProjectRoot != "" || incoming.ContinuityID != "" {
+		merged.WorkstreamKey = ""
+	}
+	if incoming.EvidenceRef != "" {
+		merged.EvidenceRef = incoming.EvidenceRef
+	}
+	if incoming.ProjectRef != "" {
+		merged.ProjectRef = incoming.ProjectRef
+	}
+	if incoming.WorkstreamRef != "" {
+		merged.WorkstreamRef = incoming.WorkstreamRef
+	}
+	if incoming.WorksetRef != "" {
+		merged.WorksetRef = incoming.WorksetRef
+	}
+	if incoming.CallGraphRef != "" {
+		merged.CallGraphRef = incoming.CallGraphRef
+	}
+	if incoming.WorkItemRef != "" {
+		merged.WorkItemRef = incoming.WorkItemRef
+	}
+	if incoming.WorkItems != nil {
+		merged.WorkItems = append(merged.WorkItems[:0:0], incoming.WorkItems...)
+	}
+	return &merged
 }
 
 func writeSessionError(w http.ResponseWriter, status int, class string, err error, sess *vision.Session, context ...map[string]any) {

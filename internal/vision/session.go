@@ -49,6 +49,31 @@ type FocusaScope struct {
 	WorkItems     []evidencepwa.WorkItemProjection `json:"work_items,omitempty"`
 }
 
+// UnmarshalJSON accepts the EPWA scope projection's ref names while retaining
+// one canonical in-memory representation for session binding.
+func (s *FocusaScope) UnmarshalJSON(data []byte) error {
+	type scopeAlias FocusaScope
+	var decoded scopeAlias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var refs struct {
+		WorkpointRef  string `json:"workpoint_ref"`
+		ContinuityRef string `json:"continuity_ref"`
+	}
+	if err := json.Unmarshal(data, &refs); err != nil {
+		return err
+	}
+	*s = FocusaScope(decoded)
+	if s.WorkpointID == "" {
+		s.WorkpointID = refs.WorkpointRef
+	}
+	if s.ContinuityID == "" {
+		s.ContinuityID = refs.ContinuityRef
+	}
+	return nil
+}
+
 func (s *FocusaScope) DerivedWorkstreamKey() string {
 	if s == nil {
 		return ""
@@ -64,6 +89,36 @@ func (s *FocusaScope) DerivedWorkstreamKey() string {
 		return root + "::" + s.ContinuityID
 	}
 	return ""
+}
+
+// ProjectReference returns the typed project reference, with the legacy root
+// retained only as a compatibility fallback for evidence consumers.
+func (s *FocusaScope) ProjectReference() string {
+	if s == nil {
+		return ""
+	}
+	if s.ProjectRef != "" {
+		return s.ProjectRef
+	}
+	return s.ProjectRoot
+}
+
+// WorkstreamReference returns the typed workstream reference, with a derived
+// legacy workstream key retained only for compatibility.
+func (s *FocusaScope) WorkstreamReference() string {
+	if s == nil {
+		return ""
+	}
+	if s.WorkstreamRef != "" {
+		return s.WorkstreamRef
+	}
+	return s.DerivedWorkstreamKey()
+}
+
+// HasEvidenceBinding reports whether scope carries the project and continuity
+// binding required to label browser evidence as fully scoped.
+func (s *FocusaScope) HasEvidenceBinding() bool {
+	return s != nil && s.ProjectReference() != "" && s.ContinuityID != ""
 }
 
 func (s *FocusaScope) ValidWorkstreamKey() bool {
@@ -1348,7 +1403,7 @@ func readFocusaScopeStatus(scope *FocusaScope) string {
 	if scope == nil {
 		return string(focusapacket.ScopeMissing)
 	}
-	if scope.ProjectRoot != "" && scope.ContinuityID != "" {
+	if scope.HasEvidenceBinding() {
 		return string(focusapacket.ScopePresent)
 	}
 	return string(focusapacket.ScopePartial)

@@ -368,7 +368,7 @@ async function toolsCall(name, args) {
     case "browser_screenshot":
       url = `${ENGINE}/api/session/${args.session_id}/screenshot`;
       method = "POST";
-      body = { format: args.format, quality: args.quality, fullPage: args.fullPage, output: args.output };
+      body = { format: args.format, quality: args.quality, fullPage: args.fullPage, output: args.output, focusa_scope: args.focusa_scope };
       break;
 
     case "browser_scroll":

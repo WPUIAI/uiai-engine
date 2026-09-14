@@ -213,6 +213,10 @@ func TestVisualToolContractsAdvertiseOnlyMandatoryEPWADelivery(t *testing.T) {
 		t.Fatalf("missing visual tool definitions: screenshot=%v fpv=%v", screenshot != nil, fpv != nil)
 	}
 	properties := screenshot["parameters"].(map[string]any)["properties"].(map[string]any)
+	scope, ok := properties["focusa_scope"].(map[string]any)
+	if !ok || scope["type"] != "object" || !strings.Contains(scope["description"].(string), "Complete evidence scope") {
+		t.Fatalf("browser_screenshot must accept complete evidence scope: %#v", scope)
+	}
 	output := properties["output"].(map[string]any)
 	enums := output["enum"].([]string)
 	if output["default"] != "epwa" || len(enums) != 1 || enums[0] != "epwa" {

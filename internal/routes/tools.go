@@ -576,6 +576,10 @@ func openAITools() []map[string]any {
 					"quality":    map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 60},
 					"fullPage":   map[string]any{"type": "boolean", "description": "Capture entire scrollable page", "default": false},
 					"output":     map[string]any{"type": "string", "description": "Compatibility input; delivery is always EPWA and raw modes are withheld", "default": "epwa", "enum": []string{"epwa"}},
+					"focusa_scope": map[string]any{
+						"type":        "object",
+						"description": "Complete evidence scope to preserve or complete the session binding before EPWA delivery",
+					},
 				},
 				"required": []string{"session_id"},
 			},
