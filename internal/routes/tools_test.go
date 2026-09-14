@@ -230,6 +230,28 @@ func TestVisualToolContractsAdvertiseOnlyMandatoryEPWADelivery(t *testing.T) {
 	}
 }
 
+func TestCaptureToolsAdvertiseFocusaScope(t *testing.T) {
+	remaining := map[string]bool{"browser_open": true, "browser_screenshot": true, "screenshot": true}
+	for _, tool := range openAITools() {
+		name, _ := tool["name"].(string)
+		if !remaining[name] {
+			continue
+		}
+		properties, ok := tool["parameters"].(map[string]any)["properties"].(map[string]any)
+		if !ok {
+			t.Fatalf("%s properties missing: %#v", name, tool)
+		}
+		scope, ok := properties["focusa_scope"].(map[string]any)
+		if !ok || scope["type"] != "object" {
+			t.Fatalf("%s must advertise focusa_scope: %#v", name, scope)
+		}
+		delete(remaining, name)
+	}
+	if len(remaining) != 0 {
+		t.Fatalf("capture tools missing from registry: %#v", remaining)
+	}
+}
+
 func containsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
