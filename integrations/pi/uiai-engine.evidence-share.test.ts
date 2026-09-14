@@ -58,6 +58,14 @@ async function tools() {
   extension({ on() {}, registerCommand() {}, registerTool(tool: any) { registered.set(tool.name, tool); } } as any);
   return registered;
 }
+test("capture tools expose complete evidence scope in their native schemas", async () => {
+  const registered = await tools();
+  for (const name of ["uiai_browser_open", "uiai_browser_screenshot", "uiai_screenshot"]) {
+    const scope = registered.get(name)?.parameters?.properties?.focusa_scope;
+    expect(scope).toBeDefined();
+  }
+});
+
 test("native screenshot automatically returns and visibly renders its HTTPS evidence", async () => {
   globalThis.fetch = (async () => Response.json(fixture())) as any;
   const tool = (await tools()).get("uiai_browser_screenshot");
