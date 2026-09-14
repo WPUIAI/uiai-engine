@@ -60,6 +60,22 @@ func TestFPVFocusaContextUsesSessionScope(t *testing.T) {
 	}
 }
 
+func TestFPVFocusaContextRetainsTypedScopeWithoutProjectRoot(t *testing.T) {
+	sess := &vision.Session{FocusaScope: &vision.FocusaScope{
+		ProjectRef: "project:uiai-engine", WorkstreamRef: "workstream:epwa", WorksetRef: "workset:scope",
+		CallGraphRef: "callgraph:scope", WorkpointID: "workpoint:scope", WorkItemRef: "work-item:scope",
+		ContinuityID: "continuity:scope",
+	}}
+	ctx := fpvFocusaContext(sess, "abc123")
+	if ctx["status"] != "linked" || ctx["project_ref"] != "project:uiai-engine" || ctx["workstream_ref"] != "workstream:epwa" || ctx["workset_ref"] != "workset:scope" || ctx["callgraph_ref"] != "callgraph:scope" || ctx["work_item_ref"] != "work-item:scope" {
+		t.Fatalf("typed Focusa scope was not retained: %#v", ctx)
+	}
+	live, ok := ctx["live"].(map[string]any)
+	if !ok || live["reason"] != "project_root unavailable for live Focusa adapter" {
+		t.Fatalf("typed scope must not query the live adapter without a project root: %#v", ctx["live"])
+	}
+}
+
 func TestFPVContextUsesFocusaScopeAdapter(t *testing.T) {
 	sess := &vision.Session{FocusaScope: &vision.FocusaScope{WorkpointID: "wp1", ContinuityID: "cont1", ProjectRoot: "/project", EvidenceRef: "ev1"}}
 	ctx := fpvContext(sess)

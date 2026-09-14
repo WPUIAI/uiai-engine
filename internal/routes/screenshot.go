@@ -36,7 +36,7 @@ func routeFocusaScopeStatus(scope *vision.FocusaScope) string {
 	if scope == nil {
 		return string(focusapacket.ScopeMissing)
 	}
-	if scope.ProjectRoot != "" && scope.ContinuityID != "" {
+	if scope.HasEvidenceBinding() {
 		return string(focusapacket.ScopePresent)
 	}
 	return string(focusapacket.ScopePartial)
@@ -83,16 +83,10 @@ func settingInt(values map[string]any, group, key string) int {
 	return 0
 }
 func scopeProject(scope *vision.FocusaScope) string {
-	if scope == nil {
-		return ""
-	}
-	return scope.ProjectRoot
+	return scope.ProjectReference()
 }
 func scopeWorkstream(scope *vision.FocusaScope) string {
-	if scope == nil {
-		return ""
-	}
-	return scope.DerivedWorkstreamKey()
+	return scope.WorkstreamReference()
 }
 
 func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore, artifacts *evidenceartifact.Store) {

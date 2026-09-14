@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 )
 
@@ -33,6 +36,39 @@ func TestSessionScreenshotOutputIsOnlyHTTPSPortableEPWA(t *testing.T) {
 	var response map[string]any
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
+	}
+	delivery, ok := response["epwa_delivery"].(map[string]any)
+	if !ok {
+		t.Fatalf("session delivery missing: %#v", response)
+	}
+	deliveredScope, ok := delivery["scope"].(map[string]any)
+	if !ok {
+		t.Fatalf("session delivery scope missing: %#v", delivery)
+	}
+	for key, want := range map[string]string{
+		"project_ref": scope.ProjectRef, "workstream_ref": scope.WorkstreamRef, "workset_ref": scope.WorksetRef,
+		"callgraph_ref": scope.CallGraphRef, "workpoint_ref": scope.WorkpointRef, "work_item_ref": scope.WorkItemRef,
+		"continuity_ref": scope.ContinuityRef,
+	} {
+		if deliveredScope[key] != want {
+			t.Fatalf("session delivery %s=%#v, want %q", key, deliveredScope[key], want)
+		}
+	}
+	epwa, ok := delivery["epwa"].(map[string]any)
+	if !ok {
+		t.Fatalf("session EPWA binding missing: %#v", delivery)
+	}
+	packageID, _ := epwa["package_id"].(string)
+	manifestBody, err := os.ReadFile(filepath.Join(evidenceShareDir(cfg), packageID, "artifact.json"))
+	if err != nil {
+		t.Fatalf("read persisted screenshot manifest: %v", err)
+	}
+	var manifest evidenceshare.Manifest
+	if err := json.Unmarshal(manifestBody, &manifest); err != nil {
+		t.Fatalf("decode persisted screenshot manifest: %v", err)
+	}
+	if len(manifest.Scope.WorkItems) != len(scope.WorkItems) || manifest.Scope.WorkItems[0].WorkItemRef != scope.WorkItems[0].WorkItemRef || manifest.Scope.WorkItems[0].Title != scope.WorkItems[0].Title {
+		t.Fatalf("session delivery lost work-items binding: %#v", manifest.Scope.WorkItems)
 	}
 	if response["screenshot"] != nil || response["artifact_path"] != nil || response["delivery_state"] != "ready" || response["raw_output_posture"] != "withheld_by_mandatory_epwa_delivery" {
 		t.Fatalf("session raw-only output escaped: %#v", response)
