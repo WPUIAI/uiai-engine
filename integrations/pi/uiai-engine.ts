@@ -25,11 +25,24 @@ const MAX_ACTIVE_OBJECT_HINTS = 16;
 type PacketMode = "research" | "diagnose" | "proof";
 type ScopeStatus = "present" | "missing" | "partial" | "mismatch_candidate";
 
+type FocusaWorkItem = {
+	work_item_ref: string;
+	[key: string]: unknown;
+};
+
 type FocusaScope = {
 	project_root?: string;
 	continuity_id?: string;
 	workpoint_id?: string;
 	evidence_ref?: string;
+	project_ref?: string;
+	workstream_ref?: string;
+	workset_ref?: string;
+	callgraph_ref?: string;
+	workpoint_ref?: string;
+	work_item_ref?: string;
+	continuity_ref?: string;
+	work_items?: FocusaWorkItem[];
 };
 
 type PacketCapture = {
@@ -258,8 +271,10 @@ function boundedStrings(values: any[], maxItems: number, maxChars = 500): string
 
 function scopeStatus(scope: any): ScopeStatus {
 	if (!scope || typeof scope !== "object") return "missing";
-	if (scope.project_root && scope.continuity_id) return "present";
-	if (scope.project_root || scope.continuity_id || scope.workpoint_id || scope.evidence_ref) return "partial";
+	const projectRef = scope.project_ref || scope.project_root;
+	const continuityRef = scope.continuity_ref || scope.continuity_id;
+	if (projectRef && continuityRef) return "present";
+	if (projectRef || continuityRef || scope.workpoint_ref || scope.workpoint_id || scope.workstream_ref || scope.workset_ref || scope.callgraph_ref || scope.work_item_ref || scope.evidence_ref || (Array.isArray(scope.work_items) && scope.work_items.length > 0)) return "partial";
 	return "missing";
 }
 

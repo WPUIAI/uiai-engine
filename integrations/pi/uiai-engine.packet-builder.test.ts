@@ -82,6 +82,19 @@ test("buildResearchDiagnosticsPacket recognizes source markdown captures", async
 });
 
 
+test("buildResearchDiagnosticsPacket retains complete typed evidence scope", async () => {
+	const { buildResearchDiagnosticsPacket } = await import("./uiai-engine");
+	const scope = {
+		project_ref: "project:uiai-engine", workstream_ref: "workstream:epwa", workset_ref: "workset:scope",
+		callgraph_ref: "callgraph:scope", workpoint_ref: "workpoint:scope", work_item_ref: "work-item:scope",
+		continuity_ref: "continuity:scope", work_items: [{ work_item_ref: "work-item:scope", title: "Forward scope" }],
+	};
+	const packet = buildResearchDiagnosticsPacket({ goal: "scope proof", focusa_scope: scope, responses: [] });
+	expect(packet.scope_status).toBe("present");
+	expect(packet.focusa_scope).toEqual(scope);
+	expect(packet.render.summary_line).toContain("scope=present");
+});
+
 test("buildResearchDiagnosticsPacket recognizes snapshot packet capture", async () => {
 	const { buildResearchDiagnosticsPacket } = await import("./uiai-engine");
 	const packet = buildResearchDiagnosticsPacket({
