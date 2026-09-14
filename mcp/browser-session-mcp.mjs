@@ -530,6 +530,7 @@ async function toolsCall(name, args) {
       body = {
         url: args.url, width: args.width, height: args.height,
         format: args.format, quality: args.quality, fullPage: args.fullPage,
+        focusa_scope: args.focusa_scope,
       };
       break;
 

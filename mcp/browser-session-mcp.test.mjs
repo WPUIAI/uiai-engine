@@ -41,7 +41,7 @@ function callMcp(child, request) {
   });
 }
 
-test("MCP browser_screenshot forwards the complete Focusa scope in its session request", async (t) => {
+test("MCP screenshots forward the complete Focusa scope in their requests", async (t) => {
   let captured;
   const server = createServer(async (request, response) => {
     const chunks = [];
@@ -96,6 +96,23 @@ test("MCP browser_screenshot forwards the complete Focusa scope in its session r
   assert.equal(result.error, undefined, JSON.stringify(result));
   assert.equal(captured.method, "POST");
   assert.equal(captured.url, "/api/session/session-1/screenshot");
+  assert.deepEqual(captured.body.focusa_scope, scope);
+  assert.equal(captured.headers["x-uiai-workpoint-ref"], scope.workpoint_ref);
+  assert.equal(captured.headers["x-uiai-continuity-ref"], scope.continuity_ref);
+  assert.deepEqual(JSON.parse(captured.headers["x-uiai-work-items"]), scope.work_items);
+
+  const oneShotResult = await callMcp(child, {
+    jsonrpc: "2.0",
+    id: 2,
+    method: "tools/call",
+    params: {
+      name: "screenshot",
+      arguments: { url: "https://example.test", format: "png", focusa_scope: scope },
+    },
+  });
+  assert.equal(oneShotResult.error, undefined, JSON.stringify(oneShotResult));
+  assert.equal(captured.method, "POST");
+  assert.equal(captured.url, "/api/screenshot");
   assert.deepEqual(captured.body.focusa_scope, scope);
   assert.equal(captured.headers["x-uiai-workpoint-ref"], scope.workpoint_ref);
   assert.equal(captured.headers["x-uiai-continuity-ref"], scope.continuity_ref);
