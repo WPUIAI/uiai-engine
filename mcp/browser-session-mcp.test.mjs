@@ -83,6 +83,23 @@ test("MCP screenshots forward the complete Focusa scope in their requests", asyn
     continuity_ref: "continuity:scope",
     work_items: [{ work_item_ref: "work-item:scope", title: "Forward scope" }],
   };
+  const openResult = await callMcp(child, {
+    jsonrpc: "2.0",
+    id: 0,
+    method: "tools/call",
+    params: {
+      name: "browser_open",
+      arguments: { url: "https://example.test", focusa_scope: scope },
+    },
+  });
+  assert.equal(openResult.error, undefined, JSON.stringify(openResult));
+  assert.equal(captured.method, "POST");
+  assert.equal(captured.url, "/api/session");
+  assert.deepEqual(captured.body.focusa_scope, scope);
+  assert.equal(captured.headers["x-uiai-workpoint-ref"], scope.workpoint_ref);
+  assert.equal(captured.headers["x-uiai-continuity-ref"], scope.continuity_ref);
+  assert.deepEqual(JSON.parse(captured.headers["x-uiai-work-items"]), scope.work_items);
+
   const result = await callMcp(child, {
     jsonrpc: "2.0",
     id: 1,
