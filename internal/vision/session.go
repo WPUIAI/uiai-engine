@@ -57,19 +57,16 @@ func (s *FocusaScope) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	var refs struct {
-		WorkpointRef  string `json:"workpoint_ref"`
-		ContinuityRef string `json:"continuity_ref"`
-	}
-	if err := json.Unmarshal(data, &refs); err != nil {
+	aliases, err := focusapacket.DecodeScopeReferenceAliases(data)
+	if err != nil {
 		return err
 	}
 	*s = FocusaScope(decoded)
 	if s.WorkpointID == "" {
-		s.WorkpointID = refs.WorkpointRef
+		s.WorkpointID = aliases.WorkpointRef
 	}
 	if s.ContinuityID == "" {
-		s.ContinuityID = refs.ContinuityRef
+		s.ContinuityID = aliases.ContinuityRef
 	}
 	return nil
 }

@@ -93,14 +93,14 @@ func TestAgentResearchPacketEndpointUsesCompleteBodyScope(t *testing.T) {
 	r := chi.NewRouter()
 	MountAgentPacketRoutes(r, &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}})
 	scope := completeEvidenceScope()
-	body, err := json.Marshal(researchPacketRequest{
-		Goal:      "body-scoped endpoint packet",
-		Responses: []map[string]any{{"focusa": map[string]any{"target_ref": "browser:https://example.test", "evidence_ref": "uiai-search:brave:body:1", "summary": "Search result"}}},
-		FocusaScope: &focusapacket.FocusaScope{
-			ProjectRef: scope.ProjectRef, ProjectRoot: "/private/source/root", WorkstreamRef: scope.WorkstreamRef,
-			WorksetRef: scope.WorksetRef, CallGraphRef: scope.CallGraphRef, WorkpointID: scope.WorkpointRef,
-			WorkItemRef: scope.WorkItemRef, WorkItems: scope.WorkItems, ContinuityID: scope.ContinuityRef,
-			EvidenceRef: "uiai-agent-packet-body-scope",
+	body, err := json.Marshal(map[string]any{
+		"goal":      "body-scoped endpoint packet",
+		"responses": []map[string]any{{"focusa": map[string]any{"target_ref": "browser:https://example.test", "evidence_ref": "uiai-search:brave:body:1", "summary": "Search result"}}},
+		"focusa_scope": map[string]any{
+			"project_ref": scope.ProjectRef, "project_root": "/private/source/root", "workstream_ref": scope.WorkstreamRef,
+			"workset_ref": scope.WorksetRef, "callgraph_ref": scope.CallGraphRef, "workpoint_ref": scope.WorkpointRef,
+			"work_item_ref": scope.WorkItemRef, "work_items": scope.WorkItems, "continuity_ref": scope.ContinuityRef,
+			"evidence_ref": "uiai-agent-packet-body-scope",
 		},
 	})
 	if err != nil {

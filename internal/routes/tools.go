@@ -440,7 +440,7 @@ func openAITools() []map[string]any {
 					"mode":                    map[string]any{"type": "string", "enum": []string{"research", "diagnose", "proof"}, "default": "research"},
 					"goal":                    map[string]string{"type": "string", "description": "Bounded research/diagnostics/proof goal"},
 					"responses":               map[string]any{"type": "array", "description": "Existing UIAI response objects that include focusa/focusa_evidence metadata"},
-					"focusa_scope":            map[string]any{"type": "object", "description": "Optional project_root/continuity_id/workpoint_id/evidence_ref scope"},
+					"focusa_scope":            map[string]any{"type": "object", "description": "Complete typed Focusa evidence scope; wire aliases normalize at the request boundary"},
 					"recommended_next_action": map[string]string{"type": "string", "description": "Optional bounded next action"},
 					"cleanup_session_id":      map[string]string{"type": "string", "description": "Optional session id to close after evidence capture"},
 				},

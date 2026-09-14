@@ -57,6 +57,43 @@ type FocusaScope struct {
 	EvidenceRef   string                           `json:"evidence_ref,omitempty"`
 }
 
+// ScopeReferenceAliases are accepted wire names that normalize to the canonical
+// workpoint_id and continuity_id fields retained in bounded packets.
+type ScopeReferenceAliases struct {
+	WorkpointRef  string `json:"workpoint_ref"`
+	ContinuityRef string `json:"continuity_ref"`
+}
+
+// DecodeScopeReferenceAliases extracts the typed wire aliases shared by browser
+// session and research-packet scope consumers.
+func DecodeScopeReferenceAliases(data []byte) (ScopeReferenceAliases, error) {
+	var aliases ScopeReferenceAliases
+	err := json.Unmarshal(data, &aliases)
+	return aliases, err
+}
+
+// UnmarshalJSON accepts typed wire aliases while preserving the packet's
+// canonical bounded field names.
+func (s *FocusaScope) UnmarshalJSON(data []byte) error {
+	type scopeAlias FocusaScope
+	var decoded scopeAlias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	aliases, err := DecodeScopeReferenceAliases(data)
+	if err != nil {
+		return err
+	}
+	*s = FocusaScope(decoded)
+	if s.WorkpointID == "" {
+		s.WorkpointID = aliases.WorkpointRef
+	}
+	if s.ContinuityID == "" {
+		s.ContinuityID = aliases.ContinuityRef
+	}
+	return nil
+}
+
 type Capture struct {
 	Type        string `json:"type"`
 	EvidenceRef string `json:"evidence_ref"`
