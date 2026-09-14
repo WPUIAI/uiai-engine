@@ -33,11 +33,22 @@ const (
 // Unlike the transactional pool (navigate → snap → forget), a session keeps
 // the page alive between calls — enabling instant re-screenshots, scrolling,
 // clicking, CSS injection, and JS evaluation without re-navigating.
+// FocusaScope is opaque evidence-binding metadata carried by one browser session.
+// It is never used to authorize browser actions; complete bindings are preserved so
+// the evidence delivery owner can validate the capture later.
 type FocusaScope struct {
-	WorkpointID  string `json:"workpoint_id,omitempty"`
-	ContinuityID string `json:"continuity_id,omitempty"`
-	ProjectRoot  string `json:"project_root,omitempty"`
-	EvidenceRef  string `json:"evidence_ref,omitempty"`
+	WorkpointID   string           `json:"workpoint_id,omitempty"`
+	ContinuityID  string           `json:"continuity_id,omitempty"`
+	ProjectRoot   string           `json:"project_root,omitempty"`
+	EvidenceRef   string           `json:"evidence_ref,omitempty"`
+	ProjectRef    string           `json:"project_ref,omitempty"`
+	WorkstreamRef string           `json:"workstream_ref,omitempty"`
+	WorksetRef    string           `json:"workset_ref,omitempty"`
+	CallGraphRef  string           `json:"callgraph_ref,omitempty"`
+	WorkpointRef  string           `json:"workpoint_ref,omitempty"`
+	WorkItemRef   string           `json:"work_item_ref,omitempty"`
+	ContinuityRef string           `json:"continuity_ref,omitempty"`
+	WorkItems     []map[string]any `json:"work_items,omitempty"`
 }
 
 type Session struct {

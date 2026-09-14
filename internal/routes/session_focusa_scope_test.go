@@ -24,3 +24,44 @@ func TestSessionInfoPayloadIncludesFocusaScope(t *testing.T) {
 		t.Fatalf("missing focusa scope: %#v", payload["focusa_scope"])
 	}
 }
+
+func TestCompleteEvidenceScopeIsRetained(t *testing.T) {
+	scope := &vision.FocusaScope{
+		ProjectRef:    "wirebot-app",
+		WorkstreamRef: "wirebot-app-execution-v1",
+		WorksetRef:    "wirebot-app-acceptance-v2",
+		CallGraphRef:  "wirebot-app-execution-v1",
+		WorkpointRef:  "wp-1",
+		WorkItemRef:   "wirebot-app-zr7",
+		ContinuityRef: "focusa-cont-wirebot-app-user0",
+		WorkItems:     []map[string]any{{"work_item_ref": "wirebot-app-zr7", "provider_surface": "beads"}},
+	}
+
+	got := resolveFocusaScope(scope, "", "", "", "")
+	if got == nil || got.WorksetRef != scope.WorksetRef || got.CallGraphRef != scope.CallGraphRef || got.WorkItemRef != scope.WorkItemRef {
+		t.Fatalf("complete scope lost: %#v", got)
+	}
+	if len(got.WorkItems) != 1 || got.WorkItems[0]["work_item_ref"] != "wirebot-app-zr7" {
+		t.Fatalf("work-item projection lost: %#v", got.WorkItems)
+	}
+}
+
+func TestMergeFocusaScopeKeepsExistingAndCaptureBindings(t *testing.T) {
+	current := &vision.FocusaScope{ProjectRoot: "/home/wirebot/Wirebot-App", ContinuityID: "cont-1", WorksetRef: "workset-1"}
+	incoming := &vision.FocusaScope{WorkpointRef: "wp-1", WorkItemRef: "wirebot-app-zr7", WorkItems: []map[string]any{{"work_item_ref": "wirebot-app-zr7"}}}
+
+	got := mergeFocusaScope(current, incoming)
+	if got.ProjectRoot != current.ProjectRoot || got.ContinuityID != current.ContinuityID || got.WorksetRef != current.WorksetRef {
+		t.Fatalf("session binding lost: %#v", got)
+	}
+	if got.WorkpointRef != incoming.WorkpointRef || got.WorkItemRef != incoming.WorkItemRef || len(got.WorkItems) != 1 {
+		t.Fatalf("capture binding lost: %#v", got)
+	}
+}
+
+func TestRouteFocusaScopeStatusAcceptsCompleteEvidenceRefs(t *testing.T) {
+	scope := &vision.FocusaScope{ProjectRef: "wirebot-app", ContinuityRef: "focusa-cont-wirebot-app-user0"}
+	if got := routeFocusaScopeStatus(scope); got != "present" {
+		t.Fatalf("expected complete evidence refs to be present, got %q", got)
+	}
+}

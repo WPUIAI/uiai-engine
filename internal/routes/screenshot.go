@@ -26,7 +26,15 @@ func routeFocusaScopeStatus(scope *vision.FocusaScope) string {
 	if scope == nil {
 		return string(focusapacket.ScopeMissing)
 	}
-	if scope.ProjectRoot != "" && scope.ContinuityID != "" {
+	project := scope.ProjectRoot
+	if project == "" {
+		project = scope.ProjectRef
+	}
+	continuity := scope.ContinuityID
+	if continuity == "" {
+		continuity = scope.ContinuityRef
+	}
+	if project != "" && continuity != "" {
 		return string(focusapacket.ScopePresent)
 	}
 	return string(focusapacket.ScopePartial)
