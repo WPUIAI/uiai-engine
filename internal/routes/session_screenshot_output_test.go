@@ -34,6 +34,23 @@ func TestSessionScreenshotOutputIsOnlyHTTPSPortableEPWA(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
+	delivery, ok := response["epwa_delivery"].(map[string]any)
+	if !ok {
+		t.Fatalf("session delivery missing: %#v", response)
+	}
+	deliveredScope, ok := delivery["scope"].(map[string]any)
+	if !ok {
+		t.Fatalf("session delivery scope missing: %#v", delivery)
+	}
+	for key, want := range map[string]string{
+		"project_ref": scope.ProjectRef, "workstream_ref": scope.WorkstreamRef, "workset_ref": scope.WorksetRef,
+		"callgraph_ref": scope.CallGraphRef, "workpoint_ref": scope.WorkpointRef, "work_item_ref": scope.WorkItemRef,
+		"continuity_ref": scope.ContinuityRef,
+	} {
+		if deliveredScope[key] != want {
+			t.Fatalf("session delivery %s=%#v, want %q", key, deliveredScope[key], want)
+		}
+	}
 	if response["screenshot"] != nil || response["artifact_path"] != nil || response["delivery_state"] != "ready" || response["raw_output_posture"] != "withheld_by_mandatory_epwa_delivery" {
 		t.Fatalf("session raw-only output escaped: %#v", response)
 	}
