@@ -115,6 +115,11 @@ func (s *FocusaScope) WorkstreamReference() string {
 	return s.DerivedWorkstreamKey()
 }
 
+// HasAnyBinding reports whether scope contains any session evidence binding.
+func (s *FocusaScope) HasAnyBinding() bool {
+	return s != nil && (s.WorkpointID != "" || s.ContinuityID != "" || s.ProjectRoot != "" || s.WorkstreamKey != "" || s.EvidenceRef != "" || s.ProjectRef != "" || s.WorkstreamRef != "" || s.WorksetRef != "" || s.CallGraphRef != "" || s.WorkItemRef != "" || len(s.WorkItems) != 0)
+}
+
 // HasEvidenceBinding reports whether scope carries the project and continuity
 // binding required to label browser evidence as fully scoped.
 func (s *FocusaScope) HasEvidenceBinding() bool {
@@ -254,7 +259,7 @@ func generateID() string {
 }
 
 func (s *Session) SetFocusaScope(scope *FocusaScope) {
-	if scope == nil || (scope.WorkpointID == "" && scope.ContinuityID == "" && scope.ProjectRoot == "" && scope.WorkstreamKey == "" && scope.EvidenceRef == "" && scope.ProjectRef == "" && scope.WorkstreamRef == "" && scope.WorksetRef == "" && scope.CallGraphRef == "" && scope.WorkItemRef == "" && len(scope.WorkItems) == 0) {
+	if !scope.HasAnyBinding() {
 		s.FocusaScope = nil
 		return
 	}
