@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -93,43 +94,151 @@ type braveWebResponse struct {
 // Brave is the default provider, but the public contract stays provider-neutral
 // so other providers can be added without changing browser/session semantics.
 func MountSearchRoutes(r chi.Router, cfg *config.Config) {
-	r.Get("/providers", handleSearchProviders)
+	r.Get("/providers", func(w http.ResponseWriter, _ *http.Request) { handleSearchProviders(w, cfg) })
 	r.Get("/", func(w http.ResponseWriter, req *http.Request) { handleSearchGET(w, req, cfg) })
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) { handleSearchPOST(w, req, cfg) })
 }
 
-func handleSearchProviders(w http.ResponseWriter, _ *http.Request) {
-	braveConfigured := strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")) != ""
-	braveStatus := "ready"
-	braveReason := ""
-	if !braveConfigured {
-		braveStatus = "degraded"
-		braveReason = "missing_key"
+// builtinSearchProvider describes a search provider the engine ships with.
+type builtinSearchProvider struct {
+	id           string
+	name         string
+	keyless      bool
+	capabilities []string
+}
+
+var builtinSearchProviders = []builtinSearchProvider{
+	{id: "brave", name: "Brave Search", capabilities: []string{"web_search", "source_urls", "snippets"}},
+	{id: "wikipedia", name: "Wikipedia OpenSearch", keyless: true, capabilities: []string{"encyclopedia_search", "source_urls", "snippets", "keyless_public"}},
+}
+
+// searchProviderIDs returns every provider this deployment can serve: the built-in
+// set plus any provider the operator added under search.providers. The list is
+// derived from configuration rather than hardcoded so a new provider needs config
+// only, never a bespoke code path.
+func searchProviderIDs(cfg *config.Config) []string {
+	seen := map[string]bool{}
+	ids := make([]string, 0, len(builtinSearchProviders))
+	add := func(id string) {
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	for _, provider := range builtinSearchProviders {
+		add(provider.id)
+	}
+	if cfg != nil {
+		for id := range cfg.Search.Providers {
+			add(strings.TrimSpace(id))
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// searchProviderMeta returns the declared name and capabilities for a provider.
+func searchProviderMeta(id string) builtinSearchProvider {
+	for _, provider := range builtinSearchProviders {
+		if provider.id == id {
+			return provider
+		}
+	}
+	return builtinSearchProvider{id: id, name: id}
+}
+
+// searchProviderConfigured reports whether a provider currently has a usable
+// credential, honouring explicit configuration first and the provider's
+// conventional environment variable only as a fallback.
+func searchProviderConfigured(cfg *config.Config, id string) (bool, string) {
+	if cfg != nil {
+		if provider, declared := cfg.Search.Providers[id]; declared && provider.Disabled {
+			// An explicit disable always wins, even for keyless providers: the
+			// operator retired this provider and the report must say so.
+			return false, "disabled"
+		}
+	}
+	meta := searchProviderMeta(id)
+	if meta.keyless {
+		return true, ""
+	}
+	if cfg != nil {
+		if _, declared := cfg.Search.Providers[id]; declared {
+			if key, err := cfg.Search.ResolveSearchProviderKey(id); err != nil {
+				return false, "credential_unreadable"
+			} else if key != "" {
+				return true, ""
+			}
+			return false, "missing_key"
+		}
+	}
+	if config.BuiltinSearchProviderKey(id) != "" {
+		return true, ""
+	}
+	return false, "missing_key"
+}
+
+// resolveDefaultSearchProvider returns the provider a request should use when it
+// names none: the operator's explicit default when it can serve, otherwise the
+// first provider that can genuinely serve. Empty means nothing can serve, and the
+// caller must say so instead of advertising a provider that would 503.
+func resolveDefaultSearchProvider(cfg *config.Config) string {
+	ids := searchProviderIDs(cfg)
+	if cfg != nil {
+		if wanted := strings.TrimSpace(cfg.Search.DefaultProvider); wanted != "" {
+			for _, id := range ids {
+				if id == wanted {
+					if configured, _ := searchProviderConfigured(cfg, id); configured {
+						return id
+					}
+					break
+				}
+			}
+		}
+	}
+	for _, id := range ids {
+		if configured, _ := searchProviderConfigured(cfg, id); configured {
+			return id
+		}
+	}
+	return ""
+}
+
+func handleSearchProviders(w http.ResponseWriter, cfg *config.Config) {
+	ids := searchProviderIDs(cfg)
+	providers := make([]map[string]any, 0, len(ids))
+	ready := make([]string, 0, len(ids))
+	for _, id := range ids {
+		meta := searchProviderMeta(id)
+		configured, reason := searchProviderConfigured(cfg, id)
+		status := "ready"
+		degradedReason := ""
+		if !configured {
+			status = "degraded"
+			degradedReason = reason
+		} else {
+			ready = append(ready, id)
+		}
+		providers = append(providers, map[string]any{
+			"id":                id,
+			"name":              meta.name,
+			"configured":        configured,
+			"status":            status,
+			"degraded_reason":   degradedReason,
+			"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
+			"capabilities":      meta.capabilities,
+		})
 	}
 
+	defaultProvider := resolveDefaultSearchProvider(cfg)
+
 	writeJSON(w, 200, map[string]any{
-		"schema":           "uiai.search_providers.v1",
-		"default_provider": "brave",
-		"providers": []map[string]any{
-			{
-				"id":                "brave",
-				"name":              "Brave Search",
-				"configured":        braveConfigured,
-				"status":            braveStatus,
-				"degraded_reason":   braveReason,
-				"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
-				"capabilities":      []string{"web_search", "source_urls", "snippets"},
-			},
-			{
-				"id":                "wikipedia",
-				"name":              "Wikipedia OpenSearch",
-				"configured":        true,
-				"status":            "ready",
-				"degraded_reason":   "",
-				"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
-				"capabilities":      []string{"encyclopedia_search", "source_urls", "snippets", "keyless_public"},
-			},
-		},
+		"schema":              "uiai.search_providers.v1",
+		"default_provider":    defaultProvider,
+		"available_providers": ids,
+		"ready_providers":     ready,
+		"providers":           providers,
 	})
 }
 
@@ -160,7 +269,14 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 	}
 	provider := strings.ToLower(strings.TrimSpace(req.Provider))
 	if provider == "" {
-		provider = "brave"
+		provider = resolveDefaultSearchProvider(cfg)
+	}
+	if provider == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error":   "no_search_provider_available",
+			"message": "no search provider can serve: configure search.providers.<id>.api_key, api_key_file, or api_key_env in the engine config",
+		})
+		return
 	}
 	limit := normalizeSearchLimit(req.Limit)
 
@@ -176,11 +292,11 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 	var err error
 	switch provider {
 	case "brave":
-		results, err = searchBrave(query, limit)
+		results, err = searchBrave(cfg, query, limit)
 	case "wikipedia":
 		results, err = searchWikipedia(query, limit)
 	default:
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": []string{"brave", "wikipedia"}})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": searchProviderIDs(cfg)})
 		return
 	}
 	var use *upstreamSearchError
@@ -222,23 +338,32 @@ func normalizeSearchLimit(limit int) int {
 	return limit
 }
 
-func searchPressureSummary() map[string]any {
+func searchPressureSummary(cfg *config.Config) map[string]any {
 	searchCache.Lock()
 	entries := len(searchCache.entries)
 	searchCache.Unlock()
-	providersStatus := "degraded"
-	pressure := "degraded"
-	if strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")) != "" {
-		providersStatus = "ready"
-		pressure = "normal"
+
+	ids := searchProviderIDs(cfg)
+	ready := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if configured, _ := searchProviderConfigured(cfg, id); configured {
+			ready = append(ready, id)
+		}
 	}
+	providersStatus := "ready"
+	pressure := "normal"
+	if len(ready) == 0 {
+		providersStatus = "degraded"
+		pressure = "degraded"
+	}
+	defaultProvider := resolveDefaultSearchProvider(cfg)
 	return map[string]any{
-		"default_provider":    "brave",
-		"provider":            "brave",
+		"default_provider":    defaultProvider,
+		"provider":            defaultProvider,
 		"provider_status":     providersStatus,
 		"pressure":            pressure,
-		"available_providers": []string{"brave", "wikipedia"},
-		"ready_providers":     []string{"wikipedia"},
+		"available_providers": ids,
+		"ready_providers":     ready,
 		"cache_entries":       entries,
 		"cache_ttl_seconds":   int(searchCacheTTL() / time.Second),
 		"packet_surface":      "search",
@@ -527,12 +652,41 @@ func upstreamErr(resp *http.Response) *upstreamSearchError {
 	return e
 }
 
-func searchBrave(query string, limit int) ([]searchResult, error) {
-	key := strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY"))
-	if key == "" {
-		return nil, fmt.Errorf("BRAVE_SEARCH_API_KEY is not configured")
+func searchBrave(cfg *config.Config, query string, limit int) ([]searchResult, error) {
+	key := ""
+	credentialSource := config.BuiltinSearchProviderEnv["brave"]
+	if cfg != nil {
+		provider, declared := cfg.Search.Providers["brave"]
+		if declared && provider.Disabled {
+			return nil, fmt.Errorf("search provider brave is disabled by configuration")
+		}
+		if declared {
+			resolved, err := cfg.Search.ResolveSearchProviderKey("brave")
+			if err != nil {
+				return nil, fmt.Errorf("resolve search provider brave credential: %w", err)
+			}
+			key = resolved
+		}
 	}
-	base := strings.TrimSpace(os.Getenv("UIAI_BRAVE_SEARCH_API_URL"))
+	if key == "" {
+		// Fallback: the provider's conventional environment variable.
+		key = config.BuiltinSearchProviderKey("brave")
+	}
+	if key == "" {
+		// Name the configuration surface an operator can act on rather than
+		// reporting a bare vendor-specific variable name.
+		return nil, fmt.Errorf("search provider brave has no credential: set search.providers.brave.api_key, api_key_file, or api_key_env in the engine config (or export %s)", credentialSource)
+	}
+
+	base := ""
+	if cfg != nil {
+		if provider, ok := cfg.Search.Providers["brave"]; ok {
+			base = strings.TrimSpace(provider.APIURL)
+		}
+	}
+	if base == "" {
+		base = strings.TrimSpace(os.Getenv("UIAI_BRAVE_SEARCH_API_URL"))
+	}
 	if base == "" {
 		base = "https://api.search.brave.com/res/v1/web/search"
 	}

@@ -283,3 +283,26 @@ cors:
     - "https://ai.wpuiai.com"
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
   headers: ["Content-Type", "X-API-Key", "X-License-Key", "X-Webhook-Secret", "X-Extension-Token", "Authorization"]
+
+search:
+  # Search providers are configuration, not code. Adding a provider needs config
+  # only; no bespoke code path or vendor-specific environment variable required.
+  default_provider: "brave"
+  providers:
+    brave:
+      api_url: "https://api.search.brave.com/res/v1/web/search"
+      # Credentials are never written as literal secrets in this file. Supply one
+      # of these instead, in precedence order:
+      #   api_key_file  - path to a 0600 credential file owned by the service user
+      #   api_key       - a load-time reference such as rbw:ITEM, rbw:ITEM:field,
+      #                   or ENV_VAR_NAME (written in dollar-brace form; never a
+      #                   literal token). WARNING: the loader expands references
+      #                   across the whole file INCLUDING comments, so never write
+      #                   a literal reference expression inside a comment.
+      #   api_key_env   - name of an environment variable the operator chooses
+      # When this block is absent the provider's conventional environment variable
+      # is still honoured, so existing deployments keep working unchanged.
+      api_key_file: ""
+      api_key: ""
+      api_key_env: ""
+      disabled: false

@@ -386,9 +386,21 @@ func writeJSONArtifactEPWA(w http.ResponseWriter, req *http.Request, cfg *config
 		"schema": "uiai.artifact_result.v2", "artifact_ref": delivery.Artifact.ArtifactRef,
 		"delivery_state": delivery.State, "epwa_delivery": delivery, "artifact_payload_posture": "withheld_until_epwa_ready",
 	}
-	if delivery.State == epwadelivery.StateReady {
+	includePayload := delivery.State == epwadelivery.StateReady
+	if includePayload {
 		status = successStatus
 		response["artifact_payload_posture"] = "included_with_epwa_delivery"
+	} else if scope.Empty() {
+		// No evidence scope was supplied at all, so the caller is not doing
+		// evidence-bound work: serve the content unsealed instead of withholding
+		// it. Nothing is published or delivered — delivery_state still says so —
+		// and no EPWA URLs are minted. A present-but-incomplete scope keeps the
+		// strict path: the caller attempted evidence binding and must reconcile.
+		response["artifact_payload_posture"] = "unsealed_no_epwa_scope"
+		response["epwa_unsealed_reason"] = "no_evidence_scope_supplied: content served without EPWA publication; not sealed evidence"
+		includePayload = true
+	}
+	if includePayload {
 		var object map[string]any
 		if json.Unmarshal(body, &object) == nil && object != nil {
 			for key, value := range object {
@@ -403,6 +415,8 @@ func writeJSONArtifactEPWA(w http.ResponseWriter, req *http.Request, cfg *config
 		} else {
 			response["artifact"] = payload
 		}
+	}
+	if delivery.State == epwadelivery.StateReady {
 		response["artifact_url"] = delivery.EPWA.RecordURL
 		response["portable_url"] = delivery.EPWA.PortableURL
 	}
@@ -524,7 +538,6 @@ func reconcileEPWADelivery(req *http.Request, cfg *config.Config, current epwade
 	next.EPWA.RecordURL, next.EPWA.PortableURL = shortShareURLs(base, current.EPWA.PackageID)
 	return epwadelivery.Record(epwaDeliveryRoot(cfg), next)
 }
-
 
 // shortShareURLs builds the friendly EPWA URLs for a package: the viewer
 // webpage (trailing slash) and the portable download — the default publish

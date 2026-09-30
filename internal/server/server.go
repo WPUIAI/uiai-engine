@@ -262,10 +262,10 @@ func (e *Engine) mountRoutes() {
 	visionEnabled := !e.cfg.Server.DisableVision
 	r.Route("/api/health", func(r chi.Router) {
 		routes.MountHealth(r, e.cfg, e.ai)
-		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions)
+		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions, e.cfg)
 	})
 	r.Route("/api/metrics", func(r chi.Router) {
-		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions)
+		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions, e.cfg)
 	})
 
 	// Also respond to /health for PHP API compat + health monitor
