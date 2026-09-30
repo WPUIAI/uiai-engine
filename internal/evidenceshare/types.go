@@ -19,6 +19,16 @@ type Scope struct {
 	ContinuityRef string                           `json:"continuity_ref,omitempty"`
 }
 
+// Empty reports whether the caller supplied no evidence scope at all: no refs and
+// no work-item projections. Empty is distinct from merely incomplete. An empty
+// scope means the caller is not doing evidence-bound work, so artifact surfaces
+// may serve their content unsealed; an incomplete scope means the caller attempted
+// evidence binding and the content stays withheld until it reconciles.
+func (s Scope) Empty() bool {
+	return s.ProjectRef == "" && s.WorkstreamRef == "" && s.WorksetRef == "" &&
+		s.CallGraphRef == "" && s.WorkpointRef == "" && s.WorkItemRef == "" && s.ContinuityRef == "" && len(s.WorkItems) == 0
+}
+
 func (s Scope) Complete() bool {
 	// Aligned with the epwadelivery delivery contract (contract_test "continuity
 	// missing"): a complete evidence scope requires all seven bindings — the six

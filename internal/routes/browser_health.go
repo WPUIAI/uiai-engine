@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/observability"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
@@ -11,7 +12,7 @@ import (
 
 // MountBrowserHealth exposes browser-specific readiness and metrics without
 // requiring agents to inspect logs or load full tool definitions.
-func MountBrowserHealth(r chi.Router, pool vision.PoolSource, visionEnabled bool, sessions *vision.SessionManager) {
+func MountBrowserHealth(r chi.Router, pool vision.PoolSource, visionEnabled bool, sessions *vision.SessionManager, cfg *config.Config) {
 	r.Get("/browser", func(w http.ResponseWriter, req *http.Request) {
 		// #96 F1b: hard 900ms deadline — health must always answer JSON.
 		done := make(chan struct{}, 1)
@@ -19,7 +20,7 @@ func MountBrowserHealth(r chi.Router, pool vision.PoolSource, visionEnabled bool
 		var payload map[string]any
 		go func() {
 			status = browserHealthStatus(pool, visionEnabled, sessions)
-			payload = browserHealthPayload(pool, visionEnabled, sessions)
+			payload = browserHealthPayload(pool, visionEnabled, sessions, cfg)
 			done <- struct{}{}
 		}()
 		select {
@@ -38,7 +39,7 @@ func MountBrowserHealth(r chi.Router, pool vision.PoolSource, visionEnabled bool
 	})
 }
 
-func agentPressureSummary(browserStats map[string]any, reconciler map[string]any) map[string]any {
+func agentPressureSummary(browserStats map[string]any, reconciler map[string]any, cfg *config.Config) map[string]any {
 	activePages := intFromAny(browserStats["active_pages"])
 	availablePages := intFromAny(browserStats["available_pages"])
 	maxPages := intFromAny(browserStats["max_pages"])
@@ -55,7 +56,7 @@ func agentPressureSummary(browserStats map[string]any, reconciler map[string]any
 	cachePressure := cachePressureLevel(cacheSummary)
 	cacheSummary["pressure"] = cachePressure
 
-	searchSummary := searchPressureSummary()
+	searchSummary := searchPressureSummary(cfg)
 	searchPressure := stringFromAny(searchSummary["pressure"], "unknown")
 	currentCapacity := currentBrowserCapacity(activePages, availablePages, maxPages, queueDepth)
 	historicalPressure := historicalBrowserPressure(queue, failCount)
@@ -261,7 +262,7 @@ func browserHealthStatus(pool vision.PoolSource, visionEnabled bool, sessions *v
 	return http.StatusOK
 }
 
-func browserHealthPayload(pool vision.PoolSource, visionEnabled bool, sessions *vision.SessionManager) map[string]any {
+func browserHealthPayload(pool vision.PoolSource, visionEnabled bool, sessions *vision.SessionManager, cfg *config.Config) map[string]any {
 	if !visionEnabled {
 		return map[string]any{
 			"status":         "disabled",
@@ -321,7 +322,7 @@ func browserHealthPayload(pool vision.PoolSource, visionEnabled bool, sessions *
 		"historical_pressure": historicalPressure,
 		"diagnostics_enabled": true,
 		"eval_async_enabled":  true,
-		"agent_pressure":      agentPressureSummary(stats, reconcilerSnapshot(sessions)),
+		"agent_pressure":      agentPressureSummary(stats, reconcilerSnapshot(sessions), cfg),
 		"actions": map[string]string{
 			"open_session": "/api/session",
 			"diagnostics":  "/api/session/{id}/diagnostics",

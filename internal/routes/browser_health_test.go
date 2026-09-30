@@ -7,7 +7,7 @@ import (
 )
 
 func TestBrowserHealthPayloadUnavailableWhenPoolNil(t *testing.T) {
-	payload := browserHealthPayload(nil, true, nil)
+	payload := browserHealthPayload(nil, true, nil, nil)
 	if got, want := payload["status"], "unavailable"; got != want {
 		t.Fatalf("status=%v want=%v", got, want)
 	}
@@ -18,7 +18,7 @@ func TestBrowserHealthPayloadUnavailableWhenPoolNil(t *testing.T) {
 
 func TestBrowserHealthStandbyWhenPoolLazyIdle(t *testing.T) {
 	pool := &vision.Pool{}
-	payload := browserHealthPayload(pool, true, nil)
+	payload := browserHealthPayload(pool, true, nil, nil)
 	if got, want := payload["status"], "standby"; got != want {
 		t.Fatalf("status=%v want=%v", got, want)
 	}
@@ -28,7 +28,7 @@ func TestBrowserHealthStandbyWhenPoolLazyIdle(t *testing.T) {
 }
 
 func TestBrowserHealthDisabledIsTruthfulAndHealthy(t *testing.T) {
-	payload := browserHealthPayload(nil, false, nil)
+	payload := browserHealthPayload(nil, false, nil, nil)
 	if got, want := payload["status"], "disabled"; got != want {
 		t.Fatalf("status=%v want=%v", got, want)
 	}
@@ -42,7 +42,7 @@ func TestBrowserHealthDisabledIsTruthfulAndHealthy(t *testing.T) {
 
 func TestBrowserHealthPayloadIncludesAgentPressure(t *testing.T) {
 	pool := &vision.Pool{}
-	payload := browserHealthPayload(pool, true, nil)
+	payload := browserHealthPayload(pool, true, nil, nil)
 	pressure, ok := payload["agent_pressure"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected agent_pressure map: %#v", payload)
@@ -86,7 +86,7 @@ func TestAgentPressureSummaryDoesNotLookSaturatedWhenCapacityAvailable(t *testin
 		"max_pages":       2,
 		"fail_count":      int64(0),
 		"queue":           map[string]any{"depth": 0, "rejected": 0, "p95_wait_ms": 0},
-	}, nil)
+	}, nil, nil)
 	browser := pressure["browser"].(map[string]any)
 	capacity := pressure["current_capacity"].(map[string]any)
 	if browser["pressure"] == "saturated" || browser["pressure"] == "constrained" {
@@ -109,7 +109,7 @@ func TestAgentPressureSummaryIgnoresHistoricalOverloadWhenCapacityReturns(t *tes
 			"rejected":    14,
 			"p95_wait_ms": 24590,
 		},
-	}, nil)
+	}, nil, nil)
 
 	browser := pressure["browser"].(map[string]any)
 	capacity := pressure["current_capacity"].(map[string]any)
@@ -135,7 +135,7 @@ func TestAgentPressureSummaryCurrentQueueIsConstrained(t *testing.T) {
 		"max_pages":       2,
 		"fail_count":      int64(0),
 		"queue":           map[string]any{"depth": 1, "rejected": 0, "p95_wait_ms": 0},
-	}, nil)
+	}, nil, nil)
 	browser := pressure["browser"].(map[string]any)
 	if got, want := browser["pressure"], "constrained"; got != want {
 		t.Fatalf("browser pressure=%v want=%v: %#v", got, want, pressure)
@@ -154,7 +154,7 @@ func TestAgentPressureSummaryClassifiesSaturatedBrowser(t *testing.T) {
 			"p95_wait_ms": 6000,
 		},
 		"cache": map[string]any{"status": "ready", "entries": 10, "max_entries": 10},
-	}, nil)
+	}, nil, nil)
 	browser := pressure["browser"].(map[string]any)
 	if browser["pressure"] != "saturated" || pressure["overall_pressure"] != "saturated" {
 		t.Fatalf("expected saturated pressure: %#v", pressure)

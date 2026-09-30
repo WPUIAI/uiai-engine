@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -159,7 +160,7 @@ func TestSearchBraveMapsWebResults(t *testing.T) {
 	defer server.Close()
 	t.Setenv("UIAI_BRAVE_SEARCH_API_URL", server.URL)
 
-	results, err := searchBrave("agent browser", 2)
+	results, err := searchBrave(nil, "agent browser", 2)
 	if err != nil {
 		t.Fatalf("searchBrave error: %v", err)
 	}
@@ -183,9 +184,8 @@ func TestSearchProvidersReportsMissingKeyDegraded(t *testing.T) {
 		}
 	}()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/search/providers", nil)
 	res := httptest.NewRecorder()
-	handleSearchProviders(res, req)
+	handleSearchProviders(res, nil)
 	if res.Code != http.StatusOK {
 		t.Fatalf("status=%d", res.Code)
 	}
@@ -222,7 +222,7 @@ func TestSearchBraveRequiresKey(t *testing.T) {
 			_ = os.Setenv("UIAI_BRAVE_SEARCH_API_URL", oldURL)
 		}
 	}()
-	if _, err := searchBrave("missing key", 1); err == nil {
+	if _, err := searchBrave(nil, "missing key", 1); err == nil {
 		t.Fatalf("expected missing key error")
 	}
 }
@@ -272,5 +272,171 @@ func TestWriteSearchResponseIncludesFocusaMetadata(t *testing.T) {
 	encoded := res.Body.String()
 	if strings.Contains(encoded, "secret") || strings.Contains(encoded, "#frag") {
 		t.Fatalf("search response leaked secret/fragment: %s", encoded)
+	}
+}
+
+// TestSearchProviderConfiguredFromConfigFileCredential proves a provider credential
+// can be supplied from an operator-owned file with no vendor-specific environment
+// variable and no bespoke code path.
+func TestSearchProviderConfiguredFromConfigFileCredential(t *testing.T) {
+	dir := t.TempDir()
+	keyFile := filepath.Join(dir, "brave.key")
+	if err := os.WriteFile(keyFile, []byte("  file-supplied-key\n"), 0o600); err != nil {
+		t.Fatalf("write key file: %v", err)
+	}
+	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	t.Setenv("BRAVE_SEARCH_API_KEY_ALT", "")
+
+	cfg := &config.Config{}
+	cfg.Search.Providers = map[string]config.SearchProviderConfig{
+		"brave": {APIKeyFile: keyFile},
+	}
+
+	key, err := cfg.Search.ResolveSearchProviderKey("brave")
+	if err != nil {
+		t.Fatalf("ResolveSearchProviderKey error: %v", err)
+	}
+	if key != "file-supplied-key" {
+		t.Fatalf("key = %q, want trimmed file contents", key)
+	}
+	if !cfg.Search.SearchProviderEnabled("brave") {
+		t.Fatalf("expected provider enabled from file credential")
+	}
+}
+
+// TestSearchProviderCredentialFromOperatorEnvName proves the credential location is
+// operator-chosen: any variable name works, not only the vendor's convention.
+func TestSearchProviderCredentialFromOperatorEnvName(t *testing.T) {
+	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	t.Setenv("ACME_SEARCH_TOKEN", "operator-named-secret")
+
+	cfg := &config.Config{}
+	cfg.Search.Providers = map[string]config.SearchProviderConfig{
+		"brave": {APIKeyEnv: "ACME_SEARCH_TOKEN"},
+	}
+
+	key, err := cfg.Search.ResolveSearchProviderKey("brave")
+	if err != nil {
+		t.Fatalf("ResolveSearchProviderKey error: %v", err)
+	}
+	if key != "operator-named-secret" {
+		t.Fatalf("key = %q, want value from operator-selected variable", key)
+	}
+}
+
+// TestSearchProviderDisabledByConfig proves an operator can retire a provider
+// without deleting its configuration.
+func TestSearchProviderDisabledByConfig(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Search.Providers = map[string]config.SearchProviderConfig{
+		"brave": {APIKeyEnv: "BRAVE_SEARCH_API_KEY", Disabled: true},
+	}
+	if cfg.Search.SearchProviderEnabled("brave") {
+		t.Fatalf("expected disabled provider to report not enabled")
+	}
+}
+
+// TestSearchProvidersReportsConfigOnlyProvider proves an operator-configured
+// provider is surfaced honestly in the providers projection.
+func TestSearchProvidersReportsConfigOnlyProvider(t *testing.T) {
+	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	cfg := &config.Config{}
+	cfg.Search.Providers = map[string]config.SearchProviderConfig{
+		"brave": {APIKeyEnv: "MISSING_BRAVE_KEY"},
+		"acme":  {APIKeyEnv: "ACME_SEARCH_TOKEN"},
+	}
+	t.Setenv("ACME_SEARCH_TOKEN", "acme-secret")
+
+	res := httptest.NewRecorder()
+	handleSearchProviders(res, cfg)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d", res.Code)
+	}
+	var body struct {
+		DefaultProvider    string   `json:"default_provider"`
+		AvailableProviders []string `json:"available_providers"`
+		ReadyProviders     []string `json:"ready_providers"`
+		Providers          []struct {
+			ID             string `json:"id"`
+			Configured     bool   `json:"configured"`
+			Status         string `json:"status"`
+			DegradedReason string `json:"degraded_reason"`
+		} `json:"providers"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode providers: %v", err)
+	}
+
+	status := map[string]string{}
+	for _, provider := range body.Providers {
+		status[provider.ID] = provider.Status
+	}
+	if status["acme"] != "ready" {
+		t.Fatalf("acme status = %q, want ready; all=%v", status["acme"], body.Providers)
+	}
+	if status["brave"] != "degraded" {
+		t.Fatalf("brave status = %q, want degraded", status["brave"])
+	}
+	if body.DefaultProvider != "acme" {
+		t.Fatalf("default_provider = %q, want the only genuinely configured provider", body.DefaultProvider)
+	}
+	if len(body.ReadyProviders) != 2 { // acme + keyless wikipedia
+		t.Fatalf("ready_providers = %v, want acme and wikipedia", body.ReadyProviders)
+	}
+}
+
+// TestSearchPressureSummaryDoesNotClaimReadyProviders proves the health surface
+// derives readiness from configuration instead of hardcoded literals.
+func TestSearchPressureSummaryDoesNotClaimReadyProviders(t *testing.T) {
+	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	cfg := &config.Config{}
+
+	summary := searchPressureSummary(cfg)
+	ready, _ := summary["ready_providers"].([]string)
+	if len(ready) != 1 || ready[0] != "wikipedia" {
+		t.Fatalf("ready_providers = %v, want only the keyless provider", ready)
+	}
+	if summary["pressure"] != "normal" {
+		t.Fatalf("pressure = %v, want normal while a keyless provider can serve", summary["pressure"])
+	}
+
+	cfg.Search.Providers = map[string]config.SearchProviderConfig{"wikipedia": {Disabled: true}}
+	summary = searchPressureSummary(cfg)
+	if summary["pressure"] != "degraded" {
+		t.Fatalf("pressure = %v, want degraded when no provider can serve", summary["pressure"])
+	}
+	if summary["default_provider"] != "" {
+		t.Fatalf("default_provider = %v, want empty when nothing can serve", summary["default_provider"])
+	}
+}
+
+// TestSearchBraveErrorNamesConfigSurface proves the failure message points an
+// operator at portable configuration instead of only a vendor variable name.
+func TestSearchBraveErrorNamesConfigSurface(t *testing.T) {
+	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	cfg := &config.Config{}
+
+	_, err := searchBrave(cfg, "query", 1)
+	if err == nil {
+		t.Fatalf("expected missing credential error")
+	}
+	for _, want := range []string{"search.providers.brave.api_key", "api_key_file", "api_key_env"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not name config surface %q", err.Error(), want)
+		}
+	}
+}
+
+// TestZeroKeyBoxServesKeylessDefault proves a deployment with no credentials at
+// all still answers searches through the keyless provider and reports that
+// provider honestly, instead of 503ing on a hardcoded default.
+func TestZeroKeyBoxServesKeylessDefault(t *testing.T) {
+	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+
+	if got := resolveDefaultSearchProvider(nil); got != "wikipedia" {
+		t.Fatalf("default = %q, want the keyless provider", got)
+	}
+	if got := resolveDefaultSearchProvider(&config.Config{}); got != "wikipedia" {
+		t.Fatalf("default = %q, want the keyless provider", got)
 	}
 }
