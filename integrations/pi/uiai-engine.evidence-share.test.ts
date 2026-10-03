@@ -58,6 +58,14 @@ async function tools() {
   extension({ on() {}, registerCommand() {}, registerTool(tool: any) { registered.set(tool.name, tool); } } as any);
   return registered;
 }
+test("capture tools expose complete evidence scope in their native schemas", async () => {
+  const registered = await tools();
+  for (const name of ["uiai_browser_open", "uiai_browser_screenshot", "uiai_screenshot"]) {
+    const scope = registered.get(name)?.parameters?.properties?.focusa_scope;
+    expect(scope).toBeDefined();
+  }
+});
+
 test("native screenshot automatically returns and visibly renders its HTTPS evidence", async () => {
   globalThis.fetch = (async () => Response.json(fixture())) as any;
   const tool = (await tools()).get("uiai_browser_screenshot");
@@ -93,6 +101,70 @@ test("concurrent native requests forward their own exact scope without account d
   expect(source).not.toContain("/home/wpuiai");
   expect(source).not.toContain("focusa-cont-uiai-engine-");
 });
+test("native browser open forwards the complete scope in its request body", async () => {
+  let body: any;
+  globalThis.fetch = (async (_url: any, options: any) => {
+    body = JSON.parse(options.body);
+    return Response.json(fixture());
+  }) as any;
+  const scope = {
+    project_ref: "project:uiai-engine", workstream_ref: "workstream:epwa", workset_ref: "workset:scope",
+    callgraph_ref: "callgraph:scope", workpoint_ref: "workpoint:scope", work_item_ref: "work-item:scope",
+    continuity_ref: "continuity:scope", work_items: [{ work_item_ref: "work-item:scope", title: "Forward scope" }],
+  };
+  const tool = (await tools()).get("uiai_browser_open");
+  await tool.execute("open", { url: "https://example.test", focusa_scope: scope });
+  expect(body.focusa_scope).toEqual(scope);
+});
+
+test("native screenshot forwards the complete scope in its request body", async () => {
+  let body: any;
+  globalThis.fetch = (async (_url: any, options: any) => {
+    body = JSON.parse(options.body);
+    return Response.json(fixture());
+  }) as any;
+  const scope = {
+    project_ref: "project:uiai-engine", workstream_ref: "workstream:epwa", workset_ref: "workset:scope",
+    callgraph_ref: "callgraph:scope", workpoint_ref: "workpoint:scope", work_item_ref: "work-item:scope",
+    continuity_ref: "continuity:scope", work_items: [{ work_item_ref: "work-item:scope", title: "Forward scope" }],
+  };
+  const tool = (await tools()).get("uiai_browser_screenshot");
+  await tool.execute("capture", { session_id: "fixture", focusa_scope: scope });
+  expect(body.focusa_scope).toEqual(scope);
+});
+
+test("native one-shot screenshot forwards the complete scope in its request body", async () => {
+  let body: any;
+  globalThis.fetch = (async (_url: any, options: any) => {
+    body = JSON.parse(options.body);
+    return Response.json(fixture());
+  }) as any;
+  const scope = {
+    project_ref: "project:uiai-engine", workstream_ref: "workstream:epwa", workset_ref: "workset:scope",
+    callgraph_ref: "callgraph:scope", workpoint_ref: "workpoint:scope", work_item_ref: "work-item:scope",
+    continuity_ref: "continuity:scope", work_items: [{ work_item_ref: "work-item:scope", title: "Forward scope" }],
+  };
+  const tool = (await tools()).get("uiai_screenshot");
+  await tool.execute("capture", { url: "https://example.test", focusa_scope: scope });
+  expect(body.focusa_scope).toEqual(scope);
+});
+
+test("native packet composition forwards the complete scope in its request body", async () => {
+  let body: any;
+  globalThis.fetch = (async (_url: any, options: any) => {
+    body = JSON.parse(options.body);
+    return Response.json(fixture());
+  }) as any;
+  const scope = {
+    project_ref: "project:uiai-engine", workstream_ref: "workstream:epwa", workset_ref: "workset:scope",
+    callgraph_ref: "callgraph:scope", workpoint_ref: "workpoint:scope", work_item_ref: "work-item:scope",
+    continuity_ref: "continuity:scope", work_items: [{ work_item_ref: "work-item:scope", title: "Forward scope" }],
+  };
+  const tool = (await tools()).get("uiai_focusa_packet_compose");
+  await tool.execute("compose", { goal: "Prove scope", responses: [], focusa_scope: scope });
+  expect(body.focusa_scope).toEqual(scope);
+});
+
 test("HTTP publication failure includes the committed artifact reconciliation handle", async () => {
   globalThis.fetch = (async () => Response.json({ error: { message: "publication pending" },
     recovery_ref: "reconcile:test", artifact_ref: "artifact:test" }, { status: 503 })) as any;

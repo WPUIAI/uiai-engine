@@ -25,11 +25,24 @@ const MAX_ACTIVE_OBJECT_HINTS = 16;
 type PacketMode = "research" | "diagnose" | "proof";
 type ScopeStatus = "present" | "missing" | "partial" | "mismatch_candidate";
 
+type FocusaWorkItem = {
+	work_item_ref: string;
+	[key: string]: unknown;
+};
+
 type FocusaScope = {
 	project_root?: string;
 	continuity_id?: string;
 	workpoint_id?: string;
 	evidence_ref?: string;
+	project_ref?: string;
+	workstream_ref?: string;
+	workset_ref?: string;
+	callgraph_ref?: string;
+	workpoint_ref?: string;
+	work_item_ref?: string;
+	continuity_ref?: string;
+	work_items?: FocusaWorkItem[];
 };
 
 type PacketCapture = {
@@ -258,8 +271,10 @@ function boundedStrings(values: any[], maxItems: number, maxChars = 500): string
 
 function scopeStatus(scope: any): ScopeStatus {
 	if (!scope || typeof scope !== "object") return "missing";
-	if (scope.project_root && scope.continuity_id) return "present";
-	if (scope.project_root || scope.continuity_id || scope.workpoint_id || scope.evidence_ref) return "partial";
+	const projectRef = scope.project_ref || scope.project_root;
+	const continuityRef = scope.continuity_ref || scope.continuity_id;
+	if (projectRef && continuityRef) return "present";
+	if (projectRef || continuityRef || scope.workpoint_ref || scope.workpoint_id || scope.workstream_ref || scope.workset_ref || scope.callgraph_ref || scope.work_item_ref || scope.evidence_ref || (Array.isArray(scope.work_items) && scope.work_items.length > 0)) return "partial";
 	return "missing";
 }
 
@@ -510,7 +525,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 			goal: Type.String({ description: "Bounded user-visible goal for the packet" }),
 			mode: Type.Optional(Type.String({ description: "research, diagnose, or proof", default: "research" })),
 			responses: Type.Array(Type.Any({ description: "Existing UIAI responses containing focusa metadata" })),
-			focusa_scope: Type.Optional(Type.Any({ description: "Optional Focusa scope to echo into the packet" })),
+			focusa_scope: Type.Optional(Type.Any({ description: "Complete typed Focusa evidence scope; wire aliases normalize at the request boundary" })),
 			recommended_next_action: Type.Optional(Type.String({ description: "Exact next browser/source/proof step" })),
 			cleanup_session_id: Type.Optional(Type.String({ description: "Browser session id to recommend closing when done" })),
 		}),
@@ -527,7 +542,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 			goal: Type.String({ description: "Bounded user-visible goal for the packet" }),
 			mode: Type.Optional(Type.String({ description: "research, diagnose, or proof", default: "research" })),
 			responses: Type.Array(Type.Any({ description: "Existing UIAI responses containing focusa/focusa_evidence metadata" })),
-			focusa_scope: Type.Optional(Type.Any({ description: "Optional Focusa scope to echo into the packet" })),
+			focusa_scope: Type.Optional(Type.Any({ description: "Complete typed Focusa evidence scope; wire aliases normalize at the request boundary" })),
 			recommended_next_action: Type.Optional(Type.String({ description: "Exact next browser/source/proof step" })),
 			cleanup_session_id: Type.Optional(Type.String({ description: "Browser session id to recommend closing when done" })),
 			expandable_json_ref: Type.Optional(Type.String({ description: "Optional external artifact/ref for larger JSON" })),

@@ -213,6 +213,10 @@ func TestVisualToolContractsAdvertiseOnlyMandatoryEPWADelivery(t *testing.T) {
 		t.Fatalf("missing visual tool definitions: screenshot=%v fpv=%v", screenshot != nil, fpv != nil)
 	}
 	properties := screenshot["parameters"].(map[string]any)["properties"].(map[string]any)
+	scope, ok := properties["focusa_scope"].(map[string]any)
+	if !ok || scope["type"] != "object" || !strings.Contains(scope["description"].(string), "Complete evidence scope") {
+		t.Fatalf("browser_screenshot must accept complete evidence scope: %#v", scope)
+	}
 	output := properties["output"].(map[string]any)
 	enums := output["enum"].([]string)
 	if output["default"] != "epwa" || len(enums) != 1 || enums[0] != "epwa" {
@@ -223,6 +227,28 @@ func TestVisualToolContractsAdvertiseOnlyMandatoryEPWADelivery(t *testing.T) {
 	}
 	if description := fpv["description"].(string); !strings.Contains(description, "ephemeral and never evidence delivery") || !strings.Contains(description, "EPWA") {
 		t.Fatalf("FPV description does not separate operational mirrors from delivery: %q", description)
+	}
+}
+
+func TestCaptureToolsAdvertiseFocusaScope(t *testing.T) {
+	remaining := map[string]bool{"browser_open": true, "browser_screenshot": true, "screenshot": true}
+	for _, tool := range openAITools() {
+		name, _ := tool["name"].(string)
+		if !remaining[name] {
+			continue
+		}
+		properties, ok := tool["parameters"].(map[string]any)["properties"].(map[string]any)
+		if !ok {
+			t.Fatalf("%s properties missing: %#v", name, tool)
+		}
+		scope, ok := properties["focusa_scope"].(map[string]any)
+		if !ok || scope["type"] != "object" {
+			t.Fatalf("%s must advertise focusa_scope: %#v", name, scope)
+		}
+		delete(remaining, name)
+	}
+	if len(remaining) != 0 {
+		t.Fatalf("capture tools missing from registry: %#v", remaining)
 	}
 }
 

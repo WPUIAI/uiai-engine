@@ -6,6 +6,16 @@ import (
 	"testing"
 )
 
+func TestFocusaScopeNormalizesTypedWireAliases(t *testing.T) {
+	var scope FocusaScope
+	if err := json.Unmarshal([]byte(`{"project_ref":"project:uiai","workpoint_ref":"workpoint:scope","continuity_ref":"continuity:scope"}`), &scope); err != nil {
+		t.Fatal(err)
+	}
+	if scope.WorkpointID != "workpoint:scope" || scope.ContinuityID != "continuity:scope" {
+		t.Fatalf("typed aliases were not normalized: %#v", scope)
+	}
+}
+
 func TestSanitizeURLRedactsSecretQueryAndStripsFragment(t *testing.T) {
 	got := SanitizeURL("https://example.com/path?token=abc&ok=yes&api_key=123&signature=sig#frag")
 	if strings.Contains(got, "abc") || strings.Contains(got, "123") || strings.Contains(got, "sig#") || strings.Contains(got, "#frag") {

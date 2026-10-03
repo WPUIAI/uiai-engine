@@ -647,7 +647,7 @@ func fpvFocusaContext(sess *vision.Session, head string) map[string]any {
 		"evidence":    []string{"fpv.wpuiai.com/m/{token}", "git:" + head},
 		"drift_guard": "Keep fpv.wpuiai.com path-gated to /m/*; do not expose /api/*",
 	}
-	if sess == nil || sess.FocusaScope == nil || (sess.FocusaScope.WorkpointID == "" && sess.FocusaScope.ContinuityID == "" && sess.FocusaScope.ProjectRoot == "" && sess.FocusaScope.EvidenceRef == "") {
+	if sess == nil || !sess.FocusaScope.HasAnyBinding() {
 		base["status"] = "degraded"
 		base["degraded"] = true
 		base["objective"] = "No Focusa scope attached to this UIAI session"
@@ -664,14 +664,24 @@ func fpvFocusaContext(sess *vision.Session, head string) map[string]any {
 	}
 	base["status"] = "linked"
 	base["degraded"] = false
+	projectRef := scope.ProjectReference()
 	base["objective"] = "Linked Focusa scope for this UIAI browser session"
-	base["next_step"] = "Resolve compact Workpoint/evidence/prediction/trajectory surfaces by project_root plus continuity_id"
+	base["next_step"] = "Resolve compact Workpoint/evidence/prediction/trajectory surfaces by project reference plus continuity"
 	base["workpoint"] = scope.WorkpointID
 	base["continuity_id"] = scope.ContinuityID
-	base["project_root"] = scope.ProjectRoot
-	base["trajectory"] = map[string]string{"project_root": scope.ProjectRoot, "continuity_id": scope.ContinuityID, "status": "scope_linked"}
+	base["project_ref"] = projectRef
+	base["workstream_ref"] = scope.WorkstreamReference()
+	base["workset_ref"] = scope.WorksetRef
+	base["callgraph_ref"] = scope.CallGraphRef
+	base["work_item_ref"] = scope.WorkItemRef
+	base["trajectory"] = map[string]string{"project_ref": projectRef, "continuity_id": scope.ContinuityID, "status": "scope_linked"}
 	base["prediction"] = map[string]string{"status": "scope_linked", "continuity_id": scope.ContinuityID}
 	base["evidence"] = evidence
+	if scope.ProjectRoot == "" {
+		base["live"] = map[string]any{"status": "degraded", "degraded": true, "reason": "project_root unavailable for live Focusa adapter"}
+		return base
+	}
+	base["project_root"] = scope.ProjectRoot
 	live := fpvLiveFocusaContext(scope)
 	base["live"] = live
 	if live["status"] == "linked" {
