@@ -92,7 +92,7 @@ function authHeaders(): Record<string, string> {
 	return headers;
 }
 
-async function callEngine(path: string, init?: RequestInit, requiresEvidence = false): Promise<any> {
+async function callEngine(path: string, init?: RequestInit, requiresEvidence = false, skipEvidence = false): Promise<any> {
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 	try {
@@ -111,7 +111,7 @@ async function callEngine(path: string, init?: RequestInit, requiresEvidence = f
 		if (!res.ok) {
 			throw Object.assign(new Error(formatEngineError(data, res.status, path)), { status: res.status });
 		}
-		assertEvidenceDelivery(data, requiresEvidence);
+		if (!skipEvidence) assertEvidenceDelivery(data, requiresEvidence);
 		return data;
 	} finally {
 		clearTimeout(timeout);
@@ -149,8 +149,8 @@ function cleanBody(body: Record<string, any>) {
 	return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
 }
 
-function post(path: string, body: Record<string, any>, requiresEvidence = false) {
-	return callEngine(path, { method: "POST", body: JSON.stringify(cleanBody(body)), headers: evidenceScopeHeaders(body.focusa_scope) }, requiresEvidence);
+function post(path: string, body: Record<string, any>, requiresEvidence = false, skipEvidence = false) {
+	return callEngine(path, { method: "POST", body: JSON.stringify(cleanBody(body)), headers: evidenceScopeHeaders(body.focusa_scope) }, requiresEvidence, skipEvidence);
 }
 
 async function runGuidedPacketWorkflow(mode: PacketMode, input: string, ctx: any) {
@@ -477,7 +477,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		promptSnippet: "Use pi_uiai_agent_card before loading full UIAI schemas or when orienting browser/visual QA workflows.",
 		parameters: Type.Object({}),
 		async execute() {
-			return textResult(await callEngine("/api/tools/agent-card"), { endpoint: "/api/tools/agent-card" });
+			return textResult(await callEngine("/api/tools/agent-card", undefined, false, true), { endpoint: "/api/tools/agent-card" });
 		},
 	});
 
@@ -488,7 +488,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		parameters: Type.Object({ q: Type.String({ description: "Keyword or phrase to search" }) }),
 		async execute(_toolCallId, params) {
 			const q = encodeURIComponent(params.q);
-			return textResult(await callEngine(`/api/tools/search?q=${q}`), { endpoint: "/api/tools/search", query: params.q });
+			return textResult(await callEngine(`/api/tools/search?q=${q}`, undefined, false, true), { endpoint: "/api/tools/search", query: params.q });
 		},
 	});
 
@@ -498,7 +498,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		description: "Read UIAI tool relationship graph with workflow routes and Focusa integration metadata.",
 		parameters: Type.Object({}),
 		async execute() {
-			return textResult(await callEngine("/api/tools/graph"), { endpoint: "/api/tools/graph" });
+			return textResult(await callEngine("/api/tools/graph", undefined, false, true), { endpoint: "/api/tools/graph" });
 		},
 	});
 
@@ -678,7 +678,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			const data = await post("/api/session", params);
-			return textResult(withoutScreenshot(data), { endpoint: "/api/session", has_screenshot: Boolean(data.screenshot) });
+			return textResult(withoutScreenshot(data), { endpoint: "/api/session", has_screenshot: Boolean(data.screenshot || data.artifact_url) });
 		},
 	});
 
@@ -1150,7 +1150,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 				return;
 			}
 			try {
-				const card = await callEngine("/api/tools/agent-card");
+				const card = await callEngine("/api/tools/agent-card", undefined, false, true);
 				ctx.ui.notify(`UIAI ready: ${card.purpose || "agent card loaded"}`, "info");
 				renderUiaiWidget(ctx);
 				pi.appendEntry(UIAI_WIDGET_STATE_ENTRY, { visible: true });

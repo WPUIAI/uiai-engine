@@ -579,6 +579,42 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromSession(sess), sess.URL, "Browser source snapshot", "source_snapshot", result, http.StatusOK)
 		})
 
+		// Also support GET for read-only consumers (query params mirror ReadOptions).
+		r.Get("/read", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			q := req.URL.Query()
+			body := vision.ReadOptions{Selector: q.Get("selector"), Format: q.Get("format"), Mode: q.Get("mode")}
+			if v := q.Get("max_chars"); v != "" {
+				if n, err := strconv.Atoi(v); err == nil {
+					body.MaxChars = n
+				}
+			}
+			if v := q.Get("include_links"); v == "true" || v == "1" {
+				body.IncludeLinks = true
+			}
+			if v := q.Get("include_images"); v == "true" || v == "1" {
+				body.IncludeImages = true
+			}
+			if body.Selector != "" {
+				if resolved, resolveErr := sess.ResolveSelector(body.Selector); resolveErr == nil {
+					body.Selector = resolved
+				} else {
+					writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "read", "selector": body.Selector})
+					return
+				}
+			}
+			result, err := sess.ReadPage(body)
+			if err != nil {
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "read", "selector": body.Selector})
+				return
+			}
+			writeJSON(w, 200, result)
+		})
+
 		// Cookies — get/set/clear
 		r.Post("/cookies", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
@@ -627,11 +663,13 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeJSON(w, 400, map[string]string{"error": "invalid JSON body"})
 				return
 			}
-			if err := sess.LoadAuth(state); err != nil {
+			report, err := sess.LoadAuth(state)
+			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeJSON(w, 200, map[string]string{"status": "loaded"})
+			report["status"] = "loaded"
+			writeJSON(w, 200, report)
 		})
 
 		// Snapshot — accessibility tree with @ref selectors
