@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "uiai.authenticity_digest_report.v2",
+  "title": "Evidence-bound authenticity replay report",
+  "description": "Synthetic producer evidence, not independent acceptance, current revocation proof, or completion authority. v1 pass-label reports cannot satisfy v2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "code_ref", "runs", "clauses", "results", "digest_sha256", "all_identical", "per_run"],
+  "properties": {
+    "schema": {"const": "uiai.authenticity_digest_report.v2"},
+    "code_ref": {"type": "string", "minLength": 1},
+    "runs": {"type": "integer", "minimum": 1, "maximum": 1000},
+    "clauses": {"type": "array", "minItems": 8, "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/clause"}},
+    "results": {"type": "array", "minItems": 8, "maxItems": 8, "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["clause", "pass", "note", "materials"],
+      "properties": {
+        "clause": {"$ref": "#/$defs/clause"},
+        "pass": {"const": true},
+        "note": {"type": "string"},
+        "materials": {"type": "array", "minItems": 1}
+      }
+    }},
+    "digest_sha256": {"$ref": "#/$defs/digest"},
+    "all_identical": {"const": true},
+    "per_run": {"type": "array", "minItems": 1, "maxItems": 1000, "items": {"$ref": "#/$defs/digest"}}
+  },
+  "$defs": {
+    "clause": {"enum": ["key_rotation", "key_revocation", "import_distrust", "custody_chain", "time_confidence", "proof_of_absence", "air_gap", "human_identity"]},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}
