@@ -1,5 +1,7 @@
 # AppVeyor free OSS tier for UIAI Engine Windows builds (Spec 177 addendum).
 version: "{build}"
+# Keep the PR integration receipt; do not also rebuild its branch.
+skip_branch_with_pr: true
 image: Visual Studio 2022
 clone_folder: c:\gopath\src\github.com\WPUIAI\uiai-engine
 environment:
