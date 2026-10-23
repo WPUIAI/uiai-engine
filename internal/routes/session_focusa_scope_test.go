@@ -3,6 +3,7 @@ package routes
 import (
 	"testing"
 
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 )
 
@@ -34,21 +35,26 @@ func TestCompleteEvidenceScopeIsRetained(t *testing.T) {
 		WorkpointRef:  "wp-1",
 		WorkItemRef:   "wirebot-app-zr7",
 		ContinuityRef: "focusa-cont-wirebot-app-user0",
-		WorkItems:     []map[string]any{{"work_item_ref": "wirebot-app-zr7", "provider_surface": "beads"}},
+		WorkItems: []evidencepwa.WorkItemProjection{{
+			WorkItemRef: "wirebot-app-zr7", ProviderSurface: "beads",
+		}},
 	}
 
 	got := resolveFocusaScope(scope, "", "", "", "")
 	if got == nil || got.WorksetRef != scope.WorksetRef || got.CallGraphRef != scope.CallGraphRef || got.WorkItemRef != scope.WorkItemRef {
 		t.Fatalf("complete scope lost: %#v", got)
 	}
-	if len(got.WorkItems) != 1 || got.WorkItems[0]["work_item_ref"] != "wirebot-app-zr7" {
+	if len(got.WorkItems) != 1 || got.WorkItems[0].WorkItemRef != "wirebot-app-zr7" {
 		t.Fatalf("work-item projection lost: %#v", got.WorkItems)
 	}
 }
 
 func TestMergeFocusaScopeKeepsExistingAndCaptureBindings(t *testing.T) {
 	current := &vision.FocusaScope{ProjectRoot: "/home/wirebot/Wirebot-App", ContinuityID: "cont-1", WorksetRef: "workset-1"}
-	incoming := &vision.FocusaScope{WorkpointRef: "wp-1", WorkItemRef: "wirebot-app-zr7", WorkItems: []map[string]any{{"work_item_ref": "wirebot-app-zr7"}}}
+	incoming := &vision.FocusaScope{
+		WorkpointRef: "wp-1", WorkItemRef: "wirebot-app-zr7",
+		WorkItems: []evidencepwa.WorkItemProjection{{WorkItemRef: "wirebot-app-zr7"}},
+	}
 
 	got := mergeFocusaScope(current, incoming)
 	if got.ProjectRoot != current.ProjectRoot || got.ContinuityID != current.ContinuityID || got.WorksetRef != current.WorksetRef {

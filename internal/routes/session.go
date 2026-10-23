@@ -10,6 +10,7 @@ import (
 
 	"github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 	"github.com/WPUIAI/uiai-engine/internal/observability"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
@@ -851,7 +852,7 @@ func mergeFocusaScope(current, incoming *vision.FocusaScope) *vision.FocusaScope
 		merged.ContinuityRef = incoming.ContinuityRef
 	}
 	if incoming.WorkItems != nil {
-		merged.WorkItems = append([]map[string]any(nil), incoming.WorkItems...)
+		merged.WorkItems = append([]evidencepwa.WorkItemProjection(nil), incoming.WorkItems...)
 	}
 	return &merged
 }

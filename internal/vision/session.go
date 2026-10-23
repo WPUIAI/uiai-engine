@@ -40,7 +40,9 @@ const (
 // the evidence delivery owner can validate the capture later.
 type FocusaScope struct {
 	WorkpointID   string                           `json:"workpoint_id,omitempty"`
+	WorkpointRef  string                           `json:"workpoint_ref,omitempty"`
 	ContinuityID  string                           `json:"continuity_id,omitempty"`
+	ContinuityRef string                           `json:"continuity_ref,omitempty"`
 	ProjectRoot   string                           `json:"project_root,omitempty"`
 	WorkstreamKey string                           `json:"workstream_key,omitempty"`
 	EvidenceRef   string                           `json:"evidence_ref,omitempty"`
