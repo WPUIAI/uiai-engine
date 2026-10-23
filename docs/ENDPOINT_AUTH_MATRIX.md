@@ -177,3 +177,11 @@ Current auth tests remain useful as migration fixtures, but final release proof 
 - `docs/UIAI_PROTECTED_WORKER_AND_FEATURE_CAPSULE_ADDENDUM_2026-08-01.md`
 - `docs/LICENSING.md`
 - Focusa Spec 152 and Spec 150A
+
+## Browser-read method compatibility
+
+`GET /api/session/{id}/read` is the canonical HTTP read transport;
+`POST /api/session/{id}/read` remains supported for existing Pi/MCP/CLI clients.
+Both inherit the same session authentication, ownership, feature and evidence
+delivery policy. Neither method changes browser-page state; read counters,
+idle leases and evidence bookkeeping are observational side effects.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -602,66 +603,58 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			writeJSON(w, 200, map[string]any{"text": text, "selector": body.Selector})
 		})
 
-		// Read — compact whole-page/region text extraction for agent web surfing (no screenshot)
-		r.Post("/read", func(w http.ResponseWriter, req *http.Request) {
+		// GET is canonical for read-only HTTP consumers; POST remains a supported
+		// compatibility transport for existing Pi/MCP/CLI clients. Both use one
+		// read and evidence-delivery implementation.
+		readHandler := func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
 				return
 			}
 			var body vision.ReadOptions
-			json.NewDecoder(req.Body).Decode(&body)
+			if req.Method == http.MethodGet {
+				q := req.URL.Query()
+				body = vision.ReadOptions{Selector: q.Get("selector"), Format: q.Get("format"), Mode: q.Get("mode")}
+				if value := q.Get("max_chars"); value != "" {
+					parsed, err := strconv.Atoi(value)
+					if err != nil {
+						writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid max_chars"})
+						return
+					}
+					body.MaxChars = parsed
+				}
+				for key, target := range map[string]*bool{"include_links": &body.IncludeLinks, "include_images": &body.IncludeImages} {
+					if value := q.Get(key); value != "" {
+						parsed, err := strconv.ParseBool(value)
+						if err != nil {
+							writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid " + key})
+							return
+						}
+						*target = parsed
+					}
+				}
+			} else if err := json.NewDecoder(req.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid read options"})
+				return
+			}
 			if body.Selector != "" {
 				if resolved, resolveErr := sess.ResolveSelector(body.Selector); resolveErr == nil {
 					body.Selector = resolved
 				} else {
-					writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "read", "selector": body.Selector})
+					writeSessionError(w, http.StatusNotFound, "selector_not_found", resolveErr, sess, map[string]any{"action": "read", "selector": body.Selector})
 					return
 				}
 			}
 			result, err := sess.ReadPage(body)
 			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "read", "selector": body.Selector})
+				writeSessionError(w, http.StatusInternalServerError, classifySessionError(err), err, sess, map[string]any{"action": "read", "selector": body.Selector})
 				return
 			}
 			writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromSession(sess), sess.URL, "Browser source snapshot", "source_snapshot", result, http.StatusOK)
-		})
-
-		// Also support GET for read-only consumers (query params mirror ReadOptions).
-		r.Get("/read", func(w http.ResponseWriter, req *http.Request) {
-			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
-			if !ok {
-				writeJSON(w, 404, map[string]string{"error": "session not found"})
-				return
-			}
-			q := req.URL.Query()
-			body := vision.ReadOptions{Selector: q.Get("selector"), Format: q.Get("format"), Mode: q.Get("mode")}
-			if v := q.Get("max_chars"); v != "" {
-				if n, err := strconv.Atoi(v); err == nil {
-					body.MaxChars = n
-				}
-			}
-			if v := q.Get("include_links"); v == "true" || v == "1" {
-				body.IncludeLinks = true
-			}
-			if v := q.Get("include_images"); v == "true" || v == "1" {
-				body.IncludeImages = true
-			}
-			if body.Selector != "" {
-				if resolved, resolveErr := sess.ResolveSelector(body.Selector); resolveErr == nil {
-					body.Selector = resolved
-				} else {
-					writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "read", "selector": body.Selector})
-					return
-				}
-			}
-			result, err := sess.ReadPage(body)
-			if err != nil {
-				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "read", "selector": body.Selector})
-				return
-			}
-			writeJSON(w, 200, result)
-		})
+		}
+		r.Get("/read", readHandler)
+		r.Post("/read", readHandler)
 
 		// Cookies — get/set/clear
 		r.Post("/cookies", func(w http.ResponseWriter, req *http.Request) {

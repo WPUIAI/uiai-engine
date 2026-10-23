@@ -367,7 +367,105 @@
               }
             }
           }
-        }
+        },
+        "description": "Supported compatibility transport for Pi, MCP and CLI; JSON ReadOptions use the same bounded, read-only implementation and delivery policy as GET."
+      },
+      "get": {
+        "summary": "Read bounded page text with mandatory EPWA delivery (canonical GET)",
+        "responses": {
+          "200": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "EPWA delivery envelope; HTTP 202 means raw output is withheld pending reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uiai_artifact_delivery_envelope_v2"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max_chars",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "maximum": 30000,
+              "default": 8000
+            }
+          },
+          {
+            "name": "include_links",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "include_images",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "text",
+                "markdown"
+              ]
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "main_content",
+                "full"
+              ]
+            }
+          }
+        ]
       }
     },
     "/api/session/{sessionID}/diagnostics": {

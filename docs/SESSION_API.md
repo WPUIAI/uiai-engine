@@ -44,7 +44,8 @@ Exact grants/limits come from the signed authority policy.
 | `GET` | `/api/session/{id}` | session metadata | owner/client/session scope |
 | `DELETE` | `/api/session/{id}` | close session | owner/client/session scope; idempotent |
 | `POST` | `/api/session/{id}/navigate` | navigate | session feature/scope |
-| `GET` | `/api/session/{id}/read` | bounded text/Markdown read | session feature/scope |
+| `GET` | `/api/session/{id}/read` | canonical bounded text/Markdown read | session feature/scope |
+| `POST` | `/api/session/{id}/read` | supported compatibility transport; JSON ReadOptions | same authority and delivery rules as GET |
 | `GET` | `/api/session/{id}/snapshot` | accessibility tree and `@ref`s | session feature/scope |
 | `POST` | `/api/session/{id}/click` | click CSS selector or `@ref` | action scope, confirmation policy where required |
 | `POST` | `/api/session/{id}/fill` | fill input | action scope |
@@ -57,6 +58,14 @@ Exact grants/limits come from the signed authority policy.
 | `POST` | `/api/session/{id}/eval` | run bounded JavaScript | sensitive feature; may be excluded from Evaluation |
 | `POST` | `/api/session/{id}/css` | inject CSS | sensitive action scope |
 | `GET/POST` | session cookie/auth routes | save/load state (load accepts flat or origin-keyed storage; returns applied counts, fails loudly on unknown shapes) | explicit sensitive feature, encrypted storage, no logs |
+
+GET `/read` uses query parameters; POST `/read` accepts the equivalent JSON
+options and remains supported for existing Pi/MCP/CLI clients without a removal
+schedule. Both are browser-read-only, capped at 30,000 characters, and use the
+same redaction and evidence-delivery policy (including HTTP 202 when delivery is
+not ready). Neither method grants permission to mutate a page. Read counters,
+idle leases and evidence metadata may advance; these are operational bookkeeping,
+not browser actuation. Invalid query option types or malformed JSON return 400.
 
 The exact current route list remains in code/tool discovery and must be generated into the endpoint-feature coverage ledger before release.
 

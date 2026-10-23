@@ -91,6 +91,21 @@ artifact_routes = {
 for path, (method, summary) in artifact_routes.items():
     openapi["paths"].setdefault(path, {})[method] = {"summary": summary, "responses": artifact_responses}
 
+# Browser reading is GET-canonical; retain POST for existing tool transports.
+read_operation = dict(openapi["paths"]["/api/session/{sessionID}/read"]["post"])
+read_operation["summary"] = "Read bounded page text with mandatory EPWA delivery (canonical GET)"
+read_operation["parameters"] = [
+    {"name": "sessionID", "in": "path", "required": True, "schema": {"type": "string"}},
+    {"name": "selector", "in": "query", "schema": {"type": "string"}},
+    {"name": "max_chars", "in": "query", "schema": {"type": "integer", "maximum": 30000, "default": 8000}},
+    {"name": "include_links", "in": "query", "schema": {"type": "boolean"}},
+    {"name": "include_images", "in": "query", "schema": {"type": "boolean"}},
+    {"name": "format", "in": "query", "schema": {"type": "string", "enum": ["text", "markdown"]}},
+    {"name": "mode", "in": "query", "schema": {"type": "string", "enum": ["main_content", "full"]}},
+]
+openapi["paths"]["/api/session/{sessionID}/read"]["get"] = read_operation
+openapi["paths"]["/api/session/{sessionID}/read"]["post"]["description"] = "Supported compatibility transport for Pi, MCP and CLI; JSON ReadOptions use the same bounded, read-only implementation and delivery policy as GET."
+
 # A committed artifact may fail before a real package binding exists. Preserve
 # commit/recovery truth in a documented error variant rather than inventing hashes.
 commit_operation = openapi["paths"]["/api/evidence/artifacts/commit"]["post"]
