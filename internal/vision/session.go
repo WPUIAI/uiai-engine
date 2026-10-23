@@ -898,6 +898,7 @@ func (s *Session) Eval(js string) (string, *SnapResult, error) {
 			raw, _ := result.Value.MarshalJSON()
 			jsResult = string(raw)
 		}
+		jsResult = sanitizeDiagnosticText(jsResult)
 	}
 
 	time.Sleep(100 * time.Millisecond) // let DOM settle after JS execution
@@ -960,6 +961,7 @@ func (s *Session) EvalAsync(js string, timeoutMs int) (string, *SnapResult, erro
 			raw, _ := result.Value.MarshalJSON()
 			jsResult = string(raw)
 		}
+		jsResult = sanitizeDiagnosticText(jsResult)
 	}
 
 	time.Sleep(100 * time.Millisecond)
@@ -1142,6 +1144,7 @@ func (s *Session) DOMInfo() (map[string]any, error) {
 	if err := json.Unmarshal([]byte(result.Value.Str()), &dom); err != nil {
 		return nil, err
 	}
+	dom = sanitizeBrowserValue(dom).(map[string]any)
 
 	s.touch()
 	return dom, nil

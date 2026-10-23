@@ -346,6 +346,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 	interactiveCount := 0
 
 	for _, el := range elements {
+		el.Name = sanitizeDiagnosticText(el.Name)
 		isInteractive := interactiveRoles[el.Role]
 		isContent := contentRoles[el.Role]
 		isStructural := structuralRoles[el.Role]

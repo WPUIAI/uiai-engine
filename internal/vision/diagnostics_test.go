@@ -86,6 +86,20 @@ func TestDiagnosticsSnapshotRedactsSessionURL(t *testing.T) {
 	}
 }
 
+func TestSanitizeBrowserValueRedactsNestedSecrets(t *testing.T) {
+	value := sanitizeBrowserValue(map[string]any{
+		"text":  "token=secret",
+		"items": []any{"https://example.test/?api_key=secret"},
+	})
+	got := value.(map[string]any)
+	if got["text"] != "token=REDACTED" {
+		t.Fatalf("text was not redacted: %#v", got)
+	}
+	if got["items"].([]any)[0] != "https://example.test/?api_key=REDACTED" {
+		t.Fatalf("nested URL was not redacted: %#v", got)
+	}
+}
+
 func TestSanitizeDiagnosticTextRedactsSecrets(t *testing.T) {
 	raw := "Authorization Bearer SECRET123 url=https://example.test/a?token=abc&ok=1#frag api_key=BAD cookie=sessionid"
 	got := sanitizeDiagnosticText(raw)

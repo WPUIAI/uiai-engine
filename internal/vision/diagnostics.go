@@ -548,6 +548,27 @@ func sanitizeDiagnosticText(raw string) string {
 	return truncateDiag(clean, 1000)
 }
 
+func sanitizeBrowserValue(value any) any {
+	switch typed := value.(type) {
+	case string:
+		return sanitizeDiagnosticText(typed)
+	case []any:
+		out := make([]any, len(typed))
+		for i, item := range typed {
+			out[i] = sanitizeBrowserValue(item)
+		}
+		return out
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for key, item := range typed {
+			out[key] = sanitizeBrowserValue(item)
+		}
+		return out
+	default:
+		return value
+	}
+}
+
 func safePageLabel(title, pageURL, sessionID string) string {
 	if strings.TrimSpace(title) != "" {
 		return sanitizeDiagnosticText(title)
