@@ -273,3 +273,16 @@ nested redirect URLs (including an additional percent-encoding layer). Malformed
 query encoding is withheld rather than copied through. Internal navigation URLs
 are unchanged. These producer protections do not claim that retained historical
 Pi/MCP transcripts have already been scrubbed.
+
+## Legacy share-viewer security
+
+`/v/{token}` uses a precompiled context-aware HTML template; stored metadata
+never becomes trusted HTML. Only structurally valid HTTP(S) targets without
+userinfo/control characters are accepted, and callback parameters are redacted
+in public link/frame URLs. Frames are sandboxed with no script/form/origin
+permissions. Responses use a restrictive CSP, no-store, no-referrer, nosniff,
+frame denial and no-index/no-archive policy, including static 404/410 errors;
+invalid stored targets return 400 without embedding them. Shared baseline
+security headers also apply to Evidence PWA assets, whose existing CSP still
+denies all frames. Source/browser regression proof is not installed-runtime
+proof; release and consumer verification remain separate acceptance steps.

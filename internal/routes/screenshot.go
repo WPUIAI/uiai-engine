@@ -776,7 +776,7 @@ func serveShareAsset(w http.ResponseWriter, req *http.Request, cfg *config.Confi
 		}
 	}
 	w.Header().Set("Content-Type", mediaType)
-	w.Header().Set("X-Content-Type-Options", "nosniff")
+	setShareSecurityHeaders(w)
 	if name == "index.html" {
 		w.Header().Set("Content-Security-Policy", evidenceShareCSP)
 	}
