@@ -41,7 +41,7 @@ fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "critique_
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "critique_dimensions")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "frame_catalog")' >/dev/null
 fetch "$ENGINE_URL/api/tools/mcp" | jq -e '.tools[] | select(.name == "uiai_errors")' >/dev/null
-fetch "$ENGINE_URL/api/media/frame/catalog" | jq -e '.count > 0' >/dev/null
+UIAI_ENGINE_URL="$ENGINE_URL" UIAI_SMOKE_TIMEOUT_SECONDS="$TIMEOUT_SECONDS" bash "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/smoke-media-catalog.sh"
 fetch "$ENGINE_URL/api/errors?limit=1" | jq -e 'has("events") and has("redaction")' >/dev/null
 fetch_auth "$ENGINE_URL/api/search/providers" | jq -e '(.providers[] | select(.id == "brave") | has("configured") and has("cache_ttl_seconds")) and (.providers[] | select(.id == "wikipedia") | .configured == true and .status == "ready" and (.capabilities | index("keyless_public")))' >/dev/null
 fetch_auth -X POST "$ENGINE_URL/api/search" -H "Content-Type: application/json" -d '{"query":"UIAI Engine browser agents","limit":1}' | jq -e '.provider == "brave" and .count >= 1 and has("cached") and has("cache_ttl_seconds") and (.results[0].evidence_ref | startswith("uiai-search:brave:")) and .results[0].rank == 1' >/dev/null

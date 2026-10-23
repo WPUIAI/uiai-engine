@@ -159,3 +159,13 @@ Never place real values in:
 - public FPV/share payloads.
 
 Prefer device-code activation, OS-protected storage, short-lived tokens, and environment injection from an approved secret store.
+
+## Media-catalog smoke posture
+
+`scripts/smoke-agent-integrations.sh` delegates the paid media catalog check to
+`scripts/smoke-media-catalog.sh`. HTTP 200 requires a nonempty numeric catalog
+count. HTTP 402 is reported as reachable but entitlement-required, explicitly
+without claiming catalog contents were verified. HTTP 401, 404, 5xx, malformed
+catalogs and transport failures remain failures. Existing API-key/bearer inputs
+are forwarded without printing their values. The check never requests a paid
+render, acquires an entitlement, or changes account state.
