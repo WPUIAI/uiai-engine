@@ -51,11 +51,12 @@ Exact grants/limits come from the signed authority policy.
 | `POST` | `/api/session/{id}/type` | type text | action scope |
 | `POST` | `/api/session/{id}/press` | keypress | action scope |
 | `POST` | `/api/session/{id}/scroll` | scroll | action scope |
-| `POST` | `/api/session/{id}/screenshot` | capture current page | screenshot feature/limit |
+| `POST` | `/api/session/{id}/screenshot` | capture current page (artifact-ref default: metadata + artifact_url, no inline pixels) | screenshot feature/limit |
+| `GET` | `/api/session/{id}/read` | compact page text (query: selector, max_chars, include_links, include_images, format, mode) | session feature/scope |
 | `GET` | `/api/session/{id}/diagnostics` | console/exceptions/network/failures | diagnostics feature and redaction |
 | `POST` | `/api/session/{id}/eval` | run bounded JavaScript | sensitive feature; may be excluded from Evaluation |
 | `POST` | `/api/session/{id}/css` | inject CSS | sensitive action scope |
-| `GET/POST` | session cookie/auth routes | save/load state | explicit sensitive feature, encrypted storage, no logs |
+| `GET/POST` | session cookie/auth routes | save/load state (load accepts flat or origin-keyed storage; returns applied counts, fails loudly on unknown shapes) | explicit sensitive feature, encrypted storage, no logs |
 
 The exact current route list remains in code/tool discovery and must be generated into the endpoint-feature coverage ledger before release.
 
@@ -149,7 +150,7 @@ The shared CLI/Pi/MCP surface uses the `research packet` and `session diagnostic
 
 ## FPV and shares
 
-Session creation may return an FPV share in the current code. Final production behavior requires:
+Session creation returns no FPV share; shares are created only through the explicit share endpoints. Final production behavior requires:
 
 - share creation as an entitled operation;
 - signed/opaque, short-lived token;
