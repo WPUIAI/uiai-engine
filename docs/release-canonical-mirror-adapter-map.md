@@ -81,3 +81,12 @@ untracked Go files. It prints exact paths and diffs and fails without rewriting
 source or staging anything. Positional argument collection avoids Bash 4-only
 `mapfile` and empty-array expansion. Regression fixtures snapshot both source
 bytes and the index, including partially staged and isolated-worktree cases.
+
+### UIAI path-scoped commits
+
+`scripts/git-hooks-pre-commit` is the project pre-commit policy. The installed
+canonical-workspace hook links to it. It does not invoke Beads synchronization
+or stage files: unrelated and partially staged ledger work stays byte-identical,
+while intentional staged Beads changes commit normally. Run Beads synchronization
+explicitly and review/stage its output when the task requires it. Installing
+generic Beads hooks must not replace this project policy with automatic staging.

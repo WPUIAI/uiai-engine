@@ -1,0 +1,21 @@
+#!/bin/sh
+# Repository commits must not flush or silently stage another agent's Beads work.
+# Beads synchronization is an explicit operation, separate from path-scoped commits.
+set -eu
+root=$(git rev-parse --show-toplevel)
+if [ ! -f "$root/.beads/issues.jsonl" ]; then
+  exit 0
+fi
+status=0
+git -C "$root" diff --quiet -- .beads/issues.jsonl || status=$?
+case "$status" in
+  0) ;;
+  1)
+    printf '%s\n' 'pre-commit: .beads/issues.jsonl has unstaged changes; preserved without flushing or staging.' >&2
+    printf '%s\n' 'Review and explicitly stage Beads changes separately when intended; this commit retains exactly your selected index.' >&2
+    ;;
+  *)
+    printf '%s\n' 'pre-commit: could not inspect Beads staging; index was not changed.' >&2
+    exit "$status"
+    ;;
+esac
