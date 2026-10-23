@@ -1,0 +1,1 @@
+{"id":"add-2026-08-19-cockpit-audit","ts":"2026-08-19T18:30:00Z","event":"addition","category":"self_test","subsystem":"release","scope":"release-proof/cockpit/audit.jsonl","change":"Initialize cockpit audit stream separate from daemon","guard":"audit-schema.py validate passes","test":"scripts/audit-schema.py","linked_run":"","product":"cockpit"}

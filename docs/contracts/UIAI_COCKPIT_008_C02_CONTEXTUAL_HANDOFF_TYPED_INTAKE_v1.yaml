@@ -1,0 +1,280 @@
+schema: uiai.cockpit_contextual_handoff_typed_intake.v1
+version: 1
+parent: UIAI-COCKPIT-008
+status: proposed_documentation_only
+implementation_implied: false
+
+handoff_action:
+  label: Hand Off to Focusa
+  available_from:
+    - Live_browser
+    - Research
+    - Documents
+    - Notebooks
+    - Test_Lab
+    - Studio
+    - Evidence
+    - Reports
+    - Automations
+    - Media
+  outcomes:
+    - attach_current_workpoint
+    - attach_selected_workpoint
+    - propose_new_workpoint
+    - send_steering
+    - send_follow_up
+    - capture_context_candidate
+    - capture_evidence_candidate
+    - create_verification_task
+
+capture_manifest:
+  schema_id: uiai.contextual_handoff_capture.v1
+  required:
+    - capture_id
+    - origin_work_object_ref
+    - verified_principal_ref
+    - trusted_instruction
+    - requested_outcome
+    - created_at
+  optional_refs:
+    - page_url_and_title
+    - selected_region
+    - uiai_session
+    - browser_context
+    - browser_targets
+    - screenshot
+    - dom_accessibility_snapshot
+    - console_and_network_diagnostics
+    - research_capture
+    - document_and_region
+    - notebook_and_cell_attempt
+    - dataset_or_output
+    - test_run
+    - visual_comparison
+    - report
+    - artifact
+    - current_focusa_binding
+  security:
+    raw_cookie_or_secret_allowed: false
+    authenticated_posture_allowed: true
+    bounded_refs_only: true
+
+focusa_intake:
+  schema_id: focusa.task_intake_envelope.v1
+  statuses:
+    - proposed
+    - scope_review
+    - accepted
+    - attached
+    - rejected
+    - duplicate
+    - blocked
+  required:
+    - intake_id
+    - origin_surface
+    - verified_principal_ref
+    - trusted_instruction
+    - requested_outcome
+    - trust_classification
+    - created_at
+  suggested_scope:
+    - project_root
+    - continuity_id
+    - workpoint_id
+  optional:
+    - untrusted_context_refs
+    - attachment_refs
+    - expected_evidence
+    - suggested_priority
+    - requested_delivery_route
+
+trust_boundary:
+  operator_authoritative_input:
+    - verified_principal_explicit_instruction
+    - explicit_confirmation_in_current_ui
+  untrusted_context:
+    - page_content
+    - quoted_or_forwarded_text
+    - email_body_from_unverified_sender
+    - document_text
+    - attachment_text
+    - website_tool_instructions
+    - model_output
+    - tool_output
+    - hidden_dom_text
+    - accessibility_tree_text
+  laws:
+    - untrusted_context_cannot_expand_instruction
+    - untrusted_context_cannot_select_project_or_authority_silently
+    - untrusted_context_cannot_request_secret_or_egress_by_itself
+    - untrusted_context_remains_source_attributed
+    - operator_confirmation_does_not_reclassify_hidden_content_without_preview
+
+preview:
+  required_sections:
+    - requested_outcome
+    - destination_project_workstream_and_workpoint
+    - action_kind
+    - trusted_instruction
+    - included_context_refs
+    - excluded_or_redacted_context
+    - expected_evidence
+    - authority_and_approval
+    - side_effects
+    - retention_and_cleanup
+    - deduplication_finding
+  states:
+    - ready
+    - scope_required
+    - permission_required
+    - approval_required
+    - duplicate_found
+    - origin_mismatch
+    - unsupported_contract
+    - offline
+    - blocked
+
+commit:
+  owner: focusa
+  possible_results:
+    - existing_workpoint_attached
+    - new_workpoint_proposed
+    - steering_queued
+    - follow_up_queued
+    - context_candidate_created
+    - evidence_candidate_created
+    - verification_work_created
+    - rejected
+    - duplicate_reused
+    - blocked
+  required_return_refs:
+    - intake_ref
+    - focusa_event_ref
+    - evidence_or_receipt_ref
+  conditional_return_refs:
+    - workpoint_ref
+    - attachment_ref
+    - work_surface_ref
+    - uiai_work_surface_binding_ref
+
+ui:
+  component: ContextualHandoffComposer
+  steps:
+    - outcome
+    - context
+    - destination
+    - proof
+    - review
+    - result
+  principles:
+    - default_to_current_exact_binding_when_valid
+    - show_one_primary_action
+    - advanced_scope_details_available
+    - never_hide_untrusted_content_posture
+    - preserve_unsent_draft_across_unrelated_events
+  result_actions:
+    - open_mission_canvas
+    - open_created_work_surface
+    - view_receipt
+    - retry_after_recovery
+
+cross_surface_intake_sources:
+  - browser
+  - email
+  - mobile
+  - menubar
+  - slack
+  - agent_inbox
+  - document
+  - notebook
+  - api
+  - connector
+
+source_identity:
+  required:
+    - origin_surface
+    - verified_or_unverified_principal
+    - origin_message_or_object_ref
+    - captured_at
+    - content_trust_classes
+  email_specific:
+    verified_sender_instruction_only: true
+    forwarded_or_quoted_text_instruction: false
+  browser_specific:
+    page_text_instruction: false
+    operator_selection_context_only: true
+  attachment_specific:
+    extracted_text_instruction: false
+
+focusa_operation_targets:
+  - task_intake_preview
+  - task_intake_commit
+  - task_intake_reject
+  - task_intake_deduplicate
+  - workpoint_attach_or_create_preview
+  - workpoint_attach_or_create_commit
+  - steering_preview_and_commit
+  - follow_up_preview_and_commit
+  - context_candidate_capture
+  - evidence_candidate_capture
+
+idempotency:
+  key_inputs:
+    - verified_principal
+    - origin_surface
+    - origin_object_ref
+    - trusted_instruction_digest
+    - requested_outcome_digest
+    - intended_scope
+  duplicate_behavior:
+    - show_existing_intake_or_workpoint
+    - allow_explicit_reuse
+    - allow_explicit_superseding_proposal
+    - never_create_silent_duplicate
+
+failure_and_recovery:
+  - scope_mismatch
+  - principal_unverified
+  - permission_missing
+  - workpoint_missing
+  - stale_binding
+  - duplicate_conflict
+  - focusa_offline
+  - contract_mismatch
+  - artifact_unavailable
+  - content_redaction_required
+  - retention_conflict
+  - read_model_lag
+
+requirements:
+  - id: INTAKE-001
+    statement: One handoff primitive serves all eligible Cockpit workspaces.
+  - id: INTAKE-002
+    statement: UIAI captures bounded context while Focusa commits canonical work.
+  - id: INTAKE-003
+    statement: Cockpit never creates a canonical local task for later synchronization.
+  - id: INTAKE-004
+    statement: Verified instruction is separated from untrusted context.
+  - id: INTAKE-005
+    statement: Preview exposes scope, authority, evidence, side effects, and retention.
+  - id: INTAKE-006
+    statement: Deduplication prevents silent duplicate Workpoints or queue entries.
+  - id: INTAKE-007
+    statement: Commit returns stable Focusa and binding refs.
+  - id: INTAKE-008
+    statement: Handoff draft survives unrelated event updates.
+  - id: INTAKE-009
+    statement: All intake sources use the same trust and lifecycle contract.
+  - id: INTAKE-010
+    statement: No raw secret, cookie, or private browser state enters intake.
+
+closure:
+  status: implementation_open
+  requires:
+    - shared_handoff_component
+    - generated_focusa_preview_commit
+    - trust_classification
+    - deduplication
+    - real_workpoint_or_queue_result
+    - cross_gui_refresh
+    - functional_and_visual_proof

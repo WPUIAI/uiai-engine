@@ -16,7 +16,12 @@
  *   2 = harness error
  */
 
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { validateCardManifest, phase0Cards } from "../src/lib/cards/phase0-card-manifest";
+import { phase0CardPlacements } from "../src/lib/cards/phase0-card-placement";
+import { buildCapabilityCatalog } from "../src/lib/cards/capability-catalog";
+import { workspaceManifest } from "../src/lib/navigation/sidebar-manifest";
 
 interface SmokeResult {
   name: string;
@@ -50,6 +55,23 @@ async function runContractValidation() {
     v.ok,
     v.ok ? "all 14 Phase 0 cards validated" : v.errors.join("; "),
   );
+  const cardIds = phase0Cards.map((card) => card.card_id).sort();
+  record(
+    "manifest: Phase 0 placement migration",
+    JSON.stringify(Object.keys(phase0CardPlacements).sort()) === JSON.stringify(cardIds),
+    "all cards have non-grid destinations",
+  );
+  const catalog = buildCapabilityCatalog(phase0Cards, phase0CardPlacements);
+  record(
+    "manifest: registered capability projection",
+    catalog.length === new Set(phase0Cards.flatMap((card) => card.capabilities)).size,
+    `${catalog.length} unique capabilities`,
+  );
+  const appRoot = fileURLToPath(new URL("..", import.meta.url));
+  const missingRoutes = workspaceManifest.filter((workspace) => !existsSync(`${appRoot}/src/routes${workspace.route === "/" ? "" : workspace.route}/+page.svelte`));
+  record("routes: all workspace paths build", missingRoutes.length === 0, missingRoutes.map((workspace) => workspace.route).join(", ") || "all present");
+  const overview = readFileSync(`${appRoot}/src/routes/+page.svelte`, "utf8");
+  record("overview: Phase 0 grid removed", !overview.includes("phase0Cards"), "final Overview composition is active");
 }
 
 async function runDiscovery() {

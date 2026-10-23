@@ -12,9 +12,9 @@
 //
 // Status code policy (spec §6.5):
 //
-//   401 Unauthorized — no auth identity at all (loopback callers may bypass)
-//   402 Payment Required — license_required (recommended for missing/invalid licenses)
-//   403 Forbidden — auth identity present but feature not enabled for the tier
+//	401 Unauthorized — no auth identity at all (loopback callers may bypass)
+//	402 Payment Required — license_required (recommended for missing/invalid licenses)
+//	403 Forbidden — auth identity present but feature not enabled for the tier
 //
 // Routes should call RequireFeature early and bail out on false. The JSON envelope
 // matches spec §11 shape (license_required, feature, message, purchase_url, docs_url).
@@ -50,37 +50,46 @@ const (
 	FeatureEvalAllowed = "eval_allowed" // sentinel — loopback eval grants this
 
 	// Spec §6.6 — license-gated routes
-	FeatureRemoteAPIAccess  = "remote_api_access"
-	FeatureCritique         = "critique"
-	FeatureUIReverse        = "ui_reverse"
-	FeatureStyleEnhance     = "style_enhance"
-	FeatureLayoutCompare    = "layout_compare"
-	FeatureSectionDetect    = "section_detect"
-	FeatureCopilot          = "copilot"
-	FeatureMediaAccess      = "media_access"
-	FeatureShareAccess      = "share_access"
-	FeatureReferenceAccess  = "reference_access"
-	FeatureDesignSystem     = "design_system"
-	FeatureContentMap       = "content_map"
-	FeatureBlockRecipes     = "block_recipes"
-	FeatureComparison       = "comparison"
-	FeatureMigration        = "migration"
+	FeatureRemoteAPIAccess = "remote_api_access"
+	FeatureCritique        = "critique"
+	FeatureUIReverse       = "ui_reverse"
+	FeatureStyleEnhance    = "style_enhance"
+	FeatureLayoutCompare   = "layout_compare"
+	FeatureSectionDetect   = "section_detect"
+	FeatureCopilot         = "copilot"
+	FeatureMediaAccess     = "media_access"
+	FeatureShareAccess     = "share_access"
+	FeatureReferenceAccess = "reference_access"
+	FeatureDesignSystem    = "design_system"
+	FeatureContentMap      = "content_map"
+	FeatureBlockRecipes    = "block_recipes"
+	FeatureComparison      = "comparison"
+	FeatureMigration       = "migration"
+
+	// UIAI-ENGINE-010 premium pillars (C-010-29 licensing closure)
+	FeaturePersonaStealth    = "persona_stealth"     // C-010-14/30 — identity personas + stealth hardening
+	FeatureAdaptiveRotation  = "adaptive_rotation"   // C-010-31 — rotate-on-flag intelligence
+	FeatureSolverCoveragePro = "solver_coverage_pro" // C-010-32 — extended provider/type matrix
+	FeatureConsensusReads    = "consensus_reads"     // C-010-18 — N>1 persona diff/trust
+	FeatureMeshWorkers       = "mesh_workers"        // C-010-19/25 — remote tailnet/container workers
+	FeatureWebStateContinuity = "web_state_continuity" // C-010-07/23 — checkpoints beyond single session
+	FeatureTimeTravelExport  = "time_travel_export"  // C-010-28 — moment-bundle export
 
 	// Spec §6.5 eval-allowed (loopback only) features
-	FeatureLocalSession     = "local_session"
-	FeatureLocalSearch      = "local_search"
-	FeatureLocalMarkdown    = "local_markdown"
-	FeatureLocalResearch    = "local_research_packet"
-	FeatureLocalScreenshot   = "local_screenshot"
+	FeatureLocalSession    = "local_session"
+	FeatureLocalSearch     = "local_search"
+	FeatureLocalMarkdown   = "local_markdown"
+	FeatureLocalResearch   = "local_research_packet"
+	FeatureLocalScreenshot = "local_screenshot"
 )
 
 // EvalAllowedFeatures is the set of feature keys that loopback callers can use without a
 // license (spec §6.3 Evaluation Mode). Non-loopback callers always need a license.
 var EvalAllowedFeatures = map[string]bool{
-	FeatureLocalSession:   true,
-	FeatureLocalSearch:    true,
-	FeatureLocalMarkdown:  true,
-	FeatureLocalResearch:  true,
+	FeatureLocalSession:    true,
+	FeatureLocalSearch:     true,
+	FeatureLocalMarkdown:   true,
+	FeatureLocalResearch:   true,
 	FeatureLocalScreenshot: true,
 }
 
@@ -123,11 +132,29 @@ func FromIdentity(id *auth.Identity) Entitlements {
 }
 
 func tierFeatures(tier string) map[string]bool {
+	// Spec 152 / ENDPOINT_AUTH_MATRIX §3: tier-derived grants are legacy.
+	// All known licensed tiers currently receive the same broad set; explicit
+	// authority-issued claims (product/features/limits) will replace this.
+	// Unknown tiers fail closed (no features) per spec 152e.
+	known := map[string]bool{"operator": true, "founders-forge": true, "team": true, "commercial": true, "enterprise": true, "internal": false, "pro": false}
+	if _, ok := known[tier]; !ok {
+		return map[string]bool{}
+	}
+	// internal/pro are legacy token-derived tiers — must not grant product features by themselves.
+	if tier == "internal" || tier == "pro" {
+		return map[string]bool{}
+	}
 	all := []string{
 		FeatureRemoteAPIAccess, FeatureCritique, FeatureUIReverse, FeatureStyleEnhance,
 		FeatureLayoutCompare, FeatureSectionDetect, FeatureCopilot, FeatureMediaAccess,
 		FeatureShareAccess, FeatureReferenceAccess, FeatureDesignSystem, FeatureContentMap,
 		FeatureBlockRecipes, FeatureComparison, FeatureMigration,
+
+		// UIAI-ENGINE-010 premium pillars (C-010-29). Granted to known licensed
+		// tiers by default; authority-issued explicit feature lists override.
+		FeaturePersonaStealth, FeatureAdaptiveRotation, FeatureSolverCoveragePro,
+		FeatureConsensusReads, FeatureMeshWorkers, FeatureWebStateContinuity,
+		FeatureTimeTravelExport,
 	}
 	features := make(map[string]bool, len(all))
 	for _, f := range all {

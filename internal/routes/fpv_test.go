@@ -8,13 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
 
 func TestFPVShareRequiresSessionID(t *testing.T) {
 	r := chi.NewRouter()
-	MountFPVRoutes(r, nil)
+	MountFPVRoutes(r, &config.Config{}, nil)
 	req := httptest.NewRequest(http.MethodPost, "/share", bytes.NewBufferString(`{}`))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)

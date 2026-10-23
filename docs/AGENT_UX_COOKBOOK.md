@@ -17,9 +17,15 @@ The helper also accepts `--search-json <file>` when a prior search response alre
 
 ### Pi
 
+Evidence-producing calls automatically compile and yield a durable HTTPS EPWA link when the producer returns a ready delivery. No separate export/share command is needed. Supply the existing verified `focusa_scope` (project, workstream, workset, CallGraph, Workpoint, work item and continuity refs); the adapter forwards it per request without account-specific defaults or invented bindings. Missing scope or publication remains an explicit delivery failure.
+
+The collapsed result shows the evidence page and portable-copy URLs. Raw-only responses, missing required capture envelopes, invalid HTTPS links and non-ready deliveries are rejected; committed artifact/session/job reconciliation handles are retained. Dispatch acknowledgement is not completed delivery. This adapter surfaces returned terminal evidence; it does not manufacture evidence for unrelated background jobs.
+
+Use `scripts/install-agent-integrations.sh` to install the adapter and its shared `uiai/epwa-contract.mjs` dependency together. `UIAI_PI_EXTENSION_DEST` and `UIAI_MCP_CONFIG_DEST` select arbitrary installation paths. Pi and MCP use the same validator. Reload the affected Pi session or start a fresh normal session after approved installation; source changes alone do not activate it. A legacy engine without EPWA publication must be upgraded/configured through the approved delivery path, not accommodated by silently dropping evidence.
+
 ```text
 uiai_search query="<topic>" limit=3
-uiai_browser_open url="<selected result url>" focusa_scope={project_root,continuity_id,evidence_ref}
+uiai_browser_open url="<selected result url>" focusa_scope={<existing verified scope refs>}
 uiai_browser_read session_id="<sid>" max_chars=2000 include_links=true
 uiai_browser_close session_id="<sid>"
 ```
@@ -189,7 +195,7 @@ Evidence handles:
 
 - packet `evidence_refs[]`
 - packet `recommended_focusa.args_preview.evidence_ref`
-- optional artifact path, e.g. `/tmp/uiai-focusa-packet-smoke.json`
+- `epwa_delivery.delivery_id`, durable HTTPS `artifact_url`, and portable `portable_url`; never a local path
 
 ## Recipe 5: Visual QA with screenshot/share artifacts
 
@@ -207,20 +213,32 @@ Session screenshot:
 uiai_browser_screenshot session_id="<sid>" fullPage=true output="file"
 ```
 
-Use `output="file"` or `output="url"` for agent/human review so the response returns `artifact_path` / `artifact_url` without embedding base64. Use `output="json"` only when a downstream tool explicitly needs the raw `screenshot` string.
+Every screenshot response must be a ready `uiai.artifact_result.v2` carrying identity-bound `uiai.epwa_delivery.v1`, a durable HTTPS `artifact_url`, and a portable `portable_url`. Compatibility `output` flags are input hints only; raw bytes, base64, local paths, and URL-only results are never successful delivery.
 
 Share artifact:
 
 ```bash
-curl -s -X POST "$UIAI_ENGINE_URL/api/share" -H 'Content-Type: application/json' -d @/tmp/share-request.json
+curl -s -X POST "$UIAI_ENGINE_URL/api/share" \
+  -H 'Content-Type: application/json' \
+  -H 'X-UIAI-Project-Ref: <project-ref>' \
+  -H 'X-UIAI-Workstream-Ref: <workstream-ref>' \
+  -H 'X-UIAI-Workset-Ref: <workset-ref>' \
+  -H 'X-UIAI-CallGraph-Ref: <callgraph-ref>' \
+  -H 'X-UIAI-Workpoint-Ref: <workpoint-ref>' \
+  -H 'X-UIAI-Work-Item-Ref: <work-item-ref>' \
+  -H 'X-UIAI-Continuity-Ref: <continuity-ref>' \
+  -H 'X-UIAI-Work-Items: <projected-work-items-json>' \
+  -d @/tmp/share-request.json
 ```
 
 Frame render:
 
 ```text
 uiai_frame_catalog
-uiai_frame_render frameId="<frame>" imageBase64="<screenshot>"
+uiai_frame_render frameId="<frame>" imageBase64="<trusted-input-image>"
 ```
+
+`imageBase64` is a bounded frame-render input, not evidence delivery. The rendered output must still return the ready EPWA envelope and portable package.
 
 Evidence handles:
 
@@ -239,7 +257,7 @@ Use when changes are ready to ship.
 
 ```bash
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/check-focusa-packet-drift.sh && go test ./...'
-as-user wpuiai 'cd /home/wpuiai/uiai-engine && bun test ./.pi/extensions/uiai-engine.packet-builder.test.ts'
+as-user wpuiai 'cd /home/wpuiai/uiai-engine && bun test ./integrations/pi/uiai-engine.packet-builder.test.ts'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-pi-extension-registration.sh && scripts/smoke-agent-integrations.sh && scripts/smoke-mcp-tool-routes.sh'
 ```
 

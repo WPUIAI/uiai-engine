@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -19,6 +18,8 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/auth"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 	"github.com/WPUIAI/uiai-engine/internal/media"
 	"github.com/WPUIAI/uiai-engine/internal/ratelimit"
 	"github.com/WPUIAI/uiai-engine/internal/storage"
@@ -43,7 +44,7 @@ func MountMediaReal(r chi.Router, cfg *config.Config, creds *credits.Service, li
 
 	// Device frame rendering (GitHub-vendored frame assets)
 	r.Route("/frame", func(r chi.Router) {
-		mountFrameRoutes(r)
+		mountFrameRoutes(r, cfg)
 	})
 }
 
@@ -127,19 +128,25 @@ func (d *mediaDeps) handleProduce(w http.ResponseWriter, r *http.Request) {
 		licenseID = id.LicenseID
 	}
 
+	deliveryBaseURL := ""
+	if base, err := canonicalEPWABase(r); err == nil {
+		deliveryBaseURL = base.String()
+	}
 	job := &media.Job{
-		ID:        jobID,
-		Type:      req.Type,
-		Status:    media.StatusPending,
-		Device:    req.Device,
-		URLs:      req.URLs,
-		Width:     req.Width,
-		Height:    req.Height,
-		Frames:    req.Frames,
-		Delay:     req.Delay,
-		Mode:      req.Mode,
-		LicenseID: licenseID,
-		CreatedAt: time.Now().UTC(),
+		ID:              jobID,
+		Type:            req.Type,
+		Status:          media.StatusPending,
+		Device:          req.Device,
+		URLs:            req.URLs,
+		Width:           req.Width,
+		Height:          req.Height,
+		Frames:          req.Frames,
+		Delay:           req.Delay,
+		Mode:            req.Mode,
+		LicenseID:       licenseID,
+		CreatedAt:       time.Now().UTC(),
+		DeliveryScope:   evidenceScopeFromRequest(r),
+		DeliveryBaseURL: deliveryBaseURL,
 	}
 
 	d.jobs.Create(job)
@@ -156,27 +163,20 @@ func (d *mediaDeps) handleProduce(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (d *mediaDeps) handleStatus(w http.ResponseWriter, r *http.Request) {
-	jobID := chi.URLParam(r, "jobID")
-	job := d.jobs.Get(jobID)
-	if job == nil {
-		writeJSON(w, 404, map[string]string{"error": "job not found"})
-		return
-	}
-
+func mediaJobResponse(job *media.Job) map[string]any {
 	resp := map[string]any{
-		"job_id":     job.ID,
-		"type":       job.Type,
-		"status":     job.Status,
-		"created_at": job.CreatedAt,
+		"schema": "uiai.media_job_status.v2", "job_id": job.ID, "artifact_ref": "media:job:" + job.ID,
+		"type": job.Type, "status": job.Status, "created_at": job.CreatedAt,
+		"delivery_state": "pending_reconcile", "raw_output_posture": "withheld_by_mandatory_epwa_delivery",
 	}
-	if job.ResultURL != "" {
-		resp["result_url"] = job.ResultURL
-	}
-	// Expose result_path — status endpoint is open (read-only, no auth required)
-	// but the path is only useful on the same server. External callers would use result_url.
-	if job.ResultPath != "" {
-		resp["result_path"] = job.ResultPath
+	if job.EPWADelivery != nil {
+		resp["schema"] = "uiai.artifact_result.v2"
+		resp["delivery_state"] = job.EPWADelivery.State
+		resp["epwa_delivery"] = job.EPWADelivery
+		if job.EPWADelivery.State == epwadelivery.StateReady {
+			resp["artifact_url"] = job.EPWADelivery.EPWA.RecordURL
+			resp["portable_url"] = job.EPWADelivery.EPWA.PortableURL
+		}
 	}
 	if job.Error != "" {
 		resp["error"] = job.Error
@@ -195,16 +195,25 @@ func (d *mediaDeps) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if job.Credits > 0 {
 		resp["credits_charged"] = job.Credits
 	}
+	return resp
+}
 
-	writeJSON(w, 200, resp)
+func (d *mediaDeps) handleStatus(w http.ResponseWriter, r *http.Request) {
+	job := d.jobs.Get(chi.URLParam(r, "jobID"))
+	if job == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "job not found"})
+		return
+	}
+	writeJSON(w, http.StatusOK, mediaJobResponse(job))
 }
 
 func (d *mediaDeps) handleList(w http.ResponseWriter, r *http.Request) {
 	jobs := d.jobs.List(50)
-	writeJSON(w, 200, map[string]any{
-		"jobs":  jobs,
-		"count": len(jobs),
-	})
+	projections := make([]map[string]any, 0, len(jobs))
+	for _, job := range jobs {
+		projections = append(projections, mediaJobResponse(job))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"jobs": projections, "count": len(projections)})
 }
 
 // executeJob runs media production locally with a timeout.
@@ -261,31 +270,41 @@ func (d *mediaDeps) executeJob(job *media.Job) {
 		return
 	}
 
-	log.Printf("[media] Job %s complete: %s", job.ID, outputPath)
+	log.Printf("[media] Job %s produced local compatibility output: %s", job.ID, outputPath)
+	delivery, err := d.publishMediaOutput(job, outputPath, completed)
+	if err != nil {
+		log.Printf("[media] Job %s EPWA publication failed: %v", job.ID, err)
+		d.jobs.Update(job.ID, func(j *media.Job) {
+			j.Status = media.StatusFailed
+			j.ResultPath = outputPath
+			j.Error = "EPWA publication failed; raw output withheld"
+			j.CompletedAt = &completed
+		})
+		return
+	}
+	if delivery.State != epwadelivery.StateReady {
+		d.jobs.Update(job.ID, func(j *media.Job) {
+			j.Status = media.StatusDeliveryBlocked
+			j.ResultPath = outputPath
+			j.EPWADelivery = &delivery
+			j.Error = "EPWA delivery is not ready; raw output withheld"
+			j.CompletedAt = &completed
+		})
+		return
+	}
 
-	// Deduct credits
-	creditCost := d.credits.Cost(string(job.Type))
+	creditCost := 0.0
+	if d.credits != nil {
+		creditCost = d.credits.Cost(string(job.Type))
+	}
 	if d.credits != nil && job.LicenseID > 0 && creditCost > 0 {
 		go d.credits.Deduct(job.LicenseID, string(job.Type), fmt.Sprintf("media_job:%s", job.ID))
 	}
-
-	// Upload to R2 if configured (ss-api-7y3)
-	var resultURL string
-	if d.cfg.Media.R2Bucket != "" && d.cfg.Media.R2PublicURL != "" {
-		r2Key := fmt.Sprintf("media/%s/%s", string(job.Type), filepath.Base(outputPath))
-		publicURL, err := uploadToR2(d.cfg, outputPath, r2Key)
-		if err != nil {
-			log.Printf("[media] R2 upload failed for job %s: %v (file still available locally)", job.ID, err)
-		} else {
-			resultURL = publicURL
-			log.Printf("[media] R2 upload ok: %s", publicURL)
-		}
-	}
-
 	d.jobs.Update(job.ID, func(j *media.Job) {
 		j.Status = media.StatusComplete
 		j.ResultPath = outputPath
-		j.ResultURL = resultURL
+		j.ResultURL = ""
+		j.EPWADelivery = &delivery
 		j.Credits = creditCost
 		j.CompletedAt = &completed
 	})
@@ -299,6 +318,29 @@ func (d *mediaDeps) executeJob(job *media.Job) {
 			CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		})
 	}
+}
+
+func (d *mediaDeps) publishMediaOutput(job *media.Job, outputPath string, capturedAt time.Time) (epwadelivery.Delivery, error) {
+	payload, err := os.ReadFile(outputPath) // #nosec G304 -- outputPath is generated inside the configured media output directory.
+	if err != nil {
+		return epwadelivery.Delivery{}, err
+	}
+	extension := strings.TrimPrefix(strings.ToLower(filepath.Ext(outputPath)), ".")
+	if extension == "" {
+		extension = "bin"
+	}
+	base, _ := url.Parse(job.DeliveryBaseURL)
+	return publishGenericEPWAAtBase(d.cfg, evidenceshare.GenericInput{
+		ArtifactRef: "media:job:" + job.ID,
+		Revision:    1,
+		Title:       "Media production " + job.ID,
+		Kind:        "media",
+		MediaType:   http.DetectContentType(payload),
+		Extension:   extension,
+		Payload:     payload,
+		CapturedAt:  capturedAt,
+		Scope:       job.DeliveryScope,
+	}, base)
 }
 
 func (d *mediaDeps) produceMockup(job *media.Job) (string, error) {
@@ -445,74 +487,4 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
-}
-
-func safeR2UploadURL(endpoint, bucket, key string) (string, error) {
-	u, err := url.Parse(strings.TrimRight(endpoint, "/"))
-	if err != nil {
-		return "", err
-	}
-	if u.Scheme != "https" {
-		return "", fmt.Errorf("R2_ENDPOINT must use https")
-	}
-	if err := validateMediaURL(u.String()); err != nil {
-		return "", err
-	}
-	u.Path = strings.TrimRight(u.Path, "/") + "/" + strings.Trim(bucket, "/") + "/" + strings.TrimLeft(key, "/")
-	return u.String(), nil
-}
-
-// uploadToR2 uploads a file to Cloudflare R2 using the S3-compatible API.
-// Returns the public URL on success.
-func uploadToR2(cfg *config.Config, localPath, r2Key string) (string, error) {
-	data, err := os.ReadFile(localPath) // #nosec G304 -- localPath is an internal generated media artifact path.
-	if err != nil {
-		return "", fmt.Errorf("read file: %w", err)
-	}
-
-	// R2 uses S3-compatible API. We construct a simple PUT request.
-	// For production, use AWS SDK or S3-compatible client.
-	// The R2 endpoint is derived from the bucket:
-	// https://<account_id>.r2.cloudflarestorage.com/<bucket>/<key>
-	r2Endpoint := os.Getenv("R2_ENDPOINT")
-	if r2Endpoint == "" {
-		return "", fmt.Errorf("R2_ENDPOINT not configured")
-	}
-
-	uploadURL, err := safeR2UploadURL(r2Endpoint, cfg.Media.R2Bucket, r2Key)
-	if err != nil {
-		return "", err
-	}
-	req, err := http.NewRequest("PUT", uploadURL, bytes.NewReader(data)) // #nosec G704 -- R2 endpoint is validated by safeR2UploadURL.
-	if err != nil {
-		return "", err
-	}
-
-	// Content type from extension
-	ext := filepath.Ext(localPath)
-	contentTypes := map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
-	if ct, ok := contentTypes[ext]; ok {
-		req.Header.Set("Content-Type", ct)
-	}
-
-	// R2 auth via AWS-style headers (simplified — production would use proper S3 signing)
-	r2AccessKey := os.Getenv("R2_ACCESS_KEY")
-	r2SecretKey := os.Getenv("R2_SECRET_KEY")
-	if r2AccessKey != "" {
-		req.SetBasicAuth(r2AccessKey, r2SecretKey)
-	}
-
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(req) // #nosec G704 -- R2 endpoint is validated by safeR2UploadURL.
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		return "", fmt.Errorf("R2 upload HTTP %d", resp.StatusCode)
-	}
-
-	publicURL := fmt.Sprintf("%s/%s", cfg.Media.R2PublicURL, r2Key)
-	return publicURL, nil
 }

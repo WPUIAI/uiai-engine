@@ -1,16 +1,12 @@
 package routes
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
@@ -39,7 +35,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		for _, s := range sessions {
 			out = append(out, sessionInfoPayload(s))
 		}
-		writeJSON(w, 200, map[string]any{"sessions": out, "count": len(out), "max": vision.MaxSessions})
+		writeJSON(w, 200, map[string]any{"sessions": out, "count": len(out), "max": vision.MaxSessions, "max_sessions": vision.MaxSessions})
 	})
 
 	// Open a new session
@@ -68,18 +64,11 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		}
 		sess.SetFocusaScope(resolveFocusaScope(body.FocusaScope, body.WorkpointID, body.ContinuityID, body.ProjectRoot, body.EvidenceRef))
 
-		fpvShare, fpvErr := fpvCreateShare(sess.ID, 60, true, false, 0)
-		if fpvErr != nil {
-			writeSessionError(w, 500, "fpv_share_failed", fpvErr, sess)
-			return
+		if !writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusCreated, map[string]any{"session": sessionInfoPayload(sess)}) {
+			// The caller never received a session id, so the session would
+			// leak until TTL and hold a per-scope slot; close it now.
+			sm.Close(sess.ID)
 		}
-		writeJSON(w, 201, map[string]any{
-			"session":     sessionInfoPayload(sess),
-			"fpv_share":   fpvShare,
-			"screenshot":  snap.Screenshot,
-			"size":        snap.Size,
-			"duration_ms": snap.Duration,
-		})
 	})
 
 	// Session-scoped routes
@@ -141,16 +130,14 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeScreenshotOutput(w, req, cfg, sessionID, snap, body.Output)
+			writeScreenshotOutput(w, req, cfg, sess, snap, body.Output)
 		})
 
 		r.Get("/screenshot/artifacts/{name}", func(w http.ResponseWriter, req *http.Request) {
-			path, ok := screenshotArtifactPath(cfg, chi.URLParam(req, "name"))
-			if !ok {
-				writeJSON(w, 400, map[string]string{"error": "invalid artifact name"})
-				return
-			}
-			http.ServeFile(w, req, path)
+			writeJSON(w, http.StatusGone, map[string]any{
+				"schema": "uiai.epwa_delivery_error.v1", "state": "unavailable",
+				"error": map[string]any{"code": "legacy_raw_artifact_removed", "message": "raw session screenshot artifacts are unavailable; use the EPWA artifact_url and portable_url returned by the producing action", "retryable": false},
+			})
 		})
 
 		// Navigate to new URL
@@ -179,7 +166,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, "auto_wait_failed", err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Scroll (relative)
@@ -211,7 +198,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Click — accepts CSS selector or @ref from snapshot
@@ -245,7 +232,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, "auto_wait_failed", err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Hover — accepts CSS selector or @ref from snapshot
@@ -279,7 +266,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, "auto_wait_failed", err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Type into input — accepts CSS selector or @ref from snapshot
@@ -312,7 +299,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "type", "selector": originalSelector, "resolved_selector": body.Selector})
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Eval JavaScript
@@ -337,13 +324,11 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 
-			resp := map[string]any{"result": jsResult}
-			if snap != nil {
-				resp["screenshot"] = snap.Screenshot
-				resp["size"] = snap.Size
-				resp["duration_ms"] = snap.Duration
+			if snap == nil {
+				writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_visual_unavailable", errors.New("eval visual result unavailable"), "", "", "retry:session-eval")
+				return
 			}
-			writeJSON(w, 200, resp)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, map[string]any{"result": jsResult})
 		})
 
 		// Eval bounded async JavaScript. Prefer browser actions/snapshot for long UI flows.
@@ -372,13 +357,11 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, "eval_failed", fmt.Errorf("%s", jsResult), sess, map[string]any{"action": "eval_async", "timeout_ms": body.TimeoutMs})
 				return
 			}
-			resp := map[string]any{"result": jsResult, "bounded_async": true}
-			if snap != nil {
-				resp["screenshot"] = snap.Screenshot
-				resp["size"] = snap.Size
-				resp["duration_ms"] = snap.Duration
+			if snap == nil {
+				writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_visual_unavailable", errors.New("async eval visual result unavailable"), "", "", "retry:session-eval-async")
+				return
 			}
-			writeJSON(w, 200, resp)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, map[string]any{"result": jsResult, "bounded_async": true})
 		})
 
 		// Resize viewport
@@ -403,7 +386,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Inject CSS
@@ -427,7 +410,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Fill — clear + type (more reliable for replacing values)
@@ -461,7 +444,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, "auto_wait_failed", err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Select — choose dropdown option by value or text
@@ -491,7 +474,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "select", "selector": body.Selector, "resolved_selector": resolved, "values": body.Values})
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Press — keyboard key (Enter, Tab, Escape, ArrowDown, etc)
@@ -514,7 +497,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Back — browser history back
@@ -529,7 +512,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Forward — browser history forward
@@ -544,7 +527,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Text — get text content of element (no screenshot)
@@ -597,7 +580,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "read", "selector": body.Selector})
 				return
 			}
-			writeJSON(w, 200, result)
+			writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromSession(sess), sess.URL, "Browser source snapshot", "source_snapshot", result, http.StatusOK)
 		})
 
 		// Cookies — get/set/clear
@@ -676,7 +659,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			// Store refs in session so click/type/hover can resolve @e3
 			sess.StoreRefs(snap.Refs)
 
-			writeJSON(w, 200, snap)
+			writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromSession(sess), sess.URL, "Browser accessibility snapshot", "dom_snapshot", snap, http.StatusOK)
 		})
 
 		// Also support GET for simple snapshot (interactive mode)
@@ -695,7 +678,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 
 			sess.StoreRefs(snap.Refs)
-			writeJSON(w, 200, snap)
+			writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromSession(sess), sess.URL, "Browser accessibility snapshot", "dom_snapshot", snap, http.StatusOK)
 		})
 
 		// Selector resolve — convert @ref, text=..., text/..., or role=...;name=... into a concrete CSS selector.
@@ -732,14 +715,11 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			sinceSeq, _ := strconv.ParseUint(req.URL.Query().Get("since_seq"), 10, 64)
 			level := req.URL.Query().Get("level")
 			failedOnly := req.URL.Query().Get("failed_only") == "true" || req.URL.Query().Get("failed_only") == "1"
-			writeJSON(w, 200, sess.DiagnosticsWithOptions(vision.DiagnosticsOptions{
-				Limit:      limit,
-				Level:      level,
-				FailedOnly: failedOnly,
-				Category:   req.URL.Query().Get("category"),
-				SinceSeq:   sinceSeq,
-				Format:     req.URL.Query().Get("format"),
-			}))
+			diagnostics := sess.DiagnosticsWithOptions(vision.DiagnosticsOptions{
+				Limit: limit, Level: level, FailedOnly: failedOnly, Category: req.URL.Query().Get("category"),
+				SinceSeq: sinceSeq, Format: req.URL.Query().Get("format"),
+			})
+			writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromSession(sess), sess.URL, "Browser diagnostics bundle", "diagnostics_bundle", diagnostics, http.StatusOK)
 		})
 
 		// Diagnostics clear — reset session diagnostic buffers
@@ -766,7 +746,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
-			writeJSON(w, 200, dom)
+			writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromSession(sess), sess.URL, "Browser DOM snapshot", "dom_snapshot", dom, http.StatusOK)
 		})
 
 		// Wait for selector to appear
@@ -791,7 +771,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 408, "timeout", err, sess)
 				return
 			}
-			writeJSON(w, 200, snap)
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
 		// Captcha solver — POST /api/session/{sessionID}/captcha/solve
@@ -877,8 +857,21 @@ func mergeFocusaScope(current, incoming *vision.FocusaScope) *vision.FocusaScope
 }
 
 func writeSessionError(w http.ResponseWriter, status int, class string, err error, sess *vision.Session, context ...map[string]any) {
-	if class == "url_not_allowed" && status >= 500 {
-		status = http.StatusBadRequest
+	// Caller-input failures are 4xx, not 500: retry/alert logic must not treat
+	// a bad selector/key or a full session scope as an engine outage (#226).
+	switch class {
+	case "selector_not_found":
+		if status >= 500 {
+			status = http.StatusNotFound
+		}
+	case "unknown_key", "url_not_allowed":
+		if status >= 500 {
+			status = http.StatusBadRequest
+		}
+	case "session_capacity":
+		if status >= 500 {
+			status = http.StatusTooManyRequests
+		}
 	}
 	details := map[string]any{}
 	for _, ctx := range context {
@@ -973,6 +966,10 @@ func classifySessionError(err error) string {
 		return "selector_not_found"
 	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline") || strings.Contains(msg, "timed out"):
 		return "timeout"
+	case strings.Contains(msg, "unknown key"):
+		return "unknown_key"
+	case strings.Contains(msg, "max sessions"):
+		return "session_capacity"
 	case strings.Contains(msg, "url scheme not allowed") || strings.Contains(msg, "url not allowed"):
 		return "url_not_allowed"
 	case strings.Contains(msg, "navigation") || strings.Contains(msg, "navigate"):
@@ -990,94 +987,16 @@ func classifySessionError(err error) string {
 	}
 }
 
-func writeScreenshotOutput(w http.ResponseWriter, req *http.Request, cfg *config.Config, sessionID string, snap *vision.SnapResult, output string) {
+func writeScreenshotOutput(w http.ResponseWriter, req *http.Request, cfg *config.Config, sess *vision.Session, snap *vision.SnapResult, output string) {
 	mode := strings.ToLower(strings.TrimSpace(output))
-	if mode == "" || mode == "json" {
-		writeJSON(w, 200, snap)
+	if mode != "" && mode != "json" && mode != "file" && mode != "url" && mode != "epwa" {
+		writeJSON(w, 400, map[string]string{"error": "output must be epwa, json, file, or url"})
 		return
 	}
-	if mode != "file" && mode != "url" {
-		writeJSON(w, 400, map[string]string{"error": "output must be json, file, or url"})
-		return
+	extra := map[string]any{"output": "epwa"}
+	if mode != "" && mode != "epwa" {
+		extra["requested_output"] = mode
+		extra["raw_output_posture"] = "withheld_by_mandatory_epwa_delivery"
 	}
-	name, path, err := saveScreenshotArtifact(cfg, sessionID, snap)
-	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": err.Error()})
-		return
-	}
-	artifactURL := fmt.Sprintf("/api/session/%s/screenshot/artifacts/%s", sessionID, name)
-	resp := map[string]any{
-		"artifact_path": path,
-		"artifact_url":  artifactURL,
-		"format":        snap.Format,
-		"size":          snap.Size,
-		"width":         snap.Width,
-		"height":        snap.Height,
-		"url":           snap.URL,
-		"title":         snap.Title,
-		"duration":      snap.Duration,
-		"output":        mode,
-	}
-	if mode == "file" {
-		writeJSON(w, 200, resp)
-		return
-	}
-	writeJSON(w, 200, resp)
-	_ = req
-}
-
-func saveScreenshotArtifact(cfg *config.Config, sessionID string, snap *vision.SnapResult) (string, string, error) {
-	data, err := base64.StdEncoding.DecodeString(snap.Screenshot)
-	if err != nil {
-		return "", "", fmt.Errorf("decode screenshot: %w", err)
-	}
-	dir := screenshotArtifactDir(cfg)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return "", "", fmt.Errorf("create screenshot artifact dir: %w", err)
-	}
-	ext := strings.ToLower(snap.Format)
-	if ext != "png" {
-		ext = "jpeg"
-	}
-	name := fmt.Sprintf("%s-%d.%s", safeArtifactName(sessionID), time.Now().UnixNano(), ext)
-	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, data, 0o640); err != nil {
-		return "", "", fmt.Errorf("write screenshot artifact: %w", err)
-	}
-	return name, path, nil
-}
-
-func screenshotArtifactDir(cfg *config.Config) string {
-	if cfg != nil && strings.TrimSpace(cfg.Vision.ShareDir) != "" {
-		return filepath.Join(cfg.Vision.ShareDir, "session-screenshots")
-	}
-	return filepath.Join(os.TempDir(), "uiai-session-screenshots")
-}
-
-func screenshotArtifactPath(cfg *config.Config, name string) (string, bool) {
-	clean := filepath.Base(name)
-	if clean == "." || clean == string(filepath.Separator) || clean != name {
-		return "", false
-	}
-	return filepath.Join(screenshotArtifactDir(cfg), clean), true
-}
-
-func safeArtifactName(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "session"
-	}
-	var b strings.Builder
-	for _, r := range value {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
-			b.WriteRune(r)
-			continue
-		}
-		b.WriteByte('-')
-	}
-	out := b.String()
-	if out == "" {
-		return "session"
-	}
-	return out
+	writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, extra)
 }

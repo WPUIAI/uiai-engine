@@ -18,7 +18,7 @@ Maintenance-only compatibility, old route retirement, and paid/mutating plugin/a
 
 - HTTP route mounts: `internal/server/server.go`.
 - Auth modes: `internal/auth/auth.go` and [Endpoint Auth Matrix](ENDPOINT_AUTH_MATRIX.md).
-- Pi tools: `.pi/extensions/uiai-engine.ts` plus `scripts/smoke-pi-extension-registration.sh`.
+- Pi tools: `integrations/pi/uiai-engine.ts` plus `scripts/smoke-pi-extension-registration.sh`.
 - MCP tools/routes: `mcp/browser-session-mcp.mjs` plus `scripts/smoke-mcp-tool-routes.sh`.
 - Cross-surface checker: `scripts/check-tool-parity.sh` verifies MCP advertised tools, Pi mirrors, MCP routes, CLI commands, docs mentions, and executable `/uiai` packet shortcuts.
 - CLI wrapper: `scripts/uiai`.

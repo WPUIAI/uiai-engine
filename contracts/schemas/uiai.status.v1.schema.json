@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "uiai.status.v1",
+  "title": "UIAI Engine Status — GET /api/status",
+  "type": "object",
+  "required": ["schema", "type", "services", "timestamp"],
+  "properties": {
+    "schema": { "const": "uiai.status.v1" },
+    "type": { "const": "status" },
+    "services": {
+      "type": "object",
+      "required": ["uiai-engine"],
+      "properties": {
+        "uiai-engine": {
+          "type": "object",
+          "required": ["id", "name", "running", "port", "health"],
+          "properties": {
+            "id": { "const": "uiai-engine" },
+            "name": { "type": "string" },
+            "running": { "type": "boolean" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "health": { "type": "string", "enum": ["healthy", "degraded", "unavailable"] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

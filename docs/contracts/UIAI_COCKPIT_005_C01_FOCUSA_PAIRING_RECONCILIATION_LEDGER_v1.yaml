@@ -1,0 +1,108 @@
+schema: uiai.cockpit.005.requirement_ledger.v1
+document: UIAI-COCKPIT-005
+version: 1.0
+status: proposed
+call_stack_design: 019fca49-b618-7502-9346-8facffeb7778
+sources:
+  focusa_pairing: /Volumes/Macintosh HD/Users/vsmith/focusa/docs/53-focusa-device-pairing-spec.md
+  focusa_rooms: /Volumes/Macintosh HD/Users/vsmith/focusa/docs/54-focusa-pairing-room-plan.md
+  focusa_self_host: /Volumes/Macintosh HD/Users/vsmith/focusa/docs/55-focusa-self-host-architecture.md
+  focusa_wizard: /Volumes/Macintosh HD/Users/vsmith/focusa/docs/56-focusa-pairing-wizard-spec.md
+  focusa_repair: /Volumes/Macintosh HD/Users/vsmith/focusa/docs/57-focusa-pairing-revoke-and-repair.md
+  cockpit_connection_planes: docs/UIAI_OPERATOR_BROWSER_DESKTOP_SPEC_2026-06-19.md#173-discovery-plane-and-dual-mode-pairing-replicated-first-auto-add-conditional
+invariants:
+  PAIR-INV-001: discovery_never_grants_authority
+  PAIR-INV-002: menubar_and_cockpit_use_distinct_device_tokens
+  PAIR-INV-003: secrets_never_enter_browser_storage_urls_logs_or_artifacts
+  PAIR-INV-004: deep_links_and_bridge_are_not_authentication
+  PAIR-INV-005: bindings_are_daemon_project_continuity_qualified
+  PAIR-INV-006: cross_daemon_projects_never_silently_merge
+  PAIR-INV-007: authority_changes_require_receipts
+  PAIR-INV-008: local_only_blocks_remote_pairing
+  PAIR-INV-009: unknown_contract_fields_fail_closed
+  PAIR-INV-010: credential_write_failure_discards_token
+contracts:
+  - FocusaDaemonCandidateV1
+  - FocusaPlatformHintV1
+  - CockpitPairingRoomV1
+  - AuthenticatedDaemonProfileV1
+  - DaemonProjectCandidateV1
+  - ProjectScopeBindingV1
+  - ScopeReconciliationDecisionV1
+tasks:
+  T005-00:
+    title: Register and freeze authority
+    depends_on: []
+    requirements: [PAIR-INV-001, PAIR-INV-002, PAIR-INV-003, PAIR-INV-004, PAIR-INV-005, PAIR-INV-006, PAIR-INV-007, PAIR-INV-008, PAIR-INV-009, PAIR-INV-010]
+    acceptance: Spec, ledger, register, authority map, and parent TaskGraph exist.
+  T005-01:
+    title: Contracts and adversarial fixtures
+    depends_on: [T005-00]
+    requirements: [PAIR-INV-003, PAIR-INV-005, PAIR-INV-009]
+    acceptance: TypeScript and Rust fixtures reject unknown fields, secrets, invalid refs, and unsupported versions.
+  T005-02:
+    title: Compatibility manifest
+    depends_on: [T005-01]
+    requirements: [PAIR-INV-002, PAIR-INV-004, PAIR-INV-009]
+    acceptance: Read-only manifest reports versions/capabilities and compatibility fails closed.
+  T005-03:
+    title: Discovery adapters
+    depends_on: [T005-01]
+    requirements: [PAIR-INV-001, PAIR-INV-008]
+    acceptance: Loopback, sibling, Bonjour, Tailscale, hints, environment, and manual candidates deduplicate without creating authority.
+  T005-04:
+    title: Secure credential storage
+    depends_on: [T005-01]
+    requirements: [PAIR-INV-002, PAIR-INV-003, PAIR-INV-010]
+    acceptance: Native credential backends pass write/read/delete/lock/deny and secret-leak tests.
+  T005-05:
+    title: Fresh VPS pairing Path A
+    depends_on: [T005-02, T005-03, T005-04]
+    requirements: [PAIR-INV-002, PAIR-INV-003, PAIR-INV-004, PAIR-INV-007, PAIR-INV-009, PAIR-INV-010]
+    acceptance: Room, bridge, approval, completion, secure persistence, verification, cleanup, and receipts pass.
+  T005-06:
+    title: Menubar-assisted pairing Path B
+    depends_on: [T005-02, T005-04, T005-05]
+    requirements: [PAIR-INV-002, PAIR-INV-003, PAIR-INV-007, PAIR-INV-009]
+    acceptance: Same-machine proof mints a new Cockpit token; denial and Path A fallback pass.
+  T005-07:
+    title: Authenticated profile registry
+    depends_on: [T005-05, T005-06]
+    requirements: [PAIR-INV-002, PAIR-INV-003, PAIR-INV-005]
+    acceptance: Profiles resolve token handles, health, scopes, expiry, and active status without secret exposure.
+  T005-08:
+    title: Fleet picker
+    depends_on: [T005-07]
+    requirements: [PAIR-INV-006, PAIR-INV-007]
+    acceptance: Zero, one, and many profile behavior passes with no silent multi-daemon choice.
+  T005-09:
+    title: Project and scope enumeration
+    depends_on: [T005-07]
+    requirements: [PAIR-INV-005, PAIR-INV-009]
+    acceptance: Projects, continuities, and Workpoints retain daemon-qualified provenance.
+  T005-10:
+    title: Reconciliation
+    depends_on: [T005-08, T005-09]
+    requirements: [PAIR-INV-005, PAIR-INV-006, PAIR-INV-007]
+    acceptance: Explicit relations persist evidence without moving credentials or canonical state.
+  T005-11:
+    title: Expiry revoke and repair
+    depends_on: [T005-07]
+    requirements: [PAIR-INV-003, PAIR-INV-007, PAIR-INV-010]
+    acceptance: Expiry, revoke, local forget, identity change, and re-pair fail safely.
+  T005-12:
+    title: UX accessibility and observability
+    depends_on: [T005-08, T005-10, T005-11]
+    requirements: [PAIR-INV-003, PAIR-INV-007]
+    acceptance: Settings/nodes/recovery/a11y and redacted event tests pass.
+  T005-13:
+    title: Cross-platform adapters
+    depends_on: [T005-04, T005-12]
+    requirements: [PAIR-INV-003, PAIR-INV-008, PAIR-INV-010]
+    acceptance: macOS, Linux, Windows, sandbox, local-only, and CI paths pass.
+  T005-14:
+    title: E2E and signed rollout
+    depends_on: [T005-13]
+    requirements: [PAIR-INV-001, PAIR-INV-002, PAIR-INV-003, PAIR-INV-004, PAIR-INV-005, PAIR-INV-006, PAIR-INV-007, PAIR-INV-008, PAIR-INV-009, PAIR-INV-010]
+    acceptance: Local, VPS, Menubar-assisted, multi-daemon, repair, update, rollback, and signed release matrix passes.
+critical_path: [T005-00, T005-01, T005-04, T005-05, T005-06, T005-07, T005-08, T005-10, T005-12, T005-13, T005-14]

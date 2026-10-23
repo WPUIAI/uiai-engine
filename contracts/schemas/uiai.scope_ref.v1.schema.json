@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "uiai.scope_ref.v1",
+  "title": "ScopeRef — WorkstreamKey = ProjectRootKey::ContinuityId",
+  "type": "object",
+  "required": ["authority_state"],
+  "properties": {
+    "project_root_key": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$" },
+    "project_label": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "workstream_key": { "type": "string", "pattern": "^[^:/?#]+::[A-Za-z0-9._:-]{1,160}$" },
+    "continuity_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$" },
+    "thread_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$" },
+    "session_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$" },
+    "cloud_node_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$" },
+    "machine_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$" },
+    "daemon_endpoint": { "type": "string", "format": "uri" },
+    "role": { "type": "string", "enum": ["owner", "assistant", "observer", "reviewer", "ci_runner", "support"] },
+    "authority_state": { "type": "string", "enum": ["verified", "missing", "stale", "conflict", "read_only"] }
+  },
+  "additionalProperties": false
+}

@@ -15,7 +15,7 @@ pub async fn focusa_discover_via_bonjour(
     timeout_secs: Option<u64>,
 ) -> Result<Option<BonjourDiscovery>, String> {
     use mdns_sd::ServiceDaemon;
-    let timeout_secs = timeout_secs.unwrap_or(2);
+    let timeout_secs = timeout_secs.unwrap_or(2).clamp(1, 5);
     let daemon = ServiceDaemon::new().map_err(|e| format!("mdns daemon: {e}"))?;
     let receiver = daemon
         .browse("_focusa._tcp.local")
@@ -29,9 +29,12 @@ pub async fn focusa_discover_via_bonjour(
         .await
         {
             if let Ok(mdns_sd::ServiceEvent::ServiceResolved(info)) = event {
-                let host = info.get_fullname().to_string();
+                let host = info.get_hostname().trim_end_matches('.').to_ascii_lowercase();
                 let port = info.get_port();
-                let url = format!("http://{}:{}", host.trim_end_matches('.'), port);
+                if !host.ends_with(".local") || port == 0 {
+                    continue;
+                }
+                let url = format!("http://{host}:{port}");
                 let _ = daemon.shutdown();
                 return Ok(Some(BonjourDiscovery { url, host, port }));
             }

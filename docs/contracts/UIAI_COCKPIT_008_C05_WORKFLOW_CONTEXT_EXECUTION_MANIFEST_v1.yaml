@@ -1,0 +1,262 @@
+schema: uiai.cockpit_workflow_context_execution_manifest.v1
+version: 1
+parent: UIAI-COCKPIT-008
+status: proposed_documentation_only
+implementation_implied: false
+
+constitutional_law:
+  mission_bound_recurrence_owner: focusa
+  execution_recipe_and_run_telemetry_owner: uiai_engine
+  duplicate_schedule_authority: forbidden
+  context_validity_owner: focusa
+  actual_context_used_recorder: uiai_engine
+
+focusa_workflow_context_policy:
+  schema_id: focusa.workflow_context_policy.v1
+  owner: focusa
+  required:
+    - policy_id
+    - policy_revision
+    - exact_scope
+    - mission_ref
+    - schedule_or_trigger_ref
+    - completion_contract_ref
+    - authority_ref
+    - evidence_requirements
+    - settlement_policy_ref
+  context_classes:
+    frozen:
+      examples:
+        - mission_instruction
+        - output_schema
+        - project_identity
+        - authority_ceiling
+        - approved_recipe_version
+    refresh_each_run:
+      examples:
+        - current_focusa_state
+        - inbox_or_source_data
+        - browser_page_state
+        - credential_grant_status
+        - provider_and_connector_health
+        - temporal_and_presence_state
+    carry_forward:
+      examples:
+        - last_successful_cursor
+        - deduplication_set
+        - unresolved_items
+        - approved_preferences
+        - previous_verified_result_refs
+    prohibited_reuse:
+      examples:
+        - previous_dom_snapshot_as_current
+        - stale_authentication_assumption
+        - previous_unverified_conclusion
+        - expired_credential_grant
+        - previous_runtime_lease
+        - hidden_notebook_kernel_state_in_reproducible_mode
+  freshness:
+    - max_age_or_validity_policy
+    - as_of_requirement
+    - source_revision_requirement
+    - temporal_preflight_requirement
+    - presence_and_placement_requirement
+
+uiai_execution_context_manifest:
+  schema_id: uiai.execution_context_manifest.v1
+  owner: uiai_engine
+  required:
+    - manifest_id
+    - manifest_revision
+    - run_id
+    - workflow_context_policy_ref
+    - work_surface_binding_ref
+    - started_at
+    - actual_inputs
+    - actual_outputs
+    - result_status
+  environment_refs:
+    - node
+    - runner
+    - browser_profile
+    - browser_contexts
+    - browser_targets
+    - notebook_environment
+    - document_runtime
+    - test_runner
+    - media_runner
+  dependency_refs:
+    - data_and_document_versions
+    - model_and_provider_versions
+    - tool_and_adapter_versions
+    - credential_grant_refs
+    - secret_binding_refs
+    - resource_budget
+  output_refs:
+    - artifacts
+    - diagnostics
+    - action_receipts
+    - evidence_candidates
+    - operator_intervention_deltas
+    - cost_and_resource_usage
+
+run_preflight:
+  checks:
+    - exact_focusa_scope_and_policy_revision
+    - schedule_or_trigger_validity
+    - workpoint_and_completion_contract
+    - required_context_refresh
+    - prohibited_reuse_absent
+    - focusa_capability_permission_and_approval
+    - credential_grants_current
+    - execution_placement_and_resource_admission
+    - browser_or_notebook_environment_compatibility
+    - idempotency_and_equivalent_run_deduplication
+    - evidence_and_receipt_destination
+  states:
+    - ready
+    - context_stale
+    - context_missing
+    - permission_required
+    - approval_required
+    - credential_blocked
+    - placement_blocked
+    - equivalent_run_active
+    - external_contract_missing
+    - unsupported_runner
+    - offline
+
+recurrence:
+  one_focusa_authority_record: true
+  cockpit_projection:
+    shows:
+      - purpose
+      - focusa_policy_ref
+      - next_run
+      - last_verified_outcome
+      - context_freshness
+      - current_uiai_run
+      - blocked_reason
+    cannot:
+      - silently_change_schedule
+      - silently_change_scope
+      - infer_completion_from_job_exit
+  local_utility_exception:
+    allowed_when:
+      - explicitly_unscoped
+      - no_focusa_project
+      - no_mission_or_workpoint
+      - no_focusa_evidence_or_settlement
+      - no_consequential_external_effect_without_local_policy
+    promotion_to_focusa_required_when:
+      - project_bound
+      - mission_bound
+      - workpoint_bound
+      - focusa_evidence_bound
+      - recurring_outcome_bound
+
+retry_and_reconciliation:
+  focusa_owns:
+    - whether_mission_run_should_continue
+    - deadline_and_temporal_policy
+    - completion_and_settlement
+    - supersession_and_cancellation
+  uiai_owns:
+    - technical_retry_execution
+    - actuator_and_provider_diagnostics
+    - idempotency_or_reconciliation_implementation
+    - execution_checkpoint
+  laws:
+    - ambiguous_side_effect_reconciles_before_retry
+    - retry_does_not_expand_authority_or_context
+    - new_run_uses_fresh_manifest
+    - resume_preserves_run_generation_and_checkpoint
+    - completed_job_is_not_focusa_completion
+
+workflow_capsule:
+  role: existing_cockpit_automation_recipe_extension_not_new_workflow_system
+  required_fields:
+    - outcome
+    - accepted_inputs
+    - capabilities
+    - side_effects
+    - approvals
+    - output_contract
+    - evidence_policy
+    - supported_runners
+    - focusa_policy_binding_when_mission_bound
+  user_presentation:
+    outcome_oriented_examples:
+      - Verify_application_after_each_deployment
+      - Monitor_vendor_page_and_explain_material_changes
+      - Run_reproducible_notebook_and_compare_results
+      - Evaluate_prediction_outcomes_and_update_calibration
+
+cross_gui_state:
+  mission_canvas_shows:
+    - mission_purpose
+    - recurrence_or_trigger
+    - next_run
+    - current_workpoint
+    - last_verified_outcome
+    - stale_or_blocked_context
+    - pending_decision
+  cockpit_automations_shows:
+    - action_graph
+    - browser_notebook_document_and_test_steps
+    - technical_inputs
+    - runner_and_node
+    - resource_use
+    - logs_and_diagnostics
+    - retry_and_reconciliation
+    - execution_manifest
+
+failure_states:
+  - focusa_policy_missing
+  - focusa_policy_stale
+  - context_refresh_failed
+  - prohibited_stale_context_detected
+  - schedule_or_trigger_invalid
+  - deadline_or_temporal_preflight_failed
+  - placement_or_resource_admission_failed
+  - credential_grant_expired
+  - equivalent_run_already_active
+  - runner_or_provider_unavailable
+  - manifest_incomplete
+  - result_ambiguous
+  - evidence_or_receipt_link_failed
+  - focusa_completion_not_met
+
+requirements:
+  - id: WFCTX-001
+    statement: Mission-bound recurrence has one Focusa authority record.
+  - id: WFCTX-002
+    statement: UIAI records actual run context in an immutable versioned manifest.
+  - id: WFCTX-003
+    statement: Frozen, refreshed, carried, and prohibited context are explicit.
+  - id: WFCTX-004
+    statement: Stale DOM, authentication assumptions, hidden kernels, and unverified conclusions cannot be reused as current truth.
+  - id: WFCTX-005
+    statement: Run preflight validates authority, freshness, placement, credentials, and deduplication.
+  - id: WFCTX-006
+    statement: Technical retry never expands mission authority or context access.
+  - id: WFCTX-007
+    statement: Cockpit extends existing Automations rather than creating a second workflow system.
+  - id: WFCTX-008
+    statement: Job exit does not imply Focusa completion or settlement.
+  - id: WFCTX-009
+    statement: Cockpit-local utility schedules remain visibly unscoped and promote to Focusa when mission-bound.
+  - id: WFCTX-010
+    statement: Mission Canvas and Cockpit show complementary, not duplicate, workflow detail.
+
+closure:
+  status: implementation_open
+  requires:
+    - focusa_workflow_context_policy
+    - uiai_execution_context_manifest
+    - preflight
+    - one_schedule_authority
+    - context_freshness_and_prohibited_reuse_tests
+    - retry_reconciliation
+    - evidence_and_receipt_linkage
+    - cross_gui_functional_and_visual_proof

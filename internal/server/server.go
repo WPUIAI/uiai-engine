@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -18,6 +19,10 @@ import (
 	captchaPkg "github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
+	"github.com/WPUIAI/uiai-engine/internal/desktop"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceregistry"
 	"github.com/WPUIAI/uiai-engine/internal/intelligence"
 	"github.com/WPUIAI/uiai-engine/internal/license"
 	"github.com/WPUIAI/uiai-engine/internal/media"
@@ -35,18 +40,22 @@ var startTime = time.Now()
 
 // Engine is the main server instance.
 type Engine struct {
-	cfg       *config.Config
-	router    chi.Router
-	server    *http.Server
-	auth      *auth.Authenticator
-	ai        *ai.Provider
-	credits   *credits.Service
-	limiter   *ratelimit.Limiter
-	usage     *storage.UsageStore
-	vision    vision.PoolSource
-	sessions  *vision.SessionManager
-	mediaJobs *media.JobStore
-	captcha   *captchaPkg.Solver
+	cfg               *config.Config
+	router            chi.Router
+	server            *http.Server
+	auth              *auth.Authenticator
+	ai                *ai.Provider
+	credits           *credits.Service
+	limiter           *ratelimit.Limiter
+	usage             *storage.UsageStore
+	vision            vision.PoolSource
+	sessions          *vision.SessionManager
+	presenter         desktop.DesktopPresenter
+	mediaJobs         *media.JobStore
+	captcha           *captchaPkg.Solver
+	evidenceArtifacts *evidenceartifact.Store
+	evidenceRegistry  *evidenceregistry.Manager
+	evidenceSync      *evidenceregistry.ContinuousSync
 }
 
 // New creates a new Engine with all routes wired.
@@ -56,7 +65,8 @@ func New(cfg *config.Config) *Engine {
 	// Global middleware
 	r.Use(middleware.RequestID)
 	r.Use(errorRecovery)
-	r.Use(middleware.Compress(5))        // gzip compression — reduces transfer size for JSON + screenshot data
+	r.Use(middleware.Compress(5))
+	r.Use(routes.CostMiddleware)         // C-010-05        // gzip compression — reduces transfer size for JSON + screenshot data
 	r.Use(maxBodySize(10 * 1024 * 1024)) // 10MB max request body
 	r.Use(requestLogger)
 	r.Use(corsMiddleware(cfg))
@@ -112,6 +122,38 @@ func New(cfg *config.Config) *Engine {
 
 	// Media job store + periodic cleanup
 	mediaJobs := media.NewJobStore(cfg.Storage.DataDir)
+	evidenceRegistry, err := evidenceregistry.NewManager(filepath.Join(cfg.Storage.DataDir, "evidence-registry"))
+	if err != nil {
+		log.Printf("[evidence-registry] WARNING: manager unavailable: %v", err)
+	}
+	var evidenceArtifacts *evidenceartifact.Store
+	if evidenceRegistry != nil && cfg.EvidenceRegistry.ArtifactStoreEnabled {
+		root := strings.TrimSpace(cfg.EvidenceRegistry.ArtifactStoreRoot)
+		if root == "" {
+			root = filepath.Join(cfg.Storage.DataDir, "evidence-artifacts")
+		}
+		maxStoreBytes := cfg.EvidenceRegistry.MaxArtifactBytes
+		if maxStoreBytes <= 0 {
+			maxStoreBytes = 10 << 30
+		}
+		maxArtifacts := cfg.EvidenceRegistry.MaxArtifactCount
+		if maxArtifacts <= 0 {
+			maxArtifacts = 100000
+		}
+		maxAssetBytes := cfg.EvidenceRegistry.MaxAssetBytes
+		if maxAssetBytes <= 0 {
+			maxAssetBytes = 512 << 20
+		}
+		evidenceArtifacts, _, err = evidenceartifact.OpenStore(evidenceartifact.StoreConfig{Root: root, MaxStoreBytes: maxStoreBytes, MaxArtifacts: maxArtifacts, MaxAssetBytes: maxAssetBytes, StagingQuarantineAge: time.Hour, GCGrace: 24 * time.Hour})
+		if err != nil {
+			log.Printf("[evidence-registry] WARNING: immutable artifact store unavailable: %v", err)
+			evidenceArtifacts = nil
+		} else if result, rebuildErr := evidenceRegistry.RebuildFromArtifactStore(context.Background(), evidenceArtifacts); rebuildErr != nil {
+			log.Printf("[evidence-registry] WARNING: immutable rebuild incomplete: %v", rebuildErr)
+		} else {
+			log.Printf("[evidence-registry] projected %d immutable artifacts across %d projects", result.Artifacts, result.Projects)
+		}
+	}
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
@@ -167,18 +209,42 @@ func New(cfg *config.Config) *Engine {
 	}
 	captchaSolver := captchaPkg.NewSolver(aiProvider, captchaCfg)
 
+	presenter := desktop.NewPresenter(func(sessionID string) bool {
+		if sessionMgr == nil {
+			return false
+		}
+		_, ok := sessionMgr.Get(sessionID)
+		return ok
+	}, desktop.NewPlatformLauncher())
+
+	var evidenceSync *evidenceregistry.ContinuousSync
+	if evidenceRegistry != nil && cfg.EvidenceRegistry.ProviderSyncEnabled {
+		evidenceSync, err = evidenceregistry.StartContinuousSync(evidenceRegistry, evidenceregistry.FocusaSyncConfig{
+			BaseURL: cfg.EvidenceRegistry.FocusaURL, TokenFile: cfg.EvidenceRegistry.FocusaTokenFile, BRPath: cfg.EvidenceRegistry.BRPath,
+			ProjectIDs: cfg.EvidenceRegistry.ProjectIDs, AllowedRootPrefixes: cfg.EvidenceRegistry.AllowedRootPrefixes,
+			MaxProjects: cfg.EvidenceRegistry.MaxProjects, MaxItems: cfg.EvidenceRegistry.MaxItems,
+		}, cfg.EvidenceRegistry.ReconcileInterval)
+		if err != nil {
+			log.Printf("[evidence-registry] WARNING: continuous sync unavailable: %v", err)
+		}
+	}
+
 	e := &Engine{
-		cfg:       cfg,
-		router:    r,
-		auth:      authenticator,
-		ai:        aiProvider,
-		credits:   creditSvc,
-		limiter:   limiter,
-		usage:     usage,
-		vision:    visionPool,
-		sessions:  sessionMgr,
-		mediaJobs: mediaJobs,
-		captcha:   captchaSolver,
+		cfg:               cfg,
+		router:            r,
+		auth:              authenticator,
+		ai:                aiProvider,
+		credits:           creditSvc,
+		limiter:           limiter,
+		usage:             usage,
+		vision:            visionPool,
+		sessions:          sessionMgr,
+		presenter:         presenter,
+		mediaJobs:         mediaJobs,
+		captcha:           captchaSolver,
+		evidenceArtifacts: evidenceArtifacts,
+		evidenceRegistry:  evidenceRegistry,
+		evidenceSync:      evidenceSync,
 	}
 
 	e.mountRoutes()
@@ -196,10 +262,10 @@ func (e *Engine) mountRoutes() {
 	visionEnabled := !e.cfg.Server.DisableVision
 	r.Route("/api/health", func(r chi.Router) {
 		routes.MountHealth(r, e.cfg, e.ai)
-		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions)
+		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions, e.cfg)
 	})
 	r.Route("/api/metrics", func(r chi.Router) {
-		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions)
+		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions, e.cfg)
 	})
 
 	// Also respond to /health for PHP API compat + health monitor
@@ -215,6 +281,10 @@ func (e *Engine) mountRoutes() {
 
 	// API status
 	r.Get("/api/status", e.handleStatus)
+
+	// Machine-readable contracts — MR-P0-03/MR-P0-04: OpenAPI 3.1 + per-schema serve
+	r.Get("/api/openapi.json", routes.HandleOpenAPI)
+	r.Get("/api/schema/{id}", routes.HandleSchema)
 
 	// -- All /api/* routes below get auth middleware in Phase A2 --
 
@@ -269,6 +339,9 @@ func (e *Engine) mountRoutes() {
 	})
 	r.Route("/api/intelligence", func(r chi.Router) {
 		intel := intelligence.NewLayer(e.cfg, e.ai)
+		intel.SetArtifactPublisher(func(req *http.Request, artifactRef, title, kind, mediaType, extension string, payload []byte) (epwadelivery.Delivery, error) {
+			return routes.PublishGenericArtifactEPWA(req, e.cfg, artifactRef, title, kind, mediaType, extension, payload)
+		})
 		intel.Mount(r)
 	})
 	r.Route("/api/training", func(r chi.Router) {
@@ -284,17 +357,43 @@ func (e *Engine) mountRoutes() {
 		routes.MountMediaReal(r, e.cfg, e.credits, e.limiter, e.usage, e.mediaJobs)
 	})
 
+	// Friendly EPWA share URLs at the host root (/e/{short}/)
+	routes.MountShortShare(r, e.cfg)
+
 	// Screenshot & Share (Rod vision pool — Phase A8)
 	r.Route("/api/screenshot", func(r chi.Router) {
-		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage)
+		r.Use(routes.WithDeadline(45 * time.Second)) // C-010-04
+		routes.MountScreenshotReal(r, e.cfg, e.vision, e.usage, e.evidenceArtifacts)
 		routes.MountScreenshotCompare(r, e.cfg, e.vision, e.ai, e.credits, e.limiter, e.usage)
 	})
+	if e.evidenceRegistry != nil && e.evidenceArtifacts != nil {
+		r.Route("/api/evidence/artifacts", func(r chi.Router) {
+			routes.MountEvidenceArtifacts(r, e.cfg, e.evidenceArtifacts, e.evidenceRegistry)
+		})
+	}
+	if e.evidenceRegistry != nil {
+		r.Route("/api/evidence/registry", func(r chi.Router) {
+			r.Route("/public", func(r chi.Router) {
+				routes.MountPublicEvidenceRegistry(r, e.evidenceRegistry, e.evidenceArtifacts, e.cfg.EvidenceRegistry.PublicProjectRefs)
+			})
+			if e.cfg.EvidenceRegistry.ProviderSyncEnabled {
+				routes.MountEvidenceRegistry(r, e.evidenceRegistry, evidenceregistry.FocusaSyncConfig{
+					BaseURL: e.cfg.EvidenceRegistry.FocusaURL, TokenFile: e.cfg.EvidenceRegistry.FocusaTokenFile, BRPath: e.cfg.EvidenceRegistry.BRPath,
+					ProjectIDs: e.cfg.EvidenceRegistry.ProjectIDs, AllowedRootPrefixes: e.cfg.EvidenceRegistry.AllowedRootPrefixes,
+					MaxProjects: e.cfg.EvidenceRegistry.MaxProjects,
+					MaxItems:    e.cfg.EvidenceRegistry.MaxItems,
+				})
+				return
+			}
+			routes.MountEvidenceRegistry(r, e.evidenceRegistry)
+		})
+	}
 	r.Route("/api/share", func(r chi.Router) {
 		r.Use(license.RequireFeatureMiddleware(license.FeatureShareAccess))
 		routes.MountShareReal(r, e.cfg, e.vision)
 	})
 	r.Route("/api/fpv", func(r chi.Router) {
-		routes.MountFPVRoutes(r, e.sessions)
+		routes.MountFPVRoutes(r, e.cfg, e.sessions)
 	})
 	r.Route("/m", func(r chi.Router) {
 		routes.MountFPVPublicRoutes(r, e.sessions)
@@ -307,8 +406,24 @@ func (e *Engine) mountRoutes() {
 
 	// Browser Sessions — persistent pages for LLM tool use
 	// Open → interact → screenshot → close (page stays alive between calls)
+	// C-010-01/C-010-03 — intent verbs + budget governors
+	r.Route("/api/intent", func(r chi.Router) {
+		r.Use(routes.CostMiddleware)
+		routes.MountIntentRoutes(r, e.sessions)
+	})
+	r.Route("/api/budget", func(r chi.Router) {
+		routes.MountBudgetRoutes(r)
+	})
+	routes.MountFocusaEvents(r) // C-010-02
+
 	r.Route("/api/session", func(r chi.Router) {
+		r.Use(routes.CostMiddleware)                 // C-010-05 innermost-instrumented
+		r.Use(routes.WithDeadline(45 * time.Second)) // C-010-04
 		routes.MountSessionRoutes(r, e.cfg, e.sessions, e.captcha)
+		routes.MountSessionPresentationRoute(r, e.presenter)
+	})
+	r.Route("/api/presentation", func(r chi.Router) {
+		routes.MountPresentationRoutes(r, e.presenter)
 	})
 
 	// Captcha solver — stateless image solve + status
@@ -328,7 +443,7 @@ func (e *Engine) mountRoutes() {
 
 	// Agent packet composer — bounded Focusa-compatible packet from existing UIAI responses
 	r.Route("/api/agent", func(r chi.Router) {
-		routes.MountAgentPacketRoutes(r)
+		routes.MountAgentPacketRoutes(r, e.cfg)
 	})
 
 	// Engine/browser error history — bounded and redacted for agent/operator troubleshooting
@@ -410,10 +525,11 @@ func (e *Engine) handleRoot(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleStatus returns service status — same shape as Bun.
+// handleStatus returns service status — same shape as Bun, now with machine schema id.
 func (e *Engine) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
-		"type": "status",
+		"schema": "uiai.status.v1",
+		"type":   "status",
 		"services": map[string]any{
 			"uiai-engine": map[string]any{
 				"id":      "uiai-engine",
@@ -430,8 +546,14 @@ func (e *Engine) handleStatus(w http.ResponseWriter, r *http.Request) {
 // Run starts the server and blocks until shutdown signal.
 func (e *Engine) Run() error {
 	e.server = &http.Server{
-		Addr:         e.cfg.Addr(),
-		Handler:      e.router,
+		Addr: e.cfg.Addr(),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/focusa-events" { // C-010-02: raw writer, no compress/cost wrappers (SSE needs Flusher)
+				routes.FocusaEventsRaw(w, r)
+				return
+			}
+			e.router.ServeHTTP(w, r)
+		}),
 		ReadTimeout:  e.cfg.Server.ReadTimeout,
 		WriteTimeout: e.cfg.Server.WriteTimeout,
 	}
@@ -464,6 +586,14 @@ func (e *Engine) Run() error {
 		if e.vision != nil {
 			log.Printf("Closing vision pool...")
 			e.vision.Close()
+		}
+		if e.evidenceSync != nil {
+			e.evidenceSync.Close()
+		}
+		if e.evidenceRegistry != nil {
+			if err := e.evidenceRegistry.Close(); err != nil {
+				log.Printf("[evidence-registry] close failed: %v", err)
+			}
 		}
 		return e.server.Shutdown(ctx)
 	}

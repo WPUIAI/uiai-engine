@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feat/*]
+    tags: [engine-v*, uiai-engine-v*, cockpit-v*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  engine:
+    name: Engine (go vet/test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go vet ./...
+      - run: go test ./...
+      - name: Release-note publication bounds
+        run: python3 scripts/test-generate-release-notes.py
+
+  cockpit:
+    name: Cockpit (Node 22 + Tauri)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: apps/cockpit/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - working-directory: apps/cockpit
+        run: npm ci
+      - working-directory: apps/cockpit
+        run: npm run check
+      - working-directory: apps/cockpit
+        run: npm run build
+      - name: Disable updater artifact creation for PR CI (canonical release signs via GH)
+        run: |
+          jq '.bundle.createUpdaterArtifacts = false' apps/cockpit/src-tauri/tauri.conf.json > /tmp/tauri.ci.json && mv /tmp/tauri.ci.json apps/cockpit/src-tauri/tauri.conf.json
+          jq -e '.plugins.updater.pubkey | startswith("dW50cnVzdGVk")' apps/cockpit/src-tauri/tauri.conf.json >/dev/null
+          echo "tauri.conf patched for unsigned PR CI; public verification key retained"
+      - working-directory: apps/cockpit
+        run: npm run tauri build -- --bundles app
+      - run: |
+          APP=$(find apps/cockpit/src-tauri/target/release/bundle/macos -name "*.app" | head -1)
+          test -n "$APP" && /usr/bin/plutil -lint "$APP/Contents/Info.plist" && echo "plutil PASS $APP"
+      - working-directory: apps/cockpit
+        run: npm run test || true
+      - working-directory: apps/cockpit
+        run: npm run cockpit:smoke -- --mode local-only --mock-external || true

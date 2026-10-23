@@ -8,17 +8,21 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 )
 
 // JobStatus represents the state of a media production job.
 type JobStatus string
 
 const (
-	StatusPending    JobStatus = "pending"
-	StatusProcessing JobStatus = "processing"
-	StatusComplete   JobStatus = "complete"
-	StatusFailed     JobStatus = "failed"
-	StatusTimeout    JobStatus = "timeout"
+	StatusPending         JobStatus = "pending"
+	StatusProcessing      JobStatus = "processing"
+	StatusComplete        JobStatus = "complete"
+	StatusDeliveryBlocked JobStatus = "delivery_blocked"
+	StatusFailed          JobStatus = "failed"
+	StatusTimeout         JobStatus = "timeout"
 )
 
 // JobType represents the kind of media being produced.
@@ -33,25 +37,28 @@ const (
 
 // Job represents a media production job.
 type Job struct {
-	ID          string            `json:"id"`
-	Type        JobType           `json:"type"`
-	Status      JobStatus         `json:"status"`
-	Device      string            `json:"device,omitempty"` // macbook-pro, iphone-15, browser-window
-	URLs        []string          `json:"urls"`
-	Width       int               `json:"width,omitempty"`
-	Height      int               `json:"height,omitempty"`
-	Frames      int               `json:"frames,omitempty"` // For GIF
-	Delay       int               `json:"delay,omitempty"`  // For GIF (centiseconds)
-	Mode        string            `json:"mode,omitempty"`   // scroll, pages
-	Palette     map[string]string `json:"palette,omitempty"`
-	ResultURL   string            `json:"result_url,omitempty"`
-	ResultPath  string            `json:"result_path,omitempty"` // Local file path
-	Error       string            `json:"error,omitempty"`
-	LicenseID   int               `json:"license_id,omitempty"`
-	Credits     float64           `json:"credits_charged,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	StartedAt   *time.Time        `json:"started_at,omitempty"`
-	CompletedAt *time.Time        `json:"completed_at,omitempty"`
+	ID              string                 `json:"id"`
+	Type            JobType                `json:"type"`
+	Status          JobStatus              `json:"status"`
+	Device          string                 `json:"device,omitempty"` // macbook-pro, iphone-15, browser-window
+	URLs            []string               `json:"urls"`
+	Width           int                    `json:"width,omitempty"`
+	Height          int                    `json:"height,omitempty"`
+	Frames          int                    `json:"frames,omitempty"` // For GIF
+	Delay           int                    `json:"delay,omitempty"`  // For GIF (centiseconds)
+	Mode            string                 `json:"mode,omitempty"`   // scroll, pages
+	Palette         map[string]string      `json:"palette,omitempty"`
+	ResultURL       string                 `json:"result_url,omitempty"`
+	ResultPath      string                 `json:"result_path,omitempty"` // Internal compatibility file; never expose through route responses.
+	DeliveryScope   evidenceshare.Scope    `json:"delivery_scope"`
+	DeliveryBaseURL string                 `json:"delivery_base_url,omitempty"`
+	EPWADelivery    *epwadelivery.Delivery `json:"epwa_delivery,omitempty"`
+	Error           string                 `json:"error,omitempty"`
+	LicenseID       int                    `json:"license_id,omitempty"`
+	Credits         float64                `json:"credits_charged,omitempty"`
+	CreatedAt       time.Time              `json:"created_at"`
+	StartedAt       *time.Time             `json:"started_at,omitempty"`
+	CompletedAt     *time.Time             `json:"completed_at,omitempty"`
 }
 
 // JobStore manages media production jobs.

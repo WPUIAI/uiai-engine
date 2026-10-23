@@ -1,0 +1,4 @@
+# C-010-29 live probes — 2026-08-25T16:58:08Z
+anon   POST /api/media    -> 401 missing authentication header (auth layer)
+internal-tier POST /api/media -> 402 license_required envelope (entitlement gate; local token = internal tier, fail-closed)
+authority: wpuiai.com WP REST validates license keys -> Identity{Tier} (internal/auth validateLicenseKey, cached TTL)

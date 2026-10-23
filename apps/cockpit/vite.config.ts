@@ -7,6 +7,8 @@ import { defineConfig } from "vite";
  */
 export default defineConfig({
   plugins: [sveltekit()],
+  // Keep mutable caches in this worktree, not a shared dependency directory.
+  cacheDir: ".svelte-kit/vite-cache",
   server: { port: 1420, strictPort: true },
   build: { target: "es2022", sourcemap: true },
   clearScreen: false,

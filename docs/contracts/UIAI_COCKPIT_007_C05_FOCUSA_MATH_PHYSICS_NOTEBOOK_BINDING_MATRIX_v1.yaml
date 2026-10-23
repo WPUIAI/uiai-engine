@@ -1,0 +1,473 @@
+schema: uiai.cockpit_focusa_math_physics_notebook_binding_matrix.v1
+version: 1
+parent: UIAI-COCKPIT-007
+status: proposed_documentation_only
+implementation_implied: false
+
+binding_law:
+  focusa_owns:
+    - mission_scope
+    - workpoints_and_trajectory
+    - temporal_authority
+    - prediction_authority
+    - mathematical_and_physical_semantics_when_implemented
+    - evidence_linkage
+    - learning_candidate_promotion
+    - verification_posture
+    - settlement
+  uiai_owns:
+    - notebook_provider_adapters
+    - kernel_and_session_lifecycle
+    - bounded_execution
+    - browser_jupyterlab_actuation
+    - output_streaming_and_capture
+    - resource_accounting
+    - local_execution_receipts
+  jupyter_owns:
+    - documented_server_and_kernel_protocol_behavior
+    - notebook_content_persistence_on_configured_server
+    - provider_execution_counts
+  cockpit_owns:
+    - presentation
+    - interaction_state
+    - local_projection_and_freshness
+  prohibited_collapses:
+    - notebook_output_to_focusa_canonical_truth
+    - simulation_to_observation
+    - probability_display_to_prediction_commitment
+    - symbolic_result_to_formal_proof
+    - notebook_control_proposal_to_actuation
+    - successful_run_to_learning_promotion
+
+external_contract_statuses:
+  available_pinned: runtime operation exists and is pinned for this UIAI build
+  partial_available: a narrower runtime slice exists than the planned notebook binding
+  contract_only: normative or planning contract exists without verified runtime
+  proposed_external: referenced future Focusa family not yet pinned in UIAI
+  unavailable: no compatible external contract found
+
+focusa_bindings:
+  - focusa_spec: 137
+    title: Temporal Authority
+    external_status: available_pinned_required_at_implementation
+    notebook_use:
+      - hydrate_temporal_status
+      - bind_claim_validity_and_horizon
+      - preflight_temporal_commitments
+      - preserve_revision_and_observation_time
+    current_known_operations:
+      - GET /v1/temporal/status
+      - POST /v1/temporal/commit
+      - POST /v1/temporal/revise
+      - POST /v1/temporal/observe
+      - POST /v1/temporal/forecast
+      - POST /v1/temporal/preflight
+    notebook_handoff_candidates:
+      - notebook_measurement_observation
+      - notebook_forecast
+      - notebook_temporal_revision
+      - notebook_experiment_window
+    required_notebook_fields:
+      - event_time
+      - observation_time
+      - ingestion_time
+      - execution_requested_at
+      - execution_started_at
+      - execution_completed_at
+      - effective_time
+      - valid_from
+      - valid_to
+      - forecast_origin_time
+      - forecast_horizon_start
+      - forecast_horizon_end
+      - resolution_time
+      - verification_time
+      - settlement_time
+      - timestamp_precision
+      - clock_source
+      - timestamp_uncertainty_ns
+    ui_posture: implementation_open
+
+  - focusa_spec: 137A
+    title: Temporal Zero-Deferral Applicability and Omission Firewall
+    external_status: contract_only_conformance_addendum
+    notebook_use:
+      - require_temporal_applicability_analysis
+      - detect_missing_time_fields
+      - prohibit_static_or_partial_temporal_conformance_claims
+      - enforce_api_cli_pi_ui_migration_test_and_evidence_parity
+    runtime_operation_expected: false
+    required_cockpit_surface:
+      - notebook_temporal_conformance_inspector
+    ui_posture: implementation_open
+
+  - focusa_spec: 137B
+    title: Proposed Computational Temporal Lineage Addendum
+    external_status: proposed_external
+    notebook_use:
+      - cell_attempt_temporal_lineage
+      - simulation_interval_lineage
+      - measurement_and_experiment_lineage
+      - microsecond_or_better_preservation
+      - causal_parentage_and_supersession
+    required_external_contracts:
+      - notebook_attempt_temporal_binding
+      - dataset_and_measurement_temporal_binding
+      - simulation_forecast_and_resolution_binding
+    ui_posture: blocked_external_contract
+
+  - focusa_spec: 138
+    title: Prediction Authority
+    external_status: partial_available
+    notebook_use:
+      - submit_prediction_authority_events
+      - request_or_build_authority_projection
+      - preserve_information_set_and_outcome_lineage
+    current_known_operations:
+      - POST /v1/prediction-authority/events
+      - POST /v1/prediction-authority/projection
+    notebook_handoff_candidates:
+      - prediction_question
+      - information_set_snapshot
+      - prediction_commitment
+      - outcome_claim
+      - outcome_resolution
+      - scoring_result
+    truth_limitations:
+      - current_runtime_is_a_narrow_authority_slice
+      - full_profiles_and_analytics_are_not_implied
+    required_cockpit_surface:
+      - explicit_partial_authority_banner
+      - prediction_commitment_and_outcome_views_when_operation_schemas_are_pinned
+    ui_posture: blocked_external_contract_until_exact_schema_pin
+
+  - focusa_spec: 138A
+    title: Epistemic Profile Completeness and Omission Firewall
+    external_status: contract_only_conformance_addendum
+    profiles:
+      A: core_recording
+      B: proper_scoring_and_calibration
+      C: source_and_indicator_fusion
+      D: scenario_and_causal_analysis
+      E: metacognitive_learning
+      F: transfer_and_self_model
+      G: consolidation_and_long_horizon_governance
+      H: high_consequence_governance
+    notebook_use:
+      - profile_coverage_matrix
+      - prohibit_false_full_conformance
+      - expose_missing_scoring_calibration_and_learning_profiles
+    required_cockpit_surface:
+      - notebook_epistemic_profile_matrix
+    ui_posture: implementation_open
+
+  - focusa_spec: 138B
+    title: Proposed Temporally Grounded Adversarial Forecasting Addendum
+    external_status: proposed_external
+    notebook_use:
+      - primary_forecast_model
+      - secondary_adversarial_model
+      - matched_control
+      - semantic_and_style_perturbation
+      - source_ablation
+      - brier_and_utility_scoring
+      - calibration_and_regime_analysis
+      - temporal_leakage_detection
+      - out_of_sample_evaluation
+    required_external_contracts:
+      - forecast_experiment
+      - adversarial_evaluator
+      - matched_control_definition
+      - scoring_and_calibration_result
+      - temporal_information_set_lock
+    ui_posture: blocked_external_contract
+
+  - focusa_spec: 140
+    title: Agent Runtime Constitution
+    external_status: available_pinned_required_at_implementation
+    notebook_use:
+      - effective_instruction_grounding
+      - notebook_agent_role_and_constraints
+      - tool_and_skill_activation
+      - environment_and_target_variants
+      - delivery_preview_and_verification
+      - activation_revocation_and_rollback
+    current_known_operation_families:
+      - instruction_scan_sources_claims_conflicts_reconcile_simulate_effective_drift
+      - constitution_draft_show_approve_activate_revoke_rollback
+      - prompt_agents_md_skills_and_target_compile
+      - variants_and_evaluations
+      - delivery_preview_commit_verify_status
+      - doctor
+      - studio_projection
+    required_notebook_behavior:
+      - effective_runtime_constitution_digest_on_agent_initiated_attempts
+      - declared_tool_and_skill_set
+      - execution_boundary_and_target
+      - no_hidden_instruction_change
+      - drift_detection
+    required_cockpit_surface:
+      - notebook_runtime_grounding_inspector
+    ui_posture: implementation_open
+
+  - focusa_spec: 141
+    title: Generated Capability and Operation Projection
+    external_status: available_pinned_required_at_implementation
+    notebook_use:
+      - generated_operation_parity
+      - typed_tool_results
+      - cli_pi_mcp_cockpit_consistency
+      - contract_digest_lock
+    requirements:
+      - notebook_operations_registered_once
+      - generated_types_and_tools_are_digest_locked
+      - missing_required_surface_fails_ci
+    ui_posture: implementation_open
+
+  - focusa_spec: 144
+    title: Semantic Integrity Build Verify Routing and Vertical Intelligence
+    external_status: contract_only
+    notebook_use:
+      - future_builder_verifier_separation
+      - obligation_compilation
+      - independent_verification_routing
+      - findings_evidence_coverage_and_settlement
+    current_truth:
+      - documentation_first
+      - runtime_implementation_not_implied
+    required_cockpit_surface:
+      - semantic_contract_only_state
+      - executable_controls_withheld
+    ui_posture: contract_only
+
+  - focusa_spec: 152
+    title: Proposed Core Mathematical Fabric
+    external_status: proposed_external
+    notebook_use:
+      - symbols_domains_and_expressions
+      - equations_and_constraints
+      - assumptions
+      - exact_and_approximate_results
+      - transformations_and_derivations
+      - solver_configuration
+      - convergence_conditioning_and_precision
+      - proof_obligations_and_counterexamples
+      - applicability_and_supersession
+    required_external_contracts:
+      - mathematical_object_registry
+      - derivation_and_transformation_events
+      - solver_result_and_validation
+      - contradiction_and_supersession
+    ui_posture: blocked_external_contract
+
+  - focusa_spec: 152A
+    title: Proposed Probability Statistics Uncertainty and Calibration Fabric
+    external_status: proposed_external
+    notebook_use:
+      - distributions_and_sampling
+      - inference_and_uncertainty
+      - monte_carlo_and_sensitivity
+      - residuals_and_model_diagnostics
+      - proper_scoring_and_calibration
+      - causal_assumptions
+      - forecast_evaluation
+    required_external_contracts:
+      - statistical_analysis_contract
+      - uncertainty_and_error_contract
+      - scoring_and_calibration_contract
+      - causal_analysis_contract
+    ui_posture: blocked_external_contract
+
+  - focusa_spec: 152B
+    title: Proposed Mathematical and Physical System Integration Fabric
+    external_status: proposed_external
+    notebook_use:
+      - operation_registry_binding
+      - ontology_binding
+      - workpoint_and_evidence_binding
+      - persistence_and_replay
+      - secondary_cognition
+      - tool_and_surface_parity
+      - reducer_settlement
+    required_external_contracts:
+      - notebook_math_physics_operation_projection
+      - focus_slice_and_mission_canvas_projection
+      - evidence_receipt_and_settlement_binding
+    ui_posture: blocked_external_contract
+
+  - focusa_spec: 152C
+    title: Proposed Mathematical Learning and Discovery Fabric
+    external_status: proposed_external
+    notebook_use:
+      - candidate_relationship
+      - reproduction
+      - alternate_derivation
+      - adversarial_challenge
+      - counterexample_search
+      - applicability_analysis
+      - scoped_learning_candidate
+    promotion_path:
+      - notebook_observation
+      - candidate_relationship
+      - reproduction
+      - alternate_derivation_or_implementation
+      - adversarial_challenge
+      - counterexample_search
+      - applicability_analysis
+      - independent_verification
+      - scoped_learning_candidate
+      - focusa_reducer_governed_promotion
+    prohibited_promotion_inputs:
+      - one_successful_run
+      - high_correlation_only
+      - attractive_plot_only
+      - model_generated_explanation_only
+    ui_posture: blocked_external_contract
+
+  - focusa_spec: 153
+    title: Proposed Core Physics Fabric
+    external_status: proposed_external
+    notebook_use:
+      - physical_quantities_units_and_dimensions
+      - reference_frames
+      - analytical_models
+      - numerical_simulations
+      - measurement_comparison
+      - domain_specific_physics_models
+    required_truth_classes:
+      - analytical_prediction
+      - numerical_simulation
+      - sensor_observation
+      - experimental_measurement
+      - estimated_state
+      - control_proposal
+      - verified_physical_finding
+    required_external_contracts:
+      - physical_quantity_and_unit_registry
+      - simulation_and_model_contract
+      - measurement_and_observation_contract
+      - validity_region_and_uncertainty_contract
+    ui_posture: blocked_external_contract
+
+  - focusa_spec: 153A
+    title: Proposed Physical Verification Simulation Control Safety and Embodiment Fabric
+    external_status: proposed_external
+    notebook_use:
+      - simulation_to_shadow_promotion
+      - simulation_to_measurement_residuals
+      - sensor_calibration_and_degradation
+      - skill_preconditions_and_stop_behavior
+      - safety_envelope_analysis
+      - authority_reduction
+      - hardware_in_loop_and_shadow_experiments
+      - outcome_verification
+    physical_action_path:
+      - notebook_result
+      - typed_physical_claim_or_control_proposal
+      - verification_and_uncertainty_review
+      - focusa_skill_or_action_proposal
+      - authority_and_safety_guards
+      - independent_controller_or_approved_actuator
+      - physical_execution_receipt
+      - sensor_observation
+      - outcome_verification_and_settlement
+    prohibited_paths:
+      - notebook_kernel_to_actuator_direct
+      - simulation_to_canonical_observation
+      - notebook_success_to_safety_clearance
+      - model_prediction_to_emergency_stop_override
+    ui_posture: blocked_external_contract
+
+notebook_handoff_types:
+  - id: notebook.attach_result_to_workpoint
+    required_focusa_contract: workpoint_evidence_linkage
+    current_status: external_contract_pin_required
+  - id: notebook.submit_temporal_observation
+    required_focusa_contract: spec_137_observe
+    current_status: external_contract_pin_required
+  - id: notebook.submit_forecast
+    required_focusa_contract: spec_137_forecast_and_spec_138_authority_as_applicable
+    current_status: external_contract_pin_required
+  - id: notebook.submit_prediction_event
+    required_focusa_contract: spec_138_prediction_authority_events
+    current_status: external_contract_pin_required
+  - id: notebook.submit_scoring_result
+    required_focusa_contract: spec_138_or_future_152A_scoring
+    current_status: blocked_external_contract
+  - id: notebook.submit_mathematical_claim_candidate
+    required_focusa_contract: future_spec_152
+    current_status: blocked_external_contract
+  - id: notebook.submit_learning_candidate
+    required_focusa_contract: future_spec_152C
+    current_status: blocked_external_contract
+  - id: notebook.submit_simulation_result
+    required_focusa_contract: future_spec_153
+    current_status: blocked_external_contract
+  - id: notebook.submit_physical_finding
+    required_focusa_contract: future_spec_153_and_153A
+    current_status: blocked_external_contract
+  - id: notebook.submit_control_proposal
+    required_focusa_contract: future_spec_153A_and_independent_safety_authority
+    current_status: blocked_external_contract
+
+handoff_preview_requirements:
+  - exact_focusa_operation_id
+  - focusa_contract_digest
+  - project_and_continuity_scope
+  - workpoint_or_mission_ref
+  - notebook_and_attempt_refs
+  - semantic_truth_class
+  - data_and_environment_lineage
+  - temporal_fields_and_precision
+  - evidence_artifacts_and_hashes
+  - uncertainty_and_limitations
+  - authority_and_side_effects
+  - data_leaving_machine
+  - expected_receipt
+  - recovery_on_rejection_or_conflict
+
+parity_requirements:
+  required_surfaces_when_applicable:
+    - engine_api
+    - cockpit
+    - cli
+    - pi_tool
+    - mcp_or_other_registered_tool_surface
+    - generated_contract_docs
+    - fixtures
+    - migrations
+    - tests
+    - evidence
+    - receipts
+    - recovery
+  closure_rule: Missing required parity for an activated notebook handoff blocks integration and release claims.
+
+focusa_truth_display:
+  available_pinned:
+    ui_label: Available
+    controls: enabled_when_scope_and_authority_allow
+  partial_available:
+    ui_label: Partial runtime support
+    controls: only_exact_pinned_operations
+  contract_only:
+    ui_label: Contract only
+    controls: withheld
+  proposed_external:
+    ui_label: Planned external Focusa fabric
+    controls: withheld
+  unavailable:
+    ui_label: Unavailable
+    controls: withheld
+
+closure:
+  current_status: proposed_documentation_only
+  currently_implemented_notebook_bindings: []
+  required_before_any_focusa_notebook_claim:
+    - exact_focusa_commit_and_release_pin
+    - operation_and_schema_digest_lock
+    - generated_type_and_tool_parity
+    - networked_integration_test
+    - functional_cockpit_ui
+    - inspected_visual_proof
+    - evidence_and_receipt_validation
+  rule: UIAI may execute and evidence notebook work independently, but it may not claim mathematical, epistemic, physical, learning, control, or settlement authority beyond the exact pinned Focusa contracts that are implemented and proven.

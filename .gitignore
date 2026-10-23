@@ -5,7 +5,14 @@ uiai-engine-v*
 uiai-engine.bak
 uiai-engine.bak.*
 
+# Focusa local project/session state
+.focusa/
+.focusa-project.json
+.focusa-bootstrap.lock
+@AGENTS.md
+
 # Runtime logs/state
+.runtime/
 engine.log
 data/usage.json
 

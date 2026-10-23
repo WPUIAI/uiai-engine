@@ -1,0 +1,120 @@
+document_number: UIAI-COCKPIT-003-C01
+parent_document_number: UIAI-COCKPIT-003
+master_document_number: UIAI-COCKPIT-000
+schema: uiai.operational_constitution_contract_ledger.v1
+version: '1.0'
+date: '2026-08-01'
+requirements:
+  - id: OPS-001
+    owner: all
+    text: Use stable operation-instance, attempt, idempotency, correlation, and causation identities.
+  - id: OPS-002
+    owner: uiai_engine
+    text: Persist an append-only attempt journal for consequential execution.
+  - id: OPS-003
+    owner: all
+    text: Classify possible external success without a durable receipt as ambiguous.
+  - id: OPS-004
+    owner: focusa
+    text: Acknowledge the exact receipt version incorporated into canonical mission state.
+  - id: OPS-005
+    owner: uiai_engine
+    text: Reconcile ambiguous consequential results before retry.
+  - id: OPS-006
+    owner: all
+    text: Declare one recovery class for every operation.
+  - id: OPS-007
+    owner: uiai_engine
+    text: Implement one Resource Governor across browser, test, document, media, AI, network, storage, and attention resources.
+  - id: OPS-008
+    owner: uiai_engine
+    text: Issue owner-scoped leases with TTL, priority, queue, budget, parking, and reclaim posture.
+  - id: OPS-009
+    owner: uiai_engine
+    text: Implement Browser Session Broker ownership, lease, parking, restore, and safe-eviction semantics.
+  - id: OPS-010
+    owner: uiai_engine
+    text: Separate liveness, readiness, capacity, degradation, recent pressure, historical SLO, dependency, and freshness.
+  - id: OPS-011
+    owner: uiai_engine
+    text: Prevent cumulative historical counters from latching current admission readiness.
+  - id: OPS-012
+    owner: uiai_engine
+    text: Persist effective runtime configuration source, digest, load time, and restart-candidate drift.
+  - id: OPS-013
+    owner: uiai_engine
+    text: Reconcile orphaned attempts, leases, sessions, watchers, credentials, and partial artifacts on restart.
+  - id: OPS-014
+    owner: all
+    text: Use canonical PrincipalRef and DelegationChain contracts.
+  - id: OPS-015
+    owner: all
+    text: Propagate revocation to pending and active bounded authority.
+  - id: OPS-016
+    owner: cockpit
+    text: Provide one Decision and Intervention Inbox.
+  - id: OPS-017
+    owner: cockpit
+    text: Support secret-shielded authentication takeover and resumable handback.
+  - id: OPS-018
+    owner: all
+    text: Negotiate shared schema versions and pin long-running work to compatible contracts.
+  - id: OPS-019
+    owner: uiai_engine
+    text: Use content-addressed, integrity-checked, lineage-preserving evidence storage.
+  - id: OPS-020
+    owner: uiai_engine
+    text: Provide standalone proof verification independent of Cockpit rendering.
+operation_states:
+  - proposed
+  - authorized
+  - admitted
+  - started
+  - external_result_observed
+  - artifacts_committed
+  - receipt_committed
+  - acknowledged_by_focusa
+  - verified
+  - settlement_pending
+  - settled
+  - blocked
+  - cancelled_before_start
+  - ambiguous_external_result
+  - reconciliation_required
+  - compensation_required
+  - dead_lettered
+  - superseded
+  - revoked
+recovery_classes:
+  - read_restartable
+  - retry_safe
+  - reconcile_before_retry
+  - compensatable
+  - human_adjudication
+  - irreversible_ambiguous
+implementation_phases:
+  - phase: 0
+    name: Operation identities and attempt journal
+  - phase: 1
+    name: Resource Governor and Browser Session Broker
+  - phase: 2
+    name: Operational truth model
+  - phase: 3
+    name: Restart reconciliation and config provenance
+  - phase: 4
+    name: Principal delegation and intervention inbox
+  - phase: 5
+    name: Compatibility and evidence storage
+  - phase: 6
+    name: Independent proof verification
+metrics:
+  - ambiguous_external_result_rate
+  - duplicate_side_effect_rate
+  - orphan_recovery_rate
+  - lease_reclaim_rate
+  - queue_starvation_rate
+  - readiness_truth_violation_rate
+  - restart_config_drift_rate
+  - intervention_time_to_decision
+  - receipt_ack_latency
+  - proof_bundle_verification_rate

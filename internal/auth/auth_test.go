@@ -193,6 +193,22 @@ func TestLoopbackToolPathsRemoteAuthPositive(t *testing.T) {
 	}
 }
 
+func TestPublicEvidenceRegistryReadBypassesRemoteAuth(t *testing.T) {
+	authenticator := New(&config.Config{})
+	hit := false
+	handler := authenticator.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "http://example.test/api/evidence/registry/public/projects", nil)
+	req.RemoteAddr = "203.0.113.10:12345"
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent || !hit {
+		t.Fatalf("public evidence read blocked: code=%d hit=%v", res.Code, hit)
+	}
+}
+
 func TestLoopbackRequestDetection(t *testing.T) {
 	req, _ := http.NewRequest("GET", "http://example.test/api/session", nil)
 	req.RemoteAddr = "127.0.0.1:12345"

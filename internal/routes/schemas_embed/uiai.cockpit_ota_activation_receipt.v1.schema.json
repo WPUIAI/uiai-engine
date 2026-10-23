@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "uiai.cockpit_ota_activation_receipt.v1",
+  "title": "Cockpit OTA Activation Receipt",
+  "type": "object",
+  "required": ["schema", "status", "version", "activated_at", "activation"],
+  "properties": {
+    "schema": { "const": "uiai.cockpit_ota_activation_receipt.v1" },
+    "status": { "const": "installed_relaunching" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-dev)?$" },
+    "activated_at": { "type": "string", "format": "date-time" },
+    "activation": { "const": "signed_updater_install_and_relaunch" }
+  },
+  "additionalProperties": false
+}

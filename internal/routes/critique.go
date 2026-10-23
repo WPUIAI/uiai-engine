@@ -160,17 +160,13 @@ func (h *critiqueHandler) critique(w http.ResponseWriter, r *http.Request) {
 		duration.Round(time.Millisecond), parseErr == nil)
 
 	if parseErr != nil {
-		// Fallback: return raw content with metadata so plugin can attempt its own repair
-		writeJSON(w, 200, map[string]any{
-			"content":      resp.Content,
-			"model":        resp.Model,
-			"model_used":   resp.Model,
-			"inputTokens":  resp.InputTokens,
-			"outputTokens": resp.OutputTokens,
-			"costUSD":      resp.CostUSD,
-			"duration_ms":  duration.Milliseconds(),
-			"parse_error":  parseErr.Error(),
-		})
+		// Preserve the unparsed report only when the same response carries ready EPWA delivery.
+		result := map[string]any{
+			"content": resp.Content, "model": resp.Model, "model_used": resp.Model,
+			"inputTokens": resp.InputTokens, "outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD,
+			"duration_ms": duration.Milliseconds(), "parse_error": parseErr.Error(),
+		}
+		writeJSONArtifactEPWA(w, r, h.cfg, evidenceScopeFromRequest(r), req.WebsiteURL, "UI/UX critique report", "critique_report", result, http.StatusOK)
 		return
 	}
 
@@ -180,23 +176,13 @@ func (h *critiqueHandler) critique(w http.ResponseWriter, r *http.Request) {
 	priorityFixes, _ := parsed["priority_fixes"].([]any)
 	summary, _ := parsed["summary"].(string)
 
-	// Return the STRUCTURED response the plugin expects
-	writeJSON(w, 200, map[string]any{
-		// Plugin-expected fields (fixes uiai-790)
-		"critique":       critique,
-		"scores":         scores,
-		"priority_fixes": priorityFixes,
-		"summary":        summary,
-		"success":        true,
-
-		// Metadata
-		"model":        resp.Model,
-		"model_used":   resp.Model,
-		"inputTokens":  resp.InputTokens,
-		"outputTokens": resp.OutputTokens,
-		"costUSD":      resp.CostUSD,
-		"duration_ms":  duration.Milliseconds(),
-	})
+	// Return plugin fields only with the mandatory EPWA delivery contract.
+	result := map[string]any{
+		"critique": critique, "scores": scores, "priority_fixes": priorityFixes, "summary": summary, "success": true,
+		"model": resp.Model, "model_used": resp.Model, "inputTokens": resp.InputTokens,
+		"outputTokens": resp.OutputTokens, "costUSD": resp.CostUSD, "duration_ms": duration.Milliseconds(),
+	}
+	writeJSONArtifactEPWA(w, r, h.cfg, evidenceScopeFromRequest(r), req.WebsiteURL, "UI/UX critique report", "critique_report", result, http.StatusOK)
 }
 
 // buildUICritPrompt constructs the full UICrit 7-dimension critique prompt.

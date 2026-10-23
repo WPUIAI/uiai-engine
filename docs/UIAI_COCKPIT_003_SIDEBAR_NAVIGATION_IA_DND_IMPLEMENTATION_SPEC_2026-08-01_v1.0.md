@@ -9,7 +9,7 @@
 **Repository:** `WPUIAI/uiai-engine`  
 **Primary implementation home:** `apps/cockpit/`  
 **Primary implementation stack:** SvelteKit 2, Svelte 5, Tauri v2, TypeScript  
-**Scope:** Cockpit shell, primary sidebar, Context Control, workspace navigation, contextual collection panes, user ordering, pinning, visibility, accessibility, entitlement presentation, migration from Slice 0, test gates, and dependency-ordered implementation work
+**Scope:** Cockpit shell, primary sidebar, Focusa authority ladder, workspace navigation, contextual collection panes, user ordering, pinning, visibility, accessibility, entitlement presentation, migration from Slice 0, test gates, and dependency-ordered implementation work
 
 ---
 
@@ -43,6 +43,8 @@ Footer
   Settings
   Help
 ```
+
+The sidebar SHALL project Focusa authority in this exact order: **Project (ScopeRef) → Trajectory Ladder → Workset → TaskGraph → Individual Tasks**. Daemon discovery, transport, and runtime administration belong to System and other operational surfaces; they are not the navigation root. Focusa remains advisory and operator steering remains authoritative. Prior references to a generic Context Control or independent scope-first navigation are superseded by this hierarchy.
 
 The manifest order and groups define the recommended default layout. Users MAY reorder workspaces, pin workspaces or work objects, hide nonessential workspaces, and restore the recommended layout. Reordering is a presentation preference only. It MUST NOT modify Project, Workstream, Workpoint, ScopeRef, NodeRef, worker ownership, session leases, authority, evidence linkage, entitlement, or backend object ownership.
 
@@ -213,7 +215,7 @@ The expanded sidebar SHALL use this structure:
 
 ```text
 Product header                     pinned
-Context Control                    pinned
+Project → Trajectory → Workset → TaskGraph → Tasks   pinned Focusa authority ladder
 Resume Workpoint                   conditional pinned action
 Search and commands                pinned action
 Workspace section header/menu      pinned within navigation region
@@ -232,24 +234,21 @@ Contains:
 - no backend-plane chips;
 - no decorative health or entitlement badges.
 
-## 5.2 Context Control
+## 5.2 Focusa authority ladder
 
-The current scope strip SHALL become one Context Control backed by actual resolved context.
+The sidebar SHALL start with the Focusa authority hierarchy rather than a generic scope chip:
 
-Supported fields:
+1. **Project** — the human-readable project is the primary control; selecting it establishes or changes the typed ScopeRef.
+2. **Trajectory Ladder** — the current HLT/MLG/STG hierarchy is subordinate to Project and remains advisory.
+3. **Workset** — the bounded body of executable work selected under the active Trajectory rung.
+4. **TaskGraph** — the dependency graph, readiness, and ordering inside the active Workset.
+5. **Individual Tasks** — executable task nodes; an active Workpoint may identify the current task/slice but does not replace the Workset or TaskGraph.
 
-- Project;
-- Workstream;
-- Workpoint;
-- session or thread where applicable;
-- NodeRef;
-- operating profile;
-- role;
-- authority state;
-- sync state;
-- route/transport in expanded disclosure.
+The collapsed Project control SHALL present the human-readable project name, not raw IDs. Expanded disclosure MAY show ScopeRef, Workstream/continuity, Workpoint, session/thread, NodeRef, role, authority state, sync state, and route/transport.
 
-The collapsed control SHALL present the most specific available human-readable context without raw IDs. Missing, stale, conflicting, or read-only context SHALL present the exact recovery action and SHALL block writes through the existing guard path.
+Missing, stale, conflicting, or read-only Project authority SHALL present the exact recovery action and SHALL block writes through the existing guard path. A missing Trajectory Ladder, Workset, TaskGraph, or Individual Task projection must remain truthfully empty and MUST NOT be fabricated from daemon availability.
+
+Daemon health and discovery indicators MAY appear as quiet status telemetry in the footer, but daemon selection and administration SHALL route to Nodes & Services or Settings and SHALL NOT sit above Project in sidebar authority.
 
 No example names from documentation are allowed in fixtures except explicitly test-only fixture data stored outside production defaults.
 
@@ -527,7 +526,7 @@ The existing card grid SHALL be removed as the default product taxonomy. Existin
 |---|---|
 | `uiai.health` | Overview system posture; Nodes & Services; Capabilities |
 | `uiai.diagnostics` | Live Inspector; Test Lab Inspector; Activity; Capabilities |
-| `focusa.project_identity` | Context Control; Overview; Inspector |
+| `focusa.project_identity` | Project step in the Focusa authority ladder; Overview; Inspector |
 | `focusa.project_card` | Overview; Scope Inspector |
 | `focusa.workpoint_resume` | Resume Workpoint; Overview Continue |
 | `focusa.trajectory_view` | Overview; Inspector |
@@ -1127,7 +1126,7 @@ Tasks are intentionally ordered for direct agent decomposition. A task MUST NOT 
 
 **Acceptance:** shell renders from registry; no backend-plane navigation remains; unrelated workspace failure does not crash shell.
 
-## T003-06 — Context Control
+## T003-06 — Focusa authority ladder
 
 **Depends on:** T003-05  
 **Integration:** Project Identity, Project Card, Workpoint, NodeRef, ScopeRef, pairing, authority, sync  
@@ -1303,7 +1302,7 @@ Tasks are intentionally ordered for direct agent decomposition. A task MUST NOT 
 - unit tests for manifests, preferences, migration, DnD decisions, badge priority;
 - component tests for disclosure, keyboard, overlays, resize, Compact mode;
 - route tests for all workspace paths;
-- integration tests for Context Control, Resume, Activity routing, entitlement recovery;
+- integration tests for Project → Trajectory Ladder → Workset → TaskGraph → Individual Tasks authority projection, Resume, Activity routing, entitlement recovery;
 - visual fixtures for normal/loading/empty/blocked/degraded/error/approval/success;
 - required screenshots: default, dark, constrained, non-happy, overlay, DnD;
 - performance checks for navigation render and reorder under representative object counts;
@@ -1400,7 +1399,7 @@ Recommended change boundaries:
 - one PR/change set for contracts/manifests/preferences;
 - one for shared shell/sidebar primitives;
 - one for DnD and persistence;
-- one for Context Control/Search/Resume;
+- one for Project/Trajectory Ladder/Workset/TaskGraph/Individual Tasks/Search/Resume;
 - one or more workspace integration changes grouped by current route ownership;
 - one entitlement/recovery integration change coordinated with entitlement work packages;
 - one final migration/cleanup and release-proof change.
@@ -1439,7 +1438,7 @@ This amendment is complete when:
 1. The current primitive navigator is removed.
 2. The exact Work/Create/Prove/System taxonomy renders from manifests.
 3. Overview remains the permanent label and becomes Mission Deck when context requires.
-4. Context Control replaces independent scope chips.
+4. Project → Trajectory Ladder → Workset → TaskGraph → Individual Tasks replaces generic Context Control and independent scope chips while preserving typed ScopeRef enforcement.
 5. Resume Workpoint consumes real contract state only.
 6. Search and commands reaches every enabled workspace and registered capability.
 7. Expanded, Compact, Hidden, and Overlay modes work and persist.

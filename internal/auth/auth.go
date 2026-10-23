@@ -33,6 +33,13 @@ func FromContext(ctx context.Context) *Identity {
 	return id
 }
 
+// ContextWithIdentity attaches a verified identity to a context. It is the
+// typed injection point for adapters and tests; it never fabricates trust —
+// callers must supply only identities verified by Authenticate.
+func ContextWithIdentity(ctx context.Context, identity *Identity) context.Context {
+	return context.WithValue(ctx, ctxKey{}, identity)
+}
+
 type cachedResult struct {
 	identity *Identity
 	err      error
@@ -91,6 +98,8 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			p == "/api/media/jobs" || // Media job list: read-only
 			strings.HasPrefix(p, "/api/media/status/") || // Media status: read-only poll
 			strings.HasPrefix(p, "/api/share/") || // Share viewing is public
+			strings.HasPrefix(p, "/e/") || // Friendly EPWA share URLs are public (same posture as /api/share/)
+			strings.HasPrefix(p, "/api/evidence/registry/public/") || // Sanitized, exact-project allowlisted evidence reads
 			strings.HasPrefix(p, "/m/") { // FPV PWA read-only share links are public by signed token path
 			// Try to extract identity if credentials present, but don't block
 			if id, err := a.Authenticate(r); err == nil {

@@ -2,15 +2,25 @@ package routes
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
+	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
+	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
+	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/storage"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
@@ -63,21 +73,65 @@ func screenshotFocusaMetadata(targetURL, artifactRef, format string, bytes int, 
 	return evidence
 }
 
-func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource, usage *storage.UsageStore) {
+func settingMap(values map[string]any, group string) map[string]any {
+	m, _ := values[group].(map[string]any)
+	return m
+}
+func settingString(values map[string]any, group, key string) string {
+	v, _ := settingMap(values, group)[key].(string)
+	return v
+}
+func settingInt(values map[string]any, group, key string) int {
+	switch v := settingMap(values, group)[key].(type) {
+	case int:
+		return v
+	case float64:
+		return int(v)
+	}
+	return 0
+}
+func scopeProject(scope *vision.FocusaScope) string {
+	if scope == nil {
+		return ""
+	}
+	return scope.ProjectRoot
+}
+func scopeWorkstream(scope *vision.FocusaScope) string {
+	if scope == nil {
+		return ""
+	}
+	return scope.DerivedWorkstreamKey()
+}
+
+func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore, artifacts *evidenceartifact.Store) {
+	settingsStore, settingsErr := evidenceshare.NewSettingsStore(cfg.Storage.DataDir)
+	if settingsErr == nil {
+		mountEvidenceShareSettings(r, settingsStore, artifacts)
+	} else {
+		slog.Error("canonical evidence settings unavailable", "error", settingsErr)
+		r.HandleFunc("/settings", func(w http.ResponseWriter, _ *http.Request) { writeSettingsUnavailable(w) })
+		r.HandleFunc("/settings/*", func(w http.ResponseWriter, _ *http.Request) { writeSettingsUnavailable(w) })
+	}
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
+		if settingsErr != nil {
+			writeSettingsUnavailable(w)
+			return
+		}
 		var body struct {
-			URL         string              `json:"url"`
-			Width       int                 `json:"width"`
-			Height      int                 `json:"height"`
-			FullPage    bool                `json:"fullPage"`
-			Format      string              `json:"format"`
-			Quality     int                 `json:"quality"`
-			WaitFor     string              `json:"waitFor"`
-			Delay       int                 `json:"delay"`
-			Cookies     string              `json:"cookies"` // "name=value; name2=value2"
-			Timeout     int                 `json:"timeout"` // overall timeout in seconds (default: 30)
-			NoCache     bool                `json:"nocache"` // skip cache, always take fresh screenshot
-			FocusaScope *vision.FocusaScope `json:"focusa_scope"`
+			URL           string               `json:"url"`
+			Width         int                  `json:"width"`
+			Height        int                  `json:"height"`
+			FullPage      bool                 `json:"fullPage"`
+			Format        string               `json:"format"`
+			Quality       int                  `json:"quality"`
+			WaitFor       string               `json:"waitFor"`
+			Delay         int                  `json:"delay"`
+			Cookies       string               `json:"cookies"` // "name=value; name2=value2"
+			Timeout       int                  `json:"timeout"` // overall timeout in seconds (default: 30)
+			NoCache       bool                 `json:"nocache"` // skip cache, always take fresh screenshot
+			FocusaScope   *vision.FocusaScope  `json:"focusa_scope"`
+			EvidenceScope *evidenceshare.Scope `json:"evidence_scope"`
+			Inline        *bool                `json:"inline"` // C-010-09: default false → artifact_ref only
 		}
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
@@ -91,6 +145,15 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource,
 		if pool == nil {
 			writeJSON(w, 503, map[string]string{"error": "vision pool not initialized"})
 			return
+		}
+		if settingsStore != nil {
+			effective := settingsStore.Effective(evidenceshare.SettingsScope{ProjectRef: scopeProject(body.FocusaScope), WorkstreamRef: scopeWorkstream(body.FocusaScope)})
+			if body.Format == "" {
+				body.Format = settingString(effective.Values, "image", "format")
+			}
+			if body.Quality == 0 {
+				body.Quality = settingInt(effective.Values, "image", "quality")
+			}
 		}
 
 		result, err := pool.Screenshot(vision.ScreenshotOpts{
@@ -135,21 +198,50 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource,
 		if body.FocusaScope != nil {
 			focusaEvidence["focusa_scope"] = body.FocusaScope
 		}
-		resp := map[string]any{
-			"screenshot":      base64.StdEncoding.EncodeToString(result.Data),
-			"width":           result.Width,
-			"height":          result.Height,
-			"format":          result.Format,
-			"size":            len(result.Data),
-			"duration":        result.Duration.Milliseconds(),
-			"focusa_evidence": focusaEvidence,
-			"focusa":          focusaEvidence,
+		capturedAt := time.Now().UTC()
+		shareInput := evidenceshare.Input{Screenshot: result.Data, Format: result.Format, Width: result.Width, Height: result.Height, SourceURL: body.URL, CapturedAt: capturedAt, DurationMS: result.Duration.Milliseconds()}
+		if body.EvidenceScope != nil {
+			shareInput.Scope = *body.EvidenceScope
+		} else if body.FocusaScope != nil {
+			shareInput.Scope = evidenceshare.Scope{
+				ProjectRef: body.FocusaScope.ProjectRef, WorkstreamRef: body.FocusaScope.WorkstreamRef,
+				WorksetRef: body.FocusaScope.WorksetRef, CallGraphRef: body.FocusaScope.CallGraphRef,
+				WorkpointRef: body.FocusaScope.WorkpointID, WorkItemRef: body.FocusaScope.WorkItemRef,
+				WorkItems: body.FocusaScope.WorkItems, ContinuityRef: body.FocusaScope.ContinuityID,
+			}
+		}
+		delivery, err := publishScreenshotEPWA(req, cfg, shareInput)
+		if err != nil {
+			digest := sha256.Sum256(result.Data)
+			writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_publication_failed", err, artifactRef, hex.EncodeToString(digest[:]), "reconcile:screenshot-epwa-publication")
+			return
+		}
+		response := map[string]any{
+			"schema": "uiai.screenshot_result.v2", "width": result.Width, "height": result.Height,
+			"format": result.Format, "size": len(result.Data), "duration_ms": result.Duration.Milliseconds(),
+			"artifact_ref": delivery.Artifact.ArtifactRef, "delivery_state": delivery.State,
+			"epwa_delivery": delivery, "focusa_evidence": focusaEvidence, "focusa": focusaEvidence,
+		}
+		if delivery.State == epwadelivery.StateReady {
+			response["artifact_url"] = delivery.EPWA.RecordURL
+			response["portable_url"] = delivery.EPWA.PortableURL
+		}
+		if body.Inline != nil && *body.Inline {
+			response["inline_posture"] = "withheld_by_mandatory_epwa_delivery"
 		}
 		if result.DOMReport != "" {
-			resp["dom_report"] = result.DOMReport
+			response["dom_report_posture"] = "withheld_pending_epwa_projection"
 		}
-		writeJSON(w, 200, resp)
+		status := http.StatusCreated
+		if delivery.State != epwadelivery.StateReady {
+			status = http.StatusAccepted
+		}
+		writeJSON(w, status, response)
 	})
+
+	mountScreenshotArtifact(r, cfg) // C-010-09 retrieval surface
+	mountEvidenceShare(r, cfg)
+	mountEPWADelivery(r, cfg)
 
 	r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
 		if pool == nil {
@@ -161,4 +253,647 @@ func MountScreenshotReal(r chi.Router, _ *config.Config, pool vision.PoolSource,
 			"pool":   pool.Stats(),
 		})
 	})
+}
+
+// screenshotArtifactDir resolves the durable store for C-010-09 artifacts.
+func screenshotStoreDir() string {
+	dir := os.Getenv("UIAI_SCREENSHOT_DIR")
+	if dir == "" {
+		dir = "/home/wpuiai/uiai-engine/data/screenshots"
+	}
+	return dir
+}
+
+// mountScreenshotArtifact resolves artifacts the engine issued without ever
+// serving raw bytes: the legacy raw-artifact route stays a fail-closed
+// tombstone for unknown digests, but any digest the engine already published
+// as an EPWA package resolves to its typed EPWA linkage (record/portable
+// URLs) so callers can inspect what they hold (issue #224 acceptance).
+func mountScreenshotArtifact(r chi.Router, cfg *config.Config) {
+	r.Get("/artifact/{sha}", func(w http.ResponseWriter, req *http.Request) {
+		// Chi may select RawPath for escaped segments. Decode exactly once,
+		// as browser/native clients percent-encode typed reference colons.
+		ref := chi.URLParam(req, "sha")
+		if req.URL.RawPath != "" {
+			var err error
+			ref, err = url.PathUnescape(ref)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid artifact reference encoding"})
+				return
+			}
+		}
+		requested := normalizeArtifactRef(ref)
+		if packet, ok := findPublishedArtifactPacket(cfg, req, requested); ok {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"schema":         "uiai.evidence_artifact_resolve.v1",
+				"artifact_ref":   requested,
+				"delivery_state": "ready",
+				"epwa":           packet,
+				"posture":        "raw_bytes_never_served",
+				"note":           "raw screenshots are available only through an EPWA viewer and portable package",
+			})
+			return
+		}
+		writeJSON(w, http.StatusGone, map[string]any{
+			"schema": "uiai.epwa_delivery_error.v1", "code": "legacy_raw_artifact_removed",
+			"artifact_ref": chi.URLParam(req, "sha"),
+			"message":      "raw screenshots are available only through an EPWA viewer and portable package",
+		})
+	})
+}
+
+// normalizeArtifactRef accepts either the full typed ref or a bare 64-hex digest.
+func normalizeArtifactRef(ref string) string {
+	ref = strings.TrimSpace(ref)
+	if len(ref) == 64 && validShareID(ref) {
+		return "uiai-artifact:sha256:" + ref
+	}
+	return ref
+}
+
+// findPublishedArtifactPacket scans the share store for a package whose
+// artifact_ref matches, reusing the bounded listing walk (max 100 packets).
+func findPublishedArtifactPacket(cfg *config.Config, req *http.Request, artifactRef string) (map[string]any, bool) {
+	if artifactRef == "" {
+		return nil, false
+	}
+	entries, err := os.ReadDir(evidenceShareDir(cfg))
+	if err != nil {
+		return nil, false
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() > entries[j].Name() })
+	for _, entry := range entries {
+		if !entry.IsDir() || !validShareID(entry.Name()) {
+			continue
+		}
+		directory := filepath.Join(evidenceShareDir(cfg), entry.Name())
+		body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
+		if err != nil {
+			continue
+		}
+		var ref string
+		var descriptor struct {
+			Schema string `json:"schema"`
+		}
+		if json.Unmarshal(body, &descriptor) != nil {
+			continue
+		}
+		switch descriptor.Schema {
+		case evidenceshare.Schema:
+			var manifest evidenceshare.Manifest
+			if json.Unmarshal(body, &manifest) == nil {
+				ref = manifest.ArtifactRef
+			}
+		case evidenceartifact.SchemaManifestV1:
+			var manifest evidenceartifact.Manifest
+			if json.Unmarshal(body, &manifest) == nil {
+				ref = manifest.ArtifactID
+			}
+		case evidenceshare.GenericArtifactSchema:
+			var manifest evidenceshare.GenericManifest
+			if json.Unmarshal(body, &manifest) == nil {
+				ref = manifest.ArtifactRef
+			}
+		}
+		if ref == "" || ref != artifactRef {
+			continue
+		}
+		if issues := verifySharePackage(cfg, entry.Name()); len(issues) != 0 {
+			continue
+		}
+		// Preserve friendly links only when the canonical prefix resolver
+		// confirms that they identify this exact package unambiguously.
+		shortID := entry.Name()
+		prefix := shortID[:shortShareIDLength]
+		if resolved, err := resolveShortShareID(cfg, prefix); err == nil && resolved == shortID {
+			shortID = prefix
+		}
+		// Absolute URLs when the canonical base resolves (env/proxy/TLS);
+		// otherwise fall back to stable relative paths so the resolver is
+		// still useful on plain-http callers without failing the lookup.
+		recordURL := requestArtifactURL(req, "/e/"+shortID+"/")
+		if recordURL == "" {
+			recordURL = "/e/" + shortID + "/"
+		}
+		portableURL := requestArtifactURL(req, "/e/"+shortID+".zip")
+		if portableURL == "" {
+			portableURL = "/e/" + shortID + ".zip"
+		}
+		return map[string]any{
+			"package_id":   entry.Name(),
+			"record_url":   recordURL,
+			"portable_url": portableURL,
+		}, true
+	}
+	return nil, false
+}
+
+func evidenceShareDir(cfg *config.Config) string {
+	if dir := os.Getenv("UIAI_EVIDENCE_SHARE_DIR"); dir != "" {
+		return dir
+	}
+	if cfg != nil && cfg.Storage.DataDir != "" {
+		return filepath.Join(cfg.Storage.DataDir, "evidence-share")
+	}
+	return filepath.Join(screenshotStoreDir(), "evidence-share")
+}
+
+// acceptPrefersHTML reports whether the request's Accept header explicitly
+// prefers text/html over application/json (browser-style negotiation).
+// Agents and curl ("*/*" or no header) keep receiving the JSON record.
+func acceptPrefersHTML(accept string) bool {
+	htmlQ := acceptQ(accept, "text/html")
+	if htmlQ <= 0 {
+		return false
+	}
+	return htmlQ >= acceptQ(accept, "application/json")
+}
+
+func acceptQ(accept, mediaType string) float64 {
+	if accept == "" {
+		return 0
+	}
+	for _, part := range strings.Split(accept, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		fields := strings.Split(part, ";")
+		if !strings.EqualFold(strings.TrimSpace(fields[0]), mediaType) {
+			continue
+		}
+		q := 1.0
+		for _, param := range fields[1:] {
+			param = strings.TrimSpace(param)
+			if strings.HasPrefix(param, "q=") {
+				if parsed, err := strconv.ParseFloat(strings.TrimPrefix(param, "q="), 64); err == nil {
+					q = parsed
+				}
+			}
+		}
+		return q
+	}
+	return 0
+}
+
+func requestArtifactURL(req *http.Request, artifactPath string) string {
+	base, err := canonicalEPWABase(req)
+	if err != nil {
+		return ""
+	}
+	return base.ResolveReference(&url.URL{Path: strings.TrimPrefix(artifactPath, "/")}).String()
+}
+
+const evidenceShareCSP = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'"
+
+type publicPackageDescriptor struct {
+	Schema string
+	Assets map[string]evidenceartifact.Asset
+}
+
+func loadPublicPackage(directory, id string) (publicPackageDescriptor, error) {
+	body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
+	if err != nil {
+		return publicPackageDescriptor{}, err
+	}
+	var envelope struct {
+		Schema string `json:"schema"`
+	}
+	if json.Unmarshal(body, &envelope) != nil {
+		return publicPackageDescriptor{}, errors.New("invalid EPWA package manifest")
+	}
+	switch envelope.Schema {
+	case evidenceshare.Schema:
+		var manifest evidenceshare.Manifest
+		if json.Unmarshal(body, &manifest) != nil || manifest.ArtifactSHA256 != id || manifest.Availability != "ready" || manifest.Access != "public_safe_read_only" || manifest.ProjectionRef == "" {
+			return publicPackageDescriptor{}, errors.New("screenshot EPWA package is not public ready")
+		}
+		var projection evidencepwa.Projection
+		projectionBody, err := os.ReadFile(filepath.Join(directory, strings.TrimPrefix(manifest.ProjectionRef, "./")))
+		if err != nil || json.Unmarshal(projectionBody, &projection) != nil || evidencepwa.ValidateProjection(projection) != nil || projection.Access != evidencepwa.AccessPublicSafe || projection.Availability != evidencepwa.AvailabilityReady {
+			return publicPackageDescriptor{}, errors.New("screenshot EPWA projection is not public ready")
+		}
+		return publicPackageDescriptor{Schema: envelope.Schema}, nil
+	case evidenceartifact.SchemaManifestV1:
+		var manifest evidenceartifact.Manifest
+		if json.Unmarshal(body, &manifest) != nil || evidenceartifact.Validate(manifest) != nil || evidenceartifact.VerifyManifestSHA256(manifest) != nil || manifest.Policy.AccessClass != evidenceartifact.AccessPublicSafe || manifest.Policy.RedactionState != evidenceartifact.RedactionPublicSafe || strings.TrimSpace(manifest.Scope.ContinuityRef) == "" {
+			return publicPackageDescriptor{}, errors.New("artifact EPWA package is not public ready")
+		}
+		wantID, err := evidenceshare.ArtifactPackageID(manifest)
+		if err != nil || wantID != id {
+			return publicPackageDescriptor{}, errors.New("artifact EPWA package identity mismatch")
+		}
+		assetByPath := make(map[string]evidenceartifact.Asset, len(manifest.Assets))
+		for _, asset := range manifest.Assets {
+			if asset.RedactionState == evidenceartifact.RedactionBlocked {
+				return publicPackageDescriptor{}, errors.New("artifact EPWA package contains blocked assets")
+			}
+			assetByPath[asset.Path] = asset
+		}
+		var projection evidencepwa.Projection
+		projectionBody, err := os.ReadFile(filepath.Join(directory, "projection.json"))
+		if err != nil || json.Unmarshal(projectionBody, &projection) != nil || evidencepwa.ValidateProjection(projection) != nil || projection.Access != evidencepwa.AccessPublicSafe || projection.Availability != evidencepwa.AvailabilityReady || projection.Artifact.ManifestSHA256 != manifest.Integrity.ManifestSHA256 {
+			return publicPackageDescriptor{}, errors.New("artifact EPWA projection is not public ready")
+		}
+		return publicPackageDescriptor{Schema: envelope.Schema, Assets: assetByPath}, nil
+	case evidenceshare.GenericArtifactSchema:
+		manifest, _, err := evidenceshare.ValidateGenericPackage(directory, id)
+		if err != nil || manifest.Access != "public_safe_read_only" || manifest.Availability != "ready" {
+			return publicPackageDescriptor{}, errors.New("generic EPWA package is not public ready")
+		}
+		assetPath := strings.TrimPrefix(manifest.AssetRef, "./")
+		return publicPackageDescriptor{Schema: envelope.Schema, Assets: map[string]evidenceartifact.Asset{
+			assetPath: {AssetID: "generic-payload", Path: assetPath, SHA256: manifest.AssetSHA256, ByteSize: int64(manifest.Bytes), MediaType: manifest.MediaType},
+		}}, nil
+	default:
+		return publicPackageDescriptor{}, errors.New("unsupported EPWA package manifest")
+	}
+}
+
+func safeShareAssetPath(value string) bool {
+	return value != "" && !strings.ContainsAny(value, "\\\r\n\x00") && !strings.HasPrefix(value, "/") && path.Clean(value) == value && value != "." && value != ".." && !strings.HasPrefix(value, "../")
+}
+
+func shareThumbnailURL(req *http.Request, packagePath, assetRef, mediaType string) string {
+	switch mediaType {
+	case "image/png", "image/jpeg", "image/webp", "image/gif", "image/avif":
+		assetPath := strings.TrimPrefix(assetRef, "./")
+		if safeShareAssetPath(assetPath) {
+			return requestArtifactURL(req, packagePath+assetPath)
+		}
+	}
+	return ""
+}
+
+func mountEvidenceShare(r chi.Router, cfg *config.Config) {
+	mountEvidenceReview(r, cfg)
+	r.Get("/share", func(w http.ResponseWriter, req *http.Request) {
+		if _, err := canonicalEPWABase(req); err != nil {
+			writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_https_unavailable", err, "", "", "configure:UIAI_EPWA_PUBLIC_BASE_URL")
+			return
+		}
+		entries, err := os.ReadDir(evidenceShareDir(cfg))
+		if err != nil {
+			writeJSON(w, http.StatusOK, map[string]any{"packets": []any{}})
+			return
+		}
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() > entries[j].Name() })
+		packets := make([]map[string]any, 0, len(entries))
+		for _, entry := range entries {
+			if !entry.IsDir() || !validShareID(entry.Name()) {
+				continue
+			}
+			directory := filepath.Join(evidenceShareDir(cfg), entry.Name())
+			descriptor, err := loadPublicPackage(directory, entry.Name())
+			if err != nil {
+				continue
+			}
+			body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
+			if err != nil {
+				continue
+			}
+			shortID := entry.Name()
+			if len(shortID) > shortShareIDLength {
+				shortID = shortID[:shortShareIDLength]
+			}
+			artifactPath := "/e/" + shortID + "/"
+			thumbnailURL := ""
+			packet := map[string]any{"packet_id": entry.Name(), "artifact_url": requestArtifactURL(req, artifactPath), "portable_url": requestArtifactURL(req, "/e/"+shortID+".zip"), "availability": "ready"}
+			switch descriptor.Schema {
+			case evidenceshare.Schema:
+				var manifest evidenceshare.Manifest
+				if json.Unmarshal(body, &manifest) != nil {
+					continue
+				}
+				packet["descriptor"], packet["artifact_ref"], packet["captured_at"] = "Screenshot evidence · "+manifest.CapturedAt.Format(time.RFC3339), manifest.ArtifactRef, manifest.CapturedAt
+				packet["source_url"], packet["workpoint_ref"], packet["continuity_ref"] = manifest.SourceURL, manifest.Scope.WorkpointRef, manifest.Scope.ContinuityRef
+				thumbnailURL = shareThumbnailURL(req, artifactPath, manifest.ScreenshotRef, manifest.MIME)
+			case evidenceartifact.SchemaManifestV1:
+				var manifest evidenceartifact.Manifest
+				if json.Unmarshal(body, &manifest) != nil {
+					continue
+				}
+				packet["descriptor"], packet["artifact_ref"], packet["captured_at"] = manifest.Title, manifest.ArtifactID, manifest.CapturedAt
+				packet["workpoint_ref"] = manifest.Scope.Workpoint.WorkpointRef
+				packet["continuity_ref"] = manifest.Scope.ContinuityRef
+				for _, asset := range manifest.Assets {
+					if thumbnailURL = shareThumbnailURL(req, artifactPath, asset.Path, asset.MediaType); thumbnailURL != "" {
+						break
+					}
+				}
+			case evidenceshare.GenericArtifactSchema:
+				var manifest evidenceshare.GenericManifest
+				if json.Unmarshal(body, &manifest) != nil {
+					continue
+				}
+				packet["descriptor"], packet["artifact_ref"], packet["captured_at"] = manifest.Title, manifest.ArtifactRef, manifest.CapturedAt
+				packet["workpoint_ref"], packet["continuity_ref"] = manifest.Scope.WorkpointRef, manifest.Scope.ContinuityRef
+				thumbnailURL = shareThumbnailURL(req, artifactPath, manifest.AssetRef, manifest.MediaType)
+			}
+			if thumbnailURL != "" {
+				packet["thumbnail_url"] = thumbnailURL
+			}
+			packets = append(packets, packet)
+			if len(packets) == 100 {
+				break
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"packets": packets, "count": len(packets)})
+	})
+	r.Get("/share/{id}", func(w http.ResponseWriter, req *http.Request) {
+		id := chi.URLParam(req, "id")
+		if !validShareID(id) {
+			http.NotFound(w, req)
+			return
+		}
+		serveShareRecord(w, req, cfg, id)
+	})
+	r.Get("/share/{id}/portable.zip", func(w http.ResponseWriter, req *http.Request) {
+		id := chi.URLParam(req, "id")
+		if !validShareID(id) {
+			http.NotFound(w, req)
+			return
+		}
+		serveShareZip(w, req, cfg, id)
+	})
+	r.Get("/share/{id}/verify", func(w http.ResponseWriter, req *http.Request) {
+		id := chi.URLParam(req, "id")
+		if !validShareID(id) {
+			http.NotFound(w, req)
+			return
+		}
+		serveShareVerify(w, cfg, id)
+	})
+	r.Get("/share/{id}/*", func(w http.ResponseWriter, req *http.Request) {
+		id := chi.URLParam(req, "id")
+		if !validShareID(id) {
+			http.NotFound(w, req)
+			return
+		}
+		serveShareAsset(w, req, cfg, id, chi.URLParam(req, "*"))
+	})
+}
+
+// serveShareRecord delivers the durable record for a published package:
+// browsers asking for text/html get the EPWA viewer webpage; agents (default
+// */* or explicit JSON) get the durable JSON record.
+func serveShareRecord(w http.ResponseWriter, req *http.Request, cfg *config.Config, id string) {
+	directory := filepath.Join(evidenceShareDir(cfg), id)
+	if _, err := loadPublicPackage(directory, id); err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	if acceptPrefersHTML(req.Header.Get("Accept")) {
+		// Friendly default for humans: land on the viewer webpage, where the
+		// package's same-origin relative assets resolve correctly.
+		http.Redirect(w, req, req.URL.Path+"/", http.StatusFound)
+		return
+	}
+	body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write(body)
+}
+
+func serveShareZip(w http.ResponseWriter, req *http.Request, cfg *config.Config, id string) {
+	directory := filepath.Join(evidenceShareDir(cfg), id)
+	if _, err := loadPublicPackage(directory, id); err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	if !validShareID(id) {
+		http.NotFound(w, req)
+		return
+	}
+	digest, err := evidenceshare.EnsurePortableArchive(evidenceShareDir(cfg), id)
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	archivePath := filepath.Join(evidenceShareDir(cfg), id+".zip")
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+id+`.epwa.zip"`)
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("ETag", `"sha256:`+digest+`"`)
+	http.ServeFile(w, req, archivePath)
+}
+
+func serveShareVerify(w http.ResponseWriter, cfg *config.Config, id string) {
+	id = strings.ToLower(id)
+	issues := verifySharePackage(cfg, id)
+	writeJSON(w, http.StatusOK, map[string]any{"packet_id": id, "descriptor": "EPWA evidence package", "valid": len(issues) == 0, "issues": issues})
+}
+
+// verifySharePackage is the shared public-readiness and payload-integrity gate.
+func verifySharePackage(cfg *config.Config, id string) []string {
+	issues := []string{}
+	if !validShareID(id) {
+		issues = append(issues, "invalid_packet_id")
+	} else {
+		directory := filepath.Join(evidenceShareDir(cfg), id)
+		descriptor, err := loadPublicPackage(directory, id)
+		if err != nil {
+			issues = append(issues, "package_not_public_ready")
+		} else {
+			switch descriptor.Schema {
+			case evidenceshare.Schema:
+				var manifest evidenceshare.Manifest
+				body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
+				if err != nil || json.Unmarshal(body, &manifest) != nil {
+					issues = append(issues, "manifest_unavailable")
+				} else if shot, err := os.ReadFile(filepath.Join(directory, strings.TrimPrefix(manifest.ScreenshotRef, "./"))); err != nil {
+					issues = append(issues, "screenshot_unavailable")
+				} else if sum := sha256.Sum256(shot); hex.EncodeToString(sum[:]) != manifest.ScreenshotSHA256 {
+					issues = append(issues, "screenshot_digest_mismatch")
+				}
+			case evidenceartifact.SchemaManifestV1, evidenceshare.GenericArtifactSchema:
+				for assetPath, asset := range descriptor.Assets {
+					data, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(assetPath)))
+					if err != nil {
+						issues = append(issues, "asset_unavailable:"+asset.AssetID)
+						continue
+					}
+					sum := sha256.Sum256(data)
+					if int64(len(data)) != asset.ByteSize || hex.EncodeToString(sum[:]) != asset.SHA256 {
+						issues = append(issues, "asset_digest_mismatch:"+asset.AssetID)
+					}
+				}
+			}
+		}
+	}
+	return issues
+}
+
+func serveShareAsset(w http.ResponseWriter, req *http.Request, cfg *config.Config, id string, assetName string) {
+	id = strings.ToLower(id)
+	name := assetName
+	if !validShareID(id) {
+		http.NotFound(w, req)
+		return
+	}
+	directory := filepath.Join(evidenceShareDir(cfg), id)
+	descriptor, err := loadPublicPackage(directory, id)
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	if name == "" {
+		name = "index.html"
+	}
+	if !safeShareAssetPath(name) {
+		http.NotFound(w, req)
+		return
+	}
+	allowed := map[string]string{"index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "work-items.js": "application/javascript; charset=utf-8", "generic-record.js": "application/javascript; charset=utf-8", "locale.js": "application/javascript; charset=utf-8", "pwa.js": "application/javascript; charset=utf-8", "app.js": "application/javascript; charset=utf-8", "manifest.webmanifest": "application/manifest+json", "icon.svg": "image/svg+xml", "sw.js": "application/javascript; charset=utf-8", "artifact.json": "application/json; charset=utf-8", "projection.json": "application/json; charset=utf-8", "inspection.json": "application/json; charset=utf-8", "screenshot.png": "image/png", "screenshot.jpg": "image/jpeg", "screenshot.webp": "image/webp"}
+	mediaType, static := allowed[name]
+	asset, artifactAsset := descriptor.Assets[name]
+	if !static && !artifactAsset {
+		http.NotFound(w, req)
+		return
+	}
+	if artifactAsset {
+		mediaType = asset.MediaType
+		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(name)+`"`)
+		if strings.HasPrefix(strings.ToLower(mediaType), "text/html") || strings.HasPrefix(strings.ToLower(mediaType), "image/svg+xml") {
+			w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(name)))
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	if artifactAsset {
+		sum := sha256.Sum256(data)
+		if int64(len(data)) != asset.ByteSize || hex.EncodeToString(sum[:]) != asset.SHA256 {
+			http.Error(w, "EPWA asset corrupt", http.StatusConflict)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", mediaType)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if name == "index.html" {
+		w.Header().Set("Content-Security-Policy", evidenceShareCSP)
+	}
+	switch {
+	case name == "sw.js":
+		w.Header().Set("Cache-Control", "no-cache")
+	case name == "artifact.json" || name == "projection.json" || name == "inspection.json" || strings.HasPrefix(name, "screenshot.") || artifactAsset:
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	default:
+		w.Header().Set("Cache-Control", "public, max-age=300")
+	}
+	_, _ = w.Write(data)
+}
+
+var (
+	errShortShareIDInvalid   = errors.New("invalid short EPWA share id")
+	errShortShareIDUnknown   = errors.New("EPWA package not found")
+	errShortShareIDAmbiguous = errors.New("ambiguous short EPWA share id")
+)
+
+// shortShareIDLength is the default short-form share id length used in
+// friendly EPWA URLs (https://<host>/e/<short12>/). It is a strict prefix of
+// the content-addressed 64-hex package id, so it stays deterministic.
+const shortShareIDLength = 12
+
+// resolveShortShareID resolves a short share-id prefix to the unique
+// content-addressed package id. Ambiguous or unknown prefixes fail closed.
+func resolveShortShareID(cfg *config.Config, short string) (string, error) {
+	if len(short) < 6 || len(short) > 64 {
+		return "", errShortShareIDInvalid
+	}
+	if _, err := hex.DecodeString(strings.ToLower(short)); err != nil {
+		return "", errShortShareIDInvalid
+	}
+	entries, err := os.ReadDir(evidenceShareDir(cfg))
+	if err != nil {
+		return "", errShortShareIDUnknown
+	}
+	match := ""
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() || !validShareID(name) || !strings.HasPrefix(name, strings.ToLower(short)) {
+			continue
+		}
+		if match != "" {
+			return "", errShortShareIDAmbiguous
+		}
+		match = name
+	}
+	if match == "" {
+		return "", errShortShareIDUnknown
+	}
+	return match, nil
+}
+
+// mountShortShareRoutes exposes the friendly EPWA URL surface:
+//
+//	GET /e/{short}.zip    -> portable package (download)
+//	GET /e/{short}        -> browsers: 302 to the viewer webpage; agents: JSON record
+//	GET /e/{short}/       -> EPWA viewer webpage
+//	GET /e/{short}/verify -> deterministic integrity verification
+//	GET /e/{short}/*      -> package assets (same-origin relative)
+//
+// MountShortShare mounts the friendly EPWA URL surface at the host root.
+func MountShortShare(r chi.Router, cfg *config.Config) {
+	resolve := func(w http.ResponseWriter, req *http.Request, tail string) (string, bool) {
+		id, err := resolveShortShareID(cfg, tail)
+		if err != nil {
+			http.NotFound(w, req)
+			return "", false
+		}
+		return id, true
+	}
+	r.Get("/e/{tail}", func(w http.ResponseWriter, req *http.Request) {
+		tail := chi.URLParam(req, "tail")
+		if strings.HasSuffix(tail, ".zip") {
+			id, ok := resolve(w, req, strings.TrimSuffix(tail, ".zip"))
+			if !ok {
+				return
+			}
+			serveShareZip(w, req, cfg, id)
+			return
+		}
+		id, ok := resolve(w, req, tail)
+		if !ok {
+			return
+		}
+		if acceptPrefersHTML(req.Header.Get("Accept")) {
+			// Friendly default for humans: land on the actual EPWA webpage.
+			http.Redirect(w, req, "/e/"+tail+"/", http.StatusFound)
+			return
+		}
+		serveShareRecord(w, req, cfg, id)
+	})
+	r.Get("/e/{tail}/*", func(w http.ResponseWriter, req *http.Request) {
+		tail := chi.URLParam(req, "tail")
+		rest := chi.URLParam(req, "*")
+		id, ok := resolve(w, req, strings.TrimSuffix(tail, ".zip"))
+		if !ok {
+			return
+		}
+		if rest == "verify" {
+			serveShareVerify(w, cfg, id)
+			return
+		}
+		if rest == "portable.zip" {
+			serveShareZip(w, req, cfg, id)
+			return
+		}
+		serveShareAsset(w, req, cfg, id, rest)
+	})
+}
+
+func validShareID(id string) bool {
+	if len(id) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(id)
+	return err == nil
 }

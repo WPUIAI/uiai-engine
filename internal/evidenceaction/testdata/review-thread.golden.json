@@ -1,0 +1,68 @@
+{
+  "schema": "uiai.evidence_review_thread.v1",
+  "thread_id": "thread:1",
+  "scope": {
+    "project_ref": "project:1",
+    "workstream_ref": "workstream:1",
+    "workset_ref": "workset:1",
+    "callgraph_ref": "callgraph:1",
+    "workpoint_ref": "workpoint:1",
+    "work_item_ref": "github:WPUIAI/uiai-engine#117"
+  },
+  "artifact_ref": "artifact:1",
+  "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "atom_refs": [
+    "atom:1",
+    "atom:2"
+  ],
+  "revision": 2,
+  "entries": [
+    {
+      "entry_id": "entry:1",
+      "revision": 1,
+      "kind": "comment",
+      "decision": "none",
+      "message": "Evidence inspected against the frozen atom.",
+      "item_ref": "github:WPUIAI/uiai-engine#117",
+      "atom_refs": [
+        "atom:1"
+      ],
+      "artifact_ref": "artifact:1",
+      "citation_refs": [
+        "citation:1"
+      ],
+      "actor_ref": "reviewer:1",
+      "delegation_ref": "delegation:reviewer",
+      "occurred_at": "2026-08-30T00:00:00Z",
+      "provenance_ref": "provenance:1",
+      "imported": false,
+      "source_trust": "verified"
+    },
+    {
+      "entry_id": "entry:2",
+      "revision": 2,
+      "kind": "decision",
+      "decision": "approved",
+      "message": "The cited evidence supports this item-scoped review decision.",
+      "item_ref": "github:WPUIAI/uiai-engine#117",
+      "atom_refs": [
+        "atom:1",
+        "atom:2"
+      ],
+      "artifact_ref": "artifact:1",
+      "citation_refs": [
+        "citation:1",
+        "citation:2"
+      ],
+      "actor_ref": "reviewer:1",
+      "delegation_ref": "delegation:reviewer",
+      "occurred_at": "2026-08-30T00:01:00Z",
+      "provenance_ref": "provenance:2",
+      "imported": false,
+      "source_trust": "verified"
+    }
+  ],
+  "source_trust": "verified",
+  "human_review_mandated": false,
+  "autonomous_eligibility": "autonomous_eligible"
+}

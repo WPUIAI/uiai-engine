@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/go-chi/chi/v5"
 )
@@ -22,7 +23,7 @@ type researchPacketRequest struct {
 
 // MountAgentPacketRoutes composes bounded agent packet proposals from existing UIAI response metadata.
 // Schema: uiai.focusa_research_diagnostics_packet.v1
-func MountAgentPacketRoutes(r chi.Router) {
+func MountAgentPacketRoutes(r chi.Router, cfg *config.Config) {
 	r.Post("/research-packet", func(w http.ResponseWriter, req *http.Request) {
 		var body researchPacketRequest
 		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
@@ -33,7 +34,38 @@ func MountAgentPacketRoutes(r chi.Router) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "goal_required", "message": "goal is required"})
 			return
 		}
-		writeJSON(w, http.StatusOK, buildResearchPacketFromResponses(body))
+		packet := buildResearchPacketFromResponses(body)
+		scope := evidenceScopeFromRequest(req)
+		if body.FocusaScope != nil {
+			if scope.ProjectRef == "" {
+				scope.ProjectRef = body.FocusaScope.ProjectRef
+				if scope.ProjectRef == "" {
+					scope.ProjectRef = body.FocusaScope.ProjectRoot
+				}
+			}
+			if scope.WorkstreamRef == "" {
+				scope.WorkstreamRef = body.FocusaScope.WorkstreamRef
+			}
+			if scope.WorksetRef == "" {
+				scope.WorksetRef = body.FocusaScope.WorksetRef
+			}
+			if scope.CallGraphRef == "" {
+				scope.CallGraphRef = body.FocusaScope.CallGraphRef
+			}
+			if scope.WorkpointRef == "" {
+				scope.WorkpointRef = body.FocusaScope.WorkpointID
+			}
+			if scope.WorkItemRef == "" {
+				scope.WorkItemRef = body.FocusaScope.WorkItemRef
+			}
+			if len(scope.WorkItems) == 0 {
+				scope.WorkItems = append(scope.WorkItems, body.FocusaScope.WorkItems...)
+			}
+			if scope.ContinuityRef == "" {
+				scope.ContinuityRef = body.FocusaScope.ContinuityID
+			}
+		}
+		writeJSONArtifactEPWA(w, req, cfg, scope, "", "Focusa research and diagnostics packet", "research_packet", packet, http.StatusOK)
 	})
 }
 
@@ -59,12 +91,13 @@ func buildResearchPacketFromResponses(req researchPacketRequest) focusapacket.Re
 	if strings.TrimSpace(nextAction) == "" {
 		nextAction = "Call focusa_evidence_capture or focusa_browser_diagnostics_intake with recommended_focusa.args_preview."
 	}
+	packetScope := packetVisibleScope(req.FocusaScope)
 	packet := focusapacket.ResearchDiagnosticsPacket{
 		Schema:             focusapacket.SchemaResearchDiagnosticsPacketV1,
 		Mode:               packetMode(req.Mode),
 		Goal:               req.Goal,
-		ScopeStatus:        packetScopeStatus(req.FocusaScope),
-		FocusaScope:        req.FocusaScope,
+		ScopeStatus:        packetScopeStatus(packetScope),
+		FocusaScope:        packetScope,
 		TargetRefs:         targetRefs,
 		EvidenceRefs:       evidenceRefs,
 		Captures:           captures,
@@ -150,11 +183,23 @@ func packetMode(mode string) focusapacket.PacketMode {
 	}
 }
 
+func packetVisibleScope(scope *focusapacket.FocusaScope) *focusapacket.FocusaScope {
+	if scope == nil {
+		return nil
+	}
+	visible := *scope
+	visible.WorkItems = nil
+	if visible.ProjectRef != "" {
+		visible.ProjectRoot = ""
+	}
+	return &visible
+}
+
 func packetScopeStatus(scope *focusapacket.FocusaScope) focusapacket.ScopeStatus {
 	if scope == nil {
 		return focusapacket.ScopeMissing
 	}
-	if scope.ProjectRoot != "" && scope.ContinuityID != "" {
+	if (scope.ProjectRef != "" || scope.ProjectRoot != "") && scope.ContinuityID != "" {
 		return focusapacket.ScopePresent
 	}
 	return focusapacket.ScopePartial

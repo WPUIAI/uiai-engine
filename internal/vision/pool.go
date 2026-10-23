@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -52,6 +53,7 @@ type Pool struct {
 	browserPID  int
 	// Lazy launch: Chrome starts on first request, auto-kills after IdleTimeout
 	idleTimer *time.Timer
+	keepAlive bool
 	active    int // number of pages currently checked out
 	// Screenshot cache: avoids redundant Chrome renders
 	cache *screenshotCache
@@ -62,6 +64,7 @@ type Pool struct {
 	queueDrop        int64   // total requests rejected (queue full or timeout)
 	queueWaitTotalMs int64   // cumulative time spent waiting for pooled pages
 	queueWaitMaxMs   int64   // max observed queue wait in milliseconds
+	interQueued      int64   // C-010-12 interactive waiters
 	queueWaitSamples []int64 // bounded tail for p95/p99 metrics, protected by mu
 	// SSRF: when true, block private/internal IPs in screenshot URLs.
 	// Commercial deployments may set false to allow localhost screenshots.
@@ -103,6 +106,7 @@ type ScreenshotResult struct {
 type PoolConfig struct {
 	MaxPages         int
 	AllowPrivateURLs bool // when true, disables SSRF private-IP blocking (for local dev/staging)
+	KeepAlive        bool // C-010-06: never idle-shutdown; prelaunch for warm first-action
 }
 
 func NewPool(maxPages int) (*Pool, error) {
@@ -113,8 +117,13 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 	if cfg.MaxPages <= 0 {
 		cfg.MaxPages = 2
 	}
+	// C-010-06: env default so ops can enable fleet warmth without code changes.
+	if os.Getenv("UIAI_VISION_KEEPALIVE") == "1" {
+		cfg.KeepAlive = true
+	}
 
 	p := &Pool{
+		keepAlive:        cfg.KeepAlive,
 		pages:            make(chan *rod.Page, cfg.MaxPages),
 		maxPages:         cfg.MaxPages,
 		lastSuccess:      time.Now(),
@@ -130,7 +139,25 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 		ssrfStatus = "OFF (private URLs allowed)"
 	}
 	log.Printf("[vision] Pool initialized: max=%d pages, cache=50MB/5min, SSRF protection=%s (Chrome starts on first request)", p.maxPages, ssrfStatus)
+	p.StartPressureRecycler(45 * time.Second) // C-010-11
 
+	// C-010-06 warm fleet: launch immediately so first action is warm.
+	// Single-flight via launchMu so prelaunch never races on-demand launches (#99).
+	if cfg.KeepAlive {
+		go func() {
+			p.launchMu.Lock()
+			defer p.launchMu.Unlock()
+			p.mu.Lock()
+			alive := p.browser != nil && p.isBrowserAlive()
+			p.mu.Unlock()
+			if alive {
+				return
+			}
+			if err := p.launchBrowser(); err != nil {
+				log.Printf("[vision] keepalive prelaunch failed: %v", err)
+			}
+		}()
+	}
 	return p, nil
 }
 
@@ -172,8 +199,15 @@ drained:
 		}
 	}
 
+	// Dedicated per-process profile: a shared default profile makes the
+	// second engine instance fail every relaunch on chromium's SingletonLock
+	// while the first instance's browser is alive (2026-09-11 OVH wedge:
+	// w2 relaunches hit ErrLaunchTimeout for the entire main-engine browser
+	// lifetime). Each process gets its own user-data-dir under os.TempDir().
+	profileDir := filepath.Join(os.TempDir(), fmt.Sprintf("uiai-engine-chromium-%d", os.Getpid()))
 	l := launcher.New().
 		Headless(true).
+		UserDataDir(profileDir).
 		// Flags NOT in Rod defaults — add explicitly
 		Set("disable-gpu").
 		Set("no-sandbox").
@@ -310,6 +344,21 @@ drained:
 }
 
 // isBrowserAlive checks if the Chrome process is still running.
+
+// tryLockWithin polls mu.TryLock until deadline — keeps health responsive (#96).
+func (p *Pool) tryLockWithin(d time.Duration) bool {
+	deadline := time.Now().Add(d)
+	for {
+		if p.mu.TryLock() {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(15 * time.Millisecond)
+	}
+}
+
 func (p *Pool) isBrowserAlive() bool {
 	if p.browserPID <= 0 {
 		return false
@@ -436,7 +485,9 @@ var ErrQueueFull = fmt.Errorf("queue full")
 // ErrQueueTimeout is returned when a request waited too long in the queue.
 var ErrQueueTimeout = fmt.Errorf("queue timeout")
 
-func (p *Pool) getPage() (*rod.Page, error) {
+func (p *Pool) getPage() (*rod.Page, error) { return p.getPagePrio(true) }
+
+func (p *Pool) getPagePrio(interactive bool) (*rod.Page, error) {
 	p.mu.Lock()
 
 	// Cancel idle timer — browser is being used
@@ -532,38 +583,71 @@ func (p *Pool) getPage() (*rod.Page, error) {
 	}
 	p.mu.Unlock()
 
-	// Enter queue — wait for a page to be released
+	if interactive {
+		atomic.AddInt64(&p.interQueued, 1)
+		defer atomic.AddInt64(&p.interQueued, -1)
+	}
+
+	// Enter queue — priority-aware wait (C-010-12)
 	queueStarted := time.Now()
 	atomic.AddInt64(&p.queued, 1)
-	log.Printf("[vision] queued request (depth=%d, active=%d, max=%d)", depth+1, p.active, p.maxPages)
+	log.Printf("[vision] queued request (prio=%s depth=%d active=%d max=%d)", prioName(interactive), depth+1, p.active, p.maxPages)
 
-	select {
-	case page := <-p.pages:
-		waitMs := time.Since(queueStarted).Milliseconds()
-		atomic.AddInt64(&p.queueWaitTotalMs, waitMs)
-		for {
-			old := atomic.LoadInt64(&p.queueWaitMaxMs)
-			if waitMs <= old || atomic.CompareAndSwapInt64(&p.queueWaitMaxMs, old, waitMs) {
-				break
-			}
+	for {
+		waitedMs := time.Since(queueStarted).Milliseconds()
+		if !interactive && batchShouldYield(atomic.LoadInt64(&p.interQueued), waitedMs) {
+			time.Sleep(20 * time.Millisecond)
+			continue
 		}
-		atomic.AddInt64(&p.queued, -1)
-		atomic.AddInt64(&p.queueDone, 1)
-		p.mu.Lock()
-		p.recordQueueWaitSampleLocked(waitMs)
-		p.active++
-		p.mu.Unlock()
-		return page, nil
-	case <-time.After(QueueWaitMax):
-		atomic.AddInt64(&p.queued, -1)
-		atomic.AddInt64(&p.queueDrop, 1)
-		return nil, ErrQueueTimeout
+		select {
+		case page := <-p.pages:
+			waitMs := time.Since(queueStarted).Milliseconds()
+			atomic.AddInt64(&p.queueWaitTotalMs, waitMs)
+			for {
+				old := atomic.LoadInt64(&p.queueWaitMaxMs)
+				if waitMs <= old || atomic.CompareAndSwapInt64(&p.queueWaitMaxMs, old, waitMs) {
+					break
+				}
+			}
+			atomic.AddInt64(&p.queued, -1)
+			atomic.AddInt64(&p.queueDone, 1)
+			p.mu.Lock()
+			p.recordQueueWaitSampleLocked(waitMs)
+			p.active++
+			p.mu.Unlock()
+			return page, nil
+		case <-time.After(QueueWaitMax):
+			atomic.AddInt64(&p.queued, -1)
+			atomic.AddInt64(&p.queueDrop, 1)
+			return nil, ErrQueueTimeout
+		}
 	}
+}
+
+func prioName(interactive bool) string {
+	if interactive {
+		return "interactive"
+	}
+	return "batch"
 }
 
 // GetPage returns a page from the pool (exported for interactive routes)
 func (p *Pool) GetPage() (*rod.Page, error) {
-	return p.getPage()
+	return p.getPagePrio(true)
+}
+
+// GetPageBatch returns a page at batch priority: it defers to queued
+// interactive callers until the starvation window elapses (C-010-12).
+func (p *Pool) GetPageBatch() (*rod.Page, error) {
+	return p.getPagePrio(false)
+}
+
+// BatchStarvationMs bounds how long batch defers to interactive waiters.
+var BatchStarvationMs int64 = 5000
+
+// batchShouldYield decides whether a batch waiter defers this tick.
+func batchShouldYield(interQueued, elapsedMs int64) bool {
+	return interQueued > 0 && elapsedMs < BatchStarvationMs
 }
 
 // ReleasePage returns a page to the pool (exported for interactive routes)
@@ -592,6 +676,32 @@ func (p *Pool) releasePage(page *rod.Page) {
 			p.created--
 			p.active--
 			p.scheduleIdleShutdown()
+			p.mu.Unlock()
+			return
+		}
+		// C-010-13 follow-up (#99): liveness probe — survive about:blank but fail trivial eval ⇒ poisoned; discard.
+		live := make(chan bool, 1)
+		go func() {
+			_, err := cleanPage.Eval("() => 1+1")
+			live <- err == nil
+		}()
+		select {
+		case ok2 := <-live:
+			if !ok2 {
+				log.Printf("[vision] release liveness probe failed; discarding page")
+				cleanPage.Close()
+				p.mu.Lock()
+				p.created--
+				p.active--
+				p.mu.Unlock()
+				return
+			}
+		case <-time.After(1500 * time.Millisecond):
+			log.Printf("[vision] release liveness probe timed out; discarding page")
+			cleanPage.Close()
+			p.mu.Lock()
+			p.created--
+			p.active--
 			p.mu.Unlock()
 			return
 		}
@@ -625,6 +735,9 @@ func (p *Pool) releasePage(page *rod.Page) {
 // scheduleIdleShutdown starts or resets the idle timer.
 // Must be called with p.mu held.
 func (p *Pool) scheduleIdleShutdown() {
+	if p.keepAlive { // C-010-06: warm fleet keeps browsers alive
+		return
+	}
 	if p.active > 0 || p.browser == nil {
 		return
 	}
@@ -1092,7 +1205,16 @@ func percentileInt64(values []int64, pct float64) int64 {
 }
 
 func (p *Pool) Stats() map[string]any {
-	p.mu.Lock()
+	// #96 F1: never block health on a wedged pool — bounded try-lock window.
+	if !p.tryLockWithin(400 * time.Millisecond) {
+		return map[string]any{
+			"degraded":     true,
+			"reason":       "stats_lock_timeout",
+			"max_pages":    p.maxPages,
+			"active_pages": p.active,
+			"fail_count":   p.failCount,
+		}
+	}
 	defer p.mu.Unlock()
 
 	browserState := "idle-off"

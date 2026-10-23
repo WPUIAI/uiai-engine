@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpuiai.com/schemas/uiai.epwa_delivery.v1.schema.json",
+  "title": "UIAI EPWA Delivery",
+  "description": "Fail-closed artifact delivery binding for a durable HTTPS EPWA viewer and portable package.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "delivery_id", "revision", "producer", "artifact", "epwa", "scope", "state", "idempotency_key", "created_at", "observed_at", "truth_notice"],
+  "properties": {
+    "schema": {"const": "uiai.epwa_delivery.v1"},
+    "delivery_id": {"type": "string", "pattern": "^uiai-epwa-delivery:sha256:[a-f0-9]{64}$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "producer": {"enum": ["screenshot.capture", "session.visual", "vision.interactive", "media.render", "artifact.runtime", "share.screenshot", "fpv.create", "artifact.commit", "derivative.connect", "diagnostics.bundle", "source.snapshot", "dom.snapshot", "report.critique", "report.visual_compare", "research.packet", "report.generated"]},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_ref", "revision", "manifest_sha256", "output_sha256"],
+      "properties": {
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "revision": {"type": "integer", "minimum": 1},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "output_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "epwa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_id", "package_ref", "package_sha256", "record_url", "portable_url", "access"],
+      "properties": {
+        "package_id": {"$ref": "#/$defs/sha256"},
+        "projection_ref": {"type": "string"},
+        "projection_sha256": {"type": "string", "pattern": "^$|^[a-f0-9]{64}$"},
+        "package_ref": {"type": "string", "pattern": "^uiai-epwa-package:sha256:[a-f0-9]{64}$"},
+        "package_sha256": {"$ref": "#/$defs/sha256"},
+        "record_url": {"type": "string"},
+        "portable_url": {"type": "string"},
+        "access": {"enum": ["public_safe", "private", "unlisted", "redacted"]}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["posture"],
+      "properties": {
+        "posture": {"enum": ["complete", "blocked"]},
+        "project_ref": {"type": "string"},
+        "workstream_ref": {"type": "string"},
+        "workset_ref": {"type": "string"},
+        "callgraph_ref": {"type": "string"},
+        "workpoint_ref": {"type": "string"},
+        "work_item_ref": {"type": "string"},
+        "continuity_ref": {"type": "string"}
+      }
+    },
+    "state": {"enum": ["ready", "blocked", "pending_reconcile", "unavailable", "corrupt", "stale", "redacted", "degraded"]},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "recovery_ref": {"type": "string"},
+    "truth_notice": {"const": "Artifact existence and EPWA delivery do not establish review, verification, completion, provider closure, settlement, or legal admissibility."}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"state": {"const": "ready"}}, "required": ["state"]},
+      "then": {
+        "properties": {
+          "recovery_ref": {"maxLength": 0},
+          "scope": {"properties": {"posture": {"const": "complete"}}, "required": ["posture", "project_ref", "workstream_ref", "workset_ref", "callgraph_ref", "workpoint_ref", "work_item_ref", "continuity_ref"]},
+          "epwa": {"properties": {"record_url": {"type": "string", "pattern": "^https://"}, "portable_url": {"type": "string", "pattern": "^https://.*\\.zip$"}, "access": {"const": "public_safe"}}, "required": ["projection_ref", "projection_sha256"]}
+        }
+      },
+      "else": {
+        "required": ["recovery_ref"],
+        "properties": {"recovery_ref": {"minLength": 1}, "epwa": {"properties": {"record_url": {"const": ""}, "portable_url": {"const": ""}}}}
+      }
+    }
+  ],
+  "$defs": {"sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}
+}

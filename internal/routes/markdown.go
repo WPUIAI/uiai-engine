@@ -22,14 +22,14 @@ import (
 var markdownURLRe = regexp.MustCompile(`https?://[^\s)\]"'<>]+`)
 
 // MountMarkdownRoutes registers the one-shot Source-to-Markdown API.
-func MountMarkdownRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManager) {
+func MountMarkdownRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager) {
 	if sm == nil {
 		return
 	}
 
 	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
 		body := markdownRequestFromQuery(req)
-		handleMarkdownRequest(w, body, sm)
+		handleMarkdownRequest(w, req, body, cfg, sm)
 	})
 
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
@@ -38,7 +38,7 @@ func MountMarkdownRoutes(r chi.Router, _ *config.Config, sm *vision.SessionManag
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 			return
 		}
-		handleMarkdownRequest(w, body, sm)
+		handleMarkdownRequest(w, req, body, cfg, sm)
 	})
 }
 
@@ -86,7 +86,7 @@ func markdownRequestFromQuery(req *http.Request) markdownRequest {
 	}
 }
 
-func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *vision.SessionManager) {
+func handleMarkdownRequest(w http.ResponseWriter, req *http.Request, body markdownRequest, cfg *config.Config, sm *vision.SessionManager) {
 	if strings.TrimSpace(body.URL) == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "url required"})
 		return
@@ -202,7 +202,7 @@ func handleMarkdownRequest(w http.ResponseWriter, body markdownRequest, sm *visi
 	if len(chunks) > 0 {
 		response["chunks"] = chunks
 	}
-	writeJSON(w, http.StatusOK, response)
+	writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromSession(sess), safeURL, "Source-to-Markdown snapshot", "source_snapshot", response, http.StatusOK)
 }
 
 func normalizeSourceMarkdownFormat(format string) string {

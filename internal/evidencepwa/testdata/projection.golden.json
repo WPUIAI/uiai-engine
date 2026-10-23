@@ -1,0 +1,143 @@
+{
+  "schema": "uiai.evidence_pwa_projection.v1",
+  "projection_id": "projection:1",
+  "artifact": {
+    "artifact_ref": "artifact:1",
+    "revision": 5,
+    "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bundle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "scope": {
+      "project_ref": "project:1",
+      "workstream_ref": "workstream:1",
+      "workset_ref": "workset:1",
+      "callgraph_ref": "callgraph:1",
+      "workpoint_ref": "workpoint:1",
+      "work_item_ref": "github:WPUIAI/uiai-engine#116"
+    }
+  },
+  "title": "Responsive evidence proof",
+  "summary": "A bounded read-only projection of immutable evidence.",
+  "sections": [
+    {
+      "id": "overview",
+      "heading": "Overview"
+    },
+    {
+      "id": "evidence",
+      "heading": "Evidence"
+    },
+    {
+      "id": "timeline",
+      "heading": "Timeline"
+    },
+    {
+      "id": "inspect",
+      "heading": "Inspect"
+    },
+    {
+      "id": "developer",
+      "heading": "Developer"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "claim:layout",
+      "statement": "The required layout is visible.",
+      "posture": "supported",
+      "citation_ids": [
+        "citation:layout"
+      ],
+      "asset_ids": [
+        "asset:layout"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "asset:layout",
+      "ref": "./assets/layout.png",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mime": "image/png",
+      "modality": "static_image",
+      "bytes": 2048
+    }
+  ],
+  "citations": [
+    {
+      "citation_id": "citation:layout",
+      "source_ref": "asset:layout",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "region:0.1,0.1,0.5,0.5"
+    }
+  ],
+  "timeline": [
+    {
+      "entry_id": "event:capture",
+      "occurred_at": "2026-08-30T00:00:00Z",
+      "event_type": "evidence_captured",
+      "refs": [
+        "claim:layout",
+        "citation:layout"
+      ]
+    }
+  ],
+  "inspection_refs": [
+    "inspection:redaction"
+  ],
+  "security_refs": [
+    "security:1"
+  ],
+  "custody_refs": [
+    "custody:1"
+  ],
+  "attestation_refs": [
+    "attestation:1"
+  ],
+  "trust_refs": [
+    "trust:1"
+  ],
+  "omission_refs": [
+    "omission:1"
+  ],
+  "related_artifact_refs": [
+    "artifact:prior"
+  ],
+  "receipt_refs": [
+    "receipt:1"
+  ],
+  "availability": "ready",
+  "access": "public_safe",
+  "redaction": {
+    "state": "applied",
+    "evidence_ref": "inspection:redaction",
+    "private_ref_count": 0,
+    "secret_finding_count": 0,
+    "pii_finding_count": 0
+  },
+  "federation_posture": "origin",
+  "freshness_observed_at": "2026-08-30T00:00:00Z",
+  "warnings": [
+    {
+      "code": "bounded_projection",
+      "message": "Large diagnostics remain ref-first.",
+      "evidence_refs": [
+        "claim:layout"
+      ]
+    }
+  ],
+  "page": {
+    "page_size": 1,
+    "total_count": 1
+  },
+  "links": [
+    {
+      "rel": "self",
+      "href": "./artifact.json"
+    },
+    {
+      "rel": "overview",
+      "href": "#overview"
+    }
+  ],
+  "interaction": "read_only"
+}

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Evidence Artifact</title>
+</head>
+<body data-epwa-shell="v1" data-interaction="read-only">
+  <a href="#evidence-artifact">Skip to evidence artifact</a>
+  <header>
+    <p>Immutable Evidence Artifact</p>
+    <nav aria-label="Evidence sections">
+      <a href="#overview">Overview</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#timeline">Timeline</a>
+      <a href="#inspect">Inspect</a>
+      <a href="#developer">Developer</a>
+    </nav>
+    <p id="artifact-status" role="status" aria-live="polite" data-epwa-status="loading">Loading the exact artifact projection.</p>
+  </header>
+  <main id="evidence-artifact">
+    <article aria-labelledby="artifact-heading" data-epwa-article="true">
+      <h1 id="artifact-heading">Evidence Artifact</h1>
+      <p data-epwa-posture="read-only">This projection is read-only. It does not by itself prove review, completion, provider closure, or settlement.</p>
+      <section id="overview" data-epwa-section="overview" aria-labelledby="overview-heading">
+        <h2 id="overview-heading">Overview</h2>
+        <p data-epwa-slot="overview">Artifact identity, scope, availability, freshness, and blockers appear here.</p>
+      </section>
+      <section id="evidence" data-epwa-section="evidence" aria-labelledby="evidence-heading">
+        <h2 id="evidence-heading">Evidence</h2>
+        <p data-epwa-slot="evidence">Claims, immutable assets, citations, omissions, and trust posture appear here.</p>
+      </section>
+      <section id="timeline" data-epwa-section="timeline" aria-labelledby="timeline-heading">
+        <h2 id="timeline-heading">Timeline</h2>
+        <p data-epwa-slot="timeline">Custody, actions, diagnostics, Receipts, and revalidation events appear here.</p>
+      </section>
+      <section id="inspect" data-epwa-section="inspect" aria-labelledby="inspect-heading">
+        <h2 id="inspect-heading">Inspect</h2>
+        <p data-epwa-slot="inspect">Hashes, provenance, inspection, redaction, access, and retention details appear here.</p>
+      </section>
+      <section id="developer" data-epwa-section="developer" aria-labelledby="developer-heading">
+        <h2 id="developer-heading">Developer</h2>
+        <p data-epwa-slot="developer">Versioned machine-contract and compatibility information appears here.</p>
+      </section>
+    </article>
+  </main>
+  <noscript>This read-only semantic artifact remains inspectable without JavaScript. Dynamic evidence is unavailable until a governed projection is embedded or loaded.</noscript>
+  <footer>
+    <p>Unavailable, blocked, corrupt, stale, redacted, degraded, and ready states must remain explicit.</p>
+  </footer>
+</body>
+</html>

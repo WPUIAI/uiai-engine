@@ -1,0 +1,326 @@
+document_number: UIAI-COCKPIT-004-C01
+parent_document_number: UIAI-COCKPIT-004
+master_document_number: UIAI-COCKPIT-000
+document_family: UIAI Cockpit numbered specification series
+normative_document_path: docs/UIAI_COCKPIT_004_DESKTOP_SESSION_PRESENTATION_AND_MENUBAR_HANDOFF_SPEC_2026-08-03_v1.0.md
+schema: uiai.desktop_session_presentation_contract_ledger.v1
+version: '1.0'
+date: '2026-08-03'
+status: proposed_normative_companion
+call_stack_design_id: 019fc617-9d91-70c2-8392-3c7488e457a7
+project_root: /Volumes/Macintosh HD/Users/vsmith/uiai-engine
+
+scheme_ownership:
+  focusa:
+    owner: focusa-menubar
+    bundle_id: com.focusa.menubar
+    authority: handoff_only
+  cockpit:
+    owner: uaiengine-cockpit
+    bundle_id: com.wpuiai.uiaiengine.cockpit
+    authority: handoff_only
+
+runtime_modes:
+  production_default: packaged_cdp
+  permitted:
+    - packaged_cdp
+    - explicit_path
+    - rod_managed_dev
+  production_download_allowed: false
+  installed_browser_autodiscovery_allowed: false
+
+schemas:
+  - uiai.browser_runtime_manifest.v1
+  - uiai.desktop_presentation_request.v1
+  - uiai.desktop_presentation_receipt.v1
+  - uiai.desktop_presentation_status.v1
+  - uiai.app_handoff_intent.v1
+  - uiai.app_handoff_receipt.v1
+  - focusa.app.manifest.v2
+
+status_vocabulary:
+  - requested
+  - resolving_session
+  - resolving_cockpit
+  - launching
+  - attaching
+  - visible
+  - focused
+  - already_visible
+  - blocked_scope
+  - session_missing
+  - cockpit_missing
+  - incompatible
+  - attach_failed
+  - desktop_unavailable
+  - expired
+  - cancelled
+  - failed
+
+reason_codes:
+  - operator_request
+  - takeover_required
+  - policy_confirmation
+  - failure_recovery
+  - workflow
+  - browser_runtime_missing
+  - browser_runtime_corrupt
+  - browser_runtime_incompatible
+  - browser_runtime_untrusted
+  - cockpit_not_installed
+  - cockpit_protocol_mismatch
+  - handoff_expired
+  - handoff_rejected
+  - scope_conflict
+  - lease_conflict
+  - session_parked
+
+requirements:
+  - id: DSP-001
+    title: One browser authority
+    owner: uiai-engine
+    acceptance: Engine remains sole process, context, page, cookie, storage, diagnostics, and lifecycle authority.
+  - id: DSP-002
+    title: Cockpit desktop shell
+    owner: uaiengine-cockpit
+    acceptance: Full desktop browser presentation opens in or focuses Cockpit.
+  - id: DSP-003
+    title: Same-session presentation
+    owner: uiai-engine+uaiengine-cockpit
+    acceptance: Presentation preserves canonical session ID and page-state lineage.
+  - id: DSP-004
+    title: No surprise runtime download
+    owner: uiai-release
+    acceptance: Production first use performs zero browser downloads.
+  - id: DSP-005
+    title: Packaged signed runtime
+    owner: uiai-release
+    acceptance: Runtime manifest, checksum, platform, architecture, signature, and CDP probe pass.
+  - id: DSP-006
+    title: Explicit development fallback
+    owner: uiai-engine
+    acceptance: Rod-managed download requires explicit development opt-in.
+  - id: DSP-007
+    title: No installed-browser default
+    owner: uiai-engine
+    acceptance: Production never silently uses Chrome, Brave, Edge, or a user profile.
+  - id: DSP-008
+    title: Typed Cockpit handoff
+    owner: uiai-engine
+    acceptance: Presentation request/status/ack are versioned, bounded, and idempotent.
+  - id: DSP-009
+    title: Single Cockpit instance
+    owner: uaiengine-cockpit
+    acceptance: Cold and warm activation converge on one process and selected session.
+  - id: DSP-010
+    title: Bidirectional scheme ownership
+    owner: uaiengine-cockpit+focusa-menubar
+    acceptance: focusa:// routes to Menubar and cockpit:// routes to Cockpit without collision.
+  - id: DSP-011
+    title: Opaque secret-free deep links
+    owner: uaiengine-cockpit+focusa-menubar
+    acceptance: Deep-link fixtures contain opaque refs only and pass secret/path/URL scans.
+  - id: DSP-012
+    title: Truth-plane fallback
+    owner: uiai-engine+focusa-daemon
+    acceptance: Stale or unresolved refs remain non-mutating and recover through authenticated reads.
+  - id: DSP-013
+    title: Distinct app identities
+    owner: uaiengine-cockpit+focusa-menubar
+    acceptance: Bundle IDs, device IDs, Keychain services, and tokens stay separate.
+  - id: DSP-014
+    title: Reuse FPV transport
+    owner: uiai-engine+uaiengine-cockpit
+    acceptance: Cockpit uses CDP screencast, MJPEG/poll fallback, audited controls, and diagnostics.
+  - id: DSP-015
+    title: Scoped mutations
+    owner: uiai-engine+focusa-daemon
+    acceptance: Scope, consent, owner, lease, and audit guards apply to all presentation controls.
+  - id: DSP-016
+    title: Standalone resilience
+    owner: all
+    acceptance: Engine, Cockpit, and Menubar each degrade truthfully when siblings are absent.
+  - id: DSP-017
+    title: Typed recovery
+    owner: all
+    acceptance: Runtime, app, protocol, session, stream, scope, and lease failures have distinct recovery.
+  - id: DSP-018
+    title: Version negotiation
+    owner: all
+    acceptance: Engine, runtime, Cockpit, Menubar, FPV, and handoff versions are observable and gated.
+
+routes:
+  engine:
+    - method: POST
+      path: /api/session/{session_id}/present
+      mutation: true
+      schema: uiai.desktop_presentation_request.v1
+      output: uiai.desktop_presentation_receipt.v1
+    - method: GET
+      path: /api/presentation/{presentation_id}
+      mutation: false
+      output: uiai.desktop_presentation_status.v1
+    - method: POST
+      path: /api/presentation/{presentation_id}/ack
+      mutation: true
+      output: uiai.desktop_presentation_receipt.v1
+    - method: GET
+      path: /.well-known/uiai-desktop.json
+      mutation: false
+      output: focusa.app.manifest.v2
+  deep_links:
+    - focusa://mission/{opaque_ref}
+    - focusa://card/{opaque_ref}
+    - focusa://workpoint/{opaque_ref}
+    - focusa://connect?payload={governed_pairing_payload}
+    - cockpit://live/session/{opaque_session_id}?handoff={opaque_ref}
+    - cockpit://focusa/{opaque_ref}
+    - cockpit://evidence/{opaque_ref}
+    - cockpit://settings/pairing
+
+phases:
+  - id: P0
+    title: Specification and contracts
+    tasks: [T004-00, T004-01]
+  - id: P1
+    title: Runtime and presenter foundations
+    tasks: [T004-02, T004-03, T004-04]
+  - id: P2
+    title: Cockpit and Menubar handoff
+    tasks: [T004-05, T004-06, T004-07, T004-08]
+  - id: P3
+    title: Lifecycle and broker integration
+    tasks: [T004-09, T004-10]
+  - id: P4
+    title: Hardening and release proof
+    tasks: [T004-11, T004-12]
+
+tasks:
+  - id: T004-00
+    bead: uiai-engine-roadmap.12.00
+    title: Register specification and freeze authority map
+    depends_on: []
+    repositories: [uiai-engine]
+  - id: T004-01
+    bead: uiai-engine-roadmap.12.01
+    title: Define generated contracts and compatibility manifest
+    depends_on: [T004-00]
+    repositories: [uiai-engine, focusa]
+  - id: T004-02
+    bead: uiai-engine-roadmap.12.02
+    title: Add browser-runtime provider and production no-download gate
+    depends_on: [T004-01, uiai-engine-roadmap.1]
+    repositories: [uiai-engine]
+  - id: T004-03
+    bead: uiai-engine-roadmap.12.03
+    title: Package sign update and roll back runtime
+    depends_on: [T004-02]
+    repositories: [uiai-engine]
+  - id: T004-04
+    bead: uiai-engine-roadmap.12.04
+    title: Implement Engine DesktopPresenter and presentation routes
+    depends_on: [T004-01, uiai-engine-roadmap.11.19]
+    repositories: [uiai-engine]
+  - id: T004-05
+    bead: uiai-engine-roadmap.12.05
+    title: Implement Cockpit deep-link registration and single-instance routing
+    depends_on: [T004-01, uiai-engine-roadmap.11.19]
+    repositories: [uiai-engine]
+  - id: T004-06
+    bead: uiai-engine-roadmap.12.06
+    title: Attach Cockpit Live to existing FPV stream and control
+    depends_on: [T004-04, T004-05]
+    repositories: [uiai-engine]
+  - id: T004-07
+    bead: uiai-engine-roadmap.12.07
+    title: Implement Menubar focusa scheme registration and handlers
+    depends_on: [T004-01]
+    repositories: [focusa]
+  - id: T004-08
+    bead: uiai-engine-roadmap.12.08
+    title: Implement bidirectional Cockpit and Menubar handoff
+    depends_on: [T004-05, T004-07]
+    repositories: [uiai-engine, focusa]
+  - id: T004-09
+    bead: uiai-engine-roadmap.12.09
+    title: Add Engine and Cockpit lifecycle and local fast channel
+    depends_on: [T004-03, T004-05]
+    repositories: [uiai-engine]
+  - id: T004-10
+    bead: uiai-engine-roadmap.12.10
+    title: Integrate broker ownership leases parking and takeover
+    depends_on: [T004-04, uiai-engine-roadmap.6, uiai-engine-roadmap.7]
+    repositories: [uiai-engine]
+  - id: T004-11
+    bead: uiai-engine-roadmap.12.11
+    title: Harden security privacy accessibility and degraded UX
+    depends_on: [T004-06, T004-08, T004-09, T004-10]
+    repositories: [uiai-engine, focusa]
+  - id: T004-12
+    bead: uiai-engine-roadmap.12.12
+    title: Prove same-session E2E and release readiness
+    depends_on: [T004-11]
+    repositories: [uiai-engine, focusa]
+
+external_dependencies:
+  - issue: uiai-engine-roadmap.11
+    relationship: completes_before_feature_rollout
+    reason: Finish current UIAI-COCKPIT-003 shell migration without bypassing active Cockpit work.
+  - issue: uiai-engine-roadmap.1
+    relationship: blocks_runtime_provider
+    reason: Browser-pressure recovery must stabilize launch and health behavior first.
+  - issue: uiai-engine-roadmap.6
+    relationship: blocks_broker_integration
+    reason: Desktop controls must respect ownership and leases.
+  - issue: uiai-engine-roadmap.7
+    relationship: blocks_park_restore_integration
+    reason: Presentation must restore parked sessions through canonical broker behavior.
+  - issue: uiai-engine-roadmap.10
+    relationship: blocked_by_feature
+    reason: Final Cockpit visibility and release proof cannot omit desktop presentation architecture.
+
+metrics:
+  - id: desktop_present_success_rate
+    target: '>= 0.99 after excluding explicit policy blocks'
+  - id: warm_present_p95_ms
+    target: '<= 750'
+  - id: cold_present_p95_ms
+    target: '<= 5000'
+  - id: first_live_frame_p95_ms
+    target: '<= 2000 after Cockpit ready'
+  - id: same_session_mismatch_count
+    target: '0'
+  - id: production_runtime_download_count
+    target: '0'
+  - id: deep_link_secret_leak_count
+    target: '0'
+  - id: duplicate_cockpit_instance_count
+    target: '0'
+
+proof_requirements:
+  - runtime_manifest_checksum_signature
+  - clean_install_offline_first_browser_session
+  - production_no_download_network_assertion
+  - cold_and_warm_cockpit_activation
+  - canonical_session_id_before_after_attach
+  - cookie_storage_dom_diagnostics_lineage_preserved
+  - cdp_to_mjpeg_to_poll_fallback
+  - audited_control_and_takeover
+  - focusa_to_cockpit_handoff
+  - cockpit_to_focusa_handoff
+  - app_absent_and_protocol_mismatch_recovery
+  - deep_link_fuzz_and_secret_scan
+  - broker_lease_and_parking_integration
+  - accessibility_keyboard_screen_reader_reduced_motion
+  - signed_release_and_rollback
+
+prohibited:
+  - installed_browser_default
+  - production_first_request_download
+  - second_cockpit_automation_webview
+  - cookie_or_storage_copy
+  - secrets_or_raw_paths_in_deep_links
+  - shared_menubar_cockpit_token
+  - direct_app_to_app_canonical_focusa_mutation
+  - broker_bypass
+  - release_without_same_session_proof

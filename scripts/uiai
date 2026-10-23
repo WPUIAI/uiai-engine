@@ -11,6 +11,24 @@ if [[ -n "${UIAI_API_KEY:-}" ]]; then
 elif [[ -n "${UIAI_BEARER_TOKEN:-}" ]]; then
   AUTH_ARGS=(-H "Authorization: Bearer ${UIAI_BEARER_TOKEN}")
 fi
+SCOPE_ARGS=()
+if [[ -n "${UIAI_EVIDENCE_SCOPE_JSON:-}" ]]; then
+  jq -e 'type == "object"' >/dev/null <<<"$UIAI_EVIDENCE_SCOPE_JSON" || { printf 'uiai: UIAI_EVIDENCE_SCOPE_JSON must be a JSON object\n' >&2; exit 4; }
+  jq -e '[.project_ref,.project_root,.workstream_ref,.workset_ref,.callgraph_ref,.workpoint_ref,.workpoint_id,.work_item_ref,.continuity_ref,.continuity_id] | map(select(type == "string")) | all(test("[\\u0000-\\u001F\\u007F]") | not)' >/dev/null <<<"$UIAI_EVIDENCE_SCOPE_JSON" || { printf 'uiai: evidence scope header values must not contain control characters\n' >&2; exit 4; }
+  while IFS=$'\t' read -r header value; do
+    [[ -n "$value" ]] && SCOPE_ARGS+=(-H "$header: $value")
+  done < <(jq -r '
+    def pick($names): . as $object | first($names[] as $name | $object[$name] | select(type == "string" and length > 0)) // "";
+    [["X-UIAI-Project-Ref", pick(["project_ref","project_root"])],
+     ["X-UIAI-Workstream-Ref", pick(["workstream_ref"])],
+     ["X-UIAI-Workset-Ref", pick(["workset_ref"])],
+     ["X-UIAI-CallGraph-Ref", pick(["callgraph_ref"])],
+     ["X-UIAI-Workpoint-Ref", pick(["workpoint_ref","workpoint_id"])],
+     ["X-UIAI-Work-Item-Ref", pick(["work_item_ref"])],
+     ["X-UIAI-Continuity-Ref", pick(["continuity_ref","continuity_id"])]][] | select(.[1] != "") | @tsv' <<<"$UIAI_EVIDENCE_SCOPE_JSON")
+  work_items="$(jq -c '.work_items // empty | select(type == "array" and length > 0)' <<<"$UIAI_EVIDENCE_SCOPE_JSON")"
+  [[ -n "$work_items" ]] && SCOPE_ARGS+=(-H "X-UIAI-Work-Items: $work_items")
+fi
 
 usage() {
   cat <<'EOF'
@@ -51,6 +69,7 @@ Environment:
   UIAI_ENGINE_URL                Default: http://localhost:7456
   UIAI_API_KEY                   Optional X-API-Key auth for remote/auth routes
   UIAI_BEARER_TOKEN              Optional bearer auth alternative
+  UIAI_EVIDENCE_SCOPE_JSON       Complete Focusa evidence-scope object for artifact-producing commands
   UIAI_CLI_TIMEOUT_SECONDS       Default: UIAI_SMOKE_TIMEOUT_SECONDS or 20
 
 Exit codes:
@@ -65,7 +84,7 @@ need jq
 
 api() {
   local method="$1" path="$2" body="${3:-}"
-  local args=(-sS --max-time "$TIMEOUT_SECONDS" -X "$method" "${AUTH_ARGS[@]}" "$ENGINE_URL$path")
+  local args=(-sS --max-time "$TIMEOUT_SECONDS" -X "$method" "${AUTH_ARGS[@]}" "${SCOPE_ARGS[@]}" "$ENGINE_URL$path")
   if [[ -n "$body" ]]; then
     args+=(-H "Content-Type: application/json" -d "$body")
   fi
@@ -86,6 +105,22 @@ api() {
     rm -f "$tmp"
     if (( status == 401 || status == 403 )); then exit 4; fi
     exit 1
+  fi
+  if jq -e 'type == "object" and (has("artifact_ref") or has("delivery_state") or has("epwa_delivery"))' >/dev/null 2>&1 <"$tmp"; then
+    if ! jq -e '
+      ([.. | objects | keys[]] | any(. == "screenshot" or . == "screenshot_path" or . == "imageBase64" or . == "image_base64" or . == "inline_bytes" or . == "artifact_path" or . == "result_path" or . == "result_url") | not) and
+      (.epwa_delivery.schema == "uiai.epwa_delivery.v1") and
+      (.delivery_state == "ready" and .epwa_delivery.state == .delivery_state) and
+      (.epwa_delivery.artifact.artifact_ref == .artifact_ref) and
+      (.artifact_url | type == "string" and startswith("https://")) and
+      (.portable_url | type == "string" and startswith("https://")) and
+      (.artifact_url == .epwa_delivery.epwa.record_url) and
+      (.portable_url == .epwa_delivery.epwa.portable_url)' >/dev/null <"$tmp"; then
+      err "artifact delivery is not a ready, identity-bound HTTPS EPWA result"
+      jq '{schema,artifact_ref,delivery_state,epwa_delivery,error,recovery_ref}' <"$tmp" >&2 || cat "$tmp" >&2
+      rm -f "$tmp"
+      exit 1
+    fi
   fi
   cat "$tmp"
   rm -f "$tmp"
@@ -220,7 +255,7 @@ cmd_research() {
         esac
       done
       [[ -n "$query" || -n "$url" ]] || { err "usage: uiai research packet [--query Q|--url URL] [--goal G] [--out PATH]"; exit 2; }
-      FORMAT="$FORMAT" ENGINE_URL="$ENGINE_URL" TIMEOUT_SECONDS="$TIMEOUT_SECONDS" UIAI_API_KEY="${UIAI_API_KEY:-}" UIAI_BEARER_TOKEN="${UIAI_BEARER_TOKEN:-}" \
+      FORMAT="$FORMAT" ENGINE_URL="$ENGINE_URL" TIMEOUT_SECONDS="$TIMEOUT_SECONDS" UIAI_API_KEY="${UIAI_API_KEY:-}" UIAI_BEARER_TOKEN="${UIAI_BEARER_TOKEN:-}" UIAI_EVIDENCE_SCOPE_JSON="${UIAI_EVIDENCE_SCOPE_JSON:-}" \
       python3 - "$query" "$url" "$goal" "$out" "$width" "$height" "$max_chars" <<'PY'
 import json, os, sys, urllib.request, urllib.error
 query, url, goal, out, width, height, max_chars = sys.argv[1:8]
@@ -232,6 +267,22 @@ if os.environ.get('UIAI_API_KEY'):
     headers['X-API-Key']=os.environ['UIAI_API_KEY']
 elif os.environ.get('UIAI_BEARER_TOKEN'):
     headers['Authorization']='Bearer '+os.environ['UIAI_BEARER_TOKEN']
+scope_json=os.environ.get('UIAI_EVIDENCE_SCOPE_JSON','')
+if not scope_json:
+    raise SystemExit('uiai research packet: UIAI_EVIDENCE_SCOPE_JSON is required')
+scope=json.loads(scope_json)
+if not isinstance(scope,dict):
+    raise SystemExit('uiai research packet: UIAI_EVIDENCE_SCOPE_JSON must be an object')
+for header, keys in {
+    'X-UIAI-Project-Ref':['project_ref','project_root'], 'X-UIAI-Workstream-Ref':['workstream_ref'],
+    'X-UIAI-Workset-Ref':['workset_ref'], 'X-UIAI-CallGraph-Ref':['callgraph_ref'],
+    'X-UIAI-Workpoint-Ref':['workpoint_ref','workpoint_id'], 'X-UIAI-Work-Item-Ref':['work_item_ref'],
+    'X-UIAI-Continuity-Ref':['continuity_ref','continuity_id'],
+}.items():
+    value=next((scope.get(key) for key in keys if isinstance(scope.get(key),str) and scope.get(key).strip()),None)
+    if value: headers[header]=value.strip()
+if isinstance(scope.get('work_items'),list):
+    headers['X-UIAI-Work-Items']=json.dumps(scope['work_items'],separators=(',',':'))
 
 def req(method,path,body=None):
     data=json.dumps(body).encode() if body is not None else None
@@ -245,12 +296,34 @@ def req(method,path,body=None):
         try: data=json.loads(raw)
         except Exception: data={'error':raw or str(e)}
         raise SystemExit(json.dumps({'ok':False,'status':e.code,'error':data}, indent=2))
+def require_delivery(body, operation):
+    forbidden={'screenshot','screenshot_path','imageBase64','image_base64','inline_bytes','artifact_path','result_path','result_url'}
+    delivery=body.get('epwa_delivery') or {}
+    epwa=delivery.get('epwa') or {}
+    def find_raw(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in forbidden and child not in (None, ''): return key
+                found=find_raw(child)
+                if found: return found
+        elif isinstance(value, list):
+            for child in value:
+                found=find_raw(child)
+                if found: return found
+        return ''
+    if find_raw(body): raise SystemExit(f'{operation}: raw artifact field returned')
+    if delivery.get('schema')!='uiai.epwa_delivery.v1' or delivery.get('state')!='ready' or body.get('delivery_state')!='ready' or (delivery.get('artifact') or {}).get('artifact_ref')!=body.get('artifact_ref'):
+        raise SystemExit(f"{operation}: EPWA delivery not ready ({delivery.get('recovery_ref') or 'invalid binding'})")
+    if not str(epwa.get('record_url','')).startswith('https://') or not str(epwa.get('portable_url','')).startswith('https://') or body.get('artifact_url')!=epwa.get('record_url') or body.get('portable_url')!=epwa.get('portable_url'):
+        raise SystemExit(f'{operation}: canonical HTTPS EPWA URLs missing')
+    return delivery
 
 responses=[]
 search=None
 selected_url=url
 if query:
     search=req('POST','/api/search',{'query':query,'limit':1})
+    require_delivery(search,'search')
     responses.append(search)
     results=search.get('results') or []
     if not selected_url and results:
@@ -261,21 +334,24 @@ if not selected_url:
 sid=None
 session_closed=False
 try:
-    opened=req('POST','/api/session',{'url':selected_url,'width':int(width),'height':int(height),'focusa_scope':{'project_root':'/home/wpuiai/uiai-engine','continuity_id':'focusa-cont-uiai-engine-82afe24f-90ce-4d6e-b5f2-1b431b7773fc','evidence_ref':'uiai-research-packet-cli'}})
+    opened=req('POST','/api/session',{'url':selected_url,'width':int(width),'height':int(height),'focusa_scope':scope})
+    require_delivery(opened,'session open')
     sid=(opened.get('session') or {}).get('id') or opened.get('id')
     if not sid: raise SystemExit(json.dumps({'ok':False,'error':'session id missing','opened':opened}, indent=2))
     read=req('POST',f'/api/session/{sid}/read',{'max_chars':int(max_chars),'include_links':True})
     snapshot=req('POST',f'/api/session/{sid}/snapshot',{'interactive':True,'compact':True})
     diagnostics=req('GET',f'/api/session/{sid}/diagnostics?limit=100')
+    for operation,response in [('source read',read),('snapshot',snapshot),('diagnostics',diagnostics)]: require_delivery(response,operation)
     responses.extend([read,snapshot,diagnostics])
     packet=req('POST','/api/agent/research-packet',{
         'mode':'research' if query else 'proof',
         'goal':goal,
         'responses':responses,
-        'focusa_scope':{'project_root':'/home/wpuiai/uiai-engine','continuity_id':'focusa-cont-uiai-engine-82afe24f-90ce-4d6e-b5f2-1b431b7773fc','evidence_ref':'uiai-research-packet-cli'},
+        'focusa_scope':scope,
         'recommended_next_action':'Capture packet evidence with Focusa, then close any remaining browser session.',
         'cleanup_session_id':sid,
     })
+    require_delivery(packet,'research packet')
 finally:
     if sid:
         try:
@@ -284,7 +360,7 @@ finally:
         except Exception:
             session_closed=False
 
-report={'ok':True,'query':query or None,'selected_url':selected_url,'session_id':sid,'session_closed':session_closed,'out':out,'packet':packet}
+report={'schema':'uiai.cli_research_summary.v2','posture':'client_summary_non_evidence','ok':True,'query':query or None,'selected_url':selected_url,'session_id':sid,'session_closed':session_closed,'out':out,'packet':packet}
 with open(out,'w') as f: json.dump(report,f,indent=2)
 if fmt == 'json':
     print(json.dumps(report,separators=(',',':')))

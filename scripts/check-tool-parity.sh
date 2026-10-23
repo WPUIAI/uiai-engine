@@ -13,6 +13,13 @@ need(){ command -v "$1" >/dev/null 2>&1 || { echo "missing required command: $1"
 need curl
 need jq
 need python3
+request_tools(){
+  if ((${#AUTH_ARGS[@]})); then
+    curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$ENGINE_URL/api/tools/mcp"
+  else
+    curl -fsS --max-time "$TIMEOUT_SECONDS" "$ENGINE_URL/api/tools/mcp"
+  fi
+}
 TMP="$(mktemp)"
 ENGINE_PID=""
 ENGINE_CONFIG=""
@@ -27,7 +34,7 @@ cleanup(){
   fi
 }
 trap cleanup EXIT
-if ! curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$ENGINE_URL/api/tools/mcp" > "$TMP"; then
+if ! request_tools > "$TMP"; then
   need go
   ENGINE_LOG="${UIAI_TOOL_PARITY_ENGINE_LOG:-/tmp/uiai-tool-parity-engine.log}"
   ENGINE_CONFIG="$(mktemp)"
@@ -62,7 +69,7 @@ PY
     fi
     sleep 0.5
   done
-  curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$ENGINE_URL/api/tools/mcp" > "$TMP"
+  request_tools > "$TMP"
 fi
 python3 - <<'PY' "$ROOT_DIR" "$TMP"
 import json, re, sys
@@ -71,7 +78,7 @@ root=Path(sys.argv[1])
 tools_json=Path(sys.argv[2])
 mcp_tools=json.loads(tools_json.read_text()).get('tools',[])
 mcp_names={t.get('name') for t in mcp_tools if t.get('name')}
-pi_src=(root/'.pi/extensions/uiai-engine.ts').read_text()
+pi_src=(root/'integrations/pi/uiai-engine.ts').read_text()
 mcp_src=(root/'mcp/browser-session-mcp.mjs').read_text()
 cli_src=(root/'scripts/uiai').read_text()
 readme=(root/'README.md').read_text()

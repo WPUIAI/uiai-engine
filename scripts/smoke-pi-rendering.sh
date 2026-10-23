@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PI_EXT="$ROOT_DIR/.pi/extensions/uiai-engine.ts"
+PI_EXT="$ROOT_DIR/integrations/pi/uiai-engine.ts"
 
 python3 - <<'PY' "$PI_EXT"
 import json

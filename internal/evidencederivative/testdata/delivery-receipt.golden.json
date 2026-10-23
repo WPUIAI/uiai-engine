@@ -1,0 +1,17 @@
+{
+  "schema": "uiai.evidence_derivative_delivery.v1",
+  "delivery_id": "delivery:1",
+  "derivative_ref": "derivative:4bd60613d60f2deaffc40fbbd1c262ba83d43b6cb6ebea765dc8bcc4851a0420",
+  "derivative_sha256": "71dae4bb67ed1dccd9e2f051db5b020ef1648b06c8ba63e8e798e0f4ab1303b1",
+  "destination_ref": "destination:1",
+  "idempotency_key": "delivery-key:1",
+  "state": "delivered",
+  "provider_receipt_ref": "provider:1",
+  "accepted_at": "2026-08-30T00:01:00Z",
+  "delivered_at": "2026-08-30T00:02:00Z",
+  "evidence_refs": [
+    "evidence:delivery"
+  ],
+  "retry_permitted": false,
+  "observed_at": "2026-08-30T00:02:00Z"
+}

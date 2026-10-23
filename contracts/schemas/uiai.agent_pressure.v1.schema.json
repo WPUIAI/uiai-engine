@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "uiai.agent_pressure.v1",
+  "title": "Agent Pressure — /api/health/browser",
+  "type": "object",
+  "required": ["schema", "overall_pressure", "browser", "recommended_action"],
+  "properties": {
+    "schema": { "const": "uiai.agent_pressure.v1" },
+    "telemetry_class": { "const": "noncanonical_operational" },
+    "authority": { "const": "advisory_only" },
+    "overall_pressure": { "type": "string", "enum": ["low", "medium", "high", "critical", "unknown"] },
+    "recommended_actions": { "type": "array", "items": { "type": "string" } },
+    "recommended_action": { "type": "string" },
+    "browser": {
+      "type": "object",
+      "required": ["pressure", "active_pages", "max_pages"],
+      "properties": {
+        "pressure": { "type": "string" },
+        "active_pages": { "type": "integer", "minimum": 0 },
+        "available_pages": { "type": "integer", "minimum": 0 },
+        "max_pages": { "type": "integer", "minimum": 1 },
+        "fail_count": { "type": "integer", "minimum": 0 },
+        "queue_depth": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "focusa_routing_hint": { "type": "string" }
+  },
+  "additionalProperties": true
+}

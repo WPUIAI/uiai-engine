@@ -7,6 +7,9 @@ ENGINE_PORT="${ENGINE_PORT:-7472}"
 OUT="${OUT:-/tmp/uiai-browser-reliability/focusa-packet-smoke.json}"
 ENGINE_BIN="${ENGINE_BIN:-/tmp/uiai-engine-packet-smoke}"
 ENGINE_LOG="${ENGINE_LOG:-/tmp/uiai-packet-smoke-engine.log}"
+# Isolated contract fixture only; deployed delivery proof must use its audited public HTTPS origin.
+export UIAI_EPWA_PUBLIC_BASE_URL="${UIAI_EPWA_PUBLIC_BASE_URL:-https://epwa-ci.invalid/}"
+[[ "$UIAI_EPWA_PUBLIC_BASE_URL" == https://* ]] || { echo "UIAI_EPWA_PUBLIC_BASE_URL must use HTTPS" >&2; exit 2; }
 cd "$ROOT_DIR"
 go build -o "$ENGINE_BIN" ./cmd/uiai-engine
 TMPDIR="$(mktemp -d)"
@@ -43,6 +46,7 @@ if ! curl -fsS "http://127.0.0.1:$ENGINE_PORT/health" >/dev/null; then
   exit 7
 fi
 mkdir -p "$(dirname "$OUT")"
+printf '{}\n' >"$OUT"
 ENGINE_URL="http://127.0.0.1:$ENGINE_PORT" OUT="$OUT" "$SCRIPT_DIR/smoke-focusa-packet.sh"
 python3 - "$OUT" <<'PY'
 import json, sys
@@ -50,7 +54,11 @@ p=sys.argv[1]
 d=json.load(open(p))
 packet=d.get('packet',{})
 assert d.get('ok') is True, d
-assert packet.get('schema') == 'uiai.focusa_research_diagnostics_packet.v1', packet
+assert packet.get('schema') == 'uiai.artifact_result.v2', packet
+assert packet.get('artifact_schema') == 'uiai.focusa_research_diagnostics_packet.v1', packet
+assert packet.get('delivery_state') == 'ready', packet
+assert str(packet.get('artifact_url','')).startswith('https://'), packet
+assert str(packet.get('portable_url','')).startswith('https://'), packet
 assert packet.get('recommended_focusa',{}).get('preferred_tool') == 'focusa_browser_diagnostics_intake', packet.get('recommended_focusa')
 assert d.get('packet_bytes', 999999) <= 8192, d.get('packet_bytes')
 print(f"packet endpoint ci smoke ok: out={p} bytes={d.get('packet_bytes')} preferred_tool={packet.get('recommended_focusa',{}).get('preferred_tool')}")

@@ -100,24 +100,26 @@ const (
 )
 
 type Manifest struct {
-	Schema       string       `json:"schema"`
-	ArtifactID   string       `json:"artifact_id"`
-	Revision     uint64       `json:"revision"`
-	Title        string       `json:"title"`
-	Summary      string       `json:"summary,omitempty"`
-	Kinds        []string     `json:"kinds"`
-	CapturedAt   string       `json:"captured_at"`
-	CreatedAt    string       `json:"created_at"`
-	Scope        Scope        `json:"scope"`
-	Authority    Authority    `json:"authority"`
-	Claims       []Claim      `json:"claims"`
-	Assets       []Asset      `json:"assets"`
-	Provenance   Provenance   `json:"provenance"`
-	Verification Verification `json:"verification"`
-	ReceiptRefs  []string     `json:"receipt_refs"`
-	Policy       Policy       `json:"policy"`
-	Integrity    Integrity    `json:"integrity"`
-	Links        Links        `json:"links"`
+	Schema       string           `json:"schema"`
+	ArtifactID   string           `json:"artifact_id"`
+	Revision     uint64           `json:"revision"`
+	Title        string           `json:"title"`
+	Summary      string           `json:"summary,omitempty"`
+	Kinds        []string         `json:"kinds"`
+	CapturedAt   string           `json:"captured_at"`
+	CreatedAt    string           `json:"created_at"`
+	Scope        Scope            `json:"scope"`
+	Authority    Authority        `json:"authority"`
+	Claims       []Claim          `json:"claims"`
+	Assets       []Asset          `json:"assets"`
+	Provenance   Provenance       `json:"provenance"`
+	Verification Verification     `json:"verification"`
+	Security     Security         `json:"security"`
+	Capture      *CaptureMetadata `json:"capture,omitempty"`
+	ReceiptRefs  []string         `json:"receipt_refs"`
+	Policy       Policy           `json:"policy"`
+	Integrity    Integrity        `json:"integrity"`
+	Links        Links            `json:"links"`
 }
 
 type Scope struct {
@@ -129,6 +131,7 @@ type Scope struct {
 	Autonomy       AutonomyBinding   `json:"autonomy"`
 	WorkItems      []WorkItemBinding `json:"work_items"`
 	TrajectoryRef  string            `json:"trajectory_ref,omitempty"`
+	ContinuityRef  string            `json:"continuity_ref,omitempty"`
 	AssignmentRefs []string          `json:"assignment_refs"`
 	OperationRefs  []string          `json:"operation_refs"`
 	OntologyRefs   []string          `json:"ontology_refs"`
@@ -287,6 +290,13 @@ type Verification struct {
 	JudgeResultRefs    []string           `json:"judge_result_refs"`
 	DecisionRefs       []string           `json:"decision_refs"`
 	InformationSetHash string             `json:"information_set_hash,omitempty"`
+}
+
+type Security struct {
+	PolicyRef             string   `json:"policy_ref"`
+	InspectionReceiptRefs []string `json:"inspection_receipt_refs"`
+	SanitizationRefs      []string `json:"sanitization_refs"`
+	RedactionRefs         []string `json:"redaction_refs"`
 }
 
 type Policy struct {

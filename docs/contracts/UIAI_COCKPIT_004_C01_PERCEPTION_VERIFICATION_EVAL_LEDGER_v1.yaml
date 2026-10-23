@@ -1,0 +1,90 @@
+document_number: UIAI-COCKPIT-004-C01
+parent_document_number: UIAI-COCKPIT-004
+master_document_number: UIAI-COCKPIT-000
+schema: uiai.perception_verification_eval_ledger.v1
+version: '1.0'
+date: '2026-08-01'
+channels:
+  - dom
+  - accessibility
+  - visual
+  - ocr_vlm
+  - navigation
+  - network
+  - browser_native
+  - structured_origin_tool
+  - external_confirmation
+  - human
+verification_independence_levels:
+  V0: executor_self_report
+  V1: separate_probe_same_runtime
+  V2: separate_channel_same_runtime
+  V3: separate_context_process_or_worker
+  V4: separate_implementation_or_node
+  V5: external_authoritative_confirmation
+  V6: human_or_third_party_adjudication
+requirements:
+  - id: PVE-001
+    owner: uiai_engine
+    text: Preserve channel-specific observations and separate facts from inferences.
+  - id: PVE-002
+    owner: uiai_engine
+    text: Preserve semantic dependency closure for projected observations.
+  - id: PVE-003
+    owner: uiai_engine
+    text: Produce bounded fused assessments without erasing disagreement.
+  - id: PVE-004
+    owner: uiai_engine
+    text: Identify correlated failure domains across channels and verifiers.
+  - id: PVE-005
+    owner: focusa
+    text: Allow Completion Predicates to require a minimum verification-independence level.
+  - id: PVE-006
+    owner: uiai_engine
+    text: Disclose achieved verification level and shared failure domains.
+  - id: PVE-007
+    owner: uiai_engine
+    text: Implement versioned benchmark packs with integrity digests and ground-truth methods.
+  - id: PVE-008
+    owner: uiai_engine
+    text: Produce reproducible eval manifests containing profile, environment, model, actuator, verifier, receipts, and evidence refs.
+  - id: PVE-009
+    owner: uiai_engine
+    text: Support hidden/public splits, contamination tracking, statistical confidence, canaries, and regression gates.
+  - id: PVE-010
+    owner: uiai_engine
+    text: Evaluate CAPTCHA/challenge detection, solving, fingerprint consistency, route health, injection, stale state, and takeover.
+  - id: PVE-011
+    owner: focusa
+    text: Scope autonomy calibration to operation, site, profile, actuator, model, procedure, and node.
+  - id: PVE-012
+    owner: cockpit
+    text: Surface channel disagreement, independence, profile benchmarks, challenge metrics, and drift.
+implementation_phases:
+  - phase: 0
+    name: Observation and fusion contracts
+  - phase: 1
+    name: Multi-channel fusion and contradiction handling
+  - phase: 2
+    name: Verification independence enforcement
+  - phase: 3
+    name: Benchmark packs and reproducible manifests
+  - phase: 4
+    name: Challenge fingerprint and profile evaluation
+  - phase: 5
+    name: Autonomy calibration and Cockpit surfaces
+metrics:
+  - channel_disagreement_rate
+  - contradiction_detection_rate
+  - achieved_verification_level_distribution
+  - false_done_rate
+  - challenge_detection_rate
+  - challenge_solve_rate
+  - challenge_escalation_rate
+  - fingerprint_consistency_rate
+  - automation_exposure_rate
+  - route_block_rate
+  - operator_rescue_rate
+  - eval_reproducibility_rate
+  - benchmark_flake_rate
+  - autonomy_downgrade_rate

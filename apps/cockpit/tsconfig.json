@@ -9,13 +9,19 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx"
   },
   "include": [
+    ".svelte-kit/ambient.d.ts",
+    ".svelte-kit/non-ambient.d.ts",
     "src/**/*.ts",
     "src/**/*.js",
     "src/**/*.svelte",
     "tests/**/*.ts",
     "smoke/**/*.ts"
+  ],
+  "exclude": [
+    "src/remotion"
   ]
 }
