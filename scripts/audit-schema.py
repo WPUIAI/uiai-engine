@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Canonical audit-trail schema for `release-proof/audit/audit.jsonl`.
 
-Every row in `audit.jsonl` MUST conform to one of four canonical shapes:
+Every row in `audit.jsonl` MUST conform to a canonical shape; versioned Cockpit
+rows use apps/cockpit/scripts/cockpit_audit.py, and legacy audit rows use the
+four shapes below:
 
     FailureRow:
       id (str, required, unique): "fail-YYYY-MM-DD-<short>"
@@ -71,6 +73,11 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+
+# Keep Cockpit's versioned producer contract in its owning module; this script
+# remains the sole JSONL reader/validator for both canonical audit dialects.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "apps/cockpit/scripts"))
+from cockpit_audit import validate_row as validate_cockpit_row
 
 VALID_CATEGORIES = {
     "brittle_regex_match",
@@ -217,6 +224,15 @@ def validate(path: str) -> int:
     seen_ids: set[str] = set()
     counts: Counter[str] = Counter()
     for row, ln in iter_rows(path):
+        if not isinstance(row, dict):
+            errors.append(f"{path}:{ln}: audit row must be an object")
+            continue
+        if "schema" in row:
+            row_errors = validate_cockpit_row(row)
+            errors.extend(f"{path}:{ln}: {message}" for message in row_errors)
+            if not row_errors:
+                counts["cockpit"] += 1
+            continue
         kind = _row_kind(row)
         if kind is None:
             errors.append(f"{path}:{ln}: missing or invalid `event` field")

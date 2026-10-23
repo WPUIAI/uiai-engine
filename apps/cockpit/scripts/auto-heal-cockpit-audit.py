@@ -27,7 +27,7 @@ from pathlib import Path
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "WPUIAI/uiai-engine")
 AUDIT_FILE = Path("release-proof/cockpit/audit.jsonl")
-SCHEMA = "uaiengine.cockpit.audit.v1"
+from cockpit_audit import SCHEMA
 
 # Each fix has: id, match (substring in log), apply (Python lambda path -> bool).
 # Fixes are applied in order; first match wins.

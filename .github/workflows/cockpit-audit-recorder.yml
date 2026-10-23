@@ -21,7 +21,7 @@ concurrency:
 jobs:
   record-and-heal:
     name: Record failure + self-heal
-    if: ${{ github.event_name == 'schedule' || github.event.workflow_run.conclusion == 'failure' }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure' }}
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
@@ -53,7 +53,7 @@ jobs:
 
       - name: Validate audit JSONL shape
         run: |
-          python3 -c 'import json,sys\nfor line in open("release-proof/cockpit/audit.jsonl"):\n  line=line.strip()\n  if not line: continue\n  d=json.loads(line)\n  assert d.get("schema")=="uaiengine.cockpit.audit.v1", d\nprint("[audit-recorder] schema OK")'
+          python3 scripts/audit-schema.py validate release-proof/cockpit/audit.jsonl
 
       - name: Commit audit updates
         shell: bash
