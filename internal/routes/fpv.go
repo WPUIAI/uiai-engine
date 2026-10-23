@@ -116,6 +116,10 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 			response["artifact_url"] = delivery.EPWA.RecordURL
 			response["portable_url"] = delivery.EPWA.PortableURL
 		}
+		if challenge := sess.CurrentAuthChallenge(); challenge != nil {
+			response["auth_challenge"] = challenge
+			response["auth_resolve_url"] = "/api/session/" + sess.ID + "/auth/resolve"
+		}
 		writeJSON(w, status, response)
 	})
 	r.Get("/events", func(w http.ResponseWriter, req *http.Request) {
