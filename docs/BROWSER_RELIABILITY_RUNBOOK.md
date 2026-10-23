@@ -116,3 +116,16 @@ Typical local artifacts:
 - Diagnostics schema used by reliability triage: [Browser Diagnostics Spec](BROWSER_DIAGNOSTICS_SPEC.md)
 - Captcha solver behavior that can affect browser flake triage: [Captcha Solver Spec](CAPTCHA_SOLVER_SPEC.md)
 - Device-frame screenshot/media workflow: [Device Frame Integration](DEVICE_FRAME_INTEGRATION.md)
+
+## Background-session keyboard delivery
+
+Run `UIAI_ENGINE_URL=http://127.0.0.1:7456 python3
+scripts/smoke-keyboard-delivery.py` on an authorized single worker, not the load
+balancer. It needs two free session slots, opens only anonymous example.com
+fixtures, installs a page-local key recorder, backgrounds the first page, and
+requires real `a`/`Enter` DOM events before success. Both sessions close in a
+finally block, including failed probes. It does not claim visual correctness or
+EPWA readiness; the receipt preserves the observed delivery state. The local
+browser regression is `UIAI_INPUT_TESTS=1 go test ./internal/vision -run
+TestPressReactivatesBackgroundSessionBrowser -count=3`. A passing current probe
+does not by itself prove the historical no-delivery failure root cause.
