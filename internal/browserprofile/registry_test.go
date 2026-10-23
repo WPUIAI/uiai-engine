@@ -84,6 +84,32 @@ func TestInheritanceCycleRejected(t *testing.T) {
 	}
 }
 
+func TestEphemeralStorageUsesPerSessionBrowserContext(t *testing.T) {
+	registry, err := NewRegistry(ReadyDefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, name := range []string{"detect", "research"} {
+		profile, err := registry.Resolve(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !profileUsesEphemeralContext(profile) {
+			t.Fatalf("profile %q must use an isolated browser context", name)
+		}
+	}
+	for _, name := range []string{"no_detect", "operator"} {
+		profile, err := registry.Resolve(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if profileUsesEphemeralContext(profile) {
+			t.Fatalf("profile %q must retain profile-scoped storage", name)
+		}
+	}
+}
+
 func TestOperatorRequiresExclusiveLock(t *testing.T) {
 	cfg := ReadyDefaultConfig()
 	operator := cfg.Profiles["operator"]

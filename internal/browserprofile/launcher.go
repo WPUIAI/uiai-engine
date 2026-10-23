@@ -33,6 +33,11 @@ type Runtime struct {
 	Browser  *rod.Browser
 	Launcher *launcher.Launcher
 	PID      int
+
+	// sessionBrowser is a per-session browser context used for profiles whose
+	// storage contract is ephemeral. It keeps cookies, cache, and local storage
+	// isolated even when the runtime is connected to a shared browser process.
+	sessionBrowser *rod.Browser
 }
 
 // Launch starts a Chromium-compatible runtime for the resolved profile.
@@ -152,8 +157,23 @@ func (r *Runtime) OpenPage(ctx context.Context, targetURL string) (*rod.Page, er
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	page, err := r.Browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+
+	browser := r.Browser
+	if profileUsesEphemeralContext(r.Profile) {
+		isolated, err := r.Browser.Incognito()
+		if err != nil {
+			return nil, fmt.Errorf("create isolated browser context: %w", err)
+		}
+		r.sessionBrowser = isolated
+		browser = isolated
+	}
+
+	page, err := browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 	if err != nil {
+		if r.sessionBrowser != nil {
+			_ = r.sessionBrowser.Close()
+			r.sessionBrowser = nil
+		}
 		return nil, fmt.Errorf("create page: %w", err)
 	}
 	viewport := r.Profile.Identity.Viewport
@@ -272,12 +292,23 @@ func (r *Runtime) Close() {
 	if r == nil {
 		return
 	}
+	if r.sessionBrowser != nil {
+		_ = r.sessionBrowser.Close()
+		r.sessionBrowser = nil
+	}
 	if r.Browser != nil {
 		_ = r.Browser.Close()
 	}
 	if r.Launcher != nil {
 		r.Launcher.Cleanup()
 	}
+}
+
+func profileUsesEphemeralContext(profile ResolvedProfile) bool {
+	storage := profile.Storage
+	return storage.CookieMode == "ephemeral" ||
+		storage.CacheMode == "ephemeral" ||
+		storage.LocalStorageMode == "ephemeral"
 }
 
 // FindSystemChromium returns the first installed Chromium-compatible binary.
