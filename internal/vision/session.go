@@ -1258,7 +1258,13 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 			if (tag === 'table') return '\n\n' + Array.from(node.querySelectorAll('tr')).map(r => mdNode(r, depth)).join('').trim() + '\n\n';
 			return Array.from(node.childNodes).map(n => mdNode(n, depth)).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 		};
-		const plainText = (clone.innerText || clone.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+		// Detached clones do not consistently implement innerText. Preserve text
+		// node boundaries so adjacent labels/tokens cannot concatenate and evade
+		// redaction (for example, two neighboring Bearer-token paragraphs).
+		const textWalker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+		const textParts = [];
+		while (textWalker.nextNode()) textParts.push(textWalker.currentNode.textContent || '');
+		const plainText = textParts.join(' ').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 		const markdown = mdNode(clone).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 		const text = format === 'markdown' ? markdown : plainText;
 		const headings = Array.from(root.querySelectorAll('h1,h2,h3')).filter(e => !hidden(e)).slice(0, 20).map(e => ({ level: e.tagName.toLowerCase(), text: (e.innerText || e.textContent || '').trim().substring(0, 160) })).filter(h => h.text);
@@ -1295,6 +1301,25 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 		return nil, fmt.Errorf("%s: %s", raw.Error, opts.Selector)
 	}
 
+	// Redact before truncation so a character budget cannot split a credential
+	// pattern and accidentally disclose its prefix. Keep page reads independent
+	// of the shorter diagnostics-preview budget.
+	raw.Text = sanitizeBrowserContent(raw.Text)
+	raw.URL = focusapacket.SanitizeURL(raw.URL)
+	raw.Title = sanitizeBrowserContent(raw.Title)
+	raw.Description = sanitizeBrowserContent(raw.Description)
+	raw.CanonicalURL = focusapacket.SanitizeURL(raw.CanonicalURL)
+	raw.SiteName = sanitizeBrowserContent(raw.SiteName)
+	for _, heading := range raw.Headings {
+		for k, v := range heading {
+			heading[k] = sanitizeBrowserValue(v)
+		}
+	}
+	for _, link := range raw.Links {
+		for k, v := range link {
+			link[k] = sanitizeBrowserValue(v)
+		}
+	}
 	text := strings.TrimSpace(raw.Text)
 	truncated := false
 	if len(text) > opts.MaxChars {

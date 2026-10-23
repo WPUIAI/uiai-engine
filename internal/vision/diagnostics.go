@@ -537,7 +537,7 @@ func redactURL(raw string) string {
 	return raw
 }
 
-func sanitizeDiagnosticText(raw string) string {
+func sanitizeBrowserContent(raw string) string {
 	if raw == "" {
 		return raw
 	}
@@ -545,13 +545,18 @@ func sanitizeDiagnosticText(raw string) string {
 	clean = diagnosticAuthBearerRe.ReplaceAllString(clean, `${1}REDACTED`)
 	clean = diagnosticBearerRe.ReplaceAllString(clean, `${1}REDACTED`)
 	clean = diagnosticSecretKeyValueRe.ReplaceAllString(clean, `${1}REDACTED`)
-	return truncateDiag(clean, 1000)
+	return clean
+}
+
+// Diagnostics are previews; full browser reads must retain their own character budget.
+func sanitizeDiagnosticText(raw string) string {
+	return truncateDiag(sanitizeBrowserContent(raw), 1000)
 }
 
 func sanitizeBrowserValue(value any) any {
 	switch typed := value.(type) {
 	case string:
-		return sanitizeDiagnosticText(typed)
+		return sanitizeBrowserContent(typed)
 	case []any:
 		out := make([]any, len(typed))
 		for i, item := range typed {
