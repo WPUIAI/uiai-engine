@@ -60,6 +60,31 @@ Exact grants/limits come from the signed authority policy.
 
 The exact current route list remains in code/tool discovery and must be generated into the endpoint-feature coverage ledger before release.
 
+## Authentication state restoration
+
+`POST /api/session/{id}/auth/load` accepts the state returned by `/auth/save`.
+Storage fields contain string values only. For example:
+
+```json
+{"url":"https://example.com/","cookies":[],"localStorage":{"probe":"example"},"sessionStorage":{}}
+```
+
+Origin-keyed storage is also accepted:
+
+```json
+{"url":"https://example.com/","localStorage":{"https://example.com/":{"probe":"example"},"https://other.example":{"unrelated":"not-applied"}}}
+```
+
+Only the target page's origin is restored; values from different websites are
+never merged. An optional trailing slash on an origin is accepted. Invalid
+storage shapes or non-string values return HTTP 400 with `invalid_auth_state`
+and the affected field name, before cookies or navigation are changed.
+Navigation, origin changes, and storage-write failures return errors rather than
+`loaded`. A runtime failure may follow partial cookie/storage application; it is
+not a transactional rollback. Success reports `cookies_applied`,
+`localstorage_keys`, `sessionstorage_keys`, and the accepted storage shapes.
+Treat saved state as sensitive; never log it or put real credentials in examples.
+
 ## Authorized-development example
 
 This example assumes a synthetic/test trust root or a valid signed entitlement and an authentication token. It is not an anonymous Evaluation flow.

@@ -479,41 +479,6 @@ func (s *Session) SaveAuth() (json.RawMessage, error) {
 	return data, nil
 }
 
-// parseAuthStorage accepts flat string maps and one-level origin-keyed
-// shapes; anything else is unparseable and must fail loudly at the caller
-// instead of silently dropping (#240).
-func parseAuthStorage(raw json.RawMessage) (map[string]string, string) {
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil, "empty"
-	}
-	var flat map[string]string
-	if err := json.Unmarshal(raw, &flat); err == nil {
-		return flat, "flat"
-	}
-	var anys map[string]any
-	if err := json.Unmarshal(raw, &anys); err == nil {
-		merged := map[string]string{}
-		origins := 0
-		for _, v := range anys {
-			if obj, ok := v.(map[string]any); ok {
-				origins++
-				for k, vv := range obj {
-					if str, ok := vv.(string); ok {
-						merged[k] = str
-					}
-				}
-			} else {
-				return nil, "unparseable"
-			}
-		}
-		if origins > 0 {
-			return merged, "origin-keyed"
-		}
-		return nil, "unparseable"
-	}
-	return nil, "unparseable"
-}
-
 // LoadAuth restores cookies + localStorage from previously saved state.
 func (s *Session) LoadAuth(state json.RawMessage) (map[string]any, error) {
 	s.mu.Lock()
@@ -529,11 +494,33 @@ func (s *Session) LoadAuth(state json.RawMessage) (map[string]any, error) {
 		SessionStorage json.RawMessage        `json:"sessionStorage"`
 	}
 	if err := json.Unmarshal(state, &data); err != nil {
-		return nil, fmt.Errorf("invalid auth state: %w", err)
+		return nil, fmt.Errorf("%w: malformed JSON", ErrInvalidAuthState)
 	}
 
-	parseStorage := func(raw json.RawMessage) (map[string]string, string) {
-		return parseAuthStorage(raw)
+	targetURL := data.URL
+	if targetURL == "" {
+		targetURL = safeEvalStr(s.page, `() => location.href`)
+	}
+	ls, lsShape := parseAuthStorage(data.LocalStorage, targetURL)
+	ss, ssShape := parseAuthStorage(data.SessionStorage, targetURL)
+	if lsShape == "unparseable" {
+		return nil, fmt.Errorf("%w: localStorage must be a string map or origin-keyed string maps", ErrInvalidAuthState)
+	}
+	if ssShape == "unparseable" {
+		return nil, fmt.Errorf("%w: sessionStorage must be a string map or origin-keyed string maps", ErrInvalidAuthState)
+	}
+	for _, cookie := range data.Cookies {
+		if cookie == nil {
+			return nil, fmt.Errorf("%w: cookies contains a null entry", ErrInvalidAuthState)
+		}
+	}
+	if data.URL != "" {
+		if s.pool == nil {
+			return nil, fmt.Errorf("auth restore navigation policy unavailable")
+		}
+		if err := s.pool.ValidateNavigationURL(data.URL); err != nil {
+			return nil, fmt.Errorf("%w: URL is not permitted", ErrInvalidAuthState)
+		}
 	}
 
 	// Bug fix: restore cookies BEFORE navigation — setting them after the
@@ -565,28 +552,35 @@ func (s *Session) LoadAuth(state json.RawMessage) (map[string]any, error) {
 	}
 
 	if data.URL != "" {
-		_ = s.page.Navigate(data.URL)
-		s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
+		if err := s.page.Navigate(data.URL); err != nil {
+			return nil, fmt.Errorf("auth restore navigation failed")
+		}
+		if err := s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15); err != nil {
+			return nil, fmt.Errorf("auth restore page did not stabilize")
+		}
+	}
+
+	if len(ls) > 0 || len(ss) > 0 {
+		actualOrigin := storageOrigin(safeEvalStr(s.page, `() => location.href`))
+		if actualOrigin == "" || actualOrigin != storageOrigin(targetURL) {
+			return nil, fmt.Errorf("storage restore refused: page origin changed")
+		}
 	}
 
 	report := map[string]any{"cookies_applied": len(data.Cookies)}
-	ls, lsShape := parseStorage(data.LocalStorage)
-	if lsShape == "unparseable" {
-		return nil, fmt.Errorf("localStorage shape not understood (want flat or origin-keyed object)")
-	}
 	if len(ls) > 0 {
 		lsJSON, _ := json.Marshal(ls)
-		s.page.Eval(`(items) => { for (const [k,v] of Object.entries(JSON.parse(items))) localStorage.setItem(k,v); }`, string(lsJSON))
+		if _, err := s.page.Eval(`(items) => { for (const [k,v] of Object.entries(JSON.parse(items))) localStorage.setItem(k,v); }`, string(lsJSON)); err != nil {
+			return nil, fmt.Errorf("localStorage restore failed")
+		}
 	}
 	report["localstorage_keys"] = len(ls)
 	report["localstorage_shape"] = lsShape
-	ss, ssShape := parseStorage(data.SessionStorage)
-	if ssShape == "unparseable" {
-		return nil, fmt.Errorf("sessionStorage shape not understood (want flat or origin-keyed object)")
-	}
 	if len(ss) > 0 {
 		ssJSON, _ := json.Marshal(ss)
-		s.page.Eval(`(items) => { for (const [k,v] of Object.entries(JSON.parse(items))) sessionStorage.setItem(k,v); }`, string(ssJSON))
+		if _, err := s.page.Eval(`(items) => { for (const [k,v] of Object.entries(JSON.parse(items))) sessionStorage.setItem(k,v); }`, string(ssJSON)); err != nil {
+			return nil, fmt.Errorf("sessionStorage restore failed")
+		}
 	}
 	report["sessionstorage_keys"] = len(ss)
 	report["sessionstorage_shape"] = ssShape

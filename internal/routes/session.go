@@ -713,6 +713,10 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			report, err := sess.LoadAuth(state)
 			if err != nil {
+				if errors.Is(err, vision.ErrInvalidAuthState) {
+					writeSessionError(w, http.StatusBadRequest, "invalid_auth_state", err, sess)
+					return
+				}
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
