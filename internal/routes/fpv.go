@@ -18,6 +18,7 @@ import (
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
@@ -219,7 +220,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			"revoked":          entry.Revoked,
 			"viewers":          fpvViewerCount(entry.Token),
 			"created_at":       entry.CreatedAt,
-			"url":              sess.URL,
+			"url":              focusapacket.SanitizeURL(sess.URL),
 			"title":            sess.Title,
 			"width":            sess.Width,
 			"height":           sess.Height,

@@ -526,6 +526,7 @@ func stackPreview(st *proto.RuntimeStackTrace) string {
 }
 
 func redactURL(raw string) string {
+	raw = focusapacket.SanitizeURL(raw)
 	if raw == "" {
 		return raw
 	}

@@ -25,6 +25,7 @@ const (
 var secretQueryKeys = []string{
 	"token", "key", "secret", "auth", "session", "password", "passwd", "code", "sig", "signature", "jwt",
 	"credential", "authorization", "cookie", "api_key", "apikey", "access_token", "refresh_token",
+	"state", "assertion", "samlresponse", "id_token",
 }
 
 type PacketMode string
@@ -174,22 +175,54 @@ func EnforceBudget(packet ResearchDiagnosticsPacket, maxBytes int) ResearchDiagn
 }
 
 func SanitizeURL(raw string) string {
+	return sanitizeURLDepth(raw, 0)
+}
+
+func sanitizeURLDepth(raw string, depth int) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return Truncate(raw, 2048)
+		return "[invalid_url_redacted]"
 	}
+	if u.Opaque != "" {
+		return u.Scheme + ":REDACTED"
+	}
+	u.User = nil
 	u.Fragment = ""
-	q := u.Query()
-	for key := range q {
-		if IsSecretQueryKey(key) {
-			q.Set(key, "REDACTED")
+	u.RawFragment = ""
+	query, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		u.RawQuery = ""
+		return Truncate(u.String(), 2048)
+	}
+	for key, values := range query {
+		if depth >= 4 || IsSecretQueryKey(key) {
+			query[key] = []string{"REDACTED"}
+			continue
+		}
+		for index, value := range values {
+			candidate := value
+			// Query parsing already decodes once; tolerate another encoding
+			// layer used by nested redirect parameters, within a fixed budget.
+			for decode := 0; decode < 2; decode++ {
+				if strings.HasPrefix(strings.ToLower(candidate), "https://") || strings.HasPrefix(strings.ToLower(candidate), "http://") {
+					break
+				}
+				decoded, err := url.QueryUnescape(candidate)
+				if err != nil || decoded == candidate {
+					break
+				}
+				candidate = decoded
+			}
+			if strings.HasPrefix(strings.ToLower(candidate), "https://") || strings.HasPrefix(strings.ToLower(candidate), "http://") {
+				values[index] = sanitizeURLDepth(candidate, depth+1)
+			}
 		}
 	}
-	u.RawQuery = q.Encode()
+	u.RawQuery = query.Encode()
 	return Truncate(u.String(), 2048)
 }
 

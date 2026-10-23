@@ -12,6 +12,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/observability"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
@@ -863,7 +864,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 func sessionInfoPayload(sess *vision.Session) map[string]any {
 	out := map[string]any{
 		"id":          sess.ID,
-		"url":         sess.URL,
+		"url":         focusapacket.SanitizeURL(sess.URL),
 		"title":       sess.Title,
 		"width":       sess.Width,
 		"height":      sess.Height,

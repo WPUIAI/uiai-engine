@@ -21,6 +21,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceartifact"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
+	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
@@ -267,7 +268,7 @@ func writeSessionSnapshot(w http.ResponseWriter, req *http.Request, cfg *config.
 	}
 	response := map[string]any{
 		"schema": "uiai.session_visual_result.v2", "width": snap.Width, "height": snap.Height,
-		"format": snap.Format, "size": snap.Size, "url": snap.URL, "title": snap.Title,
+		"format": snap.Format, "size": snap.Size, "url": focusapacket.SanitizeURL(snap.URL), "title": snap.Title,
 		"duration_ms": snap.Duration, "artifact_ref": delivery.Artifact.ArtifactRef,
 		"delivery_state": delivery.State, "epwa_delivery": delivery,
 	}

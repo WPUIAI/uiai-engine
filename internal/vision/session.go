@@ -268,7 +268,7 @@ func (sm *SessionManager) OpenScoped(url string, width, height int, scope ScopeR
 		sess, snap, err := sm.openOnceScoped(url, width, height, scope)
 		if err == nil {
 			if attempt > 1 {
-				log.Printf("[session] open recovered on attempt %d → %s", attempt, url)
+				log.Printf("[session] open recovered on attempt %d → %s", attempt, focusapacket.SanitizeURL(url))
 			}
 			return sess, snap, nil
 		}
@@ -324,7 +324,7 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 		sm.Close(sess.ID)
 		return nil, nil, fmt.Errorf("initial screenshot failed: %w", err)
 	}
-	log.Printf("[session] opened %s → %s (%dx%d)", sess.ID, url, width, height)
+	log.Printf("[session] opened %s → %s (%dx%d)", sess.ID, focusapacket.SanitizeURL(url), width, height)
 	return sess, snap, nil
 }
 

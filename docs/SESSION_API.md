@@ -263,3 +263,13 @@ Without a valid execution entitlement, allow only bounded health, license start/
 - `docs/ENDPOINT_AUTH_MATRIX.md`
 - `docs/LICENSING.md`
 - Focusa Spec 152 and Spec 150A
+
+## OAuth URL telemetry
+
+Session and snapshot JSON, session-info/FPV URLs, read metadata and session-open
+logs use the canonical URL sanitizer. It removes userinfo and fragments, masks
+OAuth code/state/assertion/token keys case-insensitively, and sanitizes bounded
+nested redirect URLs (including an additional percent-encoding layer). Malformed
+query encoding is withheld rather than copied through. Internal navigation URLs
+are unchanged. These producer protections do not claim that retained historical
+Pi/MCP transcripts have already been scrubbed.
