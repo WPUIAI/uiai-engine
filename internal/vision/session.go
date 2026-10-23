@@ -104,6 +104,7 @@ func DefaultHostScope() ScopeRef  { return ScopeRef{Kind: ScopeKindHost, ID: "lo
 
 type Session struct {
 	ID            string       `json:"id"`
+	ActorRef      string       `json:"actor_ref,omitempty"`
 	URL           string       `json:"url"`
 	Title         string       `json:"title"`
 	Width         int          `json:"width"`
@@ -201,6 +202,14 @@ func generateID() string {
 		s = s[:8]
 	}
 	return s
+}
+
+func (s *Session) SetActorRef(actorRef string) {
+	actorRef = strings.TrimSpace(actorRef)
+	if len(actorRef) > 160 {
+		actorRef = actorRef[:160]
+	}
+	s.ActorRef = actorRef
 }
 
 func (s *Session) SetFocusaScope(scope *FocusaScope) {

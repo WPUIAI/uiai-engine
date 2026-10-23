@@ -40,9 +40,9 @@ func TestErrorStoreRedactsAndBounds(t *testing.T) {
 
 func TestNewErrorEnvelopeIncludesActionAndDiagnostics(t *testing.T) {
 	store := &ErrorStore{}
-	event := store.Record(ErrorEvent{Source: "browser_session", Class: "selector_not_found", Status: 500, Message: "click failed", SuggestedNextAction: "Call snapshot"})
+	event := store.Record(ErrorEvent{Source: "browser_session", ActorRef: "agent:test", Class: "selector_not_found", Status: 500, Message: "click failed", SuggestedNextAction: "Call snapshot"})
 	env := NewErrorEnvelope(event, "fallback", map[string]any{"selector": "@bad", "api_key": "secret"})
-	if env.ErrorID != event.ID || env.ErrorClass != "selector_not_found" || env.Message != "click failed" {
+	if env.ErrorID != event.ID || env.ErrorClass != "selector_not_found" || env.Message != "click failed" || env.ActorRef != "agent:test" || event.ActorRef != "agent:test" {
 		t.Fatalf("bad envelope: %+v", env)
 	}
 	if env.SuggestedNextAction != "Call snapshot" || env.Diagnostics == "" {

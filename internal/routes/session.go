@@ -50,6 +50,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			ContinuityID string              `json:"continuity_id"`
 			ProjectRoot  string              `json:"project_root"`
 			EvidenceRef  string              `json:"evidence_ref"`
+			ActorRef     string              `json:"actor_ref"`
 		}
 		json.NewDecoder(req.Body).Decode(&body)
 
@@ -63,6 +64,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			writeSessionError(w, 500, classifySessionError(err), err, sess)
 			return
 		}
+		sess.SetActorRef(body.ActorRef)
 		sess.SetFocusaScope(resolveFocusaScope(body.FocusaScope, body.WorkpointID, body.ContinuityID, body.ProjectRoot, body.EvidenceRef))
 
 		if !writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusCreated, map[string]any{"session": sessionInfoPayload(sess)}) {
@@ -831,6 +833,7 @@ func sessionInfoPayload(sess *vision.Session) map[string]any {
 		"last_used":  sess.LastUsed,
 		"nav_count":  sess.NavCount,
 		"snap_count": sess.SnapCount,
+		"actor_ref":  sess.ActorRef,
 	}
 	if sess.FocusaScope != nil {
 		out["focusa_scope"] = sess.FocusaScope
@@ -923,6 +926,7 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 		d := sess.Diagnostics(20, "all", false)
 		diag = &d
 		details["session_id"] = diag.SessionID
+		details["actor_ref"] = diag.ActorRef
 		details["url"] = diag.URL
 		details["title"] = diag.Title
 		if diag.FocusaScope != nil {
@@ -941,6 +945,7 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 	}
 	event := observability.ErrorEvent{
 		Source:              "browser_session",
+		ActorRef:            diagActorRef(sess),
 		Class:               class,
 		Status:              status,
 		Message:             err.Error(),
@@ -967,6 +972,13 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 	event = observability.Record(event)
 	resp := observability.NewErrorEnvelope(event, err.Error(), details)
 	writeJSON(w, status, resp)
+}
+
+func diagActorRef(sess *vision.Session) string {
+	if sess == nil {
+		return ""
+	}
+	return sess.ActorRef
 }
 
 func applyAutoWait(sess *vision.Session, timeoutMs int) error {

@@ -26,6 +26,7 @@ type ErrorEvent struct {
 	URL                 string         `json:"url,omitempty"`
 	Message             string         `json:"message,omitempty"`
 	SessionID           string         `json:"session_id,omitempty"`
+	ActorRef            string         `json:"actor_ref,omitempty"`
 	SuggestedNextAction string         `json:"suggested_next_action,omitempty"`
 	Context             map[string]any `json:"context,omitempty"`
 }
@@ -36,6 +37,7 @@ type ErrorEnvelope struct {
 	ErrorID             string               `json:"error_id,omitempty"`
 	ErrorClass          string               `json:"error_class,omitempty"`
 	Status              int                  `json:"status,omitempty"`
+	ActorRef            string               `json:"actor_ref,omitempty"`
 	SuggestedNextAction string               `json:"suggested_next_action,omitempty"`
 	Retryable           bool                 `json:"retryable,omitempty"`
 	Recover             []string             `json:"recover,omitempty"`
@@ -114,6 +116,7 @@ func NewErrorEnvelope(event ErrorEvent, fallbackMessage string, details map[stri
 		Retryable:           retryable,
 		Recover:             recover,
 		Status:              event.Status,
+		ActorRef:            event.ActorRef,
 		SuggestedNextAction: event.SuggestedNextAction,
 		Diagnostics:         "/api/errors?limit=20" + diagnosticsFilter(event),
 		Details:             sanitizeContext(details),
@@ -194,6 +197,7 @@ func (s *ErrorStore) Record(event ErrorEvent) ErrorEvent {
 	event.URL = sanitizeURL(event.URL)
 	event.Message = truncate(strings.TrimSpace(event.Message), 500)
 	event.SessionID = safeToken(event.SessionID, 80)
+	event.ActorRef = safeToken(event.ActorRef, 160)
 	event.SuggestedNextAction = truncate(strings.TrimSpace(event.SuggestedNextAction), 300)
 	event.Context = sanitizeContext(event.Context)
 	event.TS = time.Now().UTC().Format(time.RFC3339Nano)
@@ -388,7 +392,7 @@ func safeToken(s string, max int) string {
 		return ""
 	}
 	s = strings.Map(func(r rune) rune {
-		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-' || r == '.' || r == '/' {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-' || r == '.' || r == '/' || r == ':' {
 			return r
 		}
 		return '_'

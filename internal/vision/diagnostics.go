@@ -71,6 +71,7 @@ type DiagnosticsSummary struct {
 
 type DiagnosticsSnapshot struct {
 	SessionID      string                     `json:"session_id"`
+	ActorRef       string                     `json:"actor_ref,omitempty"`
 	URL            string                     `json:"url"`
 	Title          string                     `json:"title"`
 	Seq            uint64                     `json:"seq"`
@@ -230,6 +231,7 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 	}
 	return DiagnosticsSnapshot{
 		SessionID:   s.ID,
+		ActorRef:    s.ActorRef,
 		URL:         redactURL(s.URL),
 		Title:       s.Title,
 		Seq:         seq,

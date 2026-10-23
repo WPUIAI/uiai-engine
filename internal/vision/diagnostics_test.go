@@ -76,8 +76,11 @@ func TestDiagnosticsRedactsURLQueryAndFragment(t *testing.T) {
 }
 
 func TestDiagnosticsSnapshotRedactsSessionURL(t *testing.T) {
-	s := &Session{ID: "sid", URL: "https://example.test/app?token=secret&ok=1#frag", diagnostics: newDiagnosticsRecorder()}
+	s := &Session{ID: "sid", ActorRef: "agent:test", URL: "https://example.test/app?token=secret&ok=1#frag", diagnostics: newDiagnosticsRecorder()}
 	snap := s.Diagnostics(10, "all", false)
+	if snap.ActorRef != "agent:test" {
+		t.Fatalf("diagnostics actor identity missing: %#v", snap)
+	}
 	if strings.Contains(snap.URL, "secret") || strings.Contains(snap.URL, "#frag") || strings.Contains(snap.URL, "token=") {
 		t.Fatalf("diagnostics URL leaked secret: %q", snap.URL)
 	}

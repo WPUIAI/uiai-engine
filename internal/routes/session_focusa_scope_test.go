@@ -18,11 +18,14 @@ func TestResolveFocusaScopeFromFlatFields(t *testing.T) {
 }
 
 func TestSessionInfoPayloadIncludesFocusaScope(t *testing.T) {
-	sess := &vision.Session{ID: "sid", URL: "https://example.test", FocusaScope: &vision.FocusaScope{WorkpointID: "wp1"}}
+	sess := &vision.Session{ID: "sid", URL: "https://example.test", ActorRef: "agent:test", FocusaScope: &vision.FocusaScope{WorkpointID: "wp1"}}
 	payload := sessionInfoPayload(sess)
 	scope, ok := payload["focusa_scope"].(*vision.FocusaScope)
 	if !ok || scope.WorkpointID != "wp1" {
 		t.Fatalf("missing focusa scope: %#v", payload["focusa_scope"])
+	}
+	if payload["actor_ref"] != "agent:test" {
+		t.Fatalf("missing actor identity: %#v", payload["actor_ref"])
 	}
 }
 
