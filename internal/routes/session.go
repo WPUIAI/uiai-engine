@@ -66,6 +66,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		}
 		sess.SetActorRef(body.ActorRef)
 		sess.SetFocusaScope(resolveFocusaScope(body.FocusaScope, body.WorkpointID, body.ContinuityID, body.ProjectRoot, body.EvidenceRef))
+		_, _ = sess.DetectAuthChallenge()
 
 		if !writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusCreated, map[string]any{"session": sessionInfoPayload(sess)}) {
 			// The caller never received a session id, so the session would
@@ -76,6 +77,16 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 
 	// Session-scoped routes
 	r.Route("/{sessionID}", func(r chi.Router) {
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+				if !ok || sess.LeaseState() != vision.LeaseAwaitingAuth || req.Method == http.MethodGet || strings.HasSuffix(req.URL.Path, "/auth/resolve") || strings.HasSuffix(req.URL.Path, "/auth/cancel") {
+					next.ServeHTTP(w, req)
+					return
+				}
+				writeJSON(w, http.StatusConflict, map[string]any{"state": vision.LeaseAwaitingAuth, "code": "auth_challenge_pending", "session": sessionInfoPayload(sess)})
+			})
+		})
 
 		// Get session info
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
@@ -85,6 +96,35 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			writeJSON(w, 200, sessionInfoPayload(sess))
+		})
+
+		r.Post("/auth/resolve", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				ResumeToken string `json:"resume_token"`
+			}
+			_ = json.NewDecoder(req.Body).Decode(&body)
+			if err := sess.ResolveAuthChallenge(body.ResumeToken); err != nil {
+				writeJSON(w, http.StatusConflict, map[string]any{"state": vision.LeaseAwaitingAuth, "code": "auth_challenge_pending", "error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"resolved": true, "session": sessionInfoPayload(sess)})
+		})
+		r.Post("/auth/cancel", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
+				return
+			}
+			challenge := sess.CancelAuthChallenge()
+			if challenge != nil {
+				sm.Close(sess.ID)
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"cancelled": challenge != nil})
 		})
 
 		// Close session — idempotent: closing an already-reaped/closed session
@@ -165,6 +205,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
 			}
+			_, _ = sess.DetectAuthChallenge()
 			if err := applyAutoWait(sess, body.AutoWaitMs); err != nil {
 				writeSessionError(w, 500, "auto_wait_failed", err, sess)
 				return
@@ -824,16 +865,20 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 
 func sessionInfoPayload(sess *vision.Session) map[string]any {
 	out := map[string]any{
-		"id":         sess.ID,
-		"url":        sess.URL,
-		"title":      sess.Title,
-		"width":      sess.Width,
-		"height":     sess.Height,
-		"created_at": sess.CreatedAt,
-		"last_used":  sess.LastUsed,
-		"nav_count":  sess.NavCount,
-		"snap_count": sess.SnapCount,
-		"actor_ref":  sess.ActorRef,
+		"id":          sess.ID,
+		"url":         sess.URL,
+		"title":       sess.Title,
+		"width":       sess.Width,
+		"height":      sess.Height,
+		"created_at":  sess.CreatedAt,
+		"last_used":   sess.LastUsed,
+		"nav_count":   sess.NavCount,
+		"snap_count":  sess.SnapCount,
+		"actor_ref":   sess.ActorRef,
+		"lease_state": sess.LeaseState(),
+	}
+	if challenge := sess.CurrentAuthChallenge(); challenge != nil {
+		out["auth_challenge"] = challenge
 	}
 	if sess.FocusaScope != nil {
 		out["focusa_scope"] = sess.FocusaScope

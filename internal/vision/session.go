@@ -125,6 +125,7 @@ type Session struct {
 	refs              map[string]SnapshotRef // @ref → CSS selector, populated by Snapshot()
 	diagnostics       *diagnosticsRecorder
 	diagnosticsCancel func()
+	authChallenge     *AuthChallenge
 }
 
 // SessionManager manages persistent browser sessions.
@@ -495,7 +496,7 @@ func (s *Session) PageTargetID() string {
 func (s *Session) touch() {
 	s.LastUsed = time.Now()
 	s.SnapCount++
-	if s.timer != nil {
+	if s.timer != nil && s.authChallenge == nil {
 		s.timer.Reset(SessionTTL)
 	}
 }
