@@ -43,6 +43,10 @@ Preserve these invariants:
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
+## Canonical workspace and Focusa markers
+
+`/home/wpuiai/uiai-engine` is the original and sole active canonical UIAI Engine workspace. Use this path for UIAI Engine work; never create a persistent duplicate clone or checkout. Preserve the ignored `.focusa-project.json` and `.focusa/` genesis/bootstrap markers as part of the workspace identity. Existing temporary or feature worktrees are historical or task-isolated evidence and do not replace this workspace.
+
 ## Quick Reference
 
 ```bash
