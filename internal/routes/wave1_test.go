@@ -11,24 +11,37 @@ import (
 // C-010-04: a handler wedged past its deadline must produce the structured
 // envelope, never a client-side hang.
 func TestDeadlineEnvelopeOnStalledHandler(t *testing.T) {
+	release := make(chan struct{})
+	late := make(chan error, 1)
 	h := WithDeadline(30 * time.Millisecond)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(150 * time.Millisecond)
-		w.WriteHeader(200)
-		_, _ = w.Write([]byte(`{"ok":true}`))
+		<-release
+		w.Header().Set("X-Late", "must-not-leak")
+		w.WriteHeader(http.StatusCreated)
+		_, err := w.Write([]byte(`{"ok":true}`))
+		late <- err
 	}))
 	w := httptest.NewRecorder()
 	start := time.Now()
 	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/x", nil))
-	if elapsed := time.Since(start); elapsed > 120*time.Millisecond {
+	elapsed := time.Since(start)
+	before := w.Body.String()
+	close(release)
+	if err := <-late; err != http.ErrHandlerTimeout {
+		t.Fatalf("late write must fail with ErrHandlerTimeout, got %v", err)
+	}
+	if elapsed > 120*time.Millisecond {
 		t.Fatalf("deadline did not bound execution: %v", elapsed)
 	}
-	if w.Code != http.StatusServiceUnavailable {
-		t.Fatalf("want 503 got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Content-Type") != "application/json" {
+		t.Fatalf("want JSON 503 got %d %v", w.Code, w.Header())
 	}
 	for _, want := range []string{`"error":"deadline_exceeded"`, `"retry":true`} {
-		if !strings.Contains(w.Body.String(), want) {
-			t.Fatalf("envelope missing %s: %s", want, w.Body.String())
+		if !strings.Contains(before, want) {
+			t.Fatalf("envelope missing %s: %s", want, before)
 		}
+	}
+	if w.Body.String() != before || w.Header().Get("X-Late") != "" {
+		t.Fatal("late handler changed the timeout response")
 	}
 }
 
