@@ -39,7 +39,7 @@ Vocabulary stays strict: **Release**=stable Latest 30+ assets, **Dev release**=v
 |--------------|----------------|-----------------|----------------|-------------|
 | **Stamp surfaces** | `stamp-menubar-version.py` 16 files + Cargo.lock + agent-card + manifest | `stamp-uiai-version.py --cockpit-only` (package.json, tauri.conf, Cargo.toml/Cargo.lock, version.ts, manifest) | `stamp-uiai-version.py --engine-only` (cmd/uiai-engine/main.go + manifest) | Single writer each track; manifest recompute + source_commit + generated_at identical logic; future Core stamp changes ported via shared `regen_manifest()` |
 | **Verify surfaces** | `verify-version-surfaces.py vX.Y.Z` | `verify-uiai-version-surfaces.py cockpit-vX.Y.Z` | same `engine-vX.Y.Z` | Same mismatch detection |
-| **Preflight FAST** | `local-release-preflight.sh` PREFLIGHT_FAST=1: Windows lint + surfaces + parity + manifest ancestor + fmt | `local-uiai-preflight.sh` PREFLIGHT_FAST=1: same but `go fmt` + `npm check` + manifest ancestor (already mirrors) | same | Shared gate shape; improvement = update both scripts from Core template |
+| **Preflight FAST** | `local-release-preflight.sh` PREFLIGHT_FAST=1: Windows lint + surfaces + parity + manifest ancestor + fmt | `local-uiai-preflight.sh` PREFLIGHT_FAST=1: same but read-only `gofmt` checks + `npm check` + manifest ancestor (already mirrors) | same | Shared gate shape; improvement = update both scripts from Core template |
 | **Preflight STRICT** | + gap gate + `FOCUSA_TEST_MODE=1` spec gates | + `go test ./...` + `check-docs-completeness` + `check-tool-parity` + cockpit `npm check` (already) | same, no cockpit check | Strict always runs before tag |
 | **Build matrix** | `rust-release` 7 targets + `tauri-build` | `signed-macos-build x86_64+aarch64` (already dual-arch merge via jq) + `linux-binary` | `go build linux/amd64 CGO_ENABLED=0 -trimpath -ldflags version/buildTime` | Matrix stays deterministic; Core improvement (e.g., new target) propagates as new matrix entry |
 | **Signing** | `TAURI_SIGNING_PRIVATE_KEY` mandatory | same (already mandatory) | cosign for engine binary (already) + sigstore via checksums job | No unsigned path |
@@ -72,3 +72,12 @@ Vocabulary stays strict: **Release**=stable Latest 30+ assets, **Dev release**=v
 - [ ] Verify `scripts/generate-release-notes.py` remains single writer (already true).
 
 Result: releases become frictionless — `bash scripts/create-cockpit-dev-release-tag.sh --push` and `engine` equivalent behave exactly like `bash scripts/create-dev-release-tag.sh --push`: push, wait deterministically, publish, verify, done.
+
+### UIAI formatting gate
+
+`scripts/check-go-format.sh` checks outgoing commits against the upstream merge
+base, the current commit (including detached HEAD), staged/working changes and
+untracked Go files. It prints exact paths and diffs and fails without rewriting
+source or staging anything. Positional argument collection avoids Bash 4-only
+`mapfile` and empty-array expansion. Regression fixtures snapshot both source
+bytes and the index, including partially staged and isolated-worktree cases.
