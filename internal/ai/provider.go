@@ -72,13 +72,13 @@ var modelCosts = map[string][2]float64{
 }
 
 type aiKeys struct {
-	Anthropic  string
-	OpenAI     string
-	OpenRouter string
-	Fireworks  string
-	Kimi       string
-	MiniMax    string
-	Qwen       string
+	Anthropic  redactedString
+	OpenAI     redactedString
+	OpenRouter redactedString
+	Fireworks  redactedString
+	Kimi       redactedString
+	MiniMax    redactedString
+	Qwen       redactedString
 	fetchedAt  time.Time
 }
 
@@ -225,7 +225,7 @@ func (p *Provider) buildFallbackChain(skipProvider string) []fallbackProvider {
 
 	type candidate struct {
 		provider string
-		key      string
+		key      redactedString
 		model    string
 	}
 	// Priority: subscribed/direct providers only. OpenRouter intentionally excluded from automatic fallback.
@@ -290,7 +290,8 @@ func summarizeError(err error) string {
 
 func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Response, error) {
 	p.keysMu.RLock()
-	var key, apiURL, providerName string
+	var key redactedString
+	var apiURL, providerName string
 	switch req.Provider {
 	case "minimax":
 		key = p.keys.MiniMax
@@ -343,7 +344,7 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 
 	httpReq, _ := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(b))
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-api-key", key)
+	httpReq.Header.Set("x-api-key", key.value())
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
 	resp, err := p.client.Do(httpReq)
@@ -354,7 +355,7 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s %d: %s", providerName, resp.StatusCode, string(respBody[:min(len(respBody), 200)]))
+		return nil, fmt.Errorf("%s returned HTTP %d", providerName, resp.StatusCode)
 	}
 
 	var data struct {
@@ -385,7 +386,8 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 
 func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, error) {
 	p.keysMu.RLock()
-	var key, baseURL string
+	var key redactedString
+	var baseURL string
 	switch req.Provider {
 	case "openrouter":
 		key = p.keys.OpenRouter
@@ -425,7 +427,7 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 	}
 
 	if req.Provider == "minimax" && req.ImageBase64 != "" {
-		if resp, err := p.minimaxCodingPlanVisionComplete(ctx, key, baseURL, req); err == nil {
+		if resp, err := p.minimaxCodingPlanVisionComplete(ctx, key.value(), baseURL, req); err == nil {
 			return resp, nil
 		} else {
 			log.Printf("[ai] minimax coding-plan vision path failed, falling back to text API: %v", summarizeError(err))
@@ -466,7 +468,7 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 
 	httpReq, _ := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(b))
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+key)
+	httpReq.Header.Set("Authorization", "Bearer "+key.value())
 	if req.Provider == "openrouter" {
 		httpReq.Header.Set("HTTP-Referer", "https://wpuiai.com")
 		httpReq.Header.Set("X-Title", "WPUIAI AI Cloud")
@@ -480,7 +482,7 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s %d: %s", req.Provider, resp.StatusCode, string(respBody[:min(len(respBody), 200)]))
+		return nil, fmt.Errorf("%s returned HTTP %d", req.Provider, resp.StatusCode)
 	}
 
 	var data struct {
@@ -549,7 +551,7 @@ func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, bas
 	defer resp.Body.Close()
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("minimax coding_plan_vlm %d: %s", resp.StatusCode, string(respBody[:min(len(respBody), 200)]))
+		return nil, fmt.Errorf("minimax coding_plan_vlm returned HTTP %d", resp.StatusCode)
 	}
 
 	var data struct {
@@ -646,13 +648,13 @@ func (p *Provider) ensureKeys() error {
 
 	p.keysMu.Lock()
 	p.keys = aiKeys{
-		Anthropic:  merge(settings.Anthropic.Key, envOr("ANTHROPIC_API_KEY", "")),
-		OpenAI:     merge(settings.OpenAI.Key, envOr("OPENAI_API_KEY", "")),
-		OpenRouter: merge(settings.OpenRouter.Key, envOr("OPENROUTER_API_KEY", "")),
-		Fireworks:  merge(settings.Fireworks.Key, envOr("FIREWORKS_API_KEY", "")),
-		Kimi:       merge(settings.Kimi.Key, envOr("KIMI_API_KEY", "")),
-		MiniMax:    merge(settings.MiniMax.Key, envOr("MINIMAX_API_KEY", "")),
-		Qwen:       merge(settings.Qwen.Key, envOr("QWEN_API_KEY", "")),
+		Anthropic:  redactedString(merge(settings.Anthropic.Key, envOr("ANTHROPIC_API_KEY", ""))),
+		OpenAI:     redactedString(merge(settings.OpenAI.Key, envOr("OPENAI_API_KEY", ""))),
+		OpenRouter: redactedString(merge(settings.OpenRouter.Key, envOr("OPENROUTER_API_KEY", ""))),
+		Fireworks:  redactedString(merge(settings.Fireworks.Key, envOr("FIREWORKS_API_KEY", ""))),
+		Kimi:       redactedString(merge(settings.Kimi.Key, envOr("KIMI_API_KEY", ""))),
+		MiniMax:    redactedString(merge(settings.MiniMax.Key, envOr("MINIMAX_API_KEY", ""))),
+		Qwen:       redactedString(merge(settings.Qwen.Key, envOr("QWEN_API_KEY", ""))),
 		fetchedAt:  time.Now(),
 	}
 	p.keysMu.Unlock()
@@ -700,13 +702,13 @@ func (p *Provider) ensureKeys() error {
 
 func (p *Provider) loadKeysFromEnv() {
 	keys := aiKeys{
-		Anthropic:  envOr("ANTHROPIC_API_KEY", ""),
-		OpenAI:     envOr("OPENAI_API_KEY", ""),
-		OpenRouter: envOr("OPENROUTER_API_KEY", ""),
-		Fireworks:  envOr("FIREWORKS_API_KEY", ""),
-		Kimi:       envOr("KIMI_API_KEY", ""),
-		MiniMax:    envOr("MINIMAX_API_KEY", ""),
-		Qwen:       envOr("QWEN_API_KEY", ""),
+		Anthropic:  redactedString(envOr("ANTHROPIC_API_KEY", "")),
+		OpenAI:     redactedString(envOr("OPENAI_API_KEY", "")),
+		OpenRouter: redactedString(envOr("OPENROUTER_API_KEY", "")),
+		Fireworks:  redactedString(envOr("FIREWORKS_API_KEY", "")),
+		Kimi:       redactedString(envOr("KIMI_API_KEY", "")),
+		MiniMax:    redactedString(envOr("MINIMAX_API_KEY", "")),
+		Qwen:       redactedString(envOr("QWEN_API_KEY", "")),
 		fetchedAt:  time.Now(),
 	}
 	if v := envOr("UIAI_DEFAULT_PROVIDER", ""); v != "" {
