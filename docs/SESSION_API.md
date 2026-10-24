@@ -286,3 +286,16 @@ invalid stored targets return 400 without embedding them. Shared baseline
 security headers also apply to Evidence PWA assets, whose existing CSP still
 denies all frames. Source/browser regression proof is not installed-runtime
 proof; release and consumer verification remain separate acceptance steps.
+
+## Engine pool storage isolation
+
+Every pooled page has a distinct non-default Chromium BrowserContext. This
+covers the SessionManager path and multi-browser pools, not only profile-launcher
+sessions. Cookies, local/session storage, IndexedDB and caches are isolated
+between simultaneous leases. Release disposes the entire context (including
+prior origins and popups) and replenishes capacity with a fresh blank context;
+navigating to `about:blank` alone is not storage cleanup. Named profile adapters
+retain their separate explicit profile policies. Each managed browser launch
+also receives a private unique temporary profile, so MultiPool browsers in the
+same engine process cannot collide on Chromium's profile lock. Launcher teardown
+owns deletion of those temporary profiles.

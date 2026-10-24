@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -175,7 +174,7 @@ func (p *Pool) launchBrowser() error {
 	for {
 		select {
 		case pg := <-p.pages:
-			pg.Close()
+			_ = closePoolPage(pg)
 		default:
 			goto drained
 		}
@@ -199,12 +198,13 @@ drained:
 		}
 	}
 
-	// Dedicated per-process profile: a shared default profile makes the
-	// second engine instance fail every relaunch on chromium's SingletonLock
-	// while the first instance's browser is alive (2026-09-11 OVH wedge:
-	// w2 relaunches hit ErrLaunchTimeout for the entire main-engine browser
-	// lifetime). Each process gets its own user-data-dir under os.TempDir().
-	profileDir := filepath.Join(os.TempDir(), fmt.Sprintf("uiai-engine-chromium-%d", os.Getpid()))
+	// Each launch owns a private profile: PID-only names collide when one
+	// engine uses MultiPool, and Chromium's SingletonLock silently removes
+	// the second pool's capacity through acquisition failover.
+	profileDir, err := os.MkdirTemp("", fmt.Sprintf("uiai-engine-chromium-%d-", os.Getpid()))
+	if err != nil {
+		return fmt.Errorf("create private browser profile: %w", err)
+	}
 	l := launcher.New().
 		Headless(true).
 		UserDataDir(profileDir).
@@ -315,7 +315,7 @@ drained:
 	for i := 0; i < warmCount; i++ {
 		warmDone := make(chan *rod.Page, 1)
 		go func() {
-			page, err := browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+			page, err := newPoolPage(browser)
 			if err != nil {
 				warmDone <- nil
 				return
@@ -456,7 +456,7 @@ func (p *Pool) restartBrowser() error {
 	for {
 		select {
 		case dead := <-p.pages:
-			_ = dead.Close()
+			_ = closePoolPage(dead)
 			p.created--
 			drained++
 			continue
@@ -529,7 +529,7 @@ func (p *Pool) getPagePrio(interactive bool) (*rod.Page, error) {
 		}
 		// Browser died — discard page
 		log.Printf("[vision] Browser dead, discarding pooled page")
-		page.Close()
+		_ = closePoolPage(page)
 		p.mu.Lock()
 		p.created--
 		p.mu.Unlock()
@@ -549,7 +549,7 @@ func (p *Pool) getPagePrio(interactive bool) (*rod.Page, error) {
 	}
 
 	if p.created < p.maxPages {
-		page, err := p.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+		page, err := newPoolPage(p.browser)
 		if err != nil {
 			// Browser connection might be dead
 			if strings.Contains(err.Error(), "closed") || strings.Contains(err.Error(), "EOF") {
@@ -558,7 +558,7 @@ func (p *Pool) getPagePrio(interactive bool) (*rod.Page, error) {
 					p.mu.Unlock()
 					return nil, fmt.Errorf("browser restart failed: %w", restartErr)
 				}
-				page, err = p.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+				page, err = newPoolPage(p.browser)
 				if err != nil {
 					p.mu.Unlock()
 					return nil, fmt.Errorf("page create failed after restart: %w", err)
@@ -656,59 +656,13 @@ func (p *Pool) ReleasePage(page *rod.Page) {
 }
 
 func (p *Pool) releasePage(page *rod.Page) {
-	// Reset page context to a fresh one (the screenshot ctx may be cancelled)
-	cleanPage := page.Context(context.Background())
-
-	// Fast release: navigate to about:blank asynchronously with short timeout.
-	// This clears cookies/state and frees renderer memory for the previous page.
-	done := make(chan bool, 1)
-	go func() {
-		err := cleanPage.Timeout(2 * time.Second).Navigate("about:blank")
-		done <- (err == nil)
-	}()
-
-	select {
-	case ok := <-done:
-		if !ok {
-			// Navigation failed — page may be in bad state, discard
-			cleanPage.Close()
-			p.mu.Lock()
-			p.created--
-			p.active--
-			p.scheduleIdleShutdown()
-			p.mu.Unlock()
-			return
-		}
-		// C-010-13 follow-up (#99): liveness probe — survive about:blank but fail trivial eval ⇒ poisoned; discard.
-		live := make(chan bool, 1)
-		go func() {
-			_, err := cleanPage.Eval("() => 1+1")
-			live <- err == nil
-		}()
-		select {
-		case ok2 := <-live:
-			if !ok2 {
-				log.Printf("[vision] release liveness probe failed; discarding page")
-				cleanPage.Close()
-				p.mu.Lock()
-				p.created--
-				p.active--
-				p.mu.Unlock()
-				return
-			}
-		case <-time.After(1500 * time.Millisecond):
-			log.Printf("[vision] release liveness probe timed out; discarding page")
-			cleanPage.Close()
-			p.mu.Lock()
-			p.created--
-			p.active--
-			p.mu.Unlock()
-			return
-		}
-	case <-time.After(2 * time.Second):
-		// Page is stuck — close it and discard
-		log.Printf("[vision] Page stuck on release, closing")
-		cleanPage.Close()
+	if page == nil {
+		return
+	}
+	// about:blank never clears browser cookies or prior-origin storage. Dispose
+	// the entire partition before allowing this capacity slot to be reused.
+	if err := closePoolPage(page); err != nil {
+		log.Printf("[vision] isolated page disposal failed: %v", err)
 		p.mu.Lock()
 		p.created--
 		p.active--
@@ -716,20 +670,41 @@ func (p *Pool) releasePage(page *rod.Page) {
 		p.mu.Unlock()
 		return
 	}
-
-	select {
-	case p.pages <- cleanPage:
-	default:
-		cleanPage.Close()
+	p.mu.Lock()
+	browser := p.browser
+	p.mu.Unlock()
+	replacement, err := newPoolPage(browser)
+	if err != nil {
+		log.Printf("[vision] isolated page replenishment failed: %v", err)
 		p.mu.Lock()
 		p.created--
+		p.active--
+		p.scheduleIdleShutdown()
 		p.mu.Unlock()
+		return
 	}
-
+	discard := false
 	p.mu.Lock()
 	p.active--
+	if browser != p.browser {
+		// A concurrent browser restart cannot republish a page from the old one.
+		p.created--
+		discard = true
+	} else {
+		select {
+		case p.pages <- replacement:
+		default:
+			p.created--
+			discard = true
+		}
+	}
 	p.scheduleIdleShutdown()
 	p.mu.Unlock()
+	if discard {
+		if err := closePoolPage(replacement); err != nil {
+			log.Printf("[vision] discarded pool page cleanup failed: %v", err)
+		}
+	}
 }
 
 // scheduleIdleShutdown starts or resets the idle timer.
@@ -755,7 +730,7 @@ func (p *Pool) scheduleIdleShutdown() {
 		for {
 			select {
 			case pg := <-p.pages:
-				pg.Close()
+				_ = closePoolPage(pg)
 			default:
 				goto drained
 			}
