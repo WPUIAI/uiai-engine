@@ -314,3 +314,17 @@ without recording the submitted input value. Browser-backed regressions exercise
 a slow focus listener, forced timeout, diagnostic observations and close with the
 same browser PID. Fixture diagnostics returned as unsealed HTTP 202 are not sealed
 EPWA delivery; no provider-authentication or installed-runtime proof is implied.
+
+### Click cancellation and uncertain effects
+
+Click uses an independent five-second action context and preserves HTTP caller
+cancellation through dispatch, settling and the bounded snapshot. Snapshot refs
+still resolve through the existing session ref store. A failure after dispatch
+may have taken effect: HTTP 409 pending_side_effect_unknown carries
+side_effects_may_have_occurred and retry_requires_reobservation in details, with
+retryable=false. Inspect diagnostics and a fresh snapshot before any authorized
+retry; never automatically repeat the click. Explicit cancellation uses HTTP 408
+operation_cancelled, also without automatic retry. These are operational error
+postures, not control-lease grants or canonical Focusa pause/resume decisions.
+An owned HTTP-202 modal fixture covers eval, async eval, snapshot, screenshot,
+network diagnostics and a single ref-click without invoking a paid provider.

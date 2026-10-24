@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -269,7 +270,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "click", "selector": body.Selector})
 				return
 			}
-			snap, err := sess.Click(resolved)
+			snap, err := sess.ClickContext(req.Context(), resolved)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "click", "selector": body.Selector, "resolved_selector": resolved})
 				return
@@ -945,6 +946,10 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 	// Caller-input failures are 4xx, not 500: retry/alert logic must not treat
 	// a bad selector/key or a full session scope as an engine outage (#226).
 	switch class {
+	case "operation_cancelled":
+		status = http.StatusRequestTimeout
+	case "pending_side_effect_unknown":
+		status = http.StatusConflict
 	case "selector_not_found":
 		if status >= 500 {
 			status = http.StatusNotFound
@@ -959,6 +964,12 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 		}
 	}
 	details := map[string]any{}
+	var actionError *vision.SessionActionError
+	if errors.As(err, &actionError) {
+		details["action_phase"] = actionError.Phase
+		details["side_effects_may_have_occurred"] = actionError.EffectsPossible
+		details["retry_requires_reobservation"] = actionError.EffectsPossible
+	}
 	for _, ctx := range context {
 		for k, v := range ctx {
 			details[k] = v
@@ -1033,6 +1044,10 @@ func applyAutoWait(sess *vision.Session, timeoutMs int) error {
 
 func suggestedNextSessionAction(class string) string {
 	switch class {
+	case "operation_cancelled":
+		return "Respect cancellation; inspect pending effects before any newly authorized retry."
+	case "pending_side_effect_unknown":
+		return "Read diagnostics and take a fresh snapshot; verify whether the action already occurred before retrying, and never automatically repeat it."
 	case "selector_not_found":
 		return "Call /api/session/{id}/snapshot or /diagnostics, then retry using a current @ref or more specific selector."
 	case "timeout", "navigation_failed":
@@ -1053,6 +1068,13 @@ func suggestedNextSessionAction(class string) string {
 func classifySessionError(err error) string {
 	if err == nil {
 		return "unknown"
+	}
+	if errors.Is(err, context.Canceled) {
+		return "operation_cancelled"
+	}
+	var actionError *vision.SessionActionError
+	if errors.As(err, &actionError) && actionError.EffectsPossible {
+		return "pending_side_effect_unknown"
 	}
 	msg := strings.ToLower(err.Error())
 	switch {

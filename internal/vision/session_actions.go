@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
 )
@@ -601,9 +602,15 @@ func (s *Session) LoadAuth(state json.RawMessage) (map[string]any, error) {
 
 // snap takes a screenshot with standard settings. Must be called with s.mu held.
 func (s *Session) snap(start time.Time) (*SnapResult, error) {
-	ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionSnapshotTimeout)
+	return s.snapWithPage(s.page, start)
+}
+
+// snapWithPage preserves a caller's action/cancellation context while applying
+// the shared screenshot bound. Caller holds s.mu.
+func (s *Session) snapWithPage(page *rod.Page, start time.Time) (*SnapResult, error) {
+	ctx, cancel := context.WithTimeout(page.GetContext(), sessionSnapshotTimeout)
 	defer cancel()
-	data, err := s.page.Context(ctx).Screenshot(false, &proto.PageCaptureScreenshot{
+	data, err := page.Context(ctx).Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
 		Quality: gson(60),
 	})

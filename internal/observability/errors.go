@@ -86,6 +86,10 @@ func Clear()     { defaultStore.Clear() }
 // classRecovery maps error classes to agent-actionable recovery semantics (#73).
 func classRecovery(class string) (bool, []string) {
 	switch class {
+	case "operation_cancelled":
+		return false, []string{"respect_cancellation", "diagnostics"}
+	case "pending_side_effect_unknown":
+		return false, []string{"diagnostics", "snapshot", "verify_effect", "no_automatic_retry"}
 	case "selector_not_found":
 		return false, []string{"snapshot", "resync_refs"}
 	case "url_not_allowed":

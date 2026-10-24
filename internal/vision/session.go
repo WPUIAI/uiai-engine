@@ -5,6 +5,7 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -746,54 +747,62 @@ func (s *Session) ClickAt(x, y int) (*SnapResult, string, error) {
 
 // Click clicks a CSS-selected element and returns a screenshot after.
 func (s *Session) Click(selector string) (*SnapResult, error) {
+	return s.ClickContext(context.Background(), selector)
+}
+
+// ClickContext preserves explicit caller cancellation and never automatically
+// retries an action whose dispatch or observation may already have effects.
+func (s *Session) ClickContext(caller context.Context, selector string) (*SnapResult, error) {
+	fail := func(phase string, cause error, effects bool) error {
+		return &SessionActionError{Operation: "click", Phase: phase, Cause: cause, EffectsPossible: effects}
+	}
+	if err := caller.Err(); err != nil {
+		return nil, fail("before_dispatch", err, false)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.page == nil {
 		return nil, fmt.Errorf("session closed")
 	}
-
+	if err := caller.Err(); err != nil {
+		return nil, fail("before_dispatch", err, false)
+	}
 	start := time.Now()
-
-	el, err := retryElement(s.page, selector)
+	ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionInputTimeout)
+	stop := context.AfterFunc(caller, cancel)
+	defer func() { stop(); cancel() }()
+	page := s.page.Context(ctx)
+	element, err := actionElement(page, selector)
 	if err != nil {
-		return nil, fmt.Errorf("element not found: %s", selector)
+		return nil, fail("locate", err, false)
 	}
-
-	if _, err := el.Eval(`() => {
-		this.scrollIntoView({ block: 'center', inline: 'center' });
-		this.click();
-		return true;
-	}`); err != nil {
-		return nil, fmt.Errorf("click failed: %w", err)
+	if _, err = element.Eval(`() => {
+  this.scrollIntoView({ block: 'center', inline: 'center' });
+  this.click();
+  return true;
+ }`); err != nil {
+		return nil, fail("dispatch", err, true)
 	}
-
-	// Wait for any triggered navigation or DOM change
 	time.Sleep(300 * time.Millisecond)
-	s.page.Timeout(2*time.Second).WaitDOMStable(100*time.Millisecond, 0.2)
-
-	s.URL = safeEvalStr(s.page, `() => window.location.href`)
-	s.Title = safeEvalStr(s.page, `() => document.title`)
-
-	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
-		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(60),
-	})
-	if err != nil {
-		return nil, err
+	settleErr := page.Timeout(2*time.Second).WaitDOMStable(100*time.Millisecond, 0.2)
+	// An ongoing animation can exhaust the settle window; still capture a fresh
+	// bounded observation unless the action expired or another protocol error arose.
+	if settleErr != nil && !errors.Is(settleErr, context.DeadlineExceeded) {
+		return nil, fail("settle", settleErr, true)
 	}
-
-	s.touch()
-
-	return &SnapResult{
-		Screenshot: base64.StdEncoding.EncodeToString(data),
-		Width:      s.Width,
-		Height:     s.Height,
-		Format:     "jpeg",
-		Size:       len(data),
-		URL:        s.URL,
-		Title:      s.Title,
-		Duration:   time.Since(start).Milliseconds(),
-	}, nil
+	if err := ctx.Err(); err != nil {
+		return nil, fail("settle", err, true)
+	}
+	s.URL = safeEvalStr(page, `() => window.location.href`)
+	s.Title = safeEvalStr(page, `() => document.title`)
+	if err := ctx.Err(); err != nil {
+		return nil, fail("observe", err, true)
+	}
+	snapshot, err := s.snapWithPage(page, start)
+	if err != nil {
+		return nil, fail("snapshot", err, true)
+	}
+	return snapshot, nil
 }
 
 // Hover hovers over a CSS-selected element.
