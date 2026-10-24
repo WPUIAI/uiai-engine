@@ -123,21 +123,7 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 		}
 		writeJSON(w, status, response)
 	})
-	r.Get("/events", func(w http.ResponseWriter, req *http.Request) {
-		since := uint64(0)
-		if raw := strings.TrimSpace(req.URL.Query().Get("since_seq")); raw != "" {
-			_, _ = fmt.Sscan(raw, &since)
-		}
-		limit := 50
-		if raw := strings.TrimSpace(req.URL.Query().Get("limit")); raw != "" {
-			var parsed int
-			if _, err := fmt.Sscan(raw, &parsed); err == nil && parsed > 0 && parsed <= 200 {
-				limit = parsed
-			}
-		}
-		events, latest := fpvAuditEventsSince(since, limit)
-		writeJSON(w, http.StatusOK, map[string]any{"events": events, "latest_seq": latest, "count": len(events)})
-	})
+	r.Get("/events", fpvAuditEventsHandler)
 
 	r.Post("/revoke", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
@@ -477,39 +463,6 @@ func fpvSharePayload(entry *fpvShare) map[string]any {
 		"one_time":              entry.OneTime,
 		"max_views":             entry.MaxViews,
 	}
-}
-
-func fpvRecordAuditEvent(token, sessionID string, log fpvAuditLog) fpvAuditLog {
-	fpvAuditMu.Lock()
-	defer fpvAuditMu.Unlock()
-	fpvAuditSeq++
-	log.Seq = fpvAuditSeq
-	if log.Meta == nil {
-		log.Meta = map[string]any{}
-	}
-	log.Meta["token"] = token
-	log.Meta["session_id"] = sessionID
-	fpvAuditEvents = append(fpvAuditEvents, log)
-	if len(fpvAuditEvents) > 500 {
-		fpvAuditEvents = fpvAuditEvents[len(fpvAuditEvents)-500:]
-	}
-	return log
-}
-
-func fpvAuditEventsSince(since uint64, limit int) ([]fpvAuditLog, uint64) {
-	fpvAuditMu.Lock()
-	defer fpvAuditMu.Unlock()
-	latest := fpvAuditSeq
-	items := []fpvAuditLog{}
-	for _, event := range fpvAuditEvents {
-		if event.Seq > since {
-			items = append(items, event)
-		}
-	}
-	if len(items) > limit {
-		items = items[len(items)-limit:]
-	}
-	return items, latest
 }
 
 func fpvAllowedViews(entry *fpvShare) int {

@@ -144,3 +144,14 @@ label does not assert that memory sampling is available. The versioned schema
 accepts current normal/degraded/constrained/saturated labels and retains legacy
 low/medium/high/critical/unknown compatibility. Cross-compilation is not native
 macOS execution proof.
+
+## FPV audit capability hygiene
+
+FPV audit records use `meta.share_ref` (a SHA-256 fingerprint) and `session_id`
+for correlation. The fingerprint grants no viewing or control authority;
+`meta.token` is redacted. The writer removes the current capability from text
+and nested JSON metadata before storing or projecting an event. Metadata is
+copied, with unencodable or over-10,000-byte metadata withheld rather than leaked.
+This audit repair does not establish origin-consent policy, control-lease
+admission, live-share inventory, revocation, or installed-runtime rollout; those
+remain separate acceptance requirements in issue #147.

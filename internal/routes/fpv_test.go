@@ -116,7 +116,7 @@ func TestFPVAuditEventsSince(t *testing.T) {
 		t.Fatalf("expected audit event, latest=%d events=%#v", latest, events)
 	}
 	meta := events[len(events)-1].Meta
-	if meta["token"] != "tok1" || meta["session_id"] != "sid1" {
-		t.Fatalf("expected token/session metadata, got %#v", meta)
+	if meta["token"] != "[REDACTED]" || meta["session_id"] != "sid1" || meta["share_ref"] == "" {
+		t.Fatalf("expected safe share/session metadata, got %#v", meta)
 	}
 }
