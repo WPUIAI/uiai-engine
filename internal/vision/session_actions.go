@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,9 @@ import (
 // require fragile eval() workarounds.
 // ═══════════════════════════════════════════════════════
 
+const sessionInputTimeout = 5 * time.Second
+const sessionSnapshotTimeout = 3 * time.Second
+
 // Fill replaces an input value without using Rod's Must* panic path.
 // We prefer DOM assignment + input/change events so slow interactive pages
 // don't crash the whole handler on click timeouts.
@@ -28,9 +32,11 @@ func (s *Session) Fill(selector, text string) (*SnapResult, error) {
 
 	start := time.Now()
 
-	el, err := retryElement(s.page, selector)
+	ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionInputTimeout)
+	defer cancel()
+	el, err := inputElement(s.page.Context(ctx), selector)
 	if err != nil {
-		return nil, fmt.Errorf("element not found: %s", selector)
+		return nil, fmt.Errorf("fill locate failed: %w", err)
 	}
 
 	if err := el.ScrollIntoView(); err != nil {
@@ -595,7 +601,9 @@ func (s *Session) LoadAuth(state json.RawMessage) (map[string]any, error) {
 
 // snap takes a screenshot with standard settings. Must be called with s.mu held.
 func (s *Session) snap(start time.Time) (*SnapResult, error) {
-	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
+	ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionSnapshotTimeout)
+	defer cancel()
+	data, err := s.page.Context(ctx).Screenshot(false, &proto.PageCaptureScreenshot{
 		Format:  proto.PageCaptureScreenshotFormatJpeg,
 		Quality: gson(60),
 	})

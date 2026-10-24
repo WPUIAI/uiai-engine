@@ -299,3 +299,18 @@ retain their separate explicit profile policies. Each managed browser launch
 also receives a private unique temporary profile, so MultiPool browsers in the
 same engine process cannot collide on Chromium's profile lock. Launcher teardown
 owns deletion of those temporary profiles.
+
+### Input timeout recovery
+
+After acquiring the session action lock, fill/type use a five-second child CDP
+context instead of inheriting the 175 ms element-lookup context. Type propagates
+selection/input errors rather than reporting success. Both input methods wait for
+the actual DOM readOnly/disabled state before clearing or inserting text, preserving
+read-only values on failure. The shared action snapshot
+helper has a separate three-second deadline. Cancellation releases the action
+lock without cancelling the session page context; diagnostics and explicit close
+remain available. HTTP failures retain the session/action and error-event ID,
+without recording the submitted input value. Browser-backed regressions exercise
+a slow focus listener, forced timeout, diagnostic observations and close with the
+same browser PID. Fixture diagnostics returned as unsealed HTTP 202 are not sealed
+EPWA delivery; no provider-authentication or installed-runtime proof is implied.

@@ -845,38 +845,21 @@ func (s *Session) Type(selector, text string) (*SnapResult, error) {
 	if s.page == nil {
 		return nil, fmt.Errorf("session closed")
 	}
-
 	start := time.Now()
-
-	el, err := retryElement(s.page, selector)
+	ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionInputTimeout)
+	defer cancel()
+	el, err := inputElement(s.page.Context(ctx), selector)
 	if err != nil {
-		return nil, fmt.Errorf("element not found: %s", selector)
+		return nil, fmt.Errorf("type locate failed: %w", err)
 	}
-
-	el.SelectAllText()
-	el.Timeout(3 * time.Second).Input(text)
+	if err := el.SelectAllText(); err != nil {
+		return nil, fmt.Errorf("type selection failed: %w", err)
+	}
+	if err := el.Timeout(3 * time.Second).Input(text); err != nil {
+		return nil, fmt.Errorf("type input failed: %w", err)
+	}
 	time.Sleep(100 * time.Millisecond)
-
-	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
-		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(60),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	s.touch()
-
-	return &SnapResult{
-		Screenshot: base64.StdEncoding.EncodeToString(data),
-		Width:      s.Width,
-		Height:     s.Height,
-		Format:     "jpeg",
-		Size:       len(data),
-		URL:        s.URL,
-		Title:      s.Title,
-		Duration:   time.Since(start).Milliseconds(),
-	}, nil
+	return s.snap(start)
 }
 
 // Eval runs JavaScript and returns the result string + a screenshot.
