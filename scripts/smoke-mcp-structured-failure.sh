@@ -5,25 +5,20 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINE_URL="${UIAI_ENGINE_URL:-http://localhost:7456}"
 TIMEOUT_SECONDS="${UIAI_SMOKE_TIMEOUT_SECONDS:-30}"
 BRIDGE="$ROOT_DIR/mcp/browser-session-mcp.mjs"
-AUTH_ARGS=()
-if [[ -n "${UIAI_API_KEY:-}" ]]; then
-  AUTH_ARGS=(-H "X-API-Key: ${UIAI_API_KEY}")
-elif [[ -n "${UIAI_BEARER_TOKEN:-}" ]]; then
-  AUTH_ARGS=(-H "Authorization: Bearer ${UIAI_BEARER_TOKEN}")
-fi
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/uiai-http-auth.sh"
 
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "missing required command: $1" >&2; exit 1; }; }
 need curl
 need jq
 need node
 
-OPEN_JSON="$(curl -fsS --max-time "$TIMEOUT_SECONDS" -X POST "${AUTH_ARGS[@]}" "$ENGINE_URL/api/session" -H 'Content-Type: application/json' -d '{"url":"https://example.com","width":800,"height":600}')"
+OPEN_JSON="$(uiai_curl_auth -fsS --max-time "$TIMEOUT_SECONDS" -X POST "$ENGINE_URL/api/session" -H 'Content-Type: application/json' -d '{"url":"https://example.com","width":800,"height":600}')"
 SID="$(printf '%s' "$OPEN_JSON" | jq -r '.session.id // .session_id // .id')"
 if [[ -z "$SID" || "$SID" == "null" ]]; then
   echo "could not open smoke session" >&2
   exit 1
 fi
-cleanup(){ curl -fsS --max-time 5 -X DELETE "${AUTH_ARGS[@]}" "$ENGINE_URL/api/session/$SID" >/dev/null 2>&1 || true; }
+cleanup(){ uiai_curl_auth -fsS --max-time 5 -X DELETE "$ENGINE_URL/api/session/$SID" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
 OUT="$(mktemp)"

@@ -3,12 +3,7 @@ set -euo pipefail
 
 ENGINE_URL="${UIAI_ENGINE_URL:-http://localhost:7456}"
 TIMEOUT_SECONDS="${UIAI_SMOKE_TIMEOUT_SECONDS:-20}"
-AUTH_ARGS=()
-if [[ -n "${UIAI_API_KEY:-}" ]]; then
-  AUTH_ARGS=(-H "X-API-Key: ${UIAI_API_KEY}")
-elif [[ -n "${UIAI_BEARER_TOKEN:-}" ]]; then
-  AUTH_ARGS=(-H "Authorization: Bearer ${UIAI_BEARER_TOKEN}")
-fi
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/uiai-http-auth.sh"
 
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "missing required command: $1" >&2; exit 1; }; }
 need curl
@@ -16,7 +11,7 @@ need jq
 
 say(){ printf "%s\n" "$*"; }
 fetch(){ curl -fsS --max-time "$TIMEOUT_SECONDS" "$@"; }
-fetch_auth(){ curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$@"; }
+fetch_auth(){ uiai_curl_auth -fsS --max-time "$TIMEOUT_SECONDS" "$@"; }
 
 say "UIAI agent integration smoke"
 say "engine_url=$ENGINE_URL"

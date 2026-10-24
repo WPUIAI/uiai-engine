@@ -5,12 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINE_URL="${UIAI_ENGINE_URL:-http://localhost:7456}"
 TIMEOUT_SECONDS="${UIAI_SMOKE_TIMEOUT_SECONDS:-20}"
 BRIDGE="$ROOT_DIR/mcp/browser-session-mcp.mjs"
-AUTH_ARGS=()
-if [[ -n "${UIAI_API_KEY:-}" ]]; then
-  AUTH_ARGS=(-H "X-API-Key: ${UIAI_API_KEY}")
-elif [[ -n "${UIAI_BEARER_TOKEN:-}" ]]; then
-  AUTH_ARGS=(-H "Authorization: Bearer ${UIAI_BEARER_TOKEN}")
-fi
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/uiai-http-auth.sh"
 
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "missing required command: $1" >&2; exit 1; }; }
 need curl
@@ -19,7 +14,7 @@ need python3
 
 ENGINE_TOOLS_JSON="$(mktemp)"
 trap 'rm -f "$ENGINE_TOOLS_JSON"' EXIT
-curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$ENGINE_URL/api/tools/mcp" > "$ENGINE_TOOLS_JSON"
+uiai_curl_auth -fsS --max-time "$TIMEOUT_SECONDS" "$ENGINE_URL/api/tools/mcp" > "$ENGINE_TOOLS_JSON"
 
 python3 - <<'PY' "$BRIDGE" "$ENGINE_TOOLS_JSON"
 import json

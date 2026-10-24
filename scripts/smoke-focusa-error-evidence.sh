@@ -4,18 +4,13 @@ set -euo pipefail
 ENGINE_URL="${UIAI_ENGINE_URL:-http://localhost:7456}"
 TIMEOUT_SECONDS="${UIAI_SMOKE_TIMEOUT_SECONDS:-20}"
 OUT="${OUT:-/tmp/uiai-error-focusa-evidence.json}"
-AUTH_ARGS=()
-if [[ -n "${UIAI_API_KEY:-}" ]]; then
-  AUTH_ARGS=(-H "X-API-Key: ${UIAI_API_KEY}")
-elif [[ -n "${UIAI_BEARER_TOKEN:-}" ]]; then
-  AUTH_ARGS=(-H "Authorization: Bearer ${UIAI_BEARER_TOKEN}")
-fi
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/uiai-http-auth.sh"
 
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "missing required command: $1" >&2; exit 1; }; }
 need curl
 need jq
 
-curl_json(){ curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$@"; }
+curl_json(){ uiai_curl_auth -fsS --max-time "$TIMEOUT_SECONDS" "$@"; }
 
 # Trigger a harmless, bounded browser/session error if possible so /api/errors has a fresh event.
 set +e

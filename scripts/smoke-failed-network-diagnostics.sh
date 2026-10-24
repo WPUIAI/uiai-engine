@@ -6,12 +6,7 @@ TIMEOUT_SECONDS="${UIAI_SMOKE_TIMEOUT_SECONDS:-20}"
 OUT="${OUT:-/tmp/uiai-failed-network-diagnostics.json}"
 SITE_PORT="${UIAI_FAILED_NETWORK_SITE_PORT:-18567}"
 TMPDIR="$(mktemp -d)"
-AUTH_ARGS=()
-if [[ -n "${UIAI_API_KEY:-}" ]]; then
-  AUTH_ARGS=(-H "X-API-Key: ${UIAI_API_KEY}")
-elif [[ -n "${UIAI_BEARER_TOKEN:-}" ]]; then
-  AUTH_ARGS=(-H "Authorization: Bearer ${UIAI_BEARER_TOKEN}")
-fi
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/uiai-http-auth.sh"
 cleanup(){
   [[ -n "${SITE_PID:-}" ]] && kill "$SITE_PID" 2>/dev/null || true
   rm -rf "$TMPDIR"
@@ -36,7 +31,7 @@ HTML
 python3 -m http.server "$SITE_PORT" -d "$TMPDIR/site" >/tmp/uiai-failed-network-site.log 2>&1 & SITE_PID=$!
 sleep 0.3
 
-curl_json(){ curl -fsS --max-time "$TIMEOUT_SECONDS" "${AUTH_ARGS[@]}" "$@"; }
+curl_json(){ uiai_curl_auth -fsS --max-time "$TIMEOUT_SECONDS" "$@"; }
 TARGET="http://127.0.0.1:${SITE_PORT}/"
 open_json="$(curl_json -X POST "$ENGINE_URL/api/session" -H "Content-Type: application/json" -d "{\"url\":\"$TARGET\",\"width\":800,\"height\":600}")"
 SID="$(printf '%s' "$open_json" | jq -r '.session.id')"

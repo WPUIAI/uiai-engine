@@ -305,6 +305,15 @@ Rules:
 - Never paste token values into docs, logs, or reports.
 - Prefer environment variables and approved secret storage.
 
+The CLI and optional-auth smoke scripts source `scripts/uiai-http-auth.sh`;
+keep that companion file alongside them. API-key authentication takes precedence
+when both credential variables are configured; neither variable means no auth
+header. The helper uses positional arguments, not empty optional arrays. Evidence
+scope values reject C0/DEL characters before transport while preserving printable
+header values. Run `python3 -m unittest discover -s tests -p test_cli_optional_auth.py -v`
+for loopback fixtures; set `UIAI_TEST_BASH=/bin/bash` on macOS to exercise its
+system shell. Linux Bash or compatibility flags alone are not Bash 3.2 proof.
+
 ## Recipe 8: MCP tool freshness after changes
 
 Use after adding/removing/renaming tools or changing MCP call routes.
