@@ -129,3 +129,18 @@ EPWA readiness; the receipt preserves the observed delivery state. The local
 browser regression is `UIAI_INPUT_TESTS=1 go test ./internal/vision -run
 TestPressReactivatesBackgroundSessionBrowser -count=3`. A passing current probe
 does not by itself prove the historical no-delivery failure root cause.
+
+## Memory-pressure measurement posture
+
+Linux uses procfs, Windows native working sets, and Darwin a two-second-bounded
+BSD ps snapshot of PID/parent/RSS columns (KiB). Exited or inaccessible processes
+contribute no readable sample; tree aggregation is best-effort and cycle-safe.
+The recycler compares KiB to the byte budget without multiplication overflow.
+Health exposes cached browser.rss_pressure measurement/protection_active fields;
+pending, failed/zero, unsupported, disabled and no-browser samples cannot claim
+active protection. Health reads never run ps. New browser PIDs invalidate old
+observations; attempted_at reports the last attempt. A normal overall pressure
+label does not assert that memory sampling is available. The versioned schema
+accepts current normal/degraded/constrained/saturated labels and retains legacy
+low/medium/high/critical/unknown compatibility. Cross-compilation is not native
+macOS execution proof.

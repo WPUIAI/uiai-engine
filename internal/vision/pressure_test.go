@@ -7,6 +7,9 @@ import (
 )
 
 func TestTreeRSSKBSelfPositive(t *testing.T) {
+	if !rssMeasurementSupported() {
+		t.Skip("process RSS adapter unsupported on this platform")
+	}
 	pid := os.Getpid()
 	if kb := treeRSSKB(pid); kb <= 0 {
 		t.Fatalf("treeRSSKB(self)=%d want >0", kb)
@@ -14,6 +17,9 @@ func TestTreeRSSKBSelfPositive(t *testing.T) {
 }
 
 func TestShouldRecycleByPressureThreshold(t *testing.T) {
+	if !rssMeasurementSupported() {
+		t.Skip("process RSS adapter unsupported on this platform")
+	}
 	p := &Pool{browserPID: os.Getpid()}
 	old := RecycleRSSBytes.Load()
 	defer RecycleRSSBytes.Store(old)

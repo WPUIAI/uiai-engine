@@ -47,9 +47,12 @@ type Pool struct {
 	maxPages int
 	created  int
 	// Health tracking
-	lastSuccess time.Time
-	failCount   int
-	browserPID  int
+	lastSuccess  time.Time
+	failCount    int
+	browserPID   int
+	rssSampleKB  int64
+	rssSamplePID int
+	rssSampleAt  time.Time
 	// Lazy launch: Chrome starts on first request, auto-kills after IdleTimeout
 	idleTimer *time.Timer
 	keepAlive bool
@@ -1185,6 +1188,7 @@ func (p *Pool) Stats() map[string]any {
 		return map[string]any{
 			"degraded":     true,
 			"reason":       "stats_lock_timeout",
+			"rss_pressure": map[string]any{"measurement": "unavailable", "protection_active": false},
 			"max_pages":    p.maxPages,
 			"active_pages": p.active,
 			"fail_count":   p.failCount,
@@ -1221,6 +1225,7 @@ func (p *Pool) Stats() map[string]any {
 		"fail_count":       p.failCount,
 		"screenshot_count": atomic.LoadInt64(&p.screenshotCount),
 		"recycle_every":    RecycleAfter,
+		"rss_pressure":     p.rssPressureSnapshotLocked(),
 		"queue": map[string]any{
 			"depth":         atomic.LoadInt64(&p.queued),
 			"max":           p.queueMax,

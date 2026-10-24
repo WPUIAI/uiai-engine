@@ -66,6 +66,10 @@ func agentPressureSummary(browserStats map[string]any, reconciler map[string]any
 	errorPressure := errorPressureLevel(freshErrors)
 	overallPressure := maxPressureLevel(browserPressure, searchPressure, cachePressure, errorPressure)
 	actions := pressureRecommendedActions(overallPressure, browserPressure, searchPressure, cachePressure, errorPressure)
+	rssPressure := mapFromAny(browserStats["rss_pressure"])
+	if len(rssPressure) == 0 {
+		rssPressure = map[string]any{"measurement": "unavailable", "protection_active": false}
+	}
 
 	return map[string]any{
 		"schema":              "uiai.agent_pressure.v1",
@@ -85,6 +89,7 @@ func agentPressureSummary(browserStats map[string]any, reconciler map[string]any
 		"historical_pressure": historicalPressure,
 		"browser": map[string]any{
 			"pressure":            browserPressure,
+			"rss_pressure":        rssPressure,
 			"current_capacity":    currentCapacity,
 			"historical_pressure": historicalPressure,
 			"active_pages":        activePages,

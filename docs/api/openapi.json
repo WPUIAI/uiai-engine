@@ -1241,7 +1241,11 @@
               "medium",
               "high",
               "critical",
-              "unknown"
+              "unknown",
+              "normal",
+              "degraded",
+              "constrained",
+              "saturated"
             ]
           },
           "recommended_actions": {
@@ -1283,6 +1287,42 @@
               "queue_depth": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "rss_pressure": {
+                "type": "object",
+                "required": [
+                  "measurement",
+                  "protection_active"
+                ],
+                "properties": {
+                  "measurement": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "sampled",
+                      "unavailable",
+                      "disabled",
+                      "no_browser",
+                      "unsupported"
+                    ]
+                  },
+                  "protection_active": {
+                    "type": "boolean"
+                  },
+                  "rss_kib": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "limit_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "attempted_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": true

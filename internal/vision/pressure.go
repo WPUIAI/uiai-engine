@@ -4,6 +4,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/events"
 	"log"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,11 +35,59 @@ func initRecycleRSS() {
 // shouldRecycleByPressure reports whether the browser tree exceeded the RSS budget.
 func (p *Pool) shouldRecycleByPressure() bool {
 	limit := RecycleRSSBytes.Load()
-	if limit <= 0 || p.browserPID <= 0 {
+	p.mu.Lock()
+	pid := p.browserPID
+	p.mu.Unlock()
+	if limit <= 0 || pid <= 0 {
 		return false
 	}
-	rss := treeRSSKB(p.browserPID)
-	return rss*1024 > limit // Convert the KiB sample once to the byte budget.
+	rss := treeRSSKB(pid)
+	p.mu.Lock()
+	if p.browserPID != pid {
+		p.mu.Unlock()
+		return false
+	}
+	p.rssSampleKB, p.rssSamplePID, p.rssSampleAt = rss, pid, time.Now().UTC()
+	p.mu.Unlock()
+	// Compare KiB against the byte budget without overflowing rss*1024.
+	return rss > 0 && rss > limit/1024
+}
+
+func rssMeasurementSupported() bool {
+	return runtime.GOOS == "linux" || runtime.GOOS == "darwin" || runtime.GOOS == "windows"
+}
+
+// Caller holds p.mu. Health reads cached observations, never spawning ps.
+func (p *Pool) rssPressureSnapshotLocked() map[string]any {
+	limit := RecycleRSSBytes.Load()
+	if limit < 0 {
+		limit = 0
+	}
+	state := "pending"
+	switch {
+	case !rssMeasurementSupported():
+		state = "unsupported"
+	case limit == 0:
+		state = "disabled"
+	case p.browser == nil || p.browserPID <= 0:
+		state = "no_browser"
+	case p.rssSampleAt.IsZero() || p.rssSamplePID != p.browserPID:
+		state = "pending"
+	case p.rssSampleKB <= 0:
+		state = "unavailable"
+	default:
+		state = "sampled"
+	}
+	out := map[string]any{"measurement": state, "protection_active": state == "sampled", "limit_bytes": limit, "rss_kib": int64(0)}
+	if p.rssSamplePID == p.browserPID {
+		if p.rssSampleKB > 0 {
+			out["rss_kib"] = p.rssSampleKB
+		}
+		if !p.rssSampleAt.IsZero() {
+			out["attempted_at"] = p.rssSampleAt.Format(time.RFC3339Nano)
+		}
+	}
+	return out
 }
 
 // procTreeRSSKB sums resident memory of pid and all descendants via procfs.
