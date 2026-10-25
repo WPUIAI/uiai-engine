@@ -36,8 +36,8 @@ func TestFPVToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fpvToken returned error: %v", err)
 	}
-	if !regexp.MustCompile(`^[a-z]+-[a-z]+-[0-9a-f]{4}$`).MatchString(token) {
-		t.Fatalf("token %q is not human-friendly slug format", token)
+	if !regexp.MustCompile(`^[a-z]+-[a-z]+-[0-9a-f]{60}$`).MatchString(token) {
+		t.Fatal("FPV capability must retain the word prefix and240-bit random suffix")
 	}
 }
 

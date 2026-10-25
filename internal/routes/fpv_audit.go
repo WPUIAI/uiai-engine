@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func fpvAuditEventsHandler(w http.ResponseWriter, req *http.Request) {
+func fpvAuditQuery(req *http.Request) (uint64, int) {
 	since := uint64(0)
 	if raw := strings.TrimSpace(req.URL.Query().Get("since_seq")); raw != "" {
 		_, _ = fmt.Sscan(raw, &since)
@@ -21,7 +21,12 @@ func fpvAuditEventsHandler(w http.ResponseWriter, req *http.Request) {
 			limit = parsed
 		}
 	}
-	events, latest := fpvAuditEventsSince(since, limit)
+	return since, limit
+}
+
+func fpvAuditEventsHandler(w http.ResponseWriter, req *http.Request) {
+	since, limit := fpvAuditQuery(req)
+	events, latest := fpvAuditEventsFiltered(since, limit, req.URL.Query().Get("session_id"), "")
 	writeJSON(w, http.StatusOK, map[string]any{"events": events, "latest_seq": latest, "count": len(events)})
 }
 
@@ -53,7 +58,7 @@ func fpvRecordAuditEvent(token, sessionID string, log fpvAuditLog) fpvAuditLog {
 		meta = map[string]any{}
 	}
 	meta["token"] = "[REDACTED]"
-	meta["share_ref"] = fmt.Sprintf("fpv-share:sha256:%x", sha256.Sum256([]byte(token)))
+	meta["share_ref"] = fpvShareRef(token)
 	meta["session_id"] = sessionID
 	log.Meta = meta
 	fpvAuditMu.Lock()
@@ -67,12 +72,29 @@ func fpvRecordAuditEvent(token, sessionID string, log fpvAuditLog) fpvAuditLog {
 	return log
 }
 
+func fpvShareRef(token string) string {
+	return fmt.Sprintf("fpv-share:sha256:%x", sha256.Sum256([]byte(token)))
+}
+
 func fpvAuditEventsSince(since uint64, limit int) ([]fpvAuditLog, uint64) {
+	return fpvAuditEventsFiltered(since, limit, "", "")
+}
+
+func fpvAuditEventsFiltered(since uint64, limit int, sessionID, shareRef string) ([]fpvAuditLog, uint64) {
 	fpvAuditMu.Lock()
 	defer fpvAuditMu.Unlock()
-	latest := fpvAuditSeq
+	latest := since
 	items := []fpvAuditLog{}
 	for _, event := range fpvAuditEvents {
+		if sessionID != "" && event.Meta["session_id"] != sessionID {
+			continue
+		}
+		if shareRef != "" && event.Meta["share_ref"] != shareRef {
+			continue
+		}
+		if event.Seq > latest {
+			latest = event.Seq
+		}
 		if event.Seq > since {
 			items = append(items, event)
 		}

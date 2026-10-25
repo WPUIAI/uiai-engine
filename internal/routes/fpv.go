@@ -24,16 +24,19 @@ import (
 )
 
 type fpvShare struct {
-	Token     string        `json:"token"`
-	SessionID string        `json:"session_id"`
-	CreatedAt time.Time     `json:"created_at"`
-	ExpiresAt time.Time     `json:"expires_at"`
-	Views     int           `json:"views"`
-	Controls  bool          `json:"controls"`
-	OneTime   bool          `json:"one_time"`
-	MaxViews  int           `json:"max_views"`
-	Revoked   bool          `json:"revoked"`
-	Audit     []fpvAuditLog `json:"audit,omitempty"`
+	Token        string        `json:"token"`
+	SessionID    string        `json:"session_id"`
+	CreatedAt    time.Time     `json:"created_at"`
+	ExpiresAt    time.Time     `json:"expires_at"`
+	Views        int           `json:"views"`
+	Controls     bool          `json:"controls"`
+	OneTime      bool          `json:"one_time"`
+	MaxViews     int           `json:"max_views"`
+	Revoked      bool          `json:"revoked"`
+	Audit        []fpvAuditLog `json:"audit,omitempty"`
+	ViewerSince  time.Time     `json:"viewer_since,omitempty"`
+	LastViewerAt time.Time     `json:"last_viewer_at,omitempty"`
+	ViewerJoins  int           `json:"viewer_join_count,omitempty"`
 }
 
 type fpvAuditLog struct {
@@ -148,8 +151,11 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "share not found"})
 			return
 		}
-		entry.Revoked = true
-		fpvShares.Store(entry.Token, entry)
+		entry, ok = fpvUpdateShare(entry.Token, func(next *fpvShare) bool { next.Revoked = true; return true })
+		if !ok {
+			writeJSON(w, http.StatusGone, map[string]string{"error": "fpv share unavailable"})
+			return
+		}
 		fpvSaveRegistry()
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "token": entry.Token, "revoked": true})
 	})
@@ -175,20 +181,50 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusGone, map[string]string{"error": "fpv share revoked"})
 			return
 		}
+		if sm == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "session manager unavailable"})
+			return
+		}
+		if _, ok := sm.Get(entry.SessionID); !ok {
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			return
+		}
 		if (entry.OneTime || entry.MaxViews > 0) && entry.Views >= fpvAllowedViews(entry) {
 			writeJSON(w, http.StatusGone, map[string]string{"error": "fpv share view limit reached"})
 			return
 		}
-		entry.Views++
-		fpvShares.Store(entry.Token, entry)
-		fpvSaveRegistry()
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		tmpl, err := template.ParseFiles(filepath.Join("web", "fpv", "index.html"))
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "fpv template unavailable"})
 			return
 		}
+		entry, ok = fpvRecordViewer(w, req, entry.Token, true)
+		if !ok {
+			writeJSON(w, http.StatusGone, map[string]string{"error": "fpv share unavailable or view limit reached"})
+			return
+		}
+		markFPVOperationalMirror(w)
 		_ = tmpl.Execute(w, map[string]any{"Token": entry.Token, "SessionID": entry.SessionID})
+	})
+	r.Get("/{token}/events", func(w http.ResponseWriter, req *http.Request) {
+		entry, ok := fpvEntry(chi.URLParam(req, "token"))
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share unavailable"})
+			return
+		}
+		if sm == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "session manager unavailable"})
+			return
+		}
+		if _, ok := sm.Get(entry.SessionID); !ok {
+			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
+			return
+		}
+		since, limit := fpvAuditQuery(req)
+		events, latest := fpvAuditEventsFiltered(since, limit, "", fpvShareRef(entry.Token))
+		markFPVOperationalMirror(w)
+		writeJSON(w, http.StatusOK, map[string]any{"events": events, "latest_seq": latest, "viewer_state": fpvViewerState(entry)})
 	})
 	r.Get("/{token}/status", func(w http.ResponseWriter, req *http.Request) {
 		entry, ok := fpvEntry(chi.URLParam(req, "token"))
@@ -201,6 +237,15 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusGone, map[string]string{"error": "session closed"})
 			return
 		}
+		entry, ok = fpvRecordViewer(w, req, entry.Token, false)
+		if !ok {
+			writeJSON(w, http.StatusGone, map[string]string{"error": "fpv share unavailable"})
+			return
+		}
+		markFPVOperationalMirror(w)
+		viewerState := fpvViewerState(entry)
+		context := fpvContext(sess)
+		context["viewer_state"] = viewerState
 		diag := sess.DiagnosticsWithOptions(vision.DiagnosticsOptions{Format: "summary", Limit: 1})
 		writeJSON(w, http.StatusOK, map[string]any{
 			"token":            entry.Token,
@@ -214,6 +259,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			"max_views":        entry.MaxViews,
 			"revoked":          entry.Revoked,
 			"viewers":          fpvViewerCount(entry.Token),
+			"viewer_state":     viewerState,
 			"created_at":       entry.CreatedAt,
 			"url":              focusapacket.SanitizeURL(sess.URL),
 			"title":            sess.Title,
@@ -230,7 +276,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 				"quality_modes": []string{"smooth", "balanced", "saver"},
 				"max_viewers":   3,
 			},
-			"context": fpvContext(sess),
+			"context": context,
 		})
 	})
 
@@ -297,11 +343,13 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			log.OK = true
 		}
 		log = fpvRecordAuditEvent(entry.Token, entry.SessionID, log)
-		entry.Audit = append(entry.Audit, log)
-		if len(entry.Audit) > 100 {
-			entry.Audit = entry.Audit[len(entry.Audit)-100:]
-		}
-		fpvShares.Store(entry.Token, entry)
+		_, _ = fpvUpdateShare(entry.Token, func(next *fpvShare) bool {
+			next.Audit = append(next.Audit, log)
+			if len(next.Audit) > 100 {
+				next.Audit = next.Audit[len(next.Audit)-100:]
+			}
+			return true
+		})
 		fpvSaveRegistry()
 		status := http.StatusOK
 		if err != nil {
@@ -346,7 +394,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many viewers for share"})
 			return
 		}
-		defer fpvReleaseViewer(entry.Token)
+		defer fpvReleaseViewer(entry.Token, entry.SessionID)
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "streaming unsupported"})
@@ -400,7 +448,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many viewers for share"})
 			return
 		}
-		defer fpvReleaseViewer(entry.Token)
+		defer fpvReleaseViewer(entry.Token, entry.SessionID)
 		markFPVOperationalMirror(w)
 		w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
 		w.Header().Set("X-Accel-Buffering", "no")
@@ -492,20 +540,32 @@ func fpvViewerCount(token string) int {
 
 func fpvAcquireViewer(token string) bool {
 	fpvStreamMu.Lock()
-	defer fpvStreamMu.Unlock()
 	if fpvStreamViewers[token] >= 3 {
+		fpvStreamMu.Unlock()
 		return false
 	}
 	fpvStreamViewers[token]++
+	count := fpvStreamViewers[token]
+	fpvStreamMu.Unlock()
+	if entry, ok := fpvEntry(token); ok {
+		fpvRecordStreamViewer(token, entry.SessionID, "fpv_viewer_joined", count)
+	}
 	return true
 }
 
-func fpvReleaseViewer(token string) {
+func fpvReleaseViewer(token, sessionID string) {
 	fpvStreamMu.Lock()
-	defer fpvStreamMu.Unlock()
-	if fpvStreamViewers[token] > 0 {
-		fpvStreamViewers[token]--
+	if fpvStreamViewers[token] <= 0 {
+		fpvStreamMu.Unlock()
+		return
 	}
+	fpvStreamViewers[token]--
+	count := fpvStreamViewers[token]
+	if count == 0 {
+		delete(fpvStreamViewers, token)
+	}
+	fpvStreamMu.Unlock()
+	fpvRecordStreamViewer(token, sessionID, "fpv_viewer_left", count)
 }
 
 func fpvStreamInterval(token string) time.Duration {
@@ -776,7 +836,7 @@ func fpvEntry(token string) (*fpvShare, bool) {
 func fpvToken() (string, error) {
 	adjectives := []string{"bright", "calm", "clear", "cosmic", "gentle", "golden", "nimble", "quiet", "rapid", "steady", "sunny", "vivid"}
 	nouns := []string{"atlas", "beacon", "comet", "harbor", "meadow", "orbit", "river", "signal", "summit", "trail", "voyage", "window"}
-	buf := make([]byte, 4)
+	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return "", fmt.Errorf("generate fpv token: %w", err)
 	}

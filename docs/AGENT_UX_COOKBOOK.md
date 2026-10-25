@@ -348,3 +348,19 @@ Symptoms of stale MCP metadata:
 - [Release Deploy Runbook](RELEASE_DEPLOY_RUNBOOK.md)
 - [CI Failure Diagnostics Guide](CI_FAILURE_DIAGNOSTICS_GUIDE.md)
 - [Endpoint Auth Matrix](ENDPOINT_AUTH_MATRIX.md)
+
+
+### Viewer-aware FPV collaboration
+
+Poll the authenticated `/api/fpv/events?session_id=<owned-session>&since_seq=<cursor>`
+for `fpv_viewer_joined` / `fpv_viewer_left`. Events carry a non-authorizing hashed
+`share_ref`, never the capability token or user agent. The read-only
+`/m/{capability}/events` exposes only that share's cursor/events, and `/status`
+includes `viewer_state` both directly and in its context. `viewer_count` counts
+active stream connections, not authenticated people; cookie-deduplicated
+`viewer_join_count`, `viewer_since`, and `last_viewer_at` describe accepted page or
+status requests. Polls/refreshes with the share-path cookie do not re-announce arrival.
+Stream disconnect releases capacity and emits left; denied/closed/expired shares
+cannot announce arrivals. These signals are advisory, not proof of rendered pixels,
+operator approval, authenticated identity, or consent. No outbound webhook is sent.
+Existing explicit-share, publication and control-approval policy remains unchanged.
