@@ -1,0 +1,21 @@
+{
+  "schema": "uiai.idle_owned_rollout_proof.v1",
+  "mechanism_commits": ["28223b3", "bac808a"],
+  "guard_tests_passed": 3,
+  "health_readiness_tests_passed": 3,
+  "live_candidate_source": "a689a4f",
+  "live_binary_sha256": "93fe1b11e52a7d053f8cb9028b7f534804c2838dbedecc9e92ec01000f5bd9ca",
+  "workers_verified": ["uiai-engine-ovh.service", "uiai-engine-ovh-w2.service"],
+  "installed_owner": "wpuiai:wpuiai",
+  "installed_mode": "0755",
+  "running_proc_exe_hashes_match": true,
+  "backups_preserved": true,
+  "busy_primary_not_restarted_during_secondary_rollout": true,
+  "independent_idle_secondary_rollout": "passed",
+  "pending_source": "80474ae",
+  "pending_binary_sha256": "7a54203ce267aef4d5c995dfa3eae3273e90266c27169d1f78d7cf1d214b1912",
+  "pending_deployment_state": "blocked_by_active_sessions_on_both_workers_at_last_observation",
+  "foreign_sessions_cancelled": false,
+  "sealed_epwa_ready_claim": false,
+  "public_release_published": false
+}
