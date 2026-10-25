@@ -541,3 +541,28 @@ additional results or spends another provider request to fill a limit; output ma
 therefore contain fewer items. Cached and fresh results share citation ranks.
 This is single-response deduplication, not multi-provider query/rank fusion;
 issue90 remains open for that and its other acceptance requirements.
+
+### Explicit HTTP research fusion (opt-in)
+
+`POST /api/search` can accept `providers:["brave","wikipedia"]` instead of
+`provider`. Two or three distinct installed providers are required. Every member
+must also be the operator's resolved default or named in the approved fallback
+configuration. Unsupported/unapproved/disabled members and a simultaneous pinned
+`provider` are rejected before traffic. Merely possessing another key never
+authorizes fanout. Ordinary requests and explicit single-provider pins do not fan
+out. This first surface is HTTP-only; native/MCP parameter bindings are separate.
+
+At most three provider calls run concurrently under one12s overall context, using
+exactly the existing per-provider cache/circuit/normalization path. Successes are
+merged using reciprocal-rank fusion with constant60; citation dedupe uses the same
+identity owner as ordinary results. `fusion_score` is distinct from the original
+provider-native `score`. Each merged result keeps its first original citation and
+lists `sources` with each contributing provider, original evidence ref and rank.
+The result `rank` is fused order, not a rewritten original evidence reference.
+
+Top-level `providers` lists successes, `provider_errors` reports value-free lane
+failures and `fusion_method` is `rrf60`; failures never masquerade as a full-success
+provider set. All-failed is a non-success response; all429 remains429. `cached`
+is true only when every requested lane succeeded from cache. No second fusion
+cache or implicit refill/probe requests exist. This does not grant paid-provider
+use, key acquisition or production fallback configuration; tests use local fakes.

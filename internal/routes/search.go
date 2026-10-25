@@ -32,35 +32,41 @@ const maxSearchSourceChars = 120
 const maxSearchAgeChars = 80
 
 type searchRequest struct {
-	Query    string `json:"query"`
-	Provider string `json:"provider"`
-	Limit    int    `json:"limit"`
+	Query     string   `json:"query"`
+	Provider  string   `json:"provider"`
+	Limit     int      `json:"limit"`
+	Providers []string `json:"providers,omitempty"`
 }
 
 type searchResult struct {
-	Title       string   `json:"title"`
-	URL         string   `json:"url"`
-	Description string   `json:"description,omitempty"`
-	Snippet     string   `json:"snippet"`
-	Provider    string   `json:"provider"`
-	Score       *float64 `json:"score,omitempty"`
-	PublishedAt string   `json:"published_at,omitempty"`
-	Source      string   `json:"source,omitempty"`
-	Age         string   `json:"age,omitempty"`
-	Rank        int      `json:"rank,omitempty"`
-	EvidenceRef string   `json:"evidence_ref,omitempty"`
+	Title       string               `json:"title"`
+	URL         string               `json:"url"`
+	Description string               `json:"description,omitempty"`
+	Snippet     string               `json:"snippet"`
+	Provider    string               `json:"provider"`
+	Score       *float64             `json:"score,omitempty"`
+	PublishedAt string               `json:"published_at,omitempty"`
+	Source      string               `json:"source,omitempty"`
+	Age         string               `json:"age,omitempty"`
+	Rank        int                  `json:"rank,omitempty"`
+	EvidenceRef string               `json:"evidence_ref,omitempty"`
+	Sources     []searchResultSource `json:"sources,omitempty"`
+	FusionScore float64              `json:"fusion_score,omitempty"`
 }
 
 type searchResponse struct {
-	Schema          string               `json:"schema"`
-	Provider        string               `json:"provider"`
-	Query           string               `json:"query"`
-	Count           int                  `json:"count"`
-	Cached          bool                 `json:"cached"`
-	CacheTTLSeconds int                  `json:"cache_ttl_seconds"`
-	Results         []searchResult       `json:"results"`
-	Next            []string             `json:"next"`
-	Focusa          searchFocusaMetadata `json:"focusa"`
+	Schema          string                  `json:"schema"`
+	Provider        string                  `json:"provider"`
+	Query           string                  `json:"query"`
+	Count           int                     `json:"count"`
+	Cached          bool                    `json:"cached"`
+	CacheTTLSeconds int                     `json:"cache_ttl_seconds"`
+	Results         []searchResult          `json:"results"`
+	Next            []string                `json:"next"`
+	Focusa          searchFocusaMetadata    `json:"focusa"`
+	Providers       []string                `json:"providers,omitempty"`
+	ProviderErrors  []searchResearchFailure `json:"provider_errors,omitempty"`
+	FusionMethod    string                  `json:"fusion_method,omitempty"`
 }
 
 type searchFocusaMetadata struct {
@@ -137,6 +143,10 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "query_required", "message": "query or q is required"})
 		return
 	}
+	if len(req.Providers) > 0 {
+		runResearchSearch(w, httpReq, cfg, query, req)
+		return
+	}
 	provider := strings.ToLower(strings.TrimSpace(req.Provider))
 	if provider == "" {
 		provider = resolveDefaultSearchProvider(cfg)
@@ -153,6 +163,7 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 	ttl := searchCacheTTL()
 	var results []searchResult
 	var err error
+	var cached bool
 	for _, candidate := range searchProviderPlan(cfg, req.Provider, provider) {
 		if httpReq.Context().Err() != nil {
 			err = httpReq.Context().Err()
@@ -164,27 +175,7 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": searchProviderIDs(cfg)})
 			return
 		}
-		if cfg != nil && cfg.Search.Providers[provider].Disabled {
-			err = fmt.Errorf("search provider %s is disabled by configuration", provider)
-			break
-		}
-		if ttl > 0 {
-			if cachedResults, ok := getCachedSearch(provider, query, limit, time.Now()); ok {
-				writeSearchResponse(w, httpReq, cfg, provider, query, cachedResults, true, ttl)
-				return
-			}
-		}
-		breakers := searchBreakersFor(httpReq)
-		attempt, wait := breakers.acquire(provider)
-		if wait > 0 {
-			err = &searchCircuitOpenError{retryAfter: wait}
-			continue
-		}
-		results, err = adapter(httpReq.Context(), cfg, query, limit)
-		if httpReq.Context().Err() != nil {
-			err = httpReq.Context().Err()
-		}
-		breakers.complete(provider, attempt, err)
+		results, cached, err = executeSearchProvider(httpReq, cfg, provider, query, limit, ttl)
 		if err == nil {
 			break
 		}
@@ -218,12 +209,7 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "search_provider_unavailable", "provider": provider, "message": err.Error()})
 		return
 	}
-	results = deduplicateSearchResults(results)
-	annotateSearchEvidence(results, provider, query)
-	if ttl > 0 {
-		setCachedSearch(provider, query, limit, results, time.Now().Add(ttl))
-	}
-	writeSearchResponse(w, httpReq, cfg, provider, query, results, false, ttl)
+	writeSearchResponse(w, httpReq, cfg, provider, query, results, cached, ttl)
 }
 
 func normalizeSearchLimit(limit int) int {
@@ -294,7 +280,7 @@ func searchCacheTTL() time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-func writeSearchResponse(w http.ResponseWriter, req *http.Request, cfg *config.Config, provider, query string, results []searchResult, cached bool, ttl time.Duration) {
+func writeSearchResponse(w http.ResponseWriter, req *http.Request, cfg *config.Config, provider, query string, results []searchResult, cached bool, ttl time.Duration, details ...searchResearchDetails) {
 	response := searchResponse{
 		Schema:          "uiai.search_results.v1",
 		Provider:        provider,
@@ -305,6 +291,11 @@ func writeSearchResponse(w http.ResponseWriter, req *http.Request, cfg *config.C
 		Results:         results,
 		Next:            []string{"browser_open a selected result URL", "browser_read page text", "browser_diagnostics on navigation failure", "cite selected result with evidence_ref"},
 		Focusa:          buildSearchFocusaMetadata(provider, query, results),
+	}
+	if len(details) > 0 {
+		response.Providers = details[0].Providers
+		response.ProviderErrors = details[0].Failures
+		response.FusionMethod = "rrf60"
 	}
 	writeJSONArtifactEPWA(w, req, cfg, evidenceScopeFromRequest(req), "", "Web search result packet", "research_packet", response, http.StatusOK)
 }
@@ -332,6 +323,7 @@ func cloneSearchResults(results []searchResult) []searchResult {
 	cloned := make([]searchResult, len(results))
 	copy(cloned, results)
 	for i := range cloned {
+		cloned[i].Sources = append([]searchResultSource(nil), results[i].Sources...)
 		if results[i].Score != nil {
 			score := *results[i].Score
 			cloned[i].Score = &score

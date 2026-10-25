@@ -62,7 +62,7 @@ func deduplicateSearchResults(results []searchResult) []searchResult {
 		duplicate := false
 		for _, index := range groups[key] {
 			old := kept[index]
-			if exact == searchCitationURL(old.URL, false) || similarSearchTitles(result.Title, old.Title) {
+			if sameSearchCitation(result, old) {
 				duplicate = true
 				break
 			}
@@ -74,4 +74,12 @@ func deduplicateSearchResults(results []searchResult) []searchResult {
 		kept = append(kept, result)
 	}
 	return kept
+}
+
+func sameSearchCitation(a, b searchResult) bool {
+	key := searchCitationURL(a.URL, true)
+	if key == "" || key != searchCitationURL(b.URL, true) {
+		return false
+	}
+	return searchCitationURL(a.URL, false) == searchCitationURL(b.URL, false) || similarSearchTitles(a.Title, b.Title)
 }
