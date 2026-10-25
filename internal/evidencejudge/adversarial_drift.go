@@ -48,7 +48,7 @@ func CompareCalibrationResults(baseline, candidate CalibrationResult, policy Cal
 	if report.CapabilityDowngraded && baseline.HighConsequenceCases > 0 {
 		block("high_consequence_capability_downgrade")
 	}
-	if candidate.Status != CalibrationPassed || !policy.EvaluatedAt.Before(candidate.ExpiresAt) {
+	if candidate.Status != CalibrationPassed || policy.EvaluatedAt.Before(candidate.EvaluatedAt) || !policy.EvaluatedAt.Before(candidate.ExpiresAt) {
 		block("candidate_not_current_and_passing")
 	}
 	if report.Status != DriftBlocked {
@@ -80,6 +80,16 @@ func CompareCalibrationResults(baseline, candidate CalibrationResult, policy Cal
 }
 
 func ValidateDriftReport(report DriftReport) error {
+	expectedDrop := uint32(0)
+	if report.BaselinePassPPM > report.CandidatePassPPM {
+		expectedDrop = report.BaselinePassPPM - report.CandidatePassPPM
+	}
+	if report.DropPPM != expectedDrop || (!report.Comparable && report.Status != DriftBlocked) ||
+		(report.Status == DriftWithinThreshold && (len(report.ReasonCodes) != 0 || report.ModelRevisionChanged || report.ProviderChanged || report.PolicyRevisionChanged)) ||
+		(report.Status == DriftWarning && len(report.ReasonCodes) == 0) {
+		return ErrDriftReportInvalid
+	}
+
 	if report.Schema != DriftReportSchema || !safeAdversarialRef(report.DriftReportID) || !validAssignmentSHA256(report.DriftReportSHA256) ||
 		!safeAdversarialRef(report.BaselineRef) || !validAssignmentSHA256(report.BaselineSHA256) || !safeAdversarialRef(report.CandidateRef) ||
 		!validAssignmentSHA256(report.CandidateSHA256) || !safeAdversarialRef(report.CorpusRef) || !safeAdversarialRef(report.CorpusRevision) ||

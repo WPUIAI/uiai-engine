@@ -123,3 +123,39 @@ func rehashCalibration(t *testing.T, r CalibrationResult, mutate func(*Calibrati
 	}
 	return r
 }
+
+func TestDriftReportSemanticForgeryAndFutureCandidate(t *testing.T) {
+	corpus := testAdversarialCorpus(t)
+	baseline, err := BuildCalibrationResult(corpus, evaluateCorpus(t, corpus), testCalibrationCapability(), testAdversarialNow())
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := CompareCalibrationResults(baseline, baseline, testDriftPolicy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*DriftReport){
+		"arithmetic":           func(r *DriftReport) { r.DropPPM = 1 },
+		"incomparable_passing": func(r *DriftReport) { r.Comparable = false },
+		"unexplained_warning":  func(r *DriftReport) { r.Status = DriftWarning },
+		"passing_with_reasons": func(r *DriftReport) { r.ReasonCodes = []string{"drift_warning"} },
+		"passing_model_drift":  func(r *DriftReport) { r.ModelRevisionChanged = true },
+	} {
+		t.Run(name, func(t *testing.T) {
+			forged := report
+			mutate(&forged)
+			forged.DriftReportSHA256, err = computeDriftReportSHA256(forged)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !errors.Is(ValidateDriftReport(forged), ErrDriftReportInvalid) {
+				t.Fatal("self-rehashed semantic forgery accepted")
+			}
+		})
+	}
+	future := rehashCalibration(t, baseline, func(r *CalibrationResult) { r.EvaluatedAt = testDriftPolicy().EvaluatedAt.Add(time.Minute) })
+	result, err := CompareCalibrationResults(baseline, future, testDriftPolicy())
+	if err != nil || result.Status != DriftBlocked || result.Comparable {
+		t.Fatal("future calibration accepted as current evidence")
+	}
+}
