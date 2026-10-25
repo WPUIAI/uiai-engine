@@ -417,7 +417,7 @@ If every attempt fails, the final provider's HTTP status and Retry-After survive
 Caller cancellation/deadlines reach upstream requests; redirects cannot expand the
 configured origin. Retiring a provider prevents serving its old cached results.
 
-Installed adapters are Brave, Exa, Tavily and Wikipedia. Other adapters, circuit
+Installed adapters are Brave, Exa, Tavily, SearxNG and Wikipedia. Other adapters, circuit
 breakers, fusion and quota accounting for issue90 remain incomplete.
 No production fallback list is enabled by this code deployment alone.
 
@@ -465,3 +465,26 @@ Circuit state resets with that router/runtime, not with a durable quota ledger.
 Proof uses fake clocks, concurrent probe admission and local synthetic HTTP
 providers (no actual paid provider calls). Issue90 remains open for other
 adapters, richer results/fusion, quota/health integration and zero-key acceptance.
+
+### Operator-configured SearxNG (no client API key)
+
+`search.providers.searxng.api_url` must name an explicitly approved full search
+endpoint, for example `https://search.operator.example/search`. No implicit
+public instance or default endpoint is selected. HTTPS is required except for
+loopback local/dev endpoints; user info, endpoint query credentials and fragments
+are rejected. A missing/invalid endpoint is not advertised ready. Explicitly
+disabled instances remain disabled.
+
+The adapter posts form-encoded `q` and `format=json` to keep query text out of
+request URLs. The instance must enable JSON in `settings.yml`; upstream403 is an
+honest non-retryable provider error, not a successful empty result. Normalized
+results use title/URL/content/publishedDate and the shared bounded, origin-confined
+transport/redactor. No credentials are sent by this adapter. Add `searxng` to the
+approved fallback list only when query disclosure to that instance is intended.
+The instance may itself forward queries to external engines.
+
+Protocol: https://docs.searxng.org/dev/search_api.html and
+https://docs.searxng.org/dev/result_types/main/mainresult.html (reviewed2026-10-25).
+Synthetic local-provider proof is not a deployed SearxNG service or out-of-box
+zero-key web-search acceptance. No service installation or production configuration
+is implied by shipping the adapter; issue90 remains open.

@@ -14,11 +14,13 @@ type builtinSearchProvider struct {
 	id           string
 	name         string
 	keyless      bool
+	configured   func(*config.Config) (bool, string)
 	capabilities []string
 	search       func(context.Context, *config.Config, string, int) ([]searchResult, error)
 }
 
 var builtinSearchProviders = []builtinSearchProvider{
+	{id: "searxng", name: "SearxNG", keyless: true, configured: searxSearchConfigured, search: searchSearxNG, capabilities: []string{"web_search", "source_urls", "snippets", "keyless_configured_endpoint"}},
 	{id: "exa", name: "Exa Search", search: searchExa, capabilities: []string{"web_search", "source_urls", "snippets"}},
 	{id: "tavily", name: "Tavily Search", search: searchTavily, capabilities: []string{"web_search", "source_urls", "snippets"}},
 	{id: "brave", name: "Brave Search", search: searchBraveContext, capabilities: []string{"web_search", "source_urls", "snippets"}},
@@ -76,6 +78,9 @@ func searchProviderConfigured(cfg *config.Config, id string) (bool, string) {
 	meta := searchProviderMeta(id)
 	if meta.search == nil {
 		return false, "unsupported_provider"
+	}
+	if meta.configured != nil {
+		return meta.configured(cfg)
 	}
 	if meta.keyless {
 		return true, ""

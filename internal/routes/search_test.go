@@ -202,7 +202,7 @@ func TestSearchProvidersReportsMissingKeyDegraded(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		t.Fatalf("decode providers: %v", err)
 	}
-	if len(body.Providers) != 4 || body.Providers[0].ID != "brave" || body.Providers[1].ID != "exa" || body.Providers[2].ID != "tavily" || body.Providers[3].ID != "wikipedia" {
+	if len(body.Providers) != 5 || body.Providers[0].ID != "brave" || body.Providers[1].ID != "exa" || body.Providers[2].ID != "searxng" || body.Providers[3].ID != "tavily" || body.Providers[4].ID != "wikipedia" {
 		t.Fatalf("unexpected providers: %+v", body.Providers)
 	}
 	brave := body.Providers[0]
