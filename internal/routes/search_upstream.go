@@ -2,17 +2,14 @@ package routes
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/WPUIAI/uiai-engine/internal/config"
-	"github.com/WPUIAI/uiai-engine/internal/httpboundary"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func searchWikipedia(query string, limit int) ([]searchResult, error) {
@@ -26,7 +23,7 @@ func searchWikipediaContext(ctx context.Context, query string, limit int) ([]sea
 	}
 	u, err := searchAPIURL(base, "https://en.wikipedia.org/w/api.php", []string{"en.wikipedia.org", "wikipedia.org"})
 	if err != nil {
-		return nil, fmt.Errorf("invalid Wikipedia API URL: %w", err)
+		return nil, fmt.Errorf("invalid Wikipedia API URL")
 	}
 	q := u.Query()
 	q.Set("action", "opensearch")
@@ -43,18 +40,8 @@ func searchWikipediaContext(ctx context.Context, query string, limit int) ([]sea
 	httpReq.Header.Set("Accept", "application/json")
 	httpReq.Header.Set("User-Agent", "uiai-engine/agent-search (+https://github.com/WPUIAI/uiai-engine)")
 
-	client := httpboundary.OriginBoundClient(&http.Client{Timeout: 12 * time.Second})
-	resp, err := client.Do(httpReq) // #nosec G704 -- API URL is restricted by searchAPIURL allowlist/loopback test gate.
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, upstreamErr(resp)
-	}
-
 	var decoded []any
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+	if err := searchJSON(httpReq, &decoded); err != nil {
 		return nil, err
 	}
 	if len(decoded) < 4 {
@@ -91,7 +78,13 @@ func searchAPIURL(raw, fallback string, allowedHosts []string) (*url.URL, error)
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid search API URL")
+	}
+	if u.User != nil {
+		return nil, fmt.Errorf("search API URL cannot contain user information")
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return nil, fmt.Errorf("search API URL must use HTTP or HTTPS")
 	}
 	if u.Scheme != "https" && !isLoopbackHost(u.Hostname()) {
 		return nil, fmt.Errorf("search API URL must use https unless loopback")
@@ -145,8 +138,12 @@ func (e *upstreamSearchError) Error() string { return e.message }
 
 func upstreamErr(resp *http.Response) *upstreamSearchError {
 	e := &upstreamSearchError{status: resp.StatusCode, message: fmt.Sprintf("search provider returned HTTP %d", resp.StatusCode)}
-	if ra := resp.Header.Get("Retry-After"); ra != "" {
-		e.retryAfter = ra
+	if ra := strings.TrimSpace(resp.Header.Get("Retry-After")); ra != "" {
+		if _, err := strconv.ParseUint(ra, 10, 32); err == nil {
+			e.retryAfter = ra
+		} else if _, err := http.ParseTime(ra); err == nil {
+			e.retryAfter = ra
+		}
 	}
 	return e
 }
@@ -156,29 +153,9 @@ func searchBrave(cfg *config.Config, query string, limit int) ([]searchResult, e
 }
 
 func searchBraveContext(ctx context.Context, cfg *config.Config, query string, limit int) ([]searchResult, error) {
-	key := ""
-	credentialSource := config.BuiltinSearchProviderEnv["brave"]
-	if cfg != nil {
-		provider, declared := cfg.Search.Providers["brave"]
-		if declared && provider.Disabled {
-			return nil, fmt.Errorf("search provider brave is disabled by configuration")
-		}
-		if declared {
-			resolved, err := cfg.Search.ResolveSearchProviderKey("brave")
-			if err != nil {
-				return nil, fmt.Errorf("resolve search provider brave credential: %w", err)
-			}
-			key = resolved
-		}
-	}
-	if key == "" {
-		// Fallback: the provider's conventional environment variable.
-		key = config.BuiltinSearchProviderKey("brave")
-	}
-	if key == "" {
-		// Name the configuration surface an operator can act on rather than
-		// reporting a bare vendor-specific variable name.
-		return nil, fmt.Errorf("search provider brave has no credential: set search.providers.brave.api_key, api_key_file, or api_key_env in the engine config (or export %s)", credentialSource)
+	key, err := searchCredential(cfg, "brave")
+	if err != nil {
+		return nil, err
 	}
 
 	base := ""
@@ -195,7 +172,7 @@ func searchBraveContext(ctx context.Context, cfg *config.Config, query string, l
 	}
 	u, err := searchAPIURL(base, "https://api.search.brave.com/res/v1/web/search", []string{"api.search.brave.com"})
 	if err != nil {
-		return nil, fmt.Errorf("invalid Brave API URL: %w", err)
+		return nil, fmt.Errorf("invalid Brave API URL")
 	}
 	q := u.Query()
 	q.Set("q", query)
@@ -209,18 +186,8 @@ func searchBraveContext(ctx context.Context, cfg *config.Config, query string, l
 	httpReq.Header.Set("X-Subscription-Token", key)
 	httpReq.Header.Set("Accept", "application/json")
 
-	client := httpboundary.OriginBoundClient(&http.Client{Timeout: 12 * time.Second})
-	resp, err := client.Do(httpReq) // #nosec G704 -- API URL is restricted by searchAPIURL allowlist/loopback test gate.
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, upstreamErr(resp)
-	}
-
 	var decoded braveWebResponse
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+	if err := searchJSON(httpReq, &decoded); err != nil {
 		return nil, err
 	}
 	results := make([]searchResult, 0, len(decoded.Web.Results))

@@ -152,3 +152,26 @@ test("MCP evidence-producing operations forward complete Focusa scope", async (t
   assert.equal(captured.headers["x-uiai-continuity-ref"], scope.continuity_ref);
   assert.deepEqual(JSON.parse(captured.headers["x-uiai-work-items"]), scope.work_items);
 });
+
+test("MCP search preserves omission and explicit provider pinning", async (t) => {
+  let captured;
+  const server = createServer(async (req, res) => {
+    if (req.method === "GET") { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ tools: [] })); return; }
+    const chunks = []; for await (const c of req) chunks.push(c);
+    captured = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ delivery_state: "ready", artifact_url: "https://evidence.example/e/fixture", portable_url: "https://evidence.example/e/fixture" }));
+  });
+  server.listen(0, "127.0.0.1"); await once(server, "listening");
+  const child = spawn(process.execPath, [process.env.UIAI_TEST_MCP_SCRIPT || "mcp/browser-session-mcp.mjs"], { cwd: root, env: { ...process.env, UIAI_ENGINE_URL: `http://127.0.0.1:${server.address().port}` }, stdio: ["pipe", "pipe", "pipe"] });
+  t.after(() => { child.kill(); server.close(); });
+  const listed = await callMcp(child, { jsonrpc: "2.0", id: 10, method: "tools/list", params: {} });
+  const search = listed.result.tools.find(t => t.name === "browser_search");
+  assert.ok(search); assert.equal(Object.hasOwn(search.inputSchema.properties.provider, "default"), false);
+  for (const [id, args] of [[11, { query: "fixture" }], [12, { query: "fixture", provider: "tavily" }]]) {
+    const reply = await callMcp(child, { jsonrpc: "2.0", id, method: "tools/call", params: { name: "browser_search", arguments: args } });
+    assert.equal(reply.error, undefined); assert.equal(reply.result.isError, undefined);
+    assert.equal(captured.provider, args.provider);
+    assert.equal(Object.hasOwn(captured, "provider"), Object.hasOwn(args, "provider"));
+  }
+});

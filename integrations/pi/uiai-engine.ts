@@ -568,7 +568,7 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with uiai_browser_open, then uiai_browser_read.",
 		parameters: Type.Object({
 			query: Type.String({ description: "Search query" }),
-			provider: Type.Optional(Type.String({ description: "Search provider id; default brave" })),
+			provider: Type.Optional(Type.String({ description: "Optional provider id; omitted uses operator defaults and approved fallback" })),
 			limit: Type.Optional(Type.Number({ description: "Result limit, max 20", default: 5 })),
 		}),
 		async execute(_toolCallId, params) {

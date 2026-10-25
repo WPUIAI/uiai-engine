@@ -205,7 +205,7 @@ const BRIDGE_CORE_TOOLS = [
       type: "object",
       properties: {
         query: { type: "string", description: "Search query" },
-        provider: { type: "string", default: "brave", description: "Search provider id" },
+        provider: { type: "string", description: "Optional provider id; omitted uses operator defaults and approved fallback" },
         limit: { type: "integer", default: 5, description: "Result limit, max 20" },
       },
       required: ["query"],

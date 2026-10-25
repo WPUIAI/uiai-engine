@@ -114,7 +114,8 @@ func (s SearchConfig) SearchProviderEnabled(providerID string) bool {
 // variable. It is a fallback only: an explicit search.providers entry always wins,
 // so an operator can relocate or rename any credential without a rebuild.
 var BuiltinSearchProviderEnv = map[string]string{
-	"brave": "BRAVE_SEARCH_API_KEY",
+	"brave":  "BRAVE_SEARCH_API_KEY",
+	"tavily": "TAVILY_API_KEY",
 }
 
 // BuiltinSearchProviderKey returns the conventional environment credential for a

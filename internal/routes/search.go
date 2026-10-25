@@ -16,6 +16,7 @@ import (
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
+	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -178,7 +179,7 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 		}
 		writeJSON(w, code, map[string]any{
 			"error": errCode, "provider": provider, "message": use.message,
-			"upstream_status": use.status, "retryable": true,
+			"upstream_status": use.status, "retryable": use.status == http.StatusTooManyRequests || use.status == http.StatusRequestTimeout || use.status >= 500,
 		})
 		return
 	}
@@ -357,11 +358,11 @@ func sanitizeSearchURL(raw string) string {
 
 func sanitizeSearchResult(result searchResult) searchResult {
 	return searchResult{
-		Title:       truncateSearchField(result.Title, maxSearchTitleChars),
+		Title:       truncateSearchField(secrettext.Text(result.Title), maxSearchTitleChars),
 		URL:         sanitizeSearchURL(result.URL),
-		Description: truncateSearchField(result.Description, maxSearchDescriptionChars),
-		Source:      truncateSearchField(result.Source, maxSearchSourceChars),
-		Age:         truncateSearchField(result.Age, maxSearchAgeChars),
+		Description: truncateSearchField(secrettext.Text(result.Description), maxSearchDescriptionChars),
+		Source:      truncateSearchField(secrettext.Text(result.Source), maxSearchSourceChars),
+		Age:         truncateSearchField(secrettext.Text(result.Age), maxSearchAgeChars),
 		Rank:        result.Rank,
 		EvidenceRef: result.EvidenceRef,
 	}

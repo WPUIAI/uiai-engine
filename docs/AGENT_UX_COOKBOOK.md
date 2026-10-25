@@ -417,6 +417,16 @@ If every attempt fails, the final provider's HTTP status and Retry-After survive
 Caller cancellation/deadlines reach upstream requests; redirects cannot expand the
 configured origin. Retiring a provider prevents serving its old cached results.
 
-Currently installed adapters remain Brave and Wikipedia. Other adapters, circuit
-breakers, fusion and quota accounting for issue90 are not completed by this slice.
+Installed adapters are Brave, Tavily and Wikipedia. Other adapters, circuit
+breakers, fusion and quota accounting for issue90 remain incomplete.
 No production fallback list is enabled by this code deployment alone.
+
+Tavily uses its documented `POST https://api.tavily.com/search` contract and
+header-only bearer authentication. Supply an operator-owned credential reference
+through `search.providers.tavily` or `TAVILY_API_KEY`; configuration does not
+prove provider entitlement or available credits. Basic search is explicit;
+automatic parameter upgrades, generated answers, raw content and images are off.
+All adapters share bounded 2 MiB complete-JSON transport and value-free errors.
+Explicit credential sources cannot fall back silently to a different env key.
+Protocol source: https://docs.tavily.com/documentation/api-reference/endpoint/search
+(reviewed2026-10-25; local synthetic protocol tests, no paid provider probe).

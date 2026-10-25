@@ -522,7 +522,7 @@ func openAITools() []map[string]any {
 				"type": "object",
 				"properties": map[string]any{
 					"query":        map[string]string{"type": "string", "description": "Search query"},
-					"provider":     map[string]any{"type": "string", "description": "Search provider id; default brave", "default": "brave"},
+					"provider":     map[string]any{"type": "string", "description": "Optional provider id; omitted uses operator defaults and approved fallback"},
 					"limit":        map[string]any{"type": "integer", "description": "Result limit, max 20", "default": 5},
 					"focusa_scope": map[string]any{"type": "object", "description": "Complete Project, Workstream, Workset, CallGraph, Workpoint, Work Item, continuity, and work-items binding required for ready EPWA delivery"},
 				},

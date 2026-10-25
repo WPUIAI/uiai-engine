@@ -176,6 +176,7 @@ func TestSearchBraveMapsWebResults(t *testing.T) {
 }
 
 func TestSearchProvidersReportsMissingKeyDegraded(t *testing.T) {
+	t.Setenv("TAVILY_API_KEY", "")
 	oldKey, hadKey := os.LookupEnv("BRAVE_SEARCH_API_KEY")
 	_ = os.Unsetenv("BRAVE_SEARCH_API_KEY")
 	defer func() {
@@ -200,7 +201,7 @@ func TestSearchProvidersReportsMissingKeyDegraded(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		t.Fatalf("decode providers: %v", err)
 	}
-	if len(body.Providers) != 2 || body.Providers[0].ID != "brave" || body.Providers[1].ID != "wikipedia" {
+	if len(body.Providers) != 3 || body.Providers[0].ID != "brave" || body.Providers[1].ID != "tavily" || body.Providers[2].ID != "wikipedia" {
 		t.Fatalf("unexpected providers: %+v", body.Providers)
 	}
 	brave := body.Providers[0]
@@ -285,6 +286,7 @@ func TestSearchProviderConfiguredFromConfigFileCredential(t *testing.T) {
 		t.Fatalf("write key file: %v", err)
 	}
 	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	t.Setenv("TAVILY_API_KEY", "")
 	t.Setenv("BRAVE_SEARCH_API_KEY_ALT", "")
 
 	cfg := &config.Config{}
@@ -308,6 +310,7 @@ func TestSearchProviderConfiguredFromConfigFileCredential(t *testing.T) {
 // operator-chosen: any variable name works, not only the vendor's convention.
 func TestSearchProviderCredentialFromOperatorEnvName(t *testing.T) {
 	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	t.Setenv("TAVILY_API_KEY", "")
 	t.Setenv("ACME_SEARCH_TOKEN", "operator-named-secret")
 
 	cfg := &config.Config{}
@@ -340,6 +343,7 @@ func TestSearchProviderDisabledByConfig(t *testing.T) {
 // provider is surfaced honestly in the providers projection.
 func TestSearchProvidersReportsConfigOnlyProvider(t *testing.T) {
 	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	t.Setenv("TAVILY_API_KEY", "")
 	cfg := &config.Config{}
 	cfg.Search.Providers = map[string]config.SearchProviderConfig{
 		"brave": {APIKeyEnv: "MISSING_BRAVE_KEY"},
@@ -389,6 +393,7 @@ func TestSearchProvidersReportsConfigOnlyProvider(t *testing.T) {
 // derives readiness from configuration instead of hardcoded literals.
 func TestSearchPressureSummaryDoesNotClaimReadyProviders(t *testing.T) {
 	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	t.Setenv("TAVILY_API_KEY", "")
 	cfg := &config.Config{}
 
 	summary := searchPressureSummary(cfg)
@@ -414,6 +419,7 @@ func TestSearchPressureSummaryDoesNotClaimReadyProviders(t *testing.T) {
 // operator at portable configuration instead of only a vendor variable name.
 func TestSearchBraveErrorNamesConfigSurface(t *testing.T) {
 	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	t.Setenv("TAVILY_API_KEY", "")
 	cfg := &config.Config{}
 
 	_, err := searchBrave(cfg, "query", 1)
@@ -432,6 +438,7 @@ func TestSearchBraveErrorNamesConfigSurface(t *testing.T) {
 // provider honestly, instead of 503ing on a hardcoded default.
 func TestZeroKeyBoxServesKeylessDefault(t *testing.T) {
 	t.Setenv("BRAVE_SEARCH_API_KEY", "")
+	t.Setenv("TAVILY_API_KEY", "")
 
 	if got := resolveDefaultSearchProvider(nil); got != "wikipedia" {
 		t.Fatalf("default = %q, want the keyless provider", got)
