@@ -1,0 +1,83 @@
+{
+  "observed_at": "2026-10-25T14:39:03Z",
+  "workers": [
+    {
+      "port": 7456,
+      "revision": "fdab1f0",
+      "version": "2.0.24",
+      "oauth_url_surfaces": [
+        "eval",
+        "read",
+        "snapshot",
+        "dom",
+        "diagnostics"
+      ],
+      "raw_navigation_preserved": true,
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "semantic_redaction_surfaces": [
+        "read",
+        "snapshot",
+        "dom",
+        "text",
+        "diagnostics",
+        "eval",
+        "title"
+      ],
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    },
+    {
+      "port": 7460,
+      "revision": "fdab1f0",
+      "version": "2.0.24",
+      "oauth_url_surfaces": [
+        "eval",
+        "read",
+        "snapshot",
+        "dom",
+        "diagnostics"
+      ],
+      "raw_navigation_preserved": true,
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "semantic_redaction_surfaces": [
+        "read",
+        "snapshot",
+        "dom",
+        "text",
+        "diagnostics",
+        "eval",
+        "title"
+      ],
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    }
+  ],
+  "viewer_events": [
+    {
+      "service": "uiai-engine-ovh.service",
+      "authenticated_session_filtered_event_poll": true,
+      "unknown_share_event_route_fails_closed": true
+    },
+    {
+      "service": "uiai-engine-ovh-w2.service",
+      "authenticated_session_filtered_event_poll": true,
+      "unknown_share_event_route_fails_closed": true
+    }
+  ],
+  "binary_sha256": "778401006f1d55d48fda19269ecf615c9af829d79a57bab2824cf1c5d92bf9f7",
+  "viewer_positive_consumer_proof": "Owned isolated HTTP fixture with actual Chromium session: cookie dedup, status/context, share-scoped and agent events, closed-session410; race suite passed. No production share or authority fabricated."
+}
