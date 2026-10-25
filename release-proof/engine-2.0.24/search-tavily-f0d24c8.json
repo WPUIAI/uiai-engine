@@ -1,0 +1,45 @@
+{
+  "schema": "uiai.search_tavily_proof.v1",
+  "issue": 90,
+  "source_revision": "f0d24c8",
+  "version": "2.0.24",
+  "build": "2026-10-25T21:39:49Z+f0d24c8",
+  "running_sha256": "440a54778d3f5326fae77764277d80b31ae3b90bd8ab74cc612123916e908f7c",
+  "workers": [
+    7456,
+    7460
+  ],
+  "protocol_source": {
+    "url": "https://docs.tavily.com/documentation/api-reference/endpoint/search",
+    "retrieved": "2026-10-25T21:29:15Z",
+    "ref": "uiai-source-markdown:sha256:5212e751186d6862",
+    "posture": "unsealed public documentation, not sealed evidence"
+  },
+  "verified": [
+    "Tavily POST header-only bearer credentials, basic depth and auto-parameter/answer/raw-content/image off",
+    "local normalized result mapping/limits, canonical semantic/URL redaction",
+    "Brave429 to approved Tavily alternate with winning-provider evidence provenance",
+    "shared complete2MiB JSON transport, partial/oversized/invalid-response rejection and value-free errors",
+    "explicit credential source cannot fall back to another env credential",
+    "provider-controlled Retry-After validated, original quota status retained and non-transient errors not marked retryable",
+    "search+credential tests/race5x, fullGo/vet/pre-push gates pass",
+    "23Node shared-boundary/transport/MCP tests and3fresh native/installer tests pass",
+    "Windowsamd64/Darwinarm64 main cross-build, not native execution",
+    "canonical idle-safe rollout and both running executable hashes/health verified",
+    "owned ordinary-browser consumers/cleanup pass both installed workers",
+    "canonical MCP-only bundle install; fresh subprocess regression from installed bytes passed on OVH; actual current gateway reconnect and exact browser_search lookup show no forced provider default"
+  ],
+  "mcp": {
+    "script_sha256": "e5bf649159818f38a1f36f43128458442daef85e4d8d1551f7547994fe0b4440",
+    "backup": "/tmp/uiai-mcp-before-search-f0d24c8.tar",
+    "backup_sha256": "64389e2d0584837ff9d999eb6c6878a8c5e7354819316e2dfcb65551de575cae",
+    "root_gateway_config_changed": false,
+    "native_pi_extension_reloaded": false
+  },
+  "activation": "No production fallback list or Tavily credential configuration changed. No real provider query/paid probe performed.",
+  "limits": [
+    "Issue90 remains OPEN: remaining adapters, breakers, fusion, quota ledger and zero-key web-search acceptance incomplete",
+    "Tavily protocol/consumer proof uses synthetic local servers, not real account entitlement/API acceptance",
+    "No fabricated scope, sealed EPWA/public Release or native Pi reload claim"
+  ]
+}
