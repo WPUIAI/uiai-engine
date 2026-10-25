@@ -37,6 +37,7 @@ func safePageProjection(page *rod.Page, values ...string) (string, []string) {
 	out := make([]string, len(values))
 	for i, value := range clean["outputs"].([]any) {
 		out[i], _ = value.(string)
+		out[i] = sanitizeBrowserContent(out[i])
 	}
 	return sanitizeDiagnosticText(title), out
 }

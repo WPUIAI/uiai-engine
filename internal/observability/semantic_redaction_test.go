@@ -20,3 +20,17 @@ func TestSemanticTextRedactedBeforeErrorPersistence(t *testing.T) {
 		}
 	}
 }
+
+func TestEmbeddedOAuthURLRedactedBeforeErrorPersistence(t *testing.T) {
+	const canary = "UIAI_SYNTHETIC_LOGGED_CALLBACK_0123456789"
+	input := "navigation failed https://example.test/callback?code=" + canary
+	store := &ErrorStore{}
+	event := store.Record(ErrorEvent{Message: input, Context: map[string]any{"detail": input}})
+	encoded, err := json.Marshal(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), canary) {
+		t.Fatal("embedded callback persisted before URL sanitization")
+	}
+}

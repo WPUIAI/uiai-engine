@@ -755,7 +755,7 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 	if !opts.NoCache && opts.Delay == 0 {
 		key := cacheKey(opts)
 		if cached := p.cache.get(key); cached != nil {
-			log.Printf("[vision] cache hit for %s (saved Chrome render)", opts.URL)
+			log.Printf("[vision] cache hit for %s (saved Chrome render)", redactURL(opts.URL))
 			return cached, nil
 		}
 	}
@@ -790,7 +790,7 @@ func (p *Pool) Screenshot(opts ScreenshotOpts) (*ScreenshotResult, error) {
 		// inside screenshotInner's defer — but we force-reclaim just in case
 		// the goroutine was stuck and the page is leaked.
 		if atomic.LoadInt32(&timedOut) == 1 {
-			log.Printf("[vision] orphaned goroutine finished for %s after caller timed out", opts.URL)
+			log.Printf("[vision] orphaned goroutine finished for %s after caller timed out", redactURL(opts.URL))
 		}
 	}()
 
@@ -1014,9 +1014,9 @@ func (p *Pool) screenshotInner(ctx context.Context, opts ScreenshotOpts) (*Scree
 	page.Eval(`() => { const f = document.getElementById('__rod_freeze'); if (f) f.remove(); }`)
 
 	if waitErr != nil {
-		log.Printf("[vision] WaitDOMStable timeout for %s after %s (continuing)", opts.URL, domDur.Round(time.Millisecond))
+		log.Printf("[vision] WaitDOMStable timeout for %s after %s (continuing)", redactURL(opts.URL), domDur.Round(time.Millisecond))
 	}
-	log.Printf("[vision] %s: nav=%s dom=%s", opts.URL, navDur.Round(time.Millisecond), domDur.Round(time.Millisecond))
+	log.Printf("[vision] %s: nav=%s dom=%s", redactURL(opts.URL), navDur.Round(time.Millisecond), domDur.Round(time.Millisecond))
 
 	// Wait for specific selector
 	if opts.WaitFor != "" {

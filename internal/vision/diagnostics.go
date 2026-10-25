@@ -2,7 +2,6 @@ package vision
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -16,10 +15,6 @@ const (
 	maxConsoleEvents   = 200
 	maxExceptionEvents = 100
 	maxNetworkEvents   = 300
-)
-
-var (
-	diagnosticURLRe = regexp.MustCompile(`https?://[^\s"'<>]+`)
 )
 
 type ConsoleEvent struct {
@@ -547,8 +542,7 @@ func sanitizeBrowserContent(raw string) string {
 	if raw == "" {
 		return raw
 	}
-	clean := diagnosticURLRe.ReplaceAllStringFunc(raw, focusapacket.SanitizeURL)
-	return secrettext.Text(clean)
+	return focusapacket.SanitizeText(raw)
 }
 
 // Diagnostics are previews; full browser reads must retain their own character budget.

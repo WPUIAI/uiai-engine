@@ -643,7 +643,7 @@ func errorRecovery(next http.Handler) http.Handler {
 					SuggestedNextAction: "Call uiai_errors or GET /api/errors?source=panic, then inspect service logs around the matching error_id.",
 					Context:             map[string]any{"request_id": middleware.GetReqID(r.Context()), "panic_preview": fmt.Sprint(rec)},
 				})
-				log.Printf("[panic] %s %s %s: %v", r.Method, r.URL.Path, event.ID, rec)
+				log.Printf("[panic] %s %s %s: %v", r.Method, r.URL.Path, event.ID, event.Message)
 				writeJSON(w, http.StatusInternalServerError, observability.NewErrorEnvelope(event, "internal server error", nil))
 			}
 		}()

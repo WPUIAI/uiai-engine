@@ -376,3 +376,10 @@ prose and explicit documentation placeholders remain readable. This boundary
 is disclosure reduction, not credential-use permission or a memory-wiping
 promise; it does not claim OCR/image redaction or replace private evidence and
 authentication policy. Synthetic fixtures only are used for regression proof.
+
+
+OAuth query/fragment values and nested redirect parameters use the canonical
+URL sanitizer, including URLs embedded in free-form diagnostics, errors, packet
+summaries and evaluation results. Sanitization precedes truncation/persistence;
+raw navigation inputs are not rewritten. Existing private transcript/journal
+history is not silently edited or represented as scrubbed by a runtime upgrade.

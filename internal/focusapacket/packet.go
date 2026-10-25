@@ -2,7 +2,6 @@ package focusapacket
 
 import (
 	"encoding/json"
-	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"net/url"
 	"strings"
 
@@ -120,16 +119,16 @@ func Normalize(packet ResearchDiagnosticsPacket) ResearchDiagnosticsPacket {
 	}
 	packet.Mode = normalizeMode(packet.Mode)
 	packet.ScopeStatus = normalizeScopeStatus(packet.ScopeStatus)
-	packet.Goal = Truncate(packet.Goal, MaxGoalChars)
-	packet.RecommendedNextAction = Truncate(packet.RecommendedNextAction, MaxRecommendedNextActionChars)
-	packet.HeadlessNextAction = Truncate(firstNonEmpty(packet.HeadlessNextAction, packet.RecommendedNextAction), MaxRecommendedNextActionChars)
+	packet.Goal = Truncate(SanitizeText(packet.Goal), MaxGoalChars)
+	packet.RecommendedNextAction = Truncate(SanitizeText(packet.RecommendedNextAction), MaxRecommendedNextActionChars)
+	packet.HeadlessNextAction = Truncate(SanitizeText(firstNonEmpty(packet.HeadlessNextAction, packet.RecommendedNextAction)), MaxRecommendedNextActionChars)
 	packet.TargetRefs = sanitizeRefs(limitStrings(packet.TargetRefs, MaxTargetRefs))
 	packet.EvidenceRefs = limitStrings(packet.EvidenceRefs, MaxEvidenceRefs)
 	packet.Captures = sanitizeCaptures(packet.Captures)
 	packet.DiagnosticsSummary = sanitizeDiagnosticsSummary(packet.DiagnosticsSummary)
 	packet.ActiveObjectHints = sanitizeActiveObjectHints(packet.ActiveObjectHints)
 	packet.RecommendedFocusa = sanitizeRecommendedFocusa(packet.RecommendedFocusa)
-	packet.Render.SummaryLine = Truncate(packet.Render.SummaryLine, 500)
+	packet.Render.SummaryLine = Truncate(SanitizeText(packet.Render.SummaryLine), 500)
 	packet.Render.ExpandableJSONRef = Truncate(packet.Render.ExpandableJSONRef, 240)
 	if packet.Cleanup != nil {
 		packet.Cleanup.SessionID = Truncate(packet.Cleanup.SessionID, 120)
@@ -282,8 +281,8 @@ func sanitizeCaptures(captures []Capture) []Capture {
 		capture.Type = Truncate(capture.Type, 40)
 		capture.EvidenceRef = Truncate(capture.EvidenceRef, 240)
 		capture.TargetRef = sanitizeTargetRef(capture.TargetRef)
-		capture.Title = Truncate(secrettext.Text(capture.Title), 200)
-		capture.Summary = Truncate(secrettext.Text(capture.Summary), MaxCaptureSummaryChars)
+		capture.Title = Truncate(SanitizeText(capture.Title), 200)
+		capture.Summary = Truncate(SanitizeText(capture.Summary), MaxCaptureSummaryChars)
 		if capture.Type != "" || capture.EvidenceRef != "" || capture.TargetRef != "" || capture.Summary != "" {
 			out = append(out, capture)
 		}
@@ -298,7 +297,7 @@ func sanitizeDiagnosticsSummary(summary *DiagnosticsSummary) *DiagnosticsSummary
 	out := *summary
 	out.TopFindings = limitStrings(out.TopFindings, 12)
 	for i := range out.TopFindings {
-		out.TopFindings[i] = Truncate(secrettext.Text(out.TopFindings[i]), 240)
+		out.TopFindings[i] = Truncate(SanitizeText(out.TopFindings[i]), 240)
 	}
 	for packetSize(out) > MaxDiagnosticsSummaryBytes && len(out.TopFindings) > 0 {
 		out.TopFindings = out.TopFindings[:len(out.TopFindings)-1]

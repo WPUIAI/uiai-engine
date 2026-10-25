@@ -150,7 +150,7 @@ func (r *Reconciler) ReconcileOnce() {
 	closed := 0
 	for _, o := range orphans {
 		if err := ts.CloseTarget(o.ID); err != nil {
-			log.Printf("[reconciler] close orphan %s (%s) failed: %v", o.ID, o.URL, err)
+			log.Printf("[reconciler] close orphan %s (%s) failed: %v", o.ID, redactURL(o.URL), sanitizeDiagnosticText(err.Error()))
 			continue
 		}
 		closed++

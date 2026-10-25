@@ -15,6 +15,7 @@ func TestSemanticSecretNeighborsBrowserOutputs(t *testing.T) {
 		t.Skip("set UIAI_AUTH_TESTS=1")
 	}
 	const canary = "UIAI_SYNTHETIC_PAGE_TOKEN_0123456789"
+	const callbackCanary = "UIAI_SYNTHETIC_CALLBACK_PROJECTION_0123456789"
 	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		_, _ = w.Write([]byte(`<html><head><title>` + canary + `</title></head><body><main><p>ordinary documentation remains useful</p><dl><dt>API key</dt><dd><code>` + canary + `</code></dd></dl><input id="api-key" name="api_key" readonly value="` + canary + `"></main></body></html>`))
@@ -37,7 +38,7 @@ func TestSemanticSecretNeighborsBrowserOutputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(encoded), canary) {
+		if strings.Contains(string(encoded), canary) || strings.Contains(string(encoded), callbackCanary) {
 			var decoded any
 			_ = json.Unmarshal(encoded, &decoded)
 			var paths []string
@@ -45,7 +46,7 @@ func TestSemanticSecretNeighborsBrowserOutputs(t *testing.T) {
 			walk = func(item any, path string) {
 				switch item := item.(type) {
 				case string:
-					if strings.Contains(item, canary) {
+					if strings.Contains(item, canary) || strings.Contains(item, callbackCanary) {
 						paths = append(paths, path)
 					}
 				case map[string]any:
@@ -111,6 +112,22 @@ func TestSemanticSecretNeighborsBrowserOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	check("structured evaluation output", value)
+
+	callback, _, err := sess.Eval(`history.replaceState({}, '', '?code=` + callbackCanary + `&ok=1'); return location.href`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("callback evaluation", callback)
+	callbackRead, err := sess.ReadPage(ReadOptions{MaxChars: 8000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("callback read", callbackRead)
+	callbackSnapshot, err := sess.Snapshot(SnapshotOptions{Compact: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("callback snapshot", callbackSnapshot)
 	check("diagnostics", sess.Diagnostics(50, "all", false))
 	func() {
 		sess.diagnostics.mu.Lock()
