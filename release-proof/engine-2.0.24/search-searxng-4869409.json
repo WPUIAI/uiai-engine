@@ -1,0 +1,43 @@
+{
+  "schema": "uiai.search_searxng_proof.v1",
+  "issue": 90,
+  "source_revision": "4869409",
+  "version": "2.0.24",
+  "build": "2026-10-25T22:20:18Z+4869409",
+  "running_sha256": "c6ee07b5c9c7b1c87d0e643a9f126f5e18d633861da1cb7fb9432e7e513b3e34",
+  "workers": [
+    7456,
+    7460
+  ],
+  "protocol_sources": [
+    {
+      "url": "https://docs.searxng.org/dev/search_api.html",
+      "ref": "uiai-source-markdown:sha256:9c6d1a1d97f09705"
+    },
+    {
+      "url": "https://docs.searxng.org/dev/result_types/main/mainresult.html",
+      "ref": "uiai-source-markdown:sha256:91cf4e574b0e8335"
+    }
+  ],
+  "source_posture": "Public documentation reviewed2026-10-25 via UIAI; owned temporary sessions auto-closed; unsealed, no scoped EPWA publication",
+  "verified": [
+    "operator-only configured full endpoint; no default/public instance or client request-supplied destination",
+    "HTTPS except loopback local/dev; missing/unsafe/userinfo/query/fragment/disabled endpoints not ready, value-free errors",
+    "documented POST form q+format=json; no credentials or query text in URL",
+    "bounded normalized/redacted title/URL/content/publishedDate and result count",
+    "synthetic Brave429-to-approvedSearxNG HTTP consumer preserves winning evidence",
+    "JSON-disabled synthetic403 is honest non-retryable upstream error with body redacted",
+    "shared origin-confined2MiB transport, credential-free adapter and router circuit owner reused",
+    "5x search/breaker race, fullGo/vet/prepush pass on OVH using isolated build cache",
+    "Windowsamd64/Darwinarm64 cross-build only, not native execution",
+    "canonical idle-safe rollback-preserving rollout and both active/healthy running hashes verified",
+    "both installed owned ordinary-browser/redaction/cleanup consumers pass",
+    "both installed provider endpoints report SearxNG missing_endpoint and not ready; metadata request only"
+  ],
+  "limits": [
+    "No SearxNG service installed/provisioned or production endpoint/fallback configured; zero-signup/out-of-box web-search acceptance remains unproven",
+    "SearxNG may forward queries to outside engines; explicit endpoint/fallback configuration represents intended query disclosure",
+    "Issue90 stays OPEN for remaining adapters, richer results/fusion, quota/all-surface health and zero-key acceptance",
+    "No paid/provider query or real credential use; no public Release/sealed EPWA/pixel inspection/native Pi reload claim"
+  ]
+}
