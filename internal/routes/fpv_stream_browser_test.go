@@ -165,6 +165,34 @@ func TestFPVStreamTwoConsumersAndPaintLatency(t *testing.T) {
 		}
 	}
 	result["actual_browser_viewer_live"] = true
+	paintCtx, paintCancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer paintCancel()
+	_, _, err = visitor.EvalContext(paintCtx, `document.getElementById("qSmooth").click();window.__fpvPaints={};window.__fpvCanvas=document.createElement("canvas");window.__fpvCanvas.width=320;window.__fpvCanvas.height=240;(function poll(){const image=document.getElementById("shot");if(image.naturalWidth){const ctx=window.__fpvCanvas.getContext("2d");ctx.drawImage(image,0,0);const p=ctx.getImageData(100,100,1,1).data;const key=[p[0],p[1],p[2]].join(",");if(!window.__fpvPaints[key])window.__fpvPaints[key]=Date.now();}requestAnimationFrame(poll)})();return true;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	browserTimings := []int64{}
+	for i := 0; i < 8; i++ {
+		red := 30 + i*26
+		started := time.Now().UnixMilli()
+		_, _, err = session.EvalContext(paintCtx, fmt.Sprintf(`document.body.style.backgroundColor="rgb(%d,190,50)";return true;`, red))
+		if err != nil {
+			t.Fatal(err)
+		}
+		observed, _, err := visitor.EvalAsyncContext(paintCtx, fmt.Sprintf(`const end=Date.now()+700;while(Date.now()<end){const match=Object.entries(window.__fpvPaints).find(([key,time])=>{const p=key.split(",").map(Number);return Math.abs(p[0]-%d)<=4&&Math.abs(p[1]-190)<=4&&Math.abs(p[2]-50)<=4});if(match)return String(match[1]);await new Promise(r=>setTimeout(r,16));}return "0";`, red), 1000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var stamp int64
+		if json.Unmarshal([]byte(observed), &stamp) != nil || stamp < started {
+			t.Fatal("actual viewer did not observe changed pixels")
+		}
+		browserTimings = append(browserTimings, stamp-started+16)
+	}
+	sort.Slice(browserTimings, func(i, j int) bool { return browserTimings[i] < browserTimings[j] })
+	result["actual_browser_paint_p95_ms"] = browserTimings[len(browserTimings)-1]
+	result["actual_browser_paint_metric"] = "same-host target mutation to viewer canvas observing decoded pixels on animation frame, plus16ms paint allowance; not a public-network guarantee"
+
 	if os.Getenv("UIAI_STREAM_PERF_TESTS") != "" {
 		snapshot, err := visitor.Screenshot("jpeg", 75)
 		if err != nil {
@@ -176,6 +204,9 @@ func TestFPVStreamTwoConsumersAndPaintLatency(t *testing.T) {
 		}
 		if err := os.WriteFile("/tmp/uiai-fpv-viewer-ui.jpg", pixels, 0600); err != nil {
 			t.Fatal(err)
+		}
+		if browserTimings[len(browserTimings)-1] > 300 {
+			t.Fatalf("actual browser smooth paint p95=%dms exceeds local300ms target", browserTimings[len(browserTimings)-1])
 		}
 		if p95 > 300 {
 			t.Fatalf("local decoded-frame p95=%dms exceeds300ms target", p95)

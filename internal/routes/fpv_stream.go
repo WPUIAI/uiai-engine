@@ -71,7 +71,7 @@ func fpvWriteStream(w http.ResponseWriter, r *http.Request, frames <-chan []byte
 	}
 	ticker := time.NewTicker(time.Second / time.Duration(fps))
 	defer ticker.Stop()
-	var latest []byte
+	latest := first
 	for {
 		select {
 		case <-r.Context().Done():
@@ -86,7 +86,6 @@ func fpvWriteStream(w http.ResponseWriter, r *http.Request, frames <-chan []byte
 				if !write(latest) {
 					return
 				}
-				latest = nil
 			}
 		}
 	}

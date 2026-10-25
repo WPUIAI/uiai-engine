@@ -402,3 +402,7 @@ the viewer reports Live/Not measured instead of invented numbers. Local conforma
 measures mutation-to-received-decoded-JPEG separately from public-network latency.
 The same binary embeds the canonical FPV template and generated asset bundle;
 `bash scripts/build-fpv-assets.sh` is its sole generated-asset writer.
+
+Native MJPEG readers receive the retained last JPEG on idle output ticks so decoders
+can finalize a frame without waiting for another page repaint; this playback does
+not assert new capture/freshness. Smooth selects10FPS, balanced4FPS, saver1FPS.
