@@ -1,0 +1,39 @@
+{
+  "schema": "uiai.search_http_fusion_proof.v1",
+  "issue": 90,
+  "source_revision": "c4f63f9",
+  "version": "2.0.24",
+  "build": "2026-10-25T23:29:29Z+c4f63f9",
+  "running_sha256": "2998c183a725d27a5558fe53ac31f998abf05ec82c7ab1dd7564adb193043dce",
+  "workers": [
+    7456,
+    7460
+  ],
+  "contract": {
+    "entry": "HTTP POST /api/search providers[2..3], explicit pinned provider conflict rejected",
+    "authority": "every selected provider must be installed, enabled and the resolved operator default or in configured fallback list; no possession-of-key authorization",
+    "execution": "max3 concurrent lanes/12s overall context inheriting shorter caller deadline; one existing per-provider cache/circuit/normalize/dedupe/evidence path",
+    "fusion": "stable reciprocal-rank fusion constant60; original provider score remains separate; first citation plus original contributing provider/rank/evidence refs retained",
+    "errors": "partial success has successful providers and value-free provider_errors; allfailed non-success, all429 remains429; lane retry metadata preserved",
+    "cache": "allCached only if every selected lane succeeded from existing cache; no second fused cache/refill/probe"
+  },
+  "verified": [
+    "actual mounted HTTP JSON consumer selects2 approved synthetic providers, merges shared citation at highest fused rank, retains original source evidence and deterministic ordering",
+    "same research request reuses each individual provider cache; one synthetic call/provider across2requests",
+    "conflicting pin, unapproved/unsupported/duplicate/over-limit lists rejected before traffic",
+    "partial-success provider set/errors and all429/RetryAfter honest; private provider bodies not exposed",
+    "caller deadline cancels both concurrent synthetic lanes promptly",
+    "result source slices cloned rather than mutable aliases",
+    "ordinary pinned/fallback/search+AI regressions pass5x race/fullGo/vet/prepush on OVH isolated GOCACHE",
+    "Windowsamd64/Darwinarm64 cross-build only, not native execution",
+    "canonical idle-safe rollback-preserving deployment, both active/healthy running executable hashes verified",
+    "both installed ordinary-browser/redaction/owned cleanup consumers pass",
+    "BOTH actual installed HTTP endpoints reject conflicting provider/providers with new400 class before provider traffic"
+  ],
+  "limits": [
+    "HTTP-only research parameters: native/MCP bindings NOT yet implemented or claimed",
+    "No actual multi-provider external/paid query, new credentials, fallback activation or service configuration changes",
+    "Issue90 remains OPEN for remaining adapters, gateway bindings, real account quota/Cockpit ledger and actual zero-key WEB service acceptance",
+    "No public Release/scoped sealed EPWA/native Pi reload/pixel inspection claim"
+  ]
+}
