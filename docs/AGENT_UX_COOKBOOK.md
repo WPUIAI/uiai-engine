@@ -488,3 +488,15 @@ https://docs.searxng.org/dev/result_types/main/mainresult.html (reviewed2026-10-
 Synthetic local-provider proof is not a deployed SearxNG service or out-of-box
 zero-key web-search acceptance. No service installation or production configuration
 is implied by shipping the adapter; issue90 remains open.
+
+### Bounded search-result cache
+
+The default query/result cache TTL is one hour, as specified in issue90.
+`UIAI_SEARCH_CACHE_TTL_SECONDS` still overrides it;0 disables caching. The shared
+result cache holds at most512 entries. Writes prune expired entries, and a new
+entry at capacity evicts the earliest-expiring entry (deterministic key tie-break).
+Updating an existing key does not evict another entry. Cache results remain
+cloned; provider/query/limit identity and existing disabled-provider checks remain.
+Search pressure reports `cache_max_entries` and prunes expired entries before
+reporting occupancy. This bounds entry count, not an exact measured byte quota or
+per-account credit ledger. No duplicate result-cache store was introduced.

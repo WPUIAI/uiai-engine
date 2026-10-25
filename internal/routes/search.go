@@ -23,7 +23,8 @@ import (
 
 const defaultSearchLimit = 5
 const maxSearchLimit = 20
-const defaultSearchCacheTTLSeconds = 60
+const defaultSearchCacheTTLSeconds = 3600
+const maxSearchCacheEntries = 512
 const maxSearchTitleChars = 200
 const maxSearchDescriptionChars = 500
 const maxSearchSourceChars = 120
@@ -228,6 +229,7 @@ func normalizeSearchLimit(limit int) int {
 
 func searchPressureSummary(cfg *config.Config) map[string]any {
 	searchCache.Lock()
+	pruneExpiredSearchCacheLocked(time.Now())
 	entries := len(searchCache.entries)
 	searchCache.Unlock()
 
@@ -253,6 +255,7 @@ func searchPressureSummary(cfg *config.Config) map[string]any {
 		"available_providers": ids,
 		"ready_providers":     ready,
 		"cache_entries":       entries,
+		"cache_max_entries":   maxSearchCacheEntries,
 		"cache_ttl_seconds":   int(searchCacheTTL() / time.Second),
 		"packet_surface":      "search",
 	}
@@ -329,7 +332,28 @@ func setCachedSearch(provider, query string, limit int, results []searchResult, 
 	key := searchCacheKey(provider, query, limit)
 	searchCache.Lock()
 	defer searchCache.Unlock()
+	pruneExpiredSearchCacheLocked(time.Now())
+	if _, exists := searchCache.entries[key]; !exists && len(searchCache.entries) >= maxSearchCacheEntries {
+		oldest := ""
+		var expiry time.Time
+		for candidate, entry := range searchCache.entries {
+			if oldest == "" || entry.ExpiresAt.Before(expiry) || (entry.ExpiresAt.Equal(expiry) && candidate < oldest) {
+				oldest = candidate
+				expiry = entry.ExpiresAt
+			}
+		}
+		delete(searchCache.entries, oldest)
+	}
 	searchCache.entries[key] = searchCacheEntry{Results: cloneSearchResults(results), ExpiresAt: expiresAt}
+}
+
+// Caller holds searchCache's lock; expiry has one owner for writes and health.
+func pruneExpiredSearchCacheLocked(now time.Time) {
+	for key, entry := range searchCache.entries {
+		if !now.Before(entry.ExpiresAt) {
+			delete(searchCache.entries, key)
+		}
+	}
 }
 
 func truncateSearchField(value string, maxChars int) string {
