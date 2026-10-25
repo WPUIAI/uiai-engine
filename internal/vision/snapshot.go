@@ -346,17 +346,19 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 	var lines []string
 	interactiveCount := 0
 
-	names := make([]string, len(elements)+1)
-	for i := range elements {
-		names[i] = elements[i].Name
+	names := make([]any, len(elements))
+	controls := make([]any, len(elements))
+	for i, element := range elements {
+		names[i] = element.Name
+		controls[i] = map[string]any{"tag": element.Tag, "selector": element.Selector, "text": element.Name}
 	}
-	names[len(elements)] = s.Title
-	cleanNames := secrettext.Fragments(names)
-	for i := range elements {
-		elements[i].Name = cleanNames[i]
+	projection := secrettext.Value(map[string]any{"names": names, "controls": controls, "title": s.Title}).(map[string]any)
+	for i, name := range projection["names"].([]any) {
+		elements[i].Name = name.(string)
 	}
-	cleanTitle := cleanNames[len(elements)]
+	cleanTitle := projection["title"].(string)
 	s.Title = cleanTitle
+
 	for _, el := range elements {
 		el.Name = sanitizeDiagnosticText(el.Name)
 		isInteractive := interactiveRoles[el.Role]

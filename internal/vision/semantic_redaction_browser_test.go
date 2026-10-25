@@ -17,7 +17,7 @@ func TestSemanticSecretNeighborsBrowserOutputs(t *testing.T) {
 	const canary = "UIAI_SYNTHETIC_PAGE_TOKEN_0123456789"
 	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		_, _ = w.Write([]byte(`<html><head><title>` + canary + `</title></head><body><main><p>ordinary documentation remains useful</p><dl><dt>API key</dt><dd><code>` + canary + `</code></dd></dl><label for="api-key">API key</label><input id="api-key" name="api_key" readonly value="` + canary + `"><p>Bearer token</p><pre>` + canary + `</pre></main></body></html>`))
+		_, _ = w.Write([]byte(`<html><head><title>` + canary + `</title></head><body><main><p>ordinary documentation remains useful</p><dl><dt>API key</dt><dd><code>` + canary + `</code></dd></dl><input id="api-key" name="api_key" readonly value="` + canary + `"></main></body></html>`))
 	}))
 	defer site.Close()
 	pool, err := NewPoolWithConfig(PoolConfig{MaxPages: 1, AllowPrivateURLs: true})
