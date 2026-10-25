@@ -16,6 +16,7 @@ echo "=== UIAI preflight: deployment readiness regression ==="
 python3 scripts/test_deploy_health.py
 python3 scripts/test_deploy_guards.py
 python3 scripts/test_warm_browser_session.py
+python3 scripts/test_runner_queue.py
 
 echo "=== UIAI preflight: version surfaces ==="
 # Dual-track: engine (Go) and cockpit (Tauri) have independent semvers.

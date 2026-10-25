@@ -253,3 +253,12 @@ The registered startup warmer is derived from `scripts/warm-browser-session.sh`;
 configuration is changed. Both201/202 and malformed deliveries with an exact
 created-session header are cleaned up; absent identity remains explicitly unknown.
 Warm-up uses `system:uiai-warmup` as provenance, never an authorization grant.
+
+
+Browser Reliability binds its payload to the existing `self-hosted/ovh/uiai-engine`
+runner. A lightweight hosted matrix sibling checks only its own run's job metadata
+with Actions-read permission; a120-second admission timeout fails explicitly and
+GitHub's native matrix fail-fast cancels the still-queued sibling. It never calls
+foreign-run cancellation or needs Actions-write/runner-administration credentials.
+Missing Chrome fails explicitly without installing packages. Per-run output paths
+and required artifact uploads prevent stale or absent JSON from becoming proof.

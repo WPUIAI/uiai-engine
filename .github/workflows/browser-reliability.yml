@@ -17,40 +17,62 @@ on:
 
 jobs:
   browser-reliability:
-    runs-on: self-hosted
+    name: Browser Reliability (${{ matrix.lane }})
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - lane: queue-guard
+            runner: ubuntu-latest
+          - lane: browser
+            runner: [self-hosted, ovh, uiai-engine]
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      actions: read
     timeout-minutes: 15
     env:
-      OUT_DIR: /tmp/uiai-browser-reliability
+      OUT_DIR: /tmp/uiai-browser-reliability/${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
+      - name: Bound OVH runner queue wait
+        if: matrix.lane == 'queue-guard'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/check-runner-queue.py
       - uses: actions/setup-go@v5
+        if: matrix.lane == 'browser'
         with:
           go-version-file: go.mod
       - name: Ensure Chrome or Chromium is available
+        if: matrix.lane == 'browser'
         run: |
           set -euo pipefail
-          if command -v google-chrome >/dev/null || command -v chromium-browser >/dev/null || command -v chromium >/dev/null; then
+          if command -v google-chrome-stable >/dev/null || command -v google-chrome >/dev/null || command -v chromium-browser >/dev/null || command -v chromium >/dev/null; then
             echo "existing browser runtime available"
-          elif sudo -n true; then
-            sudo -n apt-get update
-            sudo -n apt-get install -y chromium-browser || sudo -n apt-get install -y chromium
           else
-            echo "::error::No Chrome/Chromium runtime and runner has no governed passwordless sudo"
+            echo "::error::Chrome/Chromium missing on the named OVH runner; restore its approved runtime before rerunning"
             exit 1
           fi
       - name: Go tests
+        if: matrix.lane == 'browser'
         run: go test ./...
       - name: Focusa packet drift check
+        if: matrix.lane == 'browser'
         run: scripts/check-focusa-packet-drift.sh
       - name: Docs completeness check
+        if: matrix.lane == 'browser'
         run: scripts/check-docs-completeness.py
       - name: Tool parity check
+        if: matrix.lane == 'browser'
         run: scripts/check-tool-parity.sh
       - name: MCP and CLI EPWA contract checks
+        if: matrix.lane == 'browser'
         run: |
           node --test mcp/epwa-contract.test.mjs internal/evidenceshare/generic_record_locale.test.mjs internal/evidenceshare/review_snapshot.test.mjs
           scripts/test-uiai-open-result-contract.sh
       - name: Focusa packet endpoint smoke
+        if: matrix.lane == 'browser'
         env:
           # Contract fixture only; customer delivery proof must use its audited public HTTPS origin.
           UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
@@ -58,6 +80,7 @@ jobs:
           mkdir -p "$OUT_DIR"
           OUT="$OUT_DIR/focusa-packet-smoke.json" scripts/smoke-focusa-packet-ci.sh
       - name: Diagnostics stress 40/40
+        if: matrix.lane == 'browser'
         env:
           # Contract fixtures are scoped to this isolated source test only.
           UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
@@ -66,6 +89,7 @@ jobs:
           mkdir -p "$OUT_DIR"
           SESSIONS=4 ROUNDS=10 OUT="$OUT_DIR/diagnostics-4x10.json" scripts/stress-browser-diagnostics.sh
       - name: Mixed browser soak
+        if: matrix.lane == 'browser'
         env:
           # Contract fixtures are scoped to this isolated source test only.
           UIAI_EPWA_PUBLIC_BASE_URL: https://epwa-ci.invalid/
@@ -76,15 +100,15 @@ jobs:
           CONCURRENCY="${{ github.event.inputs.concurrency || 2 }}"
           DURATION_SECONDS="$SOAK" CONCURRENCY="$CONCURRENCY" OUT="$OUT_DIR/browser-soak.json" scripts/soak-browser-flakiness.sh
       - name: Upload reliability artifacts
-        if: always()
+        if: always() && matrix.lane == 'browser'
         uses: actions/upload-artifact@v4
         with:
           name: uiai-browser-reliability-${{ github.run_id }}
           path: |
-            /tmp/uiai-browser-reliability/*.json
+            ${{ env.OUT_DIR }}/*.json
             /tmp/uiai-packet-smoke-engine.log
             /tmp/uiai-diag-stress-engine.log
             /tmp/uiai-diag-stress-site.log
             /tmp/uiai-soak-engine.log
             /tmp/uiai-soak-site.log
-          if-no-files-found: ignore
+          if-no-files-found: error
