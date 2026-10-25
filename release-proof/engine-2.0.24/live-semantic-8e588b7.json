@@ -1,0 +1,63 @@
+{
+  "observed_at": "2026-10-25T10:30:47Z",
+  "workers": [
+    {
+      "port": 7456,
+      "revision": "8e588b7",
+      "version": "2.0.24",
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "semantic_redaction_surfaces": [
+        "read",
+        "snapshot",
+        "dom",
+        "text",
+        "diagnostics",
+        "eval",
+        "title"
+      ],
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    },
+    {
+      "port": 7460,
+      "revision": "8e588b7",
+      "version": "2.0.24",
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "semantic_redaction_surfaces": [
+        "read",
+        "snapshot",
+        "dom",
+        "text",
+        "diagnostics",
+        "eval",
+        "title"
+      ],
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    }
+  ],
+  "binary_sha256": "a7f7aeaec0fac279a67bc642f170179c4b0e1f1d33cab993592b9556568067de",
+  "warmup_helper_source_commit": "a6a99e9",
+  "warmup_helper_sha256": "a5c566b4e8ec979d0cc5e0a92d4e21e91a5e05787cfb3149a43d0293f093403b",
+  "running_process_hashes_verified": true,
+  "installed_owner": "wpuiai:wpuiai",
+  "installed_mode": "0755",
+  "startup_warmups_closed_per_worker": 2,
+  "final_session_count_per_worker": 0,
+  "foreign_sessions_cancelled": false,
+  "public_release_published": false
+}
