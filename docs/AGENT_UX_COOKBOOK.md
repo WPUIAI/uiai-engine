@@ -379,3 +379,8 @@ and shared response decoder together. `UIAI_INSTALL_PI=0` limits that delivery t
 MCP assets/configuration without adding or replacing any Pi extension. Back up the
 existing installation first; reconnect MCP and verify the actual discovered schema
 and consumer response. A staged configuration is not an activated configuration.
+
+Tool discovery treats an exact qualified identifier such as `browser_screenshot`
+as a single-tool lookup (case-insensitive, surrounding whitespace ignored). Broad
+keywords such as `screenshot` retain ranked discovery; full inventories remain at
+`/api/tools/openai` and `/api/tools/mcp`.

@@ -184,6 +184,17 @@ func agentDocsExamples() map[string]any {
 }
 
 func rankedToolSearch(tools []map[string]any, query string) []map[string]any {
+	// A fully qualified tool identifier is a lookup, not a broad keyword query.
+	// Avoid expanding browser_screenshot into every browser-related schema.
+	normalized := strings.TrimSpace(query)
+	if strings.Contains(normalized, "_") {
+		for _, tool := range tools {
+			name, _ := tool["name"].(string)
+			if strings.EqualFold(name, normalized) {
+				return []map[string]any{tool}
+			}
+		}
+	}
 	type rankedTool struct {
 		tool  map[string]any
 		score int

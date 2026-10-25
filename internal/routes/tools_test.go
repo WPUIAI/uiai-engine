@@ -293,3 +293,41 @@ func TestCaptureToolSchemasExposeCallerEvidenceScope(t *testing.T) {
 		}
 	}
 }
+
+func TestExactQualifiedToolLookupDoesNotExpandIntoUnrelatedSchemas(t *testing.T) {
+	for _, query := range []string{"browser_screenshot", " BROWSER_SCREENSHOT ", "browser_eval_async"} {
+		got := rankedToolSearch(openAITools(), query)
+		if len(got) != 1 || !strings.EqualFold(got[0]["name"].(string), strings.TrimSpace(query)) {
+			t.Fatalf("exact query %q returned %d definitions", query, len(got))
+		}
+	}
+	for _, query := range []string{"screenshot", "visual failure diagnostics", "unknown_qualified_identifier"} {
+		matches := rankedToolSearch(openAITools(), query)
+		if query == "unknown_qualified_identifier" && len(matches) != 0 {
+			t.Fatal("unknown identifier manufactured a match")
+		}
+		if query != "unknown_qualified_identifier" && len(matches) == 0 {
+			t.Fatalf("keyword discovery regressed for %q", query)
+		}
+	}
+}
+
+func TestExactToolLookupHTTPIsCompactAndConsistent(t *testing.T) {
+	r := chi.NewRouter()
+	MountToolsDiscovery(r, nil)
+	res := httptest.NewRecorder()
+	r.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/search?q=browser_screenshot", nil))
+	var body struct {
+		Count int              `json:"count"`
+		Tools []map[string]any `json:"tools"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if res.Code != 200 || body.Count != 1 || len(body.Tools) != 1 || body.Tools[0]["name"] != "browser_screenshot" {
+		t.Fatalf("inconsistent compact lookup: %s", res.Body.String())
+	}
+	if res.Body.Len() > 4096 {
+		t.Fatalf("exact lookup returned excessive schema bytes: %d", res.Body.Len())
+	}
+}
