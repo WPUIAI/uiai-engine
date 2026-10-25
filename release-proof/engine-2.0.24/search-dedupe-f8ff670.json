@@ -1,0 +1,35 @@
+{
+  "schema": "uiai.search_dedupe_proof.v1",
+  "issue": 90,
+  "source_revision": "f8ff670",
+  "version": "2.0.24",
+  "build": "2026-10-25T23:14:00Z+f8ff670",
+  "running_sha256": "94299cba3ac84f13dfebdec8d9540ba6b402d1cb3effa1adf272f03866952e01",
+  "workers": [
+    7456,
+    7460
+  ],
+  "contract": {
+    "identity": "normalized HTTP(S) URL; tracking-only variations merge only with token-set title similarity >=0.8",
+    "tracking_comparison": "utm_*,gclid,fbclid; remaining query parameters retained",
+    "citation": "first original URL/title/source retained, no rewrite to comparison key",
+    "cache": "dedupe before dense ranks/evidence and existing shared cache",
+    "budget": "no refill/provider calls to replace removed duplicates; output may be below requested limit"
+  },
+  "verified": [
+    "same URL / tracking-title aliases removed without rewriting original citation",
+    "different meaningful query selectors, hosts and unrelated titles retained",
+    "malformed/non-HTTP(S)/userinfo URLs excluded",
+    "actual synthetic HTTP consumer keeps dense provider/evidence ranks and cached/fresh result identity; two calls use one provider request",
+    "5x search/breaker/AI race, fullGo/vet/prepush pass on OVH with isolated GOCACHE",
+    "Windowsamd64/Darwinarm64 cross-build only, not native execution",
+    "canonical idle-safe rollback-preserving deployment, both active/healthy running executable hashes verified",
+    "both installed ordinary-browser/redaction/owned cleanup consumers pass"
+  ],
+  "limits": [
+    "Single-response deduplication, NOT multi-provider query/rank fusion",
+    "No new real provider query, paid credit/credential/configuration/service changes",
+    "Issue90 remains OPEN for remaining adapters, optional multi-provider fusion, actual account quota/Cockpit ledger and zero-key WEB service acceptance",
+    "No public Release/scoped sealed EPWA/native Pi reload/pixel inspection claim"
+  ]
+}
