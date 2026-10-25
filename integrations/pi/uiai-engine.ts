@@ -565,10 +565,11 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_search",
 		label: "UIAI Web Search",
-		description: "Provider-neutral web search for browser agents. Returns result URLs/snippets; open selected URLs with uiai_browser_open, then uiai_browser_read.",
+		description: "Provider-neutral search, optionally combining explicitly approved research providers. Unscoped results are unsealed; scoped evidence requires ready HTTPS EPWA delivery. Open selected URLs with uiai_browser_open, then uiai_browser_read.",
 		parameters: Type.Object({
 			query: Type.String({ description: "Search query" }),
 			provider: Type.Optional(Type.String({ description: "Optional provider id; omitted uses operator defaults and approved fallback" })),
+			providers: Type.Optional(Type.Array(Type.String(), {minItems:2,maxItems:3,uniqueItems:true,description:"Optional explicit research providers; each requires operator default/fallback approval; conflicts with provider"})),
 			limit: Type.Optional(Type.Number({ description: "Result limit, max 20", default: 5 })),
 		}),
 		async execute(_toolCallId, params) {

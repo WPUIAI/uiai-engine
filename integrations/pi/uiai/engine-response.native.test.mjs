@@ -103,6 +103,8 @@ test("canonical installer ships every native adapter runtime dependency",async()
   const installedTools=new Map();installed({on(){},registerCommand(){},registerTool(tool){installedTools.set(tool.name,tool)}});
   assert.ok(installedTools.get('uiai_browser_open').parameters.properties.focusa_scope);
   assert.ok(installedTools.get('uiai_browser_screenshot'));
+  assert.equal(installedTools.get('uiai_search').parameters.properties.providers.minItems,2);
+  assert.equal(installedTools.get('uiai_search').parameters.properties.providers.maxItems,3);
   const broken=join(home,'broken-source');await mkdir(join(broken,'scripts'),{recursive:true});await mkdir(join(broken,'integrations','pi','uiai'),{recursive:true});
   await copyFile(script,join(broken,'scripts','install-agent-integrations.sh'));
   await copyFile(dest,join(broken,'integrations','pi','uiai-engine.ts'));
@@ -111,4 +113,18 @@ test("canonical installer ships every native adapter runtime dependency",async()
   assert.notEqual(rejected.status,0);assert.match(rejected.stderr,/missing Pi runtime dependency:.*engine-response\.mjs/);
 
  }finally{await rm(home,{recursive:true})}
+});
+
+
+test("native search research schema and HTTP forwarding preserve caller routing",async()=>{
+ const search=tools.get("uiai_search");assert.ok(search);
+ assert.equal(search.parameters.properties.providers.minItems,2);assert.equal(search.parameters.properties.providers.maxItems,3);assert.equal(search.parameters.properties.providers.uniqueItems,true);
+ assert.equal(Object.hasOwn(search.parameters.properties.provider,"default"),false);
+ const received=[];
+ const server=createServer((req,res)=>{let raw="";req.on("data",chunk=>raw+=chunk);req.on("end",()=>{received.push(JSON.parse(raw));res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({delivery_state:"ready",artifact_url:"https://evidence.example/e/fixture",portable_url:"https://evidence.example/e/fixture"}))})});
+ await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));const prior=process.env.UIAI_ENGINE_URL;process.env.UIAI_ENGINE_URL=`http://127.0.0.1:${server.address().port}`;
+ const scope={project_ref:"synthetic-project",workstream_ref:"synthetic-stream",workset_ref:"synthetic-set",callgraph_ref:"synthetic-graph",workpoint_ref:"synthetic-point",work_item_ref:"synthetic-item",continuity_ref:"synthetic-continuity",work_items:[{work_item_ref:"synthetic-item",title:"Owned transport fixture"}]};
+ try{for(const params of [{query:"fixture"},{query:"fixture",provider:"tavily"},{query:"fixture",providers:["brave","wikipedia"]},{query:"fixture",provider:"brave",providers:["brave","wikipedia"]}]){
+  await search.execute("research",{...params,focusa_scope:scope});const body=received.at(-1);assert.equal(body.provider,params.provider);assert.equal(Object.hasOwn(body,"provider"),Object.hasOwn(params,"provider"));assert.deepEqual(body.providers,params.providers);assert.equal(Object.hasOwn(body,"providers"),Object.hasOwn(params,"providers"));assert.deepEqual(body.focusa_scope,scope);
+ }}finally{if(prior===undefined)delete process.env.UIAI_ENGINE_URL;else process.env.UIAI_ENGINE_URL=prior;await new Promise(resolve=>server.close(resolve))}
 });

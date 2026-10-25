@@ -550,7 +550,7 @@ must also be the operator's resolved default or named in the approved fallback
 configuration. Unsupported/unapproved/disabled members and a simultaneous pinned
 `provider` are rejected before traffic. Merely possessing another key never
 authorizes fanout. Ordinary requests and explicit single-provider pins do not fan
-out. HTTP and installed MCP support this field; native Pi schema activation remains separate.
+out. HTTP, installed MCP and fresh native Pi source support this field; the current Pi process still requires native reload before activation can be claimed.
 
 At most three provider calls run concurrently under one12s overall context, using
 exactly the existing per-provider cache/circuit/normalization path. Successes are
@@ -572,3 +572,9 @@ MCP `browser_search` forwards explicit `providers` unchanged, including conflict
 routing. Omission remains omission. The engine tool catalog and MCP fallback
 schema expose2..3 unique research IDs. Installing/reconnecting the MCP bridge is
 separate from a native Pi extension reload; no native schema activation is implied.
+
+The native `uiai_search` source schema also exposes the optional bounded research
+list, forwarding it unchanged through the existing scope/HTTP boundary. Fresh
+module/import and installer-fixture tests prove source behavior; editing the
+source or reloading an unrelated MCP process does not reload a running Pi native
+extension. Do not claim current native activation without that separate proof.
