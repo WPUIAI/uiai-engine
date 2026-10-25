@@ -1,0 +1,36 @@
+{
+  "schema": "uiai.compact_discovery_proof.v1",
+  "issue": 255,
+  "source_revision": "6730ec2",
+  "version": "2.0.24",
+  "running_sha256": "b8d59bd949efb1c63a094e10e28a6641f402d43adfaac66a05e5917a84e2ede0",
+  "previous_observed_exact_query_count": 36,
+  "verified": [
+    {
+      "port": 7456,
+      "exact_query_count": 1,
+      "response_bytes": 1370
+    },
+    {
+      "port": 7460,
+      "exact_query_count": 1,
+      "response_bytes": 1370
+    }
+  ],
+  "current_mcp_gateway_count": 1,
+  "tests": [
+    "3x focused exact/keyword/schema tests",
+    "3x focused race tests",
+    "full Go suite",
+    "go vet ./internal/routes",
+    "normal pre-push readiness/version/format checks",
+    "canonical idle-safe rollout; both running executable hashes verified",
+    "owned ordinary browser/read/snapshot/eval/diagnostics/screenshot generation/secret-redaction/cleanup consumers on both workers"
+  ],
+  "compatibility": "Only exact qualified identifiers use one-result lookup; keyword ranking and full inventory endpoints unchanged",
+  "limits": [
+    "No sealed EPWA or requesting-channel delivery claimed",
+    "No native extension reload claimed",
+    "No public Release/tag or paid/probe CI"
+  ]
+}
