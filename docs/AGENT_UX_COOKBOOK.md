@@ -417,7 +417,7 @@ If every attempt fails, the final provider's HTTP status and Retry-After survive
 Caller cancellation/deadlines reach upstream requests; redirects cannot expand the
 configured origin. Retiring a provider prevents serving its old cached results.
 
-Installed adapters are Brave, Tavily and Wikipedia. Other adapters, circuit
+Installed adapters are Brave, Exa, Tavily and Wikipedia. Other adapters, circuit
 breakers, fusion and quota accounting for issue90 remain incomplete.
 No production fallback list is enabled by this code deployment alone.
 
@@ -430,3 +430,12 @@ All adapters share bounded 2 MiB complete-JSON transport and value-free errors.
 Explicit credential sources cannot fall back silently to a different env key.
 Protocol source: https://docs.tavily.com/documentation/api-reference/endpoint/search
 (reviewed2026-10-25; local synthetic protocol tests, no paid provider probe).
+
+Exa uses its documented `POST https://api.exa.ai/search` contract with `x-api-key`
+header authentication, `type: auto`, bounded `numResults` and highlights only.
+Set operator-owned `search.providers.exa` credentials or `EXA_API_KEY`; no key or
+fallback configuration is enabled by installation. Highlights, URLs and dates
+use the existing normalized/redacted result fields. Generated answers, entities,
+subpages and full-page extraction are not requested.
+Protocol source: https://exa.ai/docs/reference/search (reviewed2026-10-25;
+synthetic protocol/HTTP consumer tests only, no real provider query or fee).

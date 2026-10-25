@@ -19,6 +19,7 @@ type builtinSearchProvider struct {
 }
 
 var builtinSearchProviders = []builtinSearchProvider{
+	{id: "exa", name: "Exa Search", search: searchExa, capabilities: []string{"web_search", "source_urls", "snippets"}},
 	{id: "tavily", name: "Tavily Search", search: searchTavily, capabilities: []string{"web_search", "source_urls", "snippets"}},
 	{id: "brave", name: "Brave Search", search: searchBraveContext, capabilities: []string{"web_search", "source_urls", "snippets"}},
 	{id: "wikipedia", name: "Wikipedia OpenSearch", search: func(ctx context.Context, _ *config.Config, query string, limit int) ([]searchResult, error) {

@@ -116,6 +116,7 @@ func (s SearchConfig) SearchProviderEnabled(providerID string) bool {
 var BuiltinSearchProviderEnv = map[string]string{
 	"brave":  "BRAVE_SEARCH_API_KEY",
 	"tavily": "TAVILY_API_KEY",
+	"exa":    "EXA_API_KEY",
 }
 
 // BuiltinSearchProviderKey returns the conventional environment credential for a
