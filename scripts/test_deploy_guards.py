@@ -27,6 +27,15 @@ class DeploymentGuards(unittest.TestCase):
         finally:
             server.shutdown(); server.server_close(); thread.join()
 
+    def test_ssh_arguments_preserve_multiple_idle_targets(self):
+        source = SCRIPT.read_text()
+        self.assertIn('printf -v REMOTE_DEPLOY_COMMAND', source)
+        value = 'http://127.0.0.1:7456 http://127.0.0.1:7460'
+        shell = 'DEPLOY_ARGS=(printf "<%s>" "$1"); printf -v command "%q " "${DEPLOY_ARGS[@]}"; bash -c "$command"'
+        result = subprocess.run(['bash', '-c', shell, 'fixture', value], capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, '<' + value + '>')
+
     def test_home_writes_use_owner_adapter(self):
         source = SCRIPT.read_text()
         for command in ['owner_run install -d', 'owner_run cp -a', 'owner_run install -m']:
