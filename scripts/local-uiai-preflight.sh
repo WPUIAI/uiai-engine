@@ -14,6 +14,7 @@ echo "Windows lint: PASS"
 
 echo "=== UIAI preflight: deployment readiness regression ==="
 python3 scripts/test_deploy_health.py
+python3 scripts/test_deploy_guards.py
 
 echo "=== UIAI preflight: version surfaces ==="
 # Dual-track: engine (Go) and cockpit (Tauri) have independent semvers.

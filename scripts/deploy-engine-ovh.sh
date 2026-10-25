@@ -20,6 +20,7 @@ set -euo pipefail
 : "${REMOTE_EXTRA_SERVICES:=}"
 : "${REMOTE_SMOKE_BASE_URLS:=http://127.0.0.1:7460}"
 : "${RELEASE_TAG:=manual}"
+: "${REMOTE_IDLE_BASE_URLS:=${REMOTE_HEALTH_URL%/health}}"
 
 if [[ ! -f "$ASSET_PATH" ]]; then
   echo "asset missing: $ASSET_PATH" >&2
@@ -74,7 +75,7 @@ REMOTE_PREFLIGHT
 
 "${SCP[@]}" "$ASSET_PATH" "${REMOTE_TARGET}:${REMOTE_TMP}"
 
-"${SSH[@]}" bash -s -- "$REMOTE_TMP" "$REMOTE_INSTALL_ROOT" "$REMOTE_SERVICE_NAME" "$REMOTE_OWNER" "$REMOTE_GROUP" "$LOCAL_SHA" "$RELEASE_TAG" "$REMOTE_HEALTH_URL" "$REMOTE_UIAI_EPWA_PUBLIC_BASE_URL" "$REMOTE_EXTRA_SERVICES" <<"REMOTE_DEPLOY"
+"${SSH[@]}" bash -s -- "$REMOTE_TMP" "$REMOTE_INSTALL_ROOT" "$REMOTE_SERVICE_NAME" "$REMOTE_OWNER" "$REMOTE_GROUP" "$LOCAL_SHA" "$RELEASE_TAG" "$REMOTE_HEALTH_URL" "$REMOTE_UIAI_EPWA_PUBLIC_BASE_URL" "$REMOTE_EXTRA_SERVICES" "$REMOTE_IDLE_BASE_URLS" <<"REMOTE_DEPLOY"
 set -euo pipefail
 remote_tmp=$1
 install_root=$2
@@ -86,11 +87,35 @@ release_tag=$7
 health_url=$8
 epwa_base_url=$9
 extra_services=${10}
+idle_bases=${11}
 binary_path="$install_root/uiai-engine"
 backup_dir="$install_root/backups"
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 
-install -d -o "$owner" -g "$group" "$backup_dir"
+owner_run() {
+  if [[ $(id -un) == "$owner" ]]; then "$@"; else runuser -u "$owner" -- "$@"; fi
+}
+assert_idle() {
+  python3 - "$idle_bases" "$extra_services" <<'IDLE_PY'
+import json, sys, urllib.request
+bases = sys.argv[1].split()
+if len(bases) != 1 + len((sys.argv[2] if len(sys.argv) > 2 else "").split()) or len(set(bases)) != len(bases):
+    raise SystemExit("deployment blocked: explicit idle-check targets missing")
+for base in bases:
+    def read(path):
+        with urllib.request.urlopen(base.rstrip('/') + path, timeout=5) as response:
+            return json.load(response)
+    sessions = read('/api/session')
+    browser = read('/api/health/browser')
+    count, pages = sessions.get('count'), browser.get('active_pages')
+    if type(count) is not int or type(pages) is not int or count != 0 or pages != 0:
+        raise SystemExit("deployment blocked: active or unreadable sessions/pages")
+print("named_workers_idle=true")
+IDLE_PY
+}
+# Run before replacing the shared artifact and again immediately before restart.
+assert_idle
+owner_run install -d -m 0755 "$backup_dir"
 test -f "$remote_tmp"
 remote_sha=$(sha256sum "$remote_tmp" | awk '{print $1}')
 if [[ "$remote_sha" != "$expected_sha" ]]; then
@@ -98,9 +123,10 @@ if [[ "$remote_sha" != "$expected_sha" ]]; then
   exit 3
 fi
 if [[ -f "$binary_path" ]]; then
-  cp -a "$binary_path" "$backup_dir/uiai-engine.${release_tag}.${stamp}"
+  owner_run cp -a "$binary_path" "$backup_dir/uiai-engine.${release_tag}.${stamp}"
 fi
-install -o "$owner" -g "$group" -m 0755 "$remote_tmp" "$binary_path"
+owner_run install -m 0755 "$remote_tmp" "$binary_path"
+[[ $(stat -c %U "$binary_path") == "$owner" && $(stat -c %G "$binary_path") == "$group" ]] || { echo "installed ownership mismatch" >&2; exit 4; }
 rm -f "$remote_tmp"
 if [[ -n "$epwa_base_url" ]]; then
   # Configure the engine's own durable HTTPS evidence base (public routing is not rewired here).
@@ -109,6 +135,7 @@ if [[ -n "$epwa_base_url" ]]; then
   printf "[Service]\nEnvironment=UIAI_EPWA_PUBLIC_BASE_URL=%s\n" "$epwa_base_url" > "$dropin_dir/epwa-public-base-url.conf"
   systemctl daemon-reload
 fi
+assert_idle
 systemctl restart "$service_name"
 "$binary_path" -version
 sha256sum "$binary_path"
@@ -141,6 +168,7 @@ for extra in $extra_services; do
     printf "[Service]\nEnvironment=UIAI_EPWA_PUBLIC_BASE_URL=%s\n" "$epwa_base_url" > "$extra_dropin/epwa-public-base-url.conf"
   fi
   systemctl daemon-reload
+  assert_idle
   systemctl restart "$extra"
   sleep 12
   systemctl is-active "$extra"

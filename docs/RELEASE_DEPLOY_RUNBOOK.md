@@ -233,3 +233,15 @@ focusa_evidence_capture(
 - [Browser Reliability Runbook](BROWSER_RELIABILITY_RUNBOOK.md)
 - [Endpoint Auth Matrix](ENDPOINT_AUTH_MATRIX.md)
 - [Session API](SESSION_API.md)
+
+
+## Idle and account-owned worker rollout
+
+The canonical OVH deployment checks `/api/session` and `/api/health/browser`
+before replacing the artifact and before each restart. Busy, missing or unreadable
+counts block that action. For the two named workers, explicitly set
+`REMOTE_IDLE_BASE_URLS="http://127.0.0.1:7456 http://127.0.0.1:7460"`
+when `REMOTE_EXTRA_SERVICES=uiai-engine-ovh-w2.service` is selected. Never add an
+unrelated service to a rollout. Home-directory backup/install writes run as the
+owning account; backups, health readiness and running-process hashes remain
+mandatory. Sealed evidence readiness is reported separately from API health.
