@@ -47,3 +47,34 @@ test("native Pi open decodes gzip and cleans its session on malformed bytes",asy
   await new Promise(resolve=>server.close(resolve));
  }
 });
+
+test("native capture and packet tools preserve complete caller scope without inventing refs",async()=>{
+ const scope={project_ref:"synthetic-project",workstream_ref:"synthetic-stream",workset_ref:"synthetic-set",callgraph_ref:"synthetic-graph",workpoint_ref:"synthetic-point",work_item_ref:"synthetic-item",continuity_ref:"synthetic-continuity",work_items:[{work_item_ref:"synthetic-item",title:"Owned transport fixture"}]};
+ const {buildResearchDiagnosticsPacket}=await import("../uiai-engine.ts");
+ const packet=buildResearchDiagnosticsPacket({goal:"Owned scope fixture",focusa_scope:scope,responses:[]});
+ assert.equal(packet.scope_status,"present");assert.deepEqual(packet.focusa_scope,scope);
+ const received=[];
+ const server=createServer((req,res)=>{
+  let raw="";req.on("data",chunk=>raw+=chunk);req.on("end",()=>{
+   received.push(JSON.parse(raw));res.writeHead(503,{"Content-Type":"application/json"});res.end(JSON.stringify({error:"owned fixture publication unavailable",error_class:"epwa_publication_failed"}));
+  });
+ });
+ await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
+ const prior=process.env.UIAI_ENGINE_URL;process.env.UIAI_ENGINE_URL=`http://127.0.0.1:${server.address().port}`;
+ try{
+  for(const [name,args] of [
+   ["uiai_browser_open",{url:"https://example.test"}],
+   ["uiai_browser_screenshot",{session_id:"owned-fixture"}],
+   ["uiai_screenshot",{url:"https://example.test"}],
+   ["uiai_focusa_packet_compose",{goal:"Owned fixture",responses:[]}],
+  ]){
+   const tool=tools.get(name);assert.ok(tool);assert.ok(tool.parameters.properties.focusa_scope,`${name} schema dropped scope`);
+   const before=received.length;
+   try{await tool.execute("scope",{...args,focusa_scope:scope});}catch(error){assert.ok(error instanceof Error)}
+   assert.equal(received.length,before+1);assert.deepEqual(received.at(-1).focusa_scope,scope);
+  }
+ }finally{
+  if(prior===undefined)delete process.env.UIAI_ENGINE_URL;else process.env.UIAI_ENGINE_URL=prior;
+  await new Promise(resolve=>server.close(resolve));
+ }
+});

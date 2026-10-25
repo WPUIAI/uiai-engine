@@ -1,0 +1,19 @@
+{
+  "schema": "uiai.scope_forwarding_verification.v1",
+  "implementation_source": "Selective reuse of PR237 adapter changes; current Go typed-scope handling retained",
+  "verified": [
+    "node --experimental-strip-types --test integrations/pi/uiai/engine-response.native.test.mjs",
+    "node --test integrations/pi/uiai/engine-response.test.mjs mcp/browser-session-mcp.test.mjs",
+    "node --experimental-strip-types --test integrations/openclaw/client.test.mjs",
+    "python3 tests/machine_readability_gate.py",
+    "go test ./... -timeout=90s"
+  ],
+  "results": "passed",
+  "legacy_bun_tests": "Added candidate vectors retained, Bun not installed so these files were not executed; equivalent real-adapter transport/packet cases executed by Node suite",
+  "limits": [
+    "Fresh source-adapter execution, not current Pi/MCP activation",
+    "No publication/grant/scope refs synthesized",
+    "No claim238/224/249 complete",
+    "Engine running candidate remainsf909e8d; no Go runtime change in adapter patch"
+  ]
+}

@@ -177,7 +177,7 @@ const BRIDGE_CORE_TOOLS = [
         goal: { type: "string", description: "Bounded research/diagnostics/proof goal" },
         mode: { type: "string", default: "research", enum: ["research", "diagnose", "proof"] },
         responses: { type: "array", description: "Existing UIAI responses with focusa/focusa_evidence metadata" },
-        focusa_scope: { type: "object", description: "Optional project_root/continuity_id/workpoint_id/evidence_ref scope" },
+        focusa_scope: { type: "object", description: "Complete caller-supplied typed evidence scope; metadata never grants authority" },
         recommended_next_action: { type: "string", description: "Optional bounded next action" },
         cleanup_session_id: { type: "string", description: "Optional session id to close after capture" },
         expandable_json_ref: { type: "string", description: "Optional external artifact/ref for larger JSON" },
@@ -528,6 +528,7 @@ async function toolsCall(name, args) {
       body = {
         url: args.url, width: args.width, height: args.height,
         format: args.format, quality: args.quality, fullPage: args.fullPage,
+        focusa_scope: args.focusa_scope,
       };
       break;
 

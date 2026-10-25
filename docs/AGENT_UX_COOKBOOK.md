@@ -364,3 +364,10 @@ Stream disconnect releases capacity and emits left; denied/closed/expired shares
 cannot announce arrivals. These signals are advisory, not proof of rendered pixels,
 operator approval, authenticated identity, or consent. No outbound webhook is sent.
 Existing explicit-share, publication and control-approval policy remains unchanged.
+
+Native/MCP capture and research-packet callers may supply the complete typed
+`focusa_scope`, including project/workstream/workset/CallGraph/workpoint/work-item
+refs and work-item metadata. Adapters forward exact caller fields without filling
+missing authority refs. Scope presence is transport metadata, not a verified grant
+or sealed/publication success. Source adapter tests do not prove an already-running
+Pi/MCP process has reloaded or a real requesting channel received an artifact.
