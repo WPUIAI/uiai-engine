@@ -111,3 +111,15 @@ test("consumer preserves the producer's portable-origin and query contract", () 
   data.portable_url = data.epwa_delivery.epwa.portable_url = "https://other.example/download.zip?revision=1";
   assert.deepEqual(assertEvidenceDelivery(data, true), { recordURL: data.artifact_url, portableURL: data.portable_url });
 });
+
+test("discovery artifact parameter descriptors are not inline artifacts", () => {
+ const descriptor={tools:[{name:"frame_render",parameters:{type:"object",properties:{imageBase64:{type:"string",description:"Input image"}}}}]};
+ assert.equal(findRawArtifactField(descriptor),"");
+ assert.doesNotThrow(()=>assertEvidenceDelivery(descriptor));
+ for(const value of ["synthetic-inline-data",{type:"string",bytes:"synthetic-inline-data"},{type:"string",default:"synthetic-inline-data"}]){
+  const hostile=structuredClone(descriptor);hostile.tools[0].parameters.properties.imageBase64=value;
+  assert.throws(()=>assertEvidenceDelivery(hostile),/EPWA delivery unavailable/);
+ }
+ assert.throws(()=>assertEvidenceDelivery({imageBase64:{type:"string",description:"not discovery"}}),/EPWA delivery unavailable/);
+ assert.throws(()=>assertEvidenceDelivery({screenshot:"synthetic-inline-data"}),/EPWA delivery unavailable/);
+});

@@ -1,0 +1,48 @@
+{
+  "schema": "uiai.adapter_installation_proof.v1",
+  "engine_revision": "3a0ca5a",
+  "engine_version": "2.0.24",
+  "engine_sha256": "de097b11ec1b95d62b9c65de49091c372c51948219c65eb2b3072d3a9d6fb307",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "full Go suite",
+    "repeated capture-schema/race tests and vet",
+    "22 shared-boundary/transport/MCP Node tests",
+    "3 actual-native/isolated-installer tests including fresh bundled MCP subprocess",
+    "Python suite and shell syntax",
+    "canonical idle-safe rollout, both running executable hashes",
+    "ordinary browser read/snapshot/eval/diagnostics/screenshot generation/OAuth-redaction/owned cleanup on both workers",
+    "real DOM keyboard events on both long-running workers",
+    "all four capture/packet scope fields in both live tool registries",
+    "current Pi MCP gateway reconnected successfully, health passed, actual tool search passed with screenshot scope present"
+  ],
+  "mcp_installation": "/home/wpuiai/.uiai-integrations",
+  "mcp_backup": {
+    "path": "/tmp/uiai-mcp-before-activation-20261026.tar",
+    "sha256": "77cd7781c88ae06ef6aa1787d9c9c5425def156eb5f65d766a6e88bd0753199a"
+  },
+  "guard_reproduction": "Tool search was rejected as raw artifact at $.tools[35].parameters.properties.imageBase64; narrow schema-descriptor handling repairs metadata without admitting actual inline payload values",
+  "guard_negative_tests": [
+    "actual raw image value",
+    "extra bytes/default fields in fake descriptor",
+    "descriptor-shaped artifact outside schema properties",
+    "ordinary raw screenshot"
+  ],
+  "limits": [
+    "No native Pi extension reload claimed",
+    "No sealed EPWA binding, public artifact or requesting-channel delivery claimed;224/238/249 remain open",
+    "228 original historical key-loss cause not proven; issue kept open despite current installed positive tests",
+    "No public Release/tag or paid probe CI",
+    "Initial MCP bundle missed canonical contract behind bridge; corrected complete dependency list and reran actual installed process",
+    "Owner-routed canonical deploy used existing root SSH alias after owning-user alias did not resolve; no direct root writes into user home"
+  ],
+  "installed_file_sha256": {
+    "mcp/browser-session-mcp.mjs": "70a5a2e85d76a07d517520c0b776b0f5d9fb40a8e55bb154acaf298b4fa57028",
+    "mcp/epwa-contract.mjs": "7f67540de9c1510691a5f73a949a82618b49c97b30be329baa1244a9599f9de3",
+    "integrations/pi/uiai/engine-response.mjs": "23232a830dd72d9ca51a3eb44ed7b547eb6691805b69e241c0a770e97bce0884",
+    "integrations/pi/uiai/epwa-contract.mjs": "9cfa84266ad88fab9c6ca6edcd97be0785751d28b1e45acf0bfa09dcc64aa829"
+  }
+}

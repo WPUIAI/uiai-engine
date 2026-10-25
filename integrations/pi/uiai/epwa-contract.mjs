@@ -44,7 +44,16 @@ export function findRawArtifactField(value, path = "$") {
     return "";
   }
   for (const [key, child] of Object.entries(value)) {
-    if (RAW_ARTIFACT_FIELDS.has(key) && child !== undefined && child !== null && child !== "") {
+    // A capability's JSON Schema property name is not an artifact payload.
+    // Accept only the narrow scalar descriptors used by discovery; continue
+    // recursively checking their contents and reject actual values/extra keys.
+    const schemaProperty = path.endsWith(".properties") &&
+      (path.includes(".parameters.") || path.includes(".inputSchema."));
+    const descriptor = schemaProperty && child && typeof child === "object" && !Array.isArray(child) &&
+      ["string", "number", "integer", "boolean", "object", "array", "null"].includes(child.type) &&
+      Object.keys(child).every(field => field === "type" || field === "description") &&
+      (child.description === undefined || typeof child.description === "string");
+    if (RAW_ARTIFACT_FIELDS.has(key) && child !== undefined && child !== null && child !== "" && !descriptor) {
       return `${path}.${key}`;
     }
     const found = findRawArtifactField(child, `${path}.${key}`);
