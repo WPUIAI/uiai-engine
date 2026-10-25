@@ -123,7 +123,10 @@ func normalizeCapture(in CaptureMetadata) CaptureMetadata {
 	return out
 }
 
-func AssembleCapture(request CaptureAssembly) (Manifest, error) {
+// AssemblyRequest is the published T04 name; CaptureAssembly remains compatible.
+type AssemblyRequest = CaptureAssembly
+
+func AssembleCapture(request AssemblyRequest) (Manifest, error) {
 	if err := validateAssemblyIdentity(request); err != nil {
 		return Manifest{}, err
 	}

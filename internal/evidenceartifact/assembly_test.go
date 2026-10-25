@@ -202,3 +202,10 @@ func reseal(t *testing.T, manifest Manifest) Manifest {
 	}
 	return sealed
 }
+
+func TestAssemblyRequestPublishedAlias(t *testing.T) {
+	var request AssemblyRequest = assemblyFixture(t, RequirementStaticVisual)
+	if _, err := AssembleCapture(request); err != nil {
+		t.Fatal(err)
+	}
+}

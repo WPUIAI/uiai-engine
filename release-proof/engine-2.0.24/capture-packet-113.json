@@ -1,0 +1,21 @@
+{
+  "schema": "uiai.capture_packet_verification.v1",
+  "implementation_commit": "48f4bbdce6ed83f4ec0e7a005f0d0c1df4ceaed4",
+  "scope_amendment_ref": "https://github.com/WPUIAI/uiai-engine/issues/113#issuecomment-5463544142",
+  "original_changes_match_amended_allowlist": true,
+  "published_api_fix": "AssemblyRequest alias preserves CaptureAssembly callers and publishes requested T04 signature",
+  "commands": [
+    "CC=clang go test -race ./internal/evidenceartifact -run TestAssemble|TestAssembly|TestUnknownCapture|TestPermissionDenied|TestCaptureDigest -count=30",
+    "go vet ./internal/evidenceartifact",
+    "GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go test -c ./internal/evidenceartifact",
+    "GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go test -c ./internal/evidenceartifact",
+    "go test ./... -timeout=90s"
+  ],
+  "results": "passed",
+  "manifest_golden_sha256_unchanged": "e26c8e759e2fc496eaacc353e870e064e94935fc63d9345c984c73f4ca9a5806",
+  "limits": [
+    "Source-only deterministic assembler; no new capture/store/provider/Focusa/publication/closure/settlement runtime",
+    "Native Windows/Darwin execution not asserted",
+    "Parent Evidence PWA readiness not asserted"
+  ]
+}
