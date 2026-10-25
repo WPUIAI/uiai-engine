@@ -131,7 +131,7 @@ func (p *Provider) Complete(ctx context.Context, req Request) (*Response, error)
 		defer cancel()
 	}
 
-	if err := p.ensureKeys(); err != nil {
+	if err := p.ensureKeysContext(ctx); err != nil {
 		return nil, fmt.Errorf("fetch AI keys: %w", err)
 	}
 
@@ -579,7 +579,16 @@ func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, bas
 	}, nil
 }
 
+const maxCredentialSettingsBytes = 1 << 20
+
 func (p *Provider) ensureKeys() error {
+	return p.ensureKeysContext(context.Background())
+}
+
+func (p *Provider) ensureKeysContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	p.keysMu.RLock()
 	if time.Since(p.keys.fetchedAt) < p.keysTTL && p.keys.fetchedAt.Unix() > 0 {
 		p.keysMu.RUnlock()
@@ -588,15 +597,31 @@ func (p *Provider) ensureKeys() error {
 	p.keysMu.RUnlock()
 
 	url := p.cfg.RESTURL("ai-settings")
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("invalid credential settings endpoint")
+	}
 	req.Header.Set("X-Webhook-Secret", p.cfg.WordPress.WebhookSecret)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		// URL/header/transport errors may contain credentials; never wrap them.
+		return fmt.Errorf("credential settings transport failed")
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxCredentialSettingsBytes+1))
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return fmt.Errorf("credential settings response read failed")
+	}
+	if len(body) > maxCredentialSettingsBytes {
+		return fmt.Errorf("credential settings response exceeds size limit")
+	}
 
 	var settings struct {
 		DefaultProvider string                      `json:"default_provider"`

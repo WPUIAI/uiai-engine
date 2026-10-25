@@ -384,3 +384,10 @@ Tool discovery treats an exact qualified identifier such as `browser_screenshot`
 as a single-tool lookup (case-insensitive, surrounding whitespace ignored). Broad
 keywords such as `screenshot` retain ranked discovery; full inventories remain at
 `/api/tools/openai` and `/api/tools/mcp`.
+
+AI credential-settings refresh inherits the completion caller deadline and
+cancellation, rejects malformed endpoints without a panic, and caps complete
+responses at 1 MiB. Transport/read failures expose bounded value-free errors, not
+URLs, headers, or provider bodies. Rejected or partial responses never populate
+the cache. This is transport hardening, not broker revocation, secret-heap wiping,
+or authority to retrieve/use new provider credentials.
