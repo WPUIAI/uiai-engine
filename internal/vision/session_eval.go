@@ -79,7 +79,8 @@ func (s *Session) evaluateContext(caller context.Context, operation, script stri
 	case <-settle.C:
 	}
 	s.URL = safeEvalStr(page, `() => window.location.href`)
-	s.Title = safeEvalStr(page, `() => document.title`)
+	title, values := safePageProjection(page, value)
+	s.Title, value = title, values[0]
 	if err := ctx.Err(); err != nil {
 		return "", nil, failure("observe", err, true)
 	}

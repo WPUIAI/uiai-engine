@@ -358,3 +358,21 @@ identity remains explicit. Full transport loss before any identity arrives remai
 unknown and must be reconciled, never guessed from another session's identity.
 Closing an awaiting-auth session remains permitted as resource cleanup; it does
 not resolve the challenge or grant resumed actuation.
+
+
+## Browser content redaction
+
+Browser text, snapshot names, DOM projections, console argument previews, action
+titles, evaluation projections, research capture summaries, and persisted error
+text share `internal/secrettext` before output/persistence and before truncation.
+It covers bearer/credential assignments, opaque values next to API-key/token
+labels, credential-labelled controls and aliases, and PEM private-key blocks.
+Explicitly labelled recovery-material sections are withheld as a unit, never
+parsed or enumerated; this grants no recovery-code automation authority.
+
+Read responses expose `metadata.redaction` with occurrence count/classes and a
+constant `[REDACTED_SECRET]` marker, never credential length/prefix. Ordinary
+prose and explicit documentation placeholders remain readable. This boundary
+is disclosure reduction, not credential-use permission or a memory-wiping
+promise; it does not claim OCR/image redaction or replace private evidence and
+authentication policy. Synthetic fixtures only are used for regression proof.

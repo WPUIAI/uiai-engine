@@ -22,7 +22,7 @@ func (s *Session) AutoWait(timeoutMs int) error {
 	time.Sleep(time.Duration(min(timeoutMs, 300)) * time.Millisecond)
 	_ = s.page.Timeout(time.Duration(timeoutMs)*time.Millisecond).WaitDOMStable(100*time.Millisecond, 0.2)
 	s.URL = safeEvalStr(s.page, `() => window.location.href`)
-	s.Title = safeEvalStr(s.page, `() => document.title`)
+	s.Title = safePageTitle(s.page)
 	s.touch()
 	return nil
 }

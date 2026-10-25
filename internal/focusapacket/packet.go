@@ -2,6 +2,7 @@ package focusapacket
 
 import (
 	"encoding/json"
+	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"net/url"
 	"strings"
 
@@ -281,8 +282,8 @@ func sanitizeCaptures(captures []Capture) []Capture {
 		capture.Type = Truncate(capture.Type, 40)
 		capture.EvidenceRef = Truncate(capture.EvidenceRef, 240)
 		capture.TargetRef = sanitizeTargetRef(capture.TargetRef)
-		capture.Title = Truncate(capture.Title, 200)
-		capture.Summary = Truncate(capture.Summary, MaxCaptureSummaryChars)
+		capture.Title = Truncate(secrettext.Text(capture.Title), 200)
+		capture.Summary = Truncate(secrettext.Text(capture.Summary), MaxCaptureSummaryChars)
 		if capture.Type != "" || capture.EvidenceRef != "" || capture.TargetRef != "" || capture.Summary != "" {
 			out = append(out, capture)
 		}
@@ -297,7 +298,7 @@ func sanitizeDiagnosticsSummary(summary *DiagnosticsSummary) *DiagnosticsSummary
 	out := *summary
 	out.TopFindings = limitStrings(out.TopFindings, 12)
 	for i := range out.TopFindings {
-		out.TopFindings[i] = Truncate(out.TopFindings[i], 240)
+		out.TopFindings[i] = Truncate(secrettext.Text(out.TopFindings[i]), 240)
 	}
 	for packetSize(out) > MaxDiagnosticsSummaryBytes && len(out.TopFindings) > 0 {
 		out.TopFindings = out.TopFindings[:len(out.TopFindings)-1]

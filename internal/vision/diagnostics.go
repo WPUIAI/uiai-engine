@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
+	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"github.com/go-rod/rod/lib/proto"
 )
 
@@ -18,10 +19,7 @@ const (
 )
 
 var (
-	diagnosticURLRe            = regexp.MustCompile(`https?://[^\s"'<>]+`)
-	diagnosticAuthBearerRe     = regexp.MustCompile(`(?i)(authorization\s*[:=]?\s*bearer\s+)[A-Za-z0-9._~+/=-]+`)
-	diagnosticBearerRe         = regexp.MustCompile(`(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+`)
-	diagnosticSecretKeyValueRe = regexp.MustCompile(`(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|cookie|set-cookie)\s*[:=]\s*)[^\s,;&]+`)
+	diagnosticURLRe = regexp.MustCompile(`https?://[^\s"'<>]+`)
 )
 
 type ConsoleEvent struct {
@@ -167,6 +165,9 @@ func (s *Session) Diagnostics(limit int, level string, failedOnly bool) Diagnost
 }
 
 func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSnapshot {
+	s.mu.Lock()
+	title := s.Title
+	s.mu.Unlock()
 	limit := opts.Limit
 	if limit <= 0 || limit > 300 {
 		limit = 100
@@ -233,7 +234,7 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 		SessionID:   s.ID,
 		ActorRef:    s.ActorRef,
 		URL:         redactURL(s.URL),
-		Title:       s.Title,
+		Title:       title,
 		Seq:         seq,
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		Mode:        format,
@@ -250,7 +251,7 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 		Network:        network,
 		FailedRequests: failed,
 		Summary:        summary,
-		Focusa:         buildDiagnosticsFocusaMetadata(s.ID, seq, s.URL, s.Title, summary, s.FocusaScope),
+		Focusa:         buildDiagnosticsFocusaMetadata(s.ID, seq, s.URL, title, summary, s.FocusaScope),
 	}
 }
 
@@ -276,7 +277,11 @@ func (s *Session) recordConsole(e *proto.RuntimeConsoleAPICalled) {
 	}
 	args := make([]string, 0, len(e.Args))
 	for _, arg := range e.Args {
-		args = append(args, sanitizeDiagnosticText(remoteObjectPreview(arg)))
+		args = append(args, remoteObjectPreview(arg))
+	}
+	args = secrettext.Fragments(args)
+	for i := range args {
+		args[i] = sanitizeDiagnosticText(args[i])
 	}
 	url, line, col := stackTop(e.StackTrace)
 	s.diagnostics.mu.Lock()
@@ -543,10 +548,7 @@ func sanitizeBrowserContent(raw string) string {
 		return raw
 	}
 	clean := diagnosticURLRe.ReplaceAllStringFunc(raw, focusapacket.SanitizeURL)
-	clean = diagnosticAuthBearerRe.ReplaceAllString(clean, `${1}REDACTED`)
-	clean = diagnosticBearerRe.ReplaceAllString(clean, `${1}REDACTED`)
-	clean = diagnosticSecretKeyValueRe.ReplaceAllString(clean, `${1}REDACTED`)
-	return clean
+	return secrettext.Text(clean)
 }
 
 // Diagnostics are previews; full browser reads must retain their own character budget.
@@ -555,19 +557,23 @@ func sanitizeDiagnosticText(raw string) string {
 }
 
 func sanitizeBrowserValue(value any) any {
+	return sanitizeBrowserValueText(secrettext.Value(value))
+}
+
+func sanitizeBrowserValueText(value any) any {
 	switch typed := value.(type) {
 	case string:
 		return sanitizeBrowserContent(typed)
 	case []any:
 		out := make([]any, len(typed))
 		for i, item := range typed {
-			out[i] = sanitizeBrowserValue(item)
+			out[i] = sanitizeBrowserValueText(item)
 		}
 		return out
 	case map[string]any:
 		out := make(map[string]any, len(typed))
 		for key, item := range typed {
-			out[key] = sanitizeBrowserValue(item)
+			out[key] = sanitizeBrowserValueText(item)
 		}
 		return out
 	default:

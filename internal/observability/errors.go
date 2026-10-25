@@ -3,6 +3,7 @@ package observability
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"net/url"
 	"strings"
 	"sync"
@@ -104,6 +105,8 @@ func classRecovery(class string) (bool, []string) {
 }
 
 func NewErrorEnvelope(event ErrorEvent, fallbackMessage string, details map[string]any) ErrorEnvelope {
+	event.Message = secrettext.Text(event.Message)
+	fallbackMessage = secrettext.Text(fallbackMessage)
 	message := strings.TrimSpace(event.Message)
 	if message == "" {
 		message = fallbackMessage
@@ -199,10 +202,10 @@ func (s *ErrorStore) Record(event ErrorEvent) ErrorEvent {
 	event.Method = safeToken(event.Method, 16)
 	event.Path = sanitizePath(event.Path)
 	event.URL = sanitizeURL(event.URL)
-	event.Message = truncate(strings.TrimSpace(event.Message), 500)
+	event.Message = truncate(secrettext.Text(strings.TrimSpace(event.Message)), 500)
 	event.SessionID = safeToken(event.SessionID, 80)
 	event.ActorRef = safeToken(event.ActorRef, 160)
-	event.SuggestedNextAction = truncate(strings.TrimSpace(event.SuggestedNextAction), 300)
+	event.SuggestedNextAction = truncate(secrettext.Text(strings.TrimSpace(event.SuggestedNextAction)), 300)
 	event.Context = sanitizeContext(event.Context)
 	event.TS = time.Now().UTC().Format(time.RFC3339Nano)
 	n := atomic.AddUint64(&s.seq, 1)
@@ -286,9 +289,9 @@ func sanitizeContext(in map[string]any) map[string]any {
 		switch val := v.(type) {
 		case string:
 			if strings.HasPrefix(strings.ToLower(key), "url") || strings.Contains(strings.ToLower(key), "url") {
-				out[key] = sanitizeURL(val)
+				out[key] = sanitizeURL(secrettext.Text(val))
 			} else {
-				out[key] = truncate(val, 300)
+				out[key] = sanitizeStringValue(val)
 			}
 		case int, int64, uint64, bool, float64:
 			out[key] = val
@@ -300,7 +303,7 @@ func sanitizeContext(in map[string]any) map[string]any {
 			if structured, ok := sanitizeStructured(val); ok {
 				out[key] = structured
 			} else {
-				out[key] = truncate(fmt.Sprint(val), 300)
+				out[key] = truncate(secrettext.Text(fmt.Sprint(val)), 300)
 			}
 		}
 	}
@@ -357,7 +360,7 @@ func sanitizeStringValue(value string) string {
 	if strings.HasPrefix(strings.ToLower(trimmed), "http://") || strings.HasPrefix(strings.ToLower(trimmed), "https://") {
 		return sanitizeURL(trimmed)
 	}
-	return truncate(value, 300)
+	return truncate(secrettext.Text(value), 300)
 }
 
 func sensitiveKey(k string) bool {

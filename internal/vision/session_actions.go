@@ -236,7 +236,7 @@ func (s *Session) Press(key string) (*SnapResult, error) {
 	s.page.Timeout(2*time.Second).WaitDOMStable(100*time.Millisecond, 0.2)
 
 	s.URL = safeEvalStr(s.page, `() => window.location.href`)
-	s.Title = safeEvalStr(s.page, `() => document.title`)
+	s.Title = safePageTitle(s.page)
 
 	return s.snap(start)
 }
@@ -265,7 +265,7 @@ func (s *Session) Back() (*SnapResult, error) {
 	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.2)
 
 	s.URL = safeEvalStr(s.page, `() => window.location.href`)
-	s.Title = safeEvalStr(s.page, `() => document.title`)
+	s.Title = safePageTitle(s.page)
 	s.NavCount++
 
 	return s.snap(start)
@@ -295,7 +295,7 @@ func (s *Session) Forward() (*SnapResult, error) {
 	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.2)
 
 	s.URL = safeEvalStr(s.page, `() => window.location.href`)
-	s.Title = safeEvalStr(s.page, `() => document.title`)
+	s.Title = safePageTitle(s.page)
 	s.NavCount++
 
 	return s.snap(start)

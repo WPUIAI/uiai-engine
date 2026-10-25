@@ -92,7 +92,7 @@ func TestSanitizeBrowserValueRedactsNestedSecrets(t *testing.T) {
 		"items": []any{"https://example.test/?api_key=secret"},
 	})
 	got := value.(map[string]any)
-	if got["text"] != "token=REDACTED" {
+	if got["text"] != "token=[REDACTED_SECRET]" {
 		t.Fatalf("text was not redacted: %#v", got)
 	}
 	if got["items"].([]any)[0] != "https://example.test/?api_key=REDACTED" {
@@ -108,7 +108,7 @@ func TestSanitizeDiagnosticTextRedactsSecrets(t *testing.T) {
 			t.Fatalf("diagnostic text leaked %q in %q", leaked, got)
 		}
 	}
-	if !strings.Contains(got, "Bearer REDACTED") || !strings.Contains(got, "token=REDACTED") {
+	if !strings.Contains(got, "Bearer [REDACTED_SECRET]") || !strings.Contains(got, "token=REDACTED") {
 		t.Fatalf("diagnostic text not redacted as expected: %q", got)
 	}
 }

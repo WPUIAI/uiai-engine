@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"log"
 	"strings"
 	"sync"
@@ -309,7 +310,7 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 	}
 
 	page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
-	sess.Title = safeEvalStr(page, `() => document.title`)
+	sess.Title = safePageTitle(page)
 	sess.NavCount = 1
 	sess.timer = time.AfterFunc(SessionTTL, func() {
 		log.Printf("[session] %s expired after %s idle", sess.ID, SessionTTL)
@@ -529,7 +530,7 @@ func (s *Session) Screenshot(format string, quality int) (*SnapResult, error) {
 		return nil, fmt.Errorf("screenshot failed: %w", err)
 	}
 
-	s.Title = safeEvalStr(s.page, `() => document.title`)
+	s.Title = safePageTitle(s.page)
 	s.URL = safeEvalStr(s.page, `() => window.location.href`)
 	s.touch()
 
@@ -793,7 +794,7 @@ func (s *Session) ClickContext(caller context.Context, selector string) (*SnapRe
 		return nil, fail("settle", err, true)
 	}
 	s.URL = safeEvalStr(page, `() => window.location.href`)
-	s.Title = safeEvalStr(page, `() => document.title`)
+	s.Title = safePageTitle(page)
 	if err := ctx.Err(); err != nil {
 		return nil, fail("observe", err, true)
 	}
@@ -891,7 +892,7 @@ func (s *Session) Navigate(url string) (*SnapResult, error) {
 	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
 
 	s.URL = url
-	s.Title = safeEvalStr(s.page, `() => document.title`)
+	s.Title = safePageTitle(s.page)
 	s.NavCount++
 
 	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
@@ -1024,6 +1025,8 @@ func (s *Session) DOMInfo() (map[string]any, error) {
 		interactive: Array.from(document.querySelectorAll('button,[role=button],a[href],input,select,textarea,[tabindex]')).slice(0,30).map(e => ({
 			tag: e.tagName.toLowerCase(),
 			type: e.type || '',
+			name: e.name || '',
+			aria_label: e.getAttribute('aria-label') || '',
 			text: (e.textContent || e.value || e.placeholder || e.alt || '').trim().substring(0,60),
 			selector: e.id ? '#'+e.id : (e.className ? e.tagName.toLowerCase()+'.'+e.className.split(' ')[0] : e.tagName.toLowerCase()),
 			visible: e.offsetParent !== null
@@ -1198,6 +1201,10 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 	// Redact before truncation so a character budget cannot split a credential
 	// pattern and accidentally disclose its prefix. Keep page reads independent
 	// of the shorter diagnostics-preview budget.
+	var redaction secrettext.Summary
+	_, redaction = secrettext.Redact(raw.Text)
+	fragments := secrettext.Fragments([]string{raw.Text, raw.Title, raw.Description, raw.SiteName})
+	raw.Text, raw.Title, raw.Description, raw.SiteName = fragments[0], fragments[1], fragments[2], fragments[3]
 	raw.Text = sanitizeBrowserContent(raw.Text)
 	raw.URL = focusapacket.SanitizeURL(raw.URL)
 	raw.Title = sanitizeBrowserContent(raw.Title)
@@ -1221,6 +1228,7 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 		truncated = true
 	}
 
+	s.Title = raw.Title
 	s.ReadCount++
 	readSeq := s.ReadCount
 	out := &PageReadResult{
@@ -1236,6 +1244,7 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 		Truncated:   truncated,
 		Headings:    raw.Headings,
 		Metadata: map[string]any{
+			"redaction":     redaction,
 			"source_type":   "webpage",
 			"canonical_url": raw.CanonicalURL,
 			"site_name":     raw.SiteName,

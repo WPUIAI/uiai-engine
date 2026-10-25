@@ -3,6 +3,7 @@ package vision
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"strings"
 
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
@@ -345,6 +346,17 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 	var lines []string
 	interactiveCount := 0
 
+	names := make([]string, len(elements)+1)
+	for i := range elements {
+		names[i] = elements[i].Name
+	}
+	names[len(elements)] = s.Title
+	cleanNames := secrettext.Fragments(names)
+	for i := range elements {
+		elements[i].Name = cleanNames[i]
+	}
+	cleanTitle := cleanNames[len(elements)]
+	s.Title = cleanTitle
 	for _, el := range elements {
 		el.Name = sanitizeDiagnosticText(el.Name)
 		isInteractive := interactiveRoles[el.Role]
@@ -412,7 +424,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 		Tree:   tree,
 		Refs:   store.refs,
 		Stats:  stats,
-		Focusa: buildSnapshotFocusaMetadata(s.ID, snapshotSeq, s.URL, s.Title, opts.Selector, stats, s.FocusaScope),
+		Focusa: buildSnapshotFocusaMetadata(s.ID, snapshotSeq, s.URL, cleanTitle, opts.Selector, stats, s.FocusaScope),
 	}, nil
 }
 
