@@ -16,6 +16,11 @@
       "issue": 114,
       "implementation_commit": "e9736e244360f3fb2c70f555003f3e79a64d28dd",
       "original_new_file_allowlist_exact": true
+    },
+    {
+      "issue": 112,
+      "implementation_commit": "b7c0af413fdfade0e5f752b3acdd4b9d267eb76a",
+      "original_new_and_modified_file_allowlist_exact": true
     }
   ],
   "commands": [
@@ -32,12 +37,13 @@
     "statement_coverage_percent": 79.2,
     "manifest_golden_sha256": "e26c8e759e2fc496eaacc353e870e064e94935fc63d9345c984c73f4ca9a5806"
   },
-  "scope": "Existing isolated contract, crash-safe store and authority-neutral signature packets; no implementation edits needed for these closures",
+  "scope": "Existing isolated contract, crash-safe store and authority-neutral signature packets; no implementation edits needed for these closures; T03 deterministic hostile-content boundary also reverified in the same30-repeat package suite",
   "exclusions": [
     "Native Windows/Darwin execution is not asserted",
     "No new deployment is required by these source-only packets",
     "No provider, architecture, Focusa completion or settlement authority is granted",
     "No parent Evidence PWA completion or sealed delivery readiness claimed",
-    "Store111 proof does not claim a restore mutation or multi-process coordination"
+    "Store111 proof does not claim a restore mutation or multi-process coordination",
+    "T03 does not claim OCR/transcription, external malware authority, archive expansion or active-document sanitization"
   ]
 }
