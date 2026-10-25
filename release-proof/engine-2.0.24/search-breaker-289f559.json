@@ -1,0 +1,45 @@
+{
+  "schema": "uiai.search_breaker_proof.v1",
+  "issue": 90,
+  "source_revision": "289f559",
+  "version": "2.0.24",
+  "build": "2026-10-25T22:12:58Z+289f559",
+  "running_sha256": "2d1d9531e15ed708b3d0cd52f652e732a7be90885931764105f0ead275d2858e",
+  "workers": [
+    7456,
+    7460
+  ],
+  "contract": {
+    "scope": "one mounted search router",
+    "threshold": 2,
+    "retryable_statuses": "429/408/500..599",
+    "local_backoff_seconds": "30,60,120,240,300 capped; valid Retry-After floor can exceed local cap",
+    "recovery": "one caller-triggered half-open request, no automatic background traffic",
+    "state": "value-free, bounded by installed providers, non-durable; no credential/quota authority"
+  },
+  "verified": [
+    "fake-clock consecutive failures, Retry-After delta/date, exponential cap and successful recovery reset",
+    "40 concurrent contenders admit exactly one recovery request",
+    "caller cancellation/deadlines and non-transient errors do not open circuits; canceled probe releases slot",
+    "stale pre-break completion cannot clear a newer circuit",
+    "failed recovery transport backs off instead of admitting an immediate probe storm",
+    "actual mounted-router synthetic HTTP consumers: primary429 twice, third unnamed query skips it and approved fallback succeeds; explicit pinned cooling provider503/RetryAfter and no alternate disclosure",
+    "configured-but-cooling provider metadata degraded/open; independent mounted router does not inherit circuit state",
+    "cached hits serve without contacting cooling upstream",
+    "search+AI race5x/fullGo/vet/prepush pass; isolated GOCACHE used for final complete suite",
+    "Windowsamd64/Darwinarm64 main cross-build only, not native execution",
+    "canonical idle-safe rollback-preserving deploy; both active/healthy running hashes verified",
+    "both installed provider endpoints expose new circuit state, all four initially closed; GET metadata only, no provider calls",
+    "both installed ordinary browser/read/snapshot/eval/diagnostics/screenshot generation/redaction/owned cleanup consumers pass"
+  ],
+  "validation_recovery": [
+    "Initial new consumer fixtures used default http URLs and received expected evidence-delivery202; corrected tests to HTTPS evidence host, no delivery guard bypass",
+    "One full build failed due missing shared Go-cache files; cause unverified, final fullGo/vet/race passed using /tmp/uiai-go-cache-search-breaker; no shared-cache deletion or service mutation"
+  ],
+  "limits": [
+    "Issue90 remains OPEN: additional providers, richer result/fusion contract, quota and all-surface health integration, zero-key web-search acceptance",
+    "Aggregate browser pressure still configuration-only, not circuit/remaining-credit proof",
+    "No real provider query/credit/credential use; no production fallback configuration changed",
+    "No public Release, sealed EPWA, pixel inspection or native Pi reload claim"
+  ]
+}
