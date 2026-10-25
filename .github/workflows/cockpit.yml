@@ -20,6 +20,18 @@ jobs:
           cache: 'npm'
           cache-dependency-path: apps/cockpit/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Native macOS RSS sampling proof
+        run: go test ./internal/vision -run 'Test(DarwinNativeRSS|PSProcessTreeRSS|RSSPressureSnapshot)' -count=1 -timeout=45s
+      - name: Native macOS Bash 3.2 compatibility proof
+        env:
+          UIAI_TEST_BASH: /bin/bash
+        run: |
+          /bin/bash --version
+          python3 -m unittest discover -s tests -p test_cli_optional_auth.py -v
       - name: Install dependencies
         working-directory: apps/cockpit
         run: npm ci
