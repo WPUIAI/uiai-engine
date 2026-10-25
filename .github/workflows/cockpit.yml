@@ -29,6 +29,9 @@ jobs:
         run: |
           npm install --no-save --no-package-lock \
             @rollup/rollup-darwin-arm64@4.62.2
+      - name: Critical and high dependency audit
+        working-directory: apps/cockpit
+        run: npm audit --audit-level=high
       - name: Typecheck
         working-directory: apps/cockpit
         run: npm run check

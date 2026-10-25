@@ -1,0 +1,31 @@
+{
+  "schema": "uiai.cockpit_dependency_audit_proof.v1",
+  "before": {
+    "info": 0,
+    "low": 6,
+    "moderate": 11,
+    "high": 14,
+    "critical": 3,
+    "total": 34
+  },
+  "after": {
+    "info": 0,
+    "low": 6,
+    "moderate": 3,
+    "high": 0,
+    "critical": 0,
+    "total": 9
+  },
+  "versions": {
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "zod": "4.6.7"
+  },
+  "typecheck_errors": 0,
+  "typecheck_warnings": 0,
+  "unit_tests_passed": 206,
+  "mocked_smoke_passed": 20,
+  "web_build": true,
+  "remaining_low_moderate_disclosed": true,
+  "production_deployment_claim": false
+}
