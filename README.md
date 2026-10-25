@@ -316,3 +316,10 @@ Trusted Veragensia microphone capture permission does not automatically grant mi
 ## License
 
 UIAI Engine is source-available under BSL 1.1. See [`LICENSE`](LICENSE) and [`docs/LICENSING.md`](docs/LICENSING.md). Source-use rights and official product entitlement are separate boundaries.
+
+### OpenClaw UIAI-only tool package (development)
+
+See [the OpenClaw adapter](integrations/openclaw/README.md) for packaging, explicit
+UIAI-only routing, SecretRefs, conversation isolation and bounded image blocks.
+Its isolated SDK/profile proof is not production activation or Discord delivery;
+issue #249 remains open until its authenticated-workflow/channel acceptance passes.

@@ -1,0 +1,12 @@
+{
+  "installed_sdk_entry": true,
+  "registered_tools": [
+    "uiai_browser",
+    "uiai_health"
+  ],
+  "real_engine_health": true,
+  "real_sdk_secret_ref": true,
+  "secret_not_in_tool_result": true,
+  "authenticated_page_proof": false,
+  "discord_delivery_proof": false
+}

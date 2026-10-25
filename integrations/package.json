@@ -1,0 +1,10 @@
+{
+  "name": "@wpuiai/openclaw-uiai",
+  "version": "0.1.0-dev",
+  "description": "UIAI-only OpenClaw browser tools; no managed-browser fallback",
+  "type": "module",
+  "files": ["openclaw/index.mjs", "openclaw/client.mjs", "openclaw/tools.mjs", "openclaw/README.md", "pi/uiai/engine-response.mjs", "pi/uiai/epwa-contract.mjs", "openclaw.plugin.json"],
+  "peerDependencies": {"openclaw": ">=2026.5.17"},
+  "engines": {"node": ">=22.22.3"},
+  "openclaw": {"extensions": ["./openclaw/index.mjs"], "compat": {"pluginApi": ">=2026.5.17", "minGatewayVersion": "2026.5.17"}}
+}

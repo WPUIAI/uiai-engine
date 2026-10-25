@@ -1,0 +1,24 @@
+{
+ "id":"uiai-engine",
+ "name":"UIAI Engine",
+ "description":"UIAI-only browser tools with explicit unavailable errors and no alternative browser launch",
+ "version":"0.1.0-dev",
+ "activation":{"onStartup":false},
+ "contracts":{"tools":["uiai_browser","uiai_health"]},
+ "toolMetadata":{"uiai_browser":{"optional":true},"uiai_health":{"optional":true}},
+ "configContracts":{"secretInputs":{"paths":[{"path":"apiKey","expected":"string"},{"path":"bearerToken","expected":"string"}]}},
+ "uiHints":{"apiKey":{"sensitive":true},"bearerToken":{"sensitive":true}},
+ "configSchema":{
+  "type":"object","additionalProperties":false,
+  "properties":{
+   "provider":{"type":"string","enum":["uiai"],"default":"uiai"},
+   "fallback":{"type":"string","enum":["none"],"default":"none"},
+   "baseUrl":{"type":"string","default":"http://127.0.0.1:7456"},
+   "apiKey":{"anyOf":[{"type":"string"},{"type":"object","required":["source","provider","id"],"additionalProperties":false,"properties":{"source":{"enum":["env","file","exec"]},"provider":{"type":"string"},"id":{"type":"string"}}}]},
+   "bearerToken":{"anyOf":[{"type":"string"},{"type":"object","required":["source","provider","id"],"additionalProperties":false,"properties":{"source":{"enum":["env","file","exec"]},"provider":{"type":"string"},"id":{"type":"string"}}}]},
+   "timeoutMs":{"type":"integer","minimum":100,"maximum":60000},
+   "privateAttachments":{"type":"boolean","default":false},
+   "evidenceOrigins":{"type":"array","items":{"type":"string"},"maxItems":8}
+  }
+ }
+}
