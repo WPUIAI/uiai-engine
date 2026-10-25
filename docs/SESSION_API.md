@@ -405,4 +405,4 @@ The same binary embeds the canonical FPV template and generated asset bundle;
 
 Native MJPEG readers receive the retained last JPEG on idle output ticks so decoders
 can finalize a frame without waiting for another page repaint; this playback does
-not assert new capture/freshness. Smooth selects10FPS, balanced4FPS, saver1FPS.
+not assert new capture/freshness. Smooth selects8FPS, balanced4FPS, saver1FPS.

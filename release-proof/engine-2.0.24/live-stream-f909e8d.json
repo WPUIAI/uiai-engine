@@ -1,0 +1,104 @@
+{
+  "observed_at": "2026-10-25T19:00:41Z",
+  "workers": [
+    {
+      "port": 7456,
+      "revision": "f909e8d",
+      "version": "2.0.24",
+      "oauth_url_surfaces": [
+        "eval",
+        "read",
+        "snapshot",
+        "dom",
+        "diagnostics"
+      ],
+      "raw_navigation_preserved": true,
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "semantic_redaction_surfaces": [
+        "read",
+        "snapshot",
+        "dom",
+        "text",
+        "diagnostics",
+        "eval",
+        "title"
+      ],
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    },
+    {
+      "port": 7460,
+      "revision": "f909e8d",
+      "version": "2.0.24",
+      "oauth_url_surfaces": [
+        "eval",
+        "read",
+        "snapshot",
+        "dom",
+        "diagnostics"
+      ],
+      "raw_navigation_preserved": true,
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "semantic_redaction_surfaces": [
+        "read",
+        "snapshot",
+        "dom",
+        "text",
+        "diagnostics",
+        "eval",
+        "title"
+      ],
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    }
+  ],
+  "stream68_installed": [
+    {
+      "service": "uiai-engine-ovh.service",
+      "running_sha_verified": true,
+      "embedded_asset_digests_match": true,
+      "fps_validation": true,
+      "unknown_share_denied": true
+    },
+    {
+      "service": "uiai-engine-ovh-w2.service",
+      "running_sha_verified": true,
+      "embedded_asset_digests_match": true,
+      "fps_validation": true,
+      "unknown_share_denied": true
+    }
+  ],
+  "binary_sha256": "abb32fd221ec71599648f22ed52b23f1b922cbc561f69dc38ccf349296783bff",
+  "owned_isolated_browser_conformance": {
+    "actual_browser_paint_metric": "same-host target mutation to viewer canvas observing decoded pixels on animation frame, plus16ms paint allowance; not a public-network guarantee",
+    "actual_browser_paint_p95_ms": 227,
+    "actual_browser_viewer_live": true,
+    "final_viewer_count": 0,
+    "fps": 8,
+    "metric": "owned-target style mutation to received-and-decoded matching JPEG; not public-network glass-to-glass",
+    "p95_ms": 201,
+    "samples": 16,
+    "surviving_viewer_after_disconnect": true
+  },
+  "pixel_fixture_sha256": "4bb7435f8ae12ab3056d15f25f6c76f2bcc18d82f86af799c283826b539d653a",
+  "evidence_limits": [
+    "Positive transport and actual browser paint proof use isolated owned synthetic fixture",
+    "Installed worker binaries, ordinary browser outcomes and embedded asset digests verified",
+    "No production public share or sealed scope fabricated",
+    "No public-network latency guarantee or public-release claim"
+  ]
+}
