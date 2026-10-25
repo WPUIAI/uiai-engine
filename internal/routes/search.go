@@ -218,6 +218,7 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "search_provider_unavailable", "provider": provider, "message": err.Error()})
 		return
 	}
+	results = deduplicateSearchResults(results)
 	annotateSearchEvidence(results, provider, query)
 	if ttl > 0 {
 		setCachedSearch(provider, query, limit, results, time.Now().Add(ttl))

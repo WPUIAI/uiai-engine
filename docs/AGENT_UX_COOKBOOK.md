@@ -527,3 +527,17 @@ means one recovery request is eligible, not that the provider has recovered.
 Legacy callers without runtime injection are labeled `configuration_only`.
 `remaining_quota_status: unknown` is not a fabricated account-credit balance;
 Cockpit credit-ledger integration and issue90's other requirements remain open.
+
+### Search result identity and deduplication
+
+Fresh results are deduplicated before dense citation ranking and caching. Exact
+normalized HTTP(S) URLs share identity; tracking-only URL variants are merged
+only when titles have at least0.8 token-set similarity. Only `utm_*`, `gclid` and
+`fbclid` are ignored for that comparison. Meaningful query parameters, different
+hosts and unrelated titles are retained. The first original citation, text and
+source metadata are preserved, not rewritten to the comparison URL.
+Malformed/non-HTTP(S)/userinfo citation URLs are omitted. Dedupe never fetches
+additional results or spends another provider request to fill a limit; output may
+therefore contain fewer items. Cached and fresh results share citation ranks.
+This is single-response deduplication, not multi-provider query/rank fusion;
+issue90 remains open for that and its other acceptance requirements.
