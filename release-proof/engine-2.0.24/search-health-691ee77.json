@@ -1,0 +1,40 @@
+{
+  "schema": "uiai.search_runtime_health_proof.v1",
+  "issue": 90,
+  "source_revision": "691ee77",
+  "version": "2.0.24",
+  "build": "2026-10-25T22:41:21Z+691ee77",
+  "running_sha256": "1f29f4e2d8ff9af2823030b7433f659f17459fb7ce4e099ba460ca48bd88805e",
+  "workers": [
+    7456,
+    7460
+  ],
+  "contract": {
+    "ownership": "one SearchRuntime per Engine.mountRoutes shared with search/provider inventory/browser health/metrics; no second map/store",
+    "projection": "single typed provider-inventory owner reused by provider endpoint and pressure",
+    "readiness": "actual configured default or explicitly approved alternate eligible under its circuit; unapproved ready provider cannot conceal cooling primary",
+    "basis": "observed_circuits when injected, configuration_only for legacy caller",
+    "remaining_quota_status": "unknown; not fabricated account credit"
+  },
+  "verified": [
+    "mounted search429 twice is observed in both health and metrics using same runtime",
+    "cooling primary without approved alternate is degraded although unapproved Wikipedia is configured ready",
+    "approved alternate restores request readiness; half-open and active single-probe readiness truthful; successful recovery reflected",
+    "health observation makes zero upstream provider queries",
+    "legacy calls labeled configuration_only rather than live-state authority",
+    "5x search/breaker/health/pressure race, fullGo/vet/prepush pass on OVH with isolated GOCACHE",
+    "Windowsamd64/Darwinarm64 cross-build only, not native execution",
+    "canonical idle-safe rollback-preserving deployment, both active/healthy running executable hashes verified",
+    "both installed ordinary-browser/redaction/owned cleanup consumers pass",
+    "BOTH actual installed health and metrics endpoints report same observed_circuits inventory/default readiness and quota unknown"
+  ],
+  "validation_recovery": [
+    "New health fixture initially used disabled vision and therefore correctly had no browser-pressure payload; corrected to existing lazy empty Pool fixture, no actual browser launched or production semantics bypassed"
+  ],
+  "limits": [
+    "Issue90 stays OPEN: remaining providers, multi-provider fusion, real account quota/Cockpit ledger and zero-key WEB service acceptance",
+    "Observed circuits describe prior requests/current admission, not proactive external-provider availability tests",
+    "No new paid/provider search query, credentials/fallback/endpoint config changes or service provisioning",
+    "No public Release/scoped sealed EPWA/native Pi reload/pixel inspection claim"
+  ]
+}
