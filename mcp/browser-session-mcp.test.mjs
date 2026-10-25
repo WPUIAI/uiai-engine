@@ -168,10 +168,14 @@ test("MCP search preserves omission and explicit provider pinning", async (t) =>
   const listed = await callMcp(child, { jsonrpc: "2.0", id: 10, method: "tools/list", params: {} });
   const search = listed.result.tools.find(t => t.name === "browser_search");
   assert.ok(search); assert.equal(Object.hasOwn(search.inputSchema.properties.provider, "default"), false);
-  for (const [id, args] of [[11, { query: "fixture" }], [12, { query: "fixture", provider: "tavily" }]]) {
+  assert.equal(search.inputSchema.properties.providers.minItems,2);
+  assert.equal(search.inputSchema.properties.providers.maxItems,3);
+  for (const [id, args] of [[11, { query: "fixture" }], [12, { query: "fixture", provider: "tavily" }], [13,{query:"fixture",providers:["brave","wikipedia"]}], [14,{query:"fixture",provider:"brave",providers:["brave","wikipedia"]}]]) {
     const reply = await callMcp(child, { jsonrpc: "2.0", id, method: "tools/call", params: { name: "browser_search", arguments: args } });
     assert.equal(reply.error, undefined); assert.equal(reply.result.isError, undefined);
     assert.equal(captured.provider, args.provider);
     assert.equal(Object.hasOwn(captured, "provider"), Object.hasOwn(args, "provider"));
+    assert.deepEqual(captured.providers,args.providers);
+    assert.equal(Object.hasOwn(captured,"providers"),Object.hasOwn(args,"providers"));
   }
 });

@@ -331,3 +331,24 @@ func TestExactToolLookupHTTPIsCompactAndConsistent(t *testing.T) {
 		t.Fatalf("exact lookup returned excessive schema bytes: %d", res.Body.Len())
 	}
 }
+
+func TestSearchResearchToolSchemaIsBoundedAndOptional(t *testing.T) {
+	matches := rankedToolSearch(openAITools(), "browser_search")
+	if len(matches) != 1 {
+		t.Fatal("exact search discovery not bounded")
+	}
+	params := matches[0]["parameters"].(map[string]any)
+	properties := params["properties"].(map[string]any)
+	research := properties["providers"].(map[string]any)
+	if research["minItems"] != 2 || research["maxItems"] != 3 || research["uniqueItems"] != true {
+		t.Fatal("research fanout bounds missing from catalog")
+	}
+	for _, required := range params["required"].([]string) {
+		if required != "query" {
+			t.Fatal("optional research became mandatory")
+		}
+	}
+	if _, forced := properties["provider"].(map[string]any)["default"]; forced {
+		t.Fatal("catalog silently pinned an omitted provider")
+	}
+}

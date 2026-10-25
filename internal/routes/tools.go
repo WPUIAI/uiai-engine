@@ -517,12 +517,13 @@ func openAITools() []map[string]any {
 		},
 		{
 			"name":        "browser_search",
-			"description": "Provider-neutral web search delivered as a durable HTTPS EPWA research packet plus portable package. Result fields are included only when delivery is ready; open selected source URLs with browser_open, then browser_read.",
+			"description": "Provider-neutral search, with optional explicitly approved multi-provider research. Unscoped results are unsealed; scoped evidence requires ready HTTPS EPWA delivery. Open selected source URLs with browser_open, then browser_read.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"query":        map[string]string{"type": "string", "description": "Search query"},
 					"provider":     map[string]any{"type": "string", "description": "Optional provider id; omitted uses operator defaults and approved fallback"},
+					"providers":    map[string]any{"type": "array", "items": map[string]string{"type": "string"}, "minItems": 2, "maxItems": 3, "uniqueItems": true, "description": "Optional explicit research providers; each requires operator default/fallback approval; conflicts with provider"},
 					"limit":        map[string]any{"type": "integer", "description": "Result limit, max 20", "default": 5},
 					"focusa_scope": map[string]any{"type": "object", "description": "Complete Project, Workstream, Workset, CallGraph, Workpoint, Work Item, continuity, and work-items binding required for ready EPWA delivery"},
 				},

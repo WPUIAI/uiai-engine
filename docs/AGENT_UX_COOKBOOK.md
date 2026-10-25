@@ -550,7 +550,7 @@ must also be the operator's resolved default or named in the approved fallback
 configuration. Unsupported/unapproved/disabled members and a simultaneous pinned
 `provider` are rejected before traffic. Merely possessing another key never
 authorizes fanout. Ordinary requests and explicit single-provider pins do not fan
-out. This first surface is HTTP-only; native/MCP parameter bindings are separate.
+out. HTTP and installed MCP support this field; native Pi schema activation remains separate.
 
 At most three provider calls run concurrently under one12s overall context, using
 exactly the existing per-provider cache/circuit/normalization path. Successes are
@@ -566,3 +566,9 @@ provider set. All-failed is a non-success response; all429 remains429. `cached`
 is true only when every requested lane succeeded from cache. No second fusion
 cache or implicit refill/probe requests exist. This does not grant paid-provider
 use, key acquisition or production fallback configuration; tests use local fakes.
+
+MCP `browser_search` forwards explicit `providers` unchanged, including conflicting
+`provider` inputs so the engine rejects them rather than silently changing query
+routing. Omission remains omission. The engine tool catalog and MCP fallback
+schema expose2..3 unique research IDs. Installing/reconnecting the MCP bridge is
+separate from a native Pi extension reload; no native schema activation is implied.

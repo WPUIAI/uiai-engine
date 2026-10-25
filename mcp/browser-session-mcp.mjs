@@ -200,12 +200,13 @@ const BRIDGE_CORE_TOOLS = [
   },
   {
     name: "browser_search",
-    description: "Provider-neutral web search delivered as a durable HTTPS EPWA research packet plus portable package. Result fields are returned only when delivery is ready.",
+    description: "Provider-neutral search, with optional explicitly approved multi-provider research. Unscoped results are unsealed; scoped evidence requires ready HTTPS EPWA delivery.",
     inputSchema: {
       type: "object",
       properties: {
         query: { type: "string", description: "Search query" },
         provider: { type: "string", description: "Optional provider id; omitted uses operator defaults and approved fallback" },
+        providers: {type:"array",items:{type:"string"},minItems:2,maxItems:3,uniqueItems:true,description:"Optional explicit research providers; each requires operator default/fallback approval; conflicts with provider"},
         limit: { type: "integer", default: 5, description: "Result limit, max 20" },
       },
       required: ["query"],
@@ -348,7 +349,7 @@ async function toolsCall(name, args) {
     case "browser_search":
       url = `${ENGINE}/api/search`;
       method = "POST";
-      body = { query: args.query, provider: args.provider, limit: args.limit };
+      body = { query: args.query, provider: args.provider, providers:args.providers, limit: args.limit };
       break;
 
     case "browser_fpv_share":
