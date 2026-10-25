@@ -1,0 +1,31 @@
+{
+  "schema": "uiai.legacy_viewer_installed_smoke.v1",
+  "workers": [
+    {
+      "service": "uiai-engine-ovh.service",
+      "checks": {
+        "status_404": true,
+        "nosniff": true,
+        "no_referrer": true,
+        "frame_deny": true,
+        "csp": true,
+        "noindex": true
+      },
+      "credential_ref": "existing service-local UIAI_LOCAL_API_TOKEN; value never emitted"
+    },
+    {
+      "service": "uiai-engine-ovh-w2.service",
+      "checks": {
+        "status_404": true,
+        "nosniff": true,
+        "no_referrer": true,
+        "frame_deny": true,
+        "csp": true,
+        "noindex": true
+      },
+      "credential_ref": "existing service-local UIAI_LOCAL_API_TOKEN; value never emitted"
+    }
+  ],
+  "source_browser_security_regressions": "passed",
+  "visual_appearance_claim": false
+}

@@ -1,4 +1,6 @@
 import importlib.util
+import sys
+sys.dont_write_bytecode = True
 import unittest
 from pathlib import Path
 
