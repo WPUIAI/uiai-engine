@@ -99,8 +99,11 @@ type braveWebResponse struct {
 // MountSearchRoutes exposes provider-neutral web discovery for browser agents.
 // Brave is the default provider, but the public contract stays provider-neutral
 // so other providers can be added without changing browser/session semantics.
-func MountSearchRoutes(r chi.Router, cfg *config.Config) {
-	breakers := newSearchBreakers(time.Now)
+func MountSearchRoutes(r chi.Router, cfg *config.Config, states ...*SearchRuntime) {
+	breakers := firstSearchRuntime(states...)
+	if breakers == nil {
+		breakers = NewSearchRuntime()
+	}
 	bind := func(req *http.Request) *http.Request {
 		return req.WithContext(context.WithValue(req.Context(), searchBreakersKey{}, breakers))
 	}
@@ -232,30 +235,42 @@ func normalizeSearchLimit(limit int) int {
 	return limit
 }
 
-func searchPressureSummary(cfg *config.Config) map[string]any {
+func searchPressureSummary(cfg *config.Config, states ...*SearchRuntime) map[string]any {
 	searchCache.Lock()
 	pruneExpiredSearchCacheLocked(time.Now())
 	entries := len(searchCache.entries)
 	searchCache.Unlock()
 
-	ids := searchProviderIDs(cfg)
-	ready := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if configured, _ := searchProviderConfigured(cfg, id); configured {
-			ready = append(ready, id)
+	runtime := firstSearchRuntime(states...)
+	inventory := buildSearchProviderInventory(cfg, runtime)
+	ids, ready := inventory.ids, inventory.ready
+	eligible := make(map[string]bool, len(ready))
+	for _, id := range ready {
+		eligible[id] = true
+	}
+	requestReady := false
+	for _, id := range searchProviderPlan(cfg, "", inventory.defaultProvider) {
+		if eligible[id] {
+			requestReady = true
+			break
 		}
 	}
 	providersStatus := "ready"
 	pressure := "normal"
-	if len(ready) == 0 {
+	if !requestReady {
 		providersStatus = "degraded"
 		pressure = "degraded"
 	}
-	defaultProvider := resolveDefaultSearchProvider(cfg)
+	defaultProvider := inventory.defaultProvider
+	basis := "configuration_only"
+	if runtime != nil {
+		basis = "observed_circuits"
+	}
 	return map[string]any{
-		"default_provider":    defaultProvider,
-		"provider":            defaultProvider,
-		"provider_status":     providersStatus,
+		"default_provider": defaultProvider,
+		"provider":         defaultProvider,
+		"provider_status":  providersStatus,
+		"readiness_basis":  basis, "default_request_ready": requestReady, "providers": inventory.providers, "remaining_quota_status": "unknown",
 		"pressure":            pressure,
 		"available_providers": ids,
 		"ready_providers":     ready,

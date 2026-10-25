@@ -458,8 +458,8 @@ the pinned call returns503 `search_provider_circuit_open`, `retryable:true` and
 `GET /api/search/providers` adds per-provider `circuit` state, failure count,
 retry delay and probe-in-flight status. Configured-but-cooling providers remain
 `configured:true`, but are degraded and omitted from `ready_providers` until a
-recovery probe can be attempted. Aggregate browser pressure remains a
-configuration-only view; no remaining-credit or all-surface health claim is made.
+recovery probe can be attempted. Aggregate browser/metrics pressure now shares that same runtime inventory;
+remaining credits still report unknown.
 Circuit state resets with that router/runtime, not with a durable quota ledger.
 
 Proof uses fake clocks, concurrent probe admission and local synthetic HTTP
@@ -514,3 +514,16 @@ Legacy fields remain available. Score values are copied at normalization and
 cache boundaries so caller mutation cannot change cached results. `content_md`
 remains absent because full-content retrieval is intentionally disabled. This
 compatible result extension is not multi-provider fusion or provider acceptance.
+
+### Search health uses the actual search runtime
+
+One search runtime is created per engine route mount and passed to both search
+and browser-health/metrics routes. The provider endpoint and aggregate pressure
+reuse one inventory projection, including per-provider cooldown. With an injected
+runtime, `readiness_basis: observed_circuits` and `default_request_ready` reflect
+whether the actual default or an explicitly approved fallback can serve now.
+A ready but unapproved alternate does not conceal a cooling primary. Half-open
+means one recovery request is eligible, not that the provider has recovered.
+Legacy callers without runtime injection are labeled `configuration_only`.
+`remaining_quota_status: unknown` is not a fabricated account-credit balance;
+Cockpit credit-ledger integration and issue90's other requirements remain open.

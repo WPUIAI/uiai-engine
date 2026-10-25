@@ -21,11 +21,11 @@ type searchTestClock struct {
 
 func (c *searchTestClock) now() time.Time      { c.mu.Lock(); defer c.mu.Unlock(); return c.t }
 func (c *searchTestClock) add(d time.Duration) { c.mu.Lock(); defer c.mu.Unlock(); c.t = c.t.Add(d) }
-func testSearchBreakers() (*searchBreakers, *searchTestClock) {
+func testSearchBreakers() (*SearchRuntime, *searchTestClock) {
 	c := &searchTestClock{t: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
 	return newSearchBreakers(c.now), c
 }
-func failSearchCircuit(b *searchBreakers, id string, err error) {
+func failSearchCircuit(b *SearchRuntime, id string, err error) {
 	for i := 0; i < 2; i++ {
 		a, wait := b.acquire(id)
 		if wait != 0 {

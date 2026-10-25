@@ -254,6 +254,7 @@ func New(cfg *config.Config) *Engine {
 // mountRoutes registers all route modules — mirrors the Bun server exactly.
 func (e *Engine) mountRoutes() {
 	r := e.router
+	searchRuntime := routes.NewSearchRuntime()
 
 	// Root
 	r.Get("/", e.handleRoot)
@@ -262,10 +263,10 @@ func (e *Engine) mountRoutes() {
 	visionEnabled := !e.cfg.Server.DisableVision
 	r.Route("/api/health", func(r chi.Router) {
 		routes.MountHealth(r, e.cfg, e.ai)
-		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions, e.cfg)
+		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions, e.cfg, searchRuntime)
 	})
 	r.Route("/api/metrics", func(r chi.Router) {
-		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions, e.cfg)
+		routes.MountBrowserHealth(r, e.vision, visionEnabled, e.sessions, e.cfg, searchRuntime)
 	})
 
 	// Also respond to /health for PHP API compat + health monitor
@@ -433,7 +434,7 @@ func (e *Engine) mountRoutes() {
 
 	// Provider-neutral web search/discovery for browser agents
 	r.Route("/api/search", func(r chi.Router) {
-		routes.MountSearchRoutes(r, e.cfg)
+		routes.MountSearchRoutes(r, e.cfg, searchRuntime)
 	})
 
 	// One-shot Source-to-Markdown API for agent research/citation workflows

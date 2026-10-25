@@ -127,11 +127,13 @@ func resolveDefaultSearchProvider(cfg *config.Config) string {
 	return ""
 }
 
-func handleSearchProviders(w http.ResponseWriter, cfg *config.Config, states ...*searchBreakers) {
-	var breakers *searchBreakers
-	if len(states) > 0 {
-		breakers = states[0]
-	}
+type searchProviderInventory struct {
+	defaultProvider string
+	ids, ready      []string
+	providers       []map[string]any
+}
+
+func buildSearchProviderInventory(cfg *config.Config, breakers *SearchRuntime) searchProviderInventory {
 	ids := searchProviderIDs(cfg)
 	providers := make([]map[string]any, 0, len(ids))
 	ready := make([]string, 0, len(ids))
@@ -162,15 +164,11 @@ func handleSearchProviders(w http.ResponseWriter, cfg *config.Config, states ...
 		})
 	}
 
-	defaultProvider := resolveDefaultSearchProvider(cfg)
-
-	writeJSON(w, 200, map[string]any{
-		"schema":              "uiai.search_providers.v1",
-		"default_provider":    defaultProvider,
-		"available_providers": ids,
-		"ready_providers":     ready,
-		"providers":           providers,
-	})
+	return searchProviderInventory{defaultProvider: resolveDefaultSearchProvider(cfg), ids: ids, ready: ready, providers: providers}
+}
+func handleSearchProviders(w http.ResponseWriter, cfg *config.Config, states ...*SearchRuntime) {
+	inventory := buildSearchProviderInventory(cfg, firstSearchRuntime(states...))
+	writeJSON(w, 200, map[string]any{"schema": "uiai.search_providers.v1", "default_provider": inventory.defaultProvider, "available_providers": inventory.ids, "ready_providers": inventory.ready, "providers": inventory.providers})
 }
 
 // searchProviderPlan permits query disclosure only to explicitly configured

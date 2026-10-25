@@ -29,9 +29,9 @@ type searchAttempt struct {
 	probe      bool
 }
 
-// searchBreakers belongs to one mounted search router, not a tenant-global map.
+// SearchRuntime belongs to one engine/search router, not a tenant-global map.
 // Only supported provider ids enter this bounded, value-free transient state.
-type searchBreakers struct {
+type SearchRuntime struct {
 	mu       sync.Mutex
 	now      func() time.Time
 	circuits map[string]searchCircuit
@@ -45,14 +45,14 @@ type searchCircuitStatus struct {
 type searchCircuitOpenError struct{ retryAfter int }
 
 func (*searchCircuitOpenError) Error() string { return "search provider circuit is cooling down" }
-func newSearchBreakers(now func() time.Time) *searchBreakers {
-	return &searchBreakers{now: now, circuits: make(map[string]searchCircuit)}
+func newSearchBreakers(now func() time.Time) *SearchRuntime {
+	return &SearchRuntime{now: now, circuits: make(map[string]searchCircuit)}
 }
-func searchBreakersFor(req *http.Request) *searchBreakers {
-	b, _ := req.Context().Value(searchBreakersKey{}).(*searchBreakers)
+func searchBreakersFor(req *http.Request) *SearchRuntime {
+	b, _ := req.Context().Value(searchBreakersKey{}).(*SearchRuntime)
 	return b
 }
-func (b *searchBreakers) acquire(id string) (searchAttempt, int) {
+func (b *SearchRuntime) acquire(id string) (searchAttempt, int) {
 	if b == nil {
 		return searchAttempt{}, 0
 	}
@@ -74,7 +74,7 @@ func (b *searchBreakers) acquire(id string) (searchAttempt, int) {
 	}
 	return attempt, 0
 }
-func (b *searchBreakers) complete(id string, attempt searchAttempt, err error) {
+func (b *SearchRuntime) complete(id string, attempt searchAttempt, err error) {
 	if b == nil {
 		return
 	}
@@ -125,7 +125,7 @@ func (b *searchBreakers) complete(id string, attempt searchAttempt, err error) {
 	}
 	b.circuits[id] = s
 }
-func (b *searchBreakers) status(id string) searchCircuitStatus {
+func (b *SearchRuntime) status(id string) searchCircuitStatus {
 	if b == nil {
 		return searchCircuitStatus{State: "closed"}
 	}
@@ -144,4 +144,13 @@ func (b *searchBreakers) status(id string) searchCircuitStatus {
 		}
 	}
 	return status
+}
+
+// NewSearchRuntime is shared only by one engine's search and health routes.
+func NewSearchRuntime() *SearchRuntime { return newSearchBreakers(time.Now) }
+func firstSearchRuntime(states ...*SearchRuntime) *SearchRuntime {
+	if len(states) > 0 {
+		return states[0]
+	}
+	return nil
 }
