@@ -6,11 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -99,149 +97,6 @@ func MountSearchRoutes(r chi.Router, cfg *config.Config) {
 	r.Post("/", func(w http.ResponseWriter, req *http.Request) { handleSearchPOST(w, req, cfg) })
 }
 
-// builtinSearchProvider describes a search provider the engine ships with.
-type builtinSearchProvider struct {
-	id           string
-	name         string
-	keyless      bool
-	capabilities []string
-}
-
-var builtinSearchProviders = []builtinSearchProvider{
-	{id: "brave", name: "Brave Search", capabilities: []string{"web_search", "source_urls", "snippets"}},
-	{id: "wikipedia", name: "Wikipedia OpenSearch", keyless: true, capabilities: []string{"encyclopedia_search", "source_urls", "snippets", "keyless_public"}},
-}
-
-// searchProviderIDs returns every provider this deployment can serve: the built-in
-// set plus any provider the operator added under search.providers. The list is
-// derived from configuration rather than hardcoded so a new provider needs config
-// only, never a bespoke code path.
-func searchProviderIDs(cfg *config.Config) []string {
-	seen := map[string]bool{}
-	ids := make([]string, 0, len(builtinSearchProviders))
-	add := func(id string) {
-		if id == "" || seen[id] {
-			return
-		}
-		seen[id] = true
-		ids = append(ids, id)
-	}
-	for _, provider := range builtinSearchProviders {
-		add(provider.id)
-	}
-	if cfg != nil {
-		for id := range cfg.Search.Providers {
-			add(strings.TrimSpace(id))
-		}
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-// searchProviderMeta returns the declared name and capabilities for a provider.
-func searchProviderMeta(id string) builtinSearchProvider {
-	for _, provider := range builtinSearchProviders {
-		if provider.id == id {
-			return provider
-		}
-	}
-	return builtinSearchProvider{id: id, name: id}
-}
-
-// searchProviderConfigured reports whether a provider currently has a usable
-// credential, honouring explicit configuration first and the provider's
-// conventional environment variable only as a fallback.
-func searchProviderConfigured(cfg *config.Config, id string) (bool, string) {
-	if cfg != nil {
-		if provider, declared := cfg.Search.Providers[id]; declared && provider.Disabled {
-			// An explicit disable always wins, even for keyless providers: the
-			// operator retired this provider and the report must say so.
-			return false, "disabled"
-		}
-	}
-	meta := searchProviderMeta(id)
-	if meta.keyless {
-		return true, ""
-	}
-	if cfg != nil {
-		if _, declared := cfg.Search.Providers[id]; declared {
-			if key, err := cfg.Search.ResolveSearchProviderKey(id); err != nil {
-				return false, "credential_unreadable"
-			} else if key != "" {
-				return true, ""
-			}
-			return false, "missing_key"
-		}
-	}
-	if config.BuiltinSearchProviderKey(id) != "" {
-		return true, ""
-	}
-	return false, "missing_key"
-}
-
-// resolveDefaultSearchProvider returns the provider a request should use when it
-// names none: the operator's explicit default when it can serve, otherwise the
-// first provider that can genuinely serve. Empty means nothing can serve, and the
-// caller must say so instead of advertising a provider that would 503.
-func resolveDefaultSearchProvider(cfg *config.Config) string {
-	ids := searchProviderIDs(cfg)
-	if cfg != nil {
-		if wanted := strings.TrimSpace(cfg.Search.DefaultProvider); wanted != "" {
-			for _, id := range ids {
-				if id == wanted {
-					if configured, _ := searchProviderConfigured(cfg, id); configured {
-						return id
-					}
-					break
-				}
-			}
-		}
-	}
-	for _, id := range ids {
-		if configured, _ := searchProviderConfigured(cfg, id); configured {
-			return id
-		}
-	}
-	return ""
-}
-
-func handleSearchProviders(w http.ResponseWriter, cfg *config.Config) {
-	ids := searchProviderIDs(cfg)
-	providers := make([]map[string]any, 0, len(ids))
-	ready := make([]string, 0, len(ids))
-	for _, id := range ids {
-		meta := searchProviderMeta(id)
-		configured, reason := searchProviderConfigured(cfg, id)
-		status := "ready"
-		degradedReason := ""
-		if !configured {
-			status = "degraded"
-			degradedReason = reason
-		} else {
-			ready = append(ready, id)
-		}
-		providers = append(providers, map[string]any{
-			"id":                id,
-			"name":              meta.name,
-			"configured":        configured,
-			"status":            status,
-			"degraded_reason":   degradedReason,
-			"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
-			"capabilities":      meta.capabilities,
-		})
-	}
-
-	defaultProvider := resolveDefaultSearchProvider(cfg)
-
-	writeJSON(w, 200, map[string]any{
-		"schema":              "uiai.search_providers.v1",
-		"default_provider":    defaultProvider,
-		"available_providers": ids,
-		"ready_providers":     ready,
-		"providers":           providers,
-	})
-}
-
 func handleSearchGET(w http.ResponseWriter, r *http.Request, cfg *config.Config) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	req := searchRequest{
@@ -281,23 +136,33 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 	limit := normalizeSearchLimit(req.Limit)
 
 	ttl := searchCacheTTL()
-	if ttl > 0 {
-		if cachedResults, ok := getCachedSearch(provider, query, limit, time.Now()); ok {
-			writeSearchResponse(w, httpReq, cfg, provider, query, cachedResults, true, ttl)
-			return
-		}
-	}
-
 	var results []searchResult
 	var err error
-	switch provider {
-	case "brave":
-		results, err = searchBrave(cfg, query, limit)
-	case "wikipedia":
-		results, err = searchWikipedia(query, limit)
-	default:
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": searchProviderIDs(cfg)})
-		return
+	for _, candidate := range searchProviderPlan(cfg, req.Provider, provider) {
+		if httpReq.Context().Err() != nil {
+			err = httpReq.Context().Err()
+			break
+		}
+		provider = candidate
+		adapter := searchProviderMeta(provider).search
+		if adapter == nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": searchProviderIDs(cfg)})
+			return
+		}
+		if cfg != nil && cfg.Search.Providers[provider].Disabled {
+			err = fmt.Errorf("search provider %s is disabled by configuration", provider)
+			break
+		}
+		if ttl > 0 {
+			if cachedResults, ok := getCachedSearch(provider, query, limit, time.Now()); ok {
+				writeSearchResponse(w, httpReq, cfg, provider, query, cachedResults, true, ttl)
+				return
+			}
+		}
+		results, err = adapter(httpReq.Context(), cfg, query, limit)
+		if err == nil {
+			break
+		}
 	}
 	var use *upstreamSearchError
 	if errors.As(err, &use) {
@@ -518,223 +383,4 @@ func annotateSearchEvidence(results []searchResult, provider, query string) {
 		results[i].Rank = rank
 		results[i].EvidenceRef = searchEvidenceRef(provider, query, rank)
 	}
-}
-
-func searchWikipedia(query string, limit int) ([]searchResult, error) {
-	base := strings.TrimSpace(os.Getenv("UIAI_WIKIPEDIA_SEARCH_API_URL"))
-	if base == "" {
-		base = "https://en.wikipedia.org/w/api.php"
-	}
-	u, err := searchAPIURL(base, "https://en.wikipedia.org/w/api.php", []string{"en.wikipedia.org", "wikipedia.org"})
-	if err != nil {
-		return nil, fmt.Errorf("invalid Wikipedia API URL: %w", err)
-	}
-	q := u.Query()
-	q.Set("action", "opensearch")
-	q.Set("format", "json")
-	q.Set("namespace", "0")
-	q.Set("limit", strconv.Itoa(limit))
-	q.Set("search", query)
-	u.RawQuery = q.Encode()
-
-	httpReq, err := http.NewRequest(http.MethodGet, u.String(), nil) // #nosec G704 -- URL validated by searchAPIURL host allowlist/loopback gate.
-	if err != nil {
-		return nil, err
-	}
-	httpReq.Header.Set("Accept", "application/json")
-	httpReq.Header.Set("User-Agent", "uiai-engine/agent-search (+https://github.com/WPUIAI/uiai-engine)")
-
-	client := &http.Client{Timeout: 12 * time.Second}
-	resp, err := client.Do(httpReq) // #nosec G704 -- API URL is restricted by searchAPIURL allowlist/loopback test gate.
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, upstreamErr(resp)
-	}
-
-	var decoded []any
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
-		return nil, err
-	}
-	if len(decoded) < 4 {
-		return nil, fmt.Errorf("wikipedia API returned unexpected OpenSearch payload")
-	}
-	titles := stringsFromJSONArray(decoded[1])
-	descriptions := stringsFromJSONArray(decoded[2])
-	urls := stringsFromJSONArray(decoded[3])
-	results := make([]searchResult, 0, len(titles))
-	for i, title := range titles {
-		if i >= len(urls) || strings.TrimSpace(urls[i]) == "" {
-			continue
-		}
-		desc := ""
-		if i < len(descriptions) {
-			desc = descriptions[i]
-		}
-		results = append(results, sanitizeSearchResult(searchResult{
-			Title:       title,
-			URL:         urls[i],
-			Description: desc,
-			Source:      "Wikipedia",
-		}))
-		if len(results) >= limit {
-			break
-		}
-	}
-	return results, nil
-}
-
-func searchAPIURL(raw, fallback string, allowedHosts []string) (*url.URL, error) {
-	if strings.TrimSpace(raw) == "" {
-		raw = fallback
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return nil, err
-	}
-	if u.Scheme != "https" && !isLoopbackHost(u.Hostname()) {
-		return nil, fmt.Errorf("search API URL must use https unless loopback")
-	}
-	host := strings.ToLower(u.Hostname())
-	if isLoopbackHost(host) {
-		return u, nil
-	}
-	for _, allowed := range allowedHosts {
-		allowed = strings.ToLower(strings.TrimSpace(allowed))
-		if host == allowed || strings.HasSuffix(host, "."+allowed) {
-			return u, nil
-		}
-	}
-	return nil, fmt.Errorf("search API host %q is not allowed", host)
-}
-
-func isLoopbackHost(host string) bool {
-	host = strings.ToLower(strings.TrimSpace(host))
-	if host == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
-}
-
-func stringsFromJSONArray(value any) []string {
-	items, ok := value.([]any)
-	if !ok {
-		return nil
-	}
-	out := make([]string, 0, len(items))
-	for _, item := range items {
-		if s, ok := item.(string); ok {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-// upstreamSearchError preserves the provider's HTTP status so the handler
-// can return honest semantics (#64): 429 stays 429 (retryable, with
-// Retry-After), never a blanket unrecoverable 503.
-type upstreamSearchError struct {
-	status     int
-	retryAfter string
-	message    string
-}
-
-func (e *upstreamSearchError) Error() string { return e.message }
-
-func upstreamErr(resp *http.Response) *upstreamSearchError {
-	e := &upstreamSearchError{status: resp.StatusCode, message: fmt.Sprintf("search provider returned HTTP %d", resp.StatusCode)}
-	if ra := resp.Header.Get("Retry-After"); ra != "" {
-		e.retryAfter = ra
-	}
-	return e
-}
-
-func searchBrave(cfg *config.Config, query string, limit int) ([]searchResult, error) {
-	key := ""
-	credentialSource := config.BuiltinSearchProviderEnv["brave"]
-	if cfg != nil {
-		provider, declared := cfg.Search.Providers["brave"]
-		if declared && provider.Disabled {
-			return nil, fmt.Errorf("search provider brave is disabled by configuration")
-		}
-		if declared {
-			resolved, err := cfg.Search.ResolveSearchProviderKey("brave")
-			if err != nil {
-				return nil, fmt.Errorf("resolve search provider brave credential: %w", err)
-			}
-			key = resolved
-		}
-	}
-	if key == "" {
-		// Fallback: the provider's conventional environment variable.
-		key = config.BuiltinSearchProviderKey("brave")
-	}
-	if key == "" {
-		// Name the configuration surface an operator can act on rather than
-		// reporting a bare vendor-specific variable name.
-		return nil, fmt.Errorf("search provider brave has no credential: set search.providers.brave.api_key, api_key_file, or api_key_env in the engine config (or export %s)", credentialSource)
-	}
-
-	base := ""
-	if cfg != nil {
-		if provider, ok := cfg.Search.Providers["brave"]; ok {
-			base = strings.TrimSpace(provider.APIURL)
-		}
-	}
-	if base == "" {
-		base = strings.TrimSpace(os.Getenv("UIAI_BRAVE_SEARCH_API_URL"))
-	}
-	if base == "" {
-		base = "https://api.search.brave.com/res/v1/web/search"
-	}
-	u, err := searchAPIURL(base, "https://api.search.brave.com/res/v1/web/search", []string{"api.search.brave.com"})
-	if err != nil {
-		return nil, fmt.Errorf("invalid Brave API URL: %w", err)
-	}
-	q := u.Query()
-	q.Set("q", query)
-	q.Set("count", strconv.Itoa(limit))
-	u.RawQuery = q.Encode()
-
-	httpReq, err := http.NewRequest(http.MethodGet, u.String(), nil) // #nosec G704 -- URL validated by searchAPIURL host allowlist/loopback gate.
-	if err != nil {
-		return nil, err
-	}
-	httpReq.Header.Set("X-Subscription-Token", key)
-	httpReq.Header.Set("Accept", "application/json")
-
-	client := &http.Client{Timeout: 12 * time.Second}
-	resp, err := client.Do(httpReq) // #nosec G704 -- API URL is restricted by searchAPIURL allowlist/loopback test gate.
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, upstreamErr(resp)
-	}
-
-	var decoded braveWebResponse
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
-		return nil, err
-	}
-	results := make([]searchResult, 0, len(decoded.Web.Results))
-	for _, item := range decoded.Web.Results {
-		if strings.TrimSpace(item.URL) == "" {
-			continue
-		}
-		results = append(results, sanitizeSearchResult(searchResult{
-			Title:       item.Title,
-			URL:         item.URL,
-			Description: item.Description,
-			Source:      item.Profile.Name,
-			Age:         item.Age,
-		}))
-		if len(results) >= limit {
-			break
-		}
-	}
-	return results, nil
 }

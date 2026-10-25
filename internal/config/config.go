@@ -28,12 +28,15 @@ type Config struct {
 }
 
 // SearchConfig makes search providers and their credentials operator-configurable
-// rather than hardcoded to one provider's environment variable. Any provider can be
-// added by configuration alone; no bespoke code path per vendor.
+// rather than hardcoded to one provider's environment variable. Configuration
+// selects credentials/endpoints for installed adapters; it cannot install one.
 type SearchConfig struct {
 	// DefaultProvider selects the provider used when a request omits one.
 	// Empty means "use the built-in default chain".
 	DefaultProvider string `yaml:"default_provider,omitempty"`
+	// FallbackProviders opts unnamed search requests into this ordered disclosure chain.
+	// Explicit request providers never fall back to another provider.
+	FallbackProviders []string `yaml:"fallback_providers,omitempty"`
 	// Providers is keyed by provider id (for example "brave"). Built-in
 	// providers remain available when they are absent from this map.
 	Providers map[string]SearchProviderConfig `yaml:"providers,omitempty"`

@@ -371,17 +371,17 @@ func TestSearchProvidersReportsConfigOnlyProvider(t *testing.T) {
 	for _, provider := range body.Providers {
 		status[provider.ID] = provider.Status
 	}
-	if status["acme"] != "ready" {
-		t.Fatalf("acme status = %q, want ready; all=%v", status["acme"], body.Providers)
+	if status["acme"] != "degraded" {
+		t.Fatalf("acme status = %q, want degraded; all=%v", status["acme"], body.Providers)
 	}
 	if status["brave"] != "degraded" {
 		t.Fatalf("brave status = %q, want degraded", status["brave"])
 	}
-	if body.DefaultProvider != "acme" {
-		t.Fatalf("default_provider = %q, want the only genuinely configured provider", body.DefaultProvider)
+	if body.DefaultProvider != "wikipedia" {
+		t.Fatalf("default_provider = %q, want the implemented keyless provider", body.DefaultProvider)
 	}
-	if len(body.ReadyProviders) != 2 { // acme + keyless wikipedia
-		t.Fatalf("ready_providers = %v, want acme and wikipedia", body.ReadyProviders)
+	if len(body.ReadyProviders) != 1 { // only implemented keyless wikipedia
+		t.Fatalf("ready_providers = %v, want only wikipedia", body.ReadyProviders)
 	}
 }
 

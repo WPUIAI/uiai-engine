@@ -396,3 +396,27 @@ Credential-settings redirects may remain within the configured scheme/host only;
 credentials are never forwarded to another origin, a downgraded scheme, or a
 redirect URL containing user information. Same-origin redirects retain any
 existing client policy; the inference client itself is not reconfigured.
+
+### Configured search fallback
+
+Unnamed search requests may use an operator-approved ordered fallback list:
+
+```yaml
+search:
+  default_provider: brave
+  fallback_providers: [wikipedia]
+```
+
+An explicit request `provider` is always pinned. An empty fallback list preserves
+legacy single-provider behavior; merely having another credential does not consent
+to disclosing a query to another provider. Disabled, unimplemented and repeated
+alternates are skipped. Credentials alone never make an adapter ready.
+
+The selected provider owns result ranks, evidence references and cache entries.
+If every attempt fails, the final provider's HTTP status and Retry-After survive.
+Caller cancellation/deadlines reach upstream requests; redirects cannot expand the
+configured origin. Retiring a provider prevents serving its old cached results.
+
+Currently installed adapters remain Brave and Wikipedia. Other adapters, circuit
+breakers, fusion and quota accounting for issue90 are not completed by this slice.
+No production fallback list is enabled by this code deployment alone.
