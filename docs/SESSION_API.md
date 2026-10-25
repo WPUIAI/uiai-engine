@@ -383,3 +383,10 @@ URL sanitizer, including URLs embedded in free-form diagnostics, errors, packet
 summaries and evaluation results. Sanitization precedes truncation/persistence;
 raw navigation inputs are not rewritten. Existing private transcript/journal
 history is not silently edited or represented as scrubbed by a runtime upgrade.
+
+
+The explicit public FPV share endpoint is view-only. `controls: true` fails closed
+with `fpv_control_approval_required`; self-asserted confirmation booleans do not
+supply an operator grant. A separate canonical control-approval resolver remains
+required before that stronger capability can be exposed. This does not claim the
+remaining origin/consent/revocation work complete or weaken evidence publication.

@@ -79,9 +79,18 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 			OneTime        bool   `json:"one_time"`
 			MaxViews       int    `json:"max_views"`
 		}
-		_ = json.NewDecoder(req.Body).Decode(&body)
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid share request"})
+			return
+		}
 		if body.SessionID == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "session_id required"})
+			return
+		}
+		// This public-sharing surface has no canonical operator-control grant
+		// resolver; caller booleans cannot mint stronger control authority.
+		if body.Controls {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "public control sharing requires a separately verified operator grant", "error_class": "fpv_control_approval_required"})
 			return
 		}
 		sess, ok := sm.Get(body.SessionID)
