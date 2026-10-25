@@ -89,8 +89,14 @@ test("canonical installer ships every native adapter runtime dependency",async()
  const dest=join(home,'extensions','uiai-engine.ts');
  try{
   const script=fileURLToPath(new URL('../../../scripts/install-agent-integrations.sh',import.meta.url));
-  const result=spawnSync('bash',[script],{encoding:'utf8',env:{...process.env,HOME:home,UIAI_PI_EXTENSION_DEST:dest,UIAI_MCP_CONFIG_DEST:join(home,'mcp.json'),UIAI_ENGINE_URL:'http://127.0.0.1:1',UIAI_API_KEY:'',UIAI_BEARER_TOKEN:'',DRY_RUN:'0'}});
+  const result=spawnSync('bash',[script],{encoding:'utf8',env:{...process.env,HOME:home,UIAI_PI_EXTENSION_DEST:dest,UIAI_MCP_CONFIG_DEST:join(home,'mcp.json'),UIAI_MCP_BUNDLE_ROOT:join(home,'bundle'),UIAI_ENGINE_URL:'http://127.0.0.1:1',UIAI_API_KEY:'',UIAI_BEARER_TOKEN:'',DRY_RUN:'0'}});
   assert.equal(result.status,0,result.stderr);
+  const config=JSON.parse(await readFile(join(home,'mcp.json'),'utf8'));
+  assert.equal(config.mcpServers['uiai-browser'].args[0],join(home,'bundle','mcp','browser-session-mcp.mjs'));
+  const bundled=spawnSync(process.execPath,['--test',fileURLToPath(new URL('../../../mcp/browser-session-mcp.test.mjs',import.meta.url))],{encoding:'utf8',env:{...process.env,UIAI_TEST_MCP_SCRIPT:config.mcpServers['uiai-browser'].args[0]}});
+  assert.equal(bundled.status,0,bundled.stdout+bundled.stderr);
+  const mcpOnly=spawnSync('bash',[script],{encoding:'utf8',env:{...process.env,HOME:home,UIAI_INSTALL_PI:'0',UIAI_PI_EXTENSION_DEST:join(home,'excluded-pi','extension.ts'),UIAI_MCP_BUNDLE_ROOT:join(home,'bundle-only'),UIAI_MCP_CONFIG_DEST:join(home,'mcp-only.json'),UIAI_API_KEY:'',UIAI_BEARER_TOKEN:'',DRY_RUN:'0'}});
+  assert.equal(mcpOnly.status,0,mcpOnly.stderr);await assert.rejects(readFile(join(home,'excluded-pi','extension.ts')),{code:'ENOENT'});
   const actual=await readFile(join(home,'extensions','uiai','engine-response.mjs'));
   assert.deepEqual(actual,await readFile(new URL('./engine-response.mjs',import.meta.url)));
   const installed=(await import(pathToFileURL(dest).href)).default;

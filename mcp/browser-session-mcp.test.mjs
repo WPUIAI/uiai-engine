@@ -63,7 +63,7 @@ test("MCP evidence-producing operations forward complete Focusa scope", async (t
   await once(server, "listening");
   const address = server.address();
   const engine = `http://127.0.0.1:${address.port}`;
-  const child = spawn(process.execPath, ["mcp/browser-session-mcp.mjs"], {
+  const child = spawn(process.execPath, [process.env.UIAI_TEST_MCP_SCRIPT || "mcp/browser-session-mcp.mjs"], {
     cwd: root,
     env: { ...process.env, UIAI_ENGINE_URL: engine },
     stdio: ["pipe", "pipe", "pipe"],

@@ -571,11 +571,12 @@ func openAITools() []map[string]any {
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"session_id": map[string]string{"type": "string", "description": "Session ID from browser_open"},
-					"format":     map[string]any{"type": "string", "description": "Image format", "default": "jpeg", "enum": []string{"jpeg", "png"}},
-					"quality":    map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 60},
-					"fullPage":   map[string]any{"type": "boolean", "description": "Capture entire scrollable page", "default": false},
-					"output":     map[string]any{"type": "string", "description": "Compatibility input; delivery is always EPWA and raw modes are withheld", "default": "epwa", "enum": []string{"epwa"}},
+					"session_id":   map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"focusa_scope": map[string]any{"type": "object", "description": "Complete caller-supplied evidence scope; metadata does not grant authority"},
+					"format":       map[string]any{"type": "string", "description": "Image format", "default": "jpeg", "enum": []string{"jpeg", "png"}},
+					"quality":      map[string]any{"type": "integer", "description": "JPEG quality 1-100", "default": 60},
+					"fullPage":     map[string]any{"type": "boolean", "description": "Capture entire scrollable page", "default": false},
+					"output":       map[string]any{"type": "string", "description": "Compatibility input; delivery is always EPWA and raw modes are withheld", "default": "epwa", "enum": []string{"epwa"}},
 				},
 				"required": []string{"session_id"},
 			},

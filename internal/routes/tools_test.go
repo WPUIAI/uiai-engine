@@ -271,3 +271,25 @@ func TestToolGraphIncludesFocusaPacketWorkflow(t *testing.T) {
 		t.Fatalf("missing packet builder relations: %#v", relations)
 	}
 }
+
+func TestCaptureToolSchemasExposeCallerEvidenceScope(t *testing.T) {
+	required := map[string]bool{"browser_open": false, "browser_screenshot": false, "screenshot": false, "uiai_focusa_packet_compose": false}
+	for _, tool := range openAITools() {
+		name, _ := tool["name"].(string)
+		if _, ok := required[name]; !ok {
+			continue
+		}
+		params := tool["parameters"].(map[string]any)
+		props := params["properties"].(map[string]any)
+		scope, ok := props["focusa_scope"].(map[string]any)
+		if !ok || scope["type"] != "object" {
+			t.Fatalf("%s drops caller evidence scope from discovery", name)
+		}
+		required[name] = true
+	}
+	for name, found := range required {
+		if !found {
+			t.Fatalf("missing capture tool %s", name)
+		}
+	}
+}

@@ -12,6 +12,10 @@ PI_RESPONSE_DEST="$(dirname "$PI_EXT_DEST")/uiai/engine-response.mjs"
 MCP_CONFIG_DEST="${UIAI_MCP_CONFIG_DEST:-$HOME/.pi/agent/mcp.json}"
 MCP_SERVER_NAME="${UIAI_MCP_SERVER_NAME:-uiai-browser}"
 DRY_RUN="${DRY_RUN:-0}"
+INSTALL_PI="${UIAI_INSTALL_PI:-1}"
+MCP_BUNDLE_ROOT="${UIAI_MCP_BUNDLE_ROOT:-}"
+MCP_SCRIPT="$ROOT_DIR/mcp/browser-session-mcp.mjs"
+MCP_FILES=(mcp/browser-session-mcp.mjs mcp/epwa-contract.mjs integrations/pi/uiai/engine-response.mjs integrations/pi/uiai/epwa-contract.mjs)
 
 say(){ printf "%s\n" "$*"; }
 run(){ if [[ "$DRY_RUN" == "1" ]]; then printf "DRY_RUN "; printf "%q " "$@"; printf "\n"; else "$@"; fi; }
@@ -23,19 +27,37 @@ if [[ -n "${UIAI_API_KEY:-}" || -n "${UIAI_BEARER_TOKEN:-}" ]]; then
   say "auth_env=client credentials will be passed to MCP config (values redacted)"
 fi
 
-for source in "$PI_EXT_SRC" "$PI_CONTRACT_SRC" "$PI_RESPONSE_SRC"; do
+for source in "$PI_EXT_SRC" "$PI_CONTRACT_SRC" "$PI_RESPONSE_SRC" "${MCP_FILES[@]/#/$ROOT_DIR/}"; do
   if [[ ! -f "$source" ]]; then
     say "missing Pi runtime dependency: $source" >&2
     exit 1
   fi
 done
 
-run mkdir -p "$(dirname "$PI_EXT_DEST")"
-run mkdir -p "$(dirname "$PI_CONTRACT_DEST")"
-run cp "$PI_CONTRACT_SRC" "$PI_CONTRACT_DEST"
-run cp "$PI_RESPONSE_SRC" "$PI_RESPONSE_DEST"
-run cp "$PI_EXT_SRC" "$PI_EXT_DEST"
-say "Pi extension installed: $PI_EXT_DEST"
+if [[ "$INSTALL_PI" == "1" ]]; then
+  run mkdir -p "$(dirname "$PI_EXT_DEST")"
+  run mkdir -p "$(dirname "$PI_CONTRACT_DEST")"
+  run cp "$PI_CONTRACT_SRC" "$PI_CONTRACT_DEST"
+  run cp "$PI_RESPONSE_SRC" "$PI_RESPONSE_DEST"
+  run cp "$PI_EXT_SRC" "$PI_EXT_DEST"
+  say "Pi extension installed: $PI_EXT_DEST"
+elif [[ "$INSTALL_PI" != "0" ]]; then
+  say "UIAI_INSTALL_PI must be 0 or 1" >&2
+  exit 1
+fi
+
+if [[ -n "$MCP_BUNDLE_ROOT" ]]; then
+  if [[ "$MCP_BUNDLE_ROOT" != /* || "$MCP_BUNDLE_ROOT" == "$ROOT_DIR" || "$MCP_BUNDLE_ROOT" == "/" ]]; then
+    say "MCP bundle must be an explicit absolute installation directory outside the source root" >&2
+    exit 1
+  fi
+  for relative in "${MCP_FILES[@]}"; do
+    run mkdir -p "$(dirname "$MCP_BUNDLE_ROOT/$relative")"
+    run cp "$ROOT_DIR/$relative" "$MCP_BUNDLE_ROOT/$relative"
+  done
+  MCP_SCRIPT="$MCP_BUNDLE_ROOT/mcp/browser-session-mcp.mjs"
+  say "MCP runtime bundle installed: $MCP_SCRIPT"
+fi
 
 run mkdir -p "$(dirname "$MCP_CONFIG_DEST")"
 if [[ "$DRY_RUN" == "1" ]]; then
@@ -47,7 +69,7 @@ elif command -v jq >/dev/null 2>&1; then
   else
     printf '{"mcpServers":{}}' > "$tmp"
   fi
-  jq --arg name "$MCP_SERVER_NAME" --arg script "$ROOT_DIR/mcp/browser-session-mcp.mjs" --arg url "$ENGINE_URL" --arg api_key "${UIAI_API_KEY:-}" --arg bearer "${UIAI_BEARER_TOKEN:-}" \
+  jq --arg name "$MCP_SERVER_NAME" --arg script "$MCP_SCRIPT" --arg url "$ENGINE_URL" --arg api_key "${UIAI_API_KEY:-}" --arg bearer "${UIAI_BEARER_TOKEN:-}" \
     '.mcpServers[$name] = {"command":"node","args":[$script],"env":({"UIAI_ENGINE_URL":$url} + (if $api_key != "" then {"UIAI_API_KEY":$api_key} else {} end) + (if $bearer != "" then {"UIAI_BEARER_TOKEN":$bearer} else {} end)),"lifecycle":"lazy","idleTimeout":60,"description":"UIAI Engine browser/session/search tools with Focusa-aware graph metadata"}' \
     "$tmp" > "$tmp.out"
   mv "$tmp.out" "$MCP_CONFIG_DEST"
@@ -60,7 +82,7 @@ else
   "mcpServers": {
     "$MCP_SERVER_NAME": {
       "command": "node",
-      "args": ["$ROOT_DIR/mcp/browser-session-mcp.mjs"],
+      "args": ["$MCP_SCRIPT"],
       "env": { "UIAI_ENGINE_URL": "$ENGINE_URL" },
       "lifecycle": "lazy",
       "idleTimeout": 60,

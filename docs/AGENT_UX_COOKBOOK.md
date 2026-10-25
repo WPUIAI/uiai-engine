@@ -371,3 +371,11 @@ refs and work-item metadata. Adapters forward exact caller fields without fillin
 missing authority refs. Scope presence is transport metadata, not a verified grant
 or sealed/publication success. Source adapter tests do not prove an already-running
 Pi/MCP process has reloaded or a real requesting channel received an artifact.
+
+For a standalone MCP installation, run the canonical integration installer with
+`UIAI_MCP_BUNDLE_ROOT` set to the verified installation directory. It preserves
+relative imports by installing the MCP entry, contract bridge, canonical contract,
+and shared response decoder together. `UIAI_INSTALL_PI=0` limits that delivery to
+MCP assets/configuration without adding or replacing any Pi extension. Back up the
+existing installation first; reconnect MCP and verify the actual discovered schema
+and consumer response. A staged configuration is not an activated configuration.
