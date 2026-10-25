@@ -328,3 +328,20 @@ operation_cancelled, also without automatic retry. These are operational error
 postures, not control-lease grants or canonical Focusa pause/resume decisions.
 An owned HTTP-202 modal fixture covers eval, async eval, snapshot, screenshot,
 network diagnostics and a single ref-click without invoking a paid provider.
+
+### Evaluation failures and cancellation
+
+Eval and eval_async share one bounded evaluation/result/screenshot boundary.
+JavaScript exceptions, navigation/context replacement, caller cancellation and
+capture failures are errors, never successful result strings. A legitimate result
+beginning with `error:` remains ordinary data. HTTP caller cancellation propagates
+to the action, without cancelling the session's shared page context.
+
+After dispatch, arbitrary JavaScript may have taken effect even when its await,
+result or screenshot fails. Such failures use `pending_side_effect_unknown` with
+`retryable=false` and explicit re-observation guidance. Cancelling a wait does not
+roll back or guarantee termination of JavaScript already running in Chromium.
+Errors expose a bounded `cause_class` (such as `javascript_exception`,
+`execution_context_changed` or `deadline_exceeded`), not submitted scripts,
+exception values or protocol parameters. The internal wrapped cause remains
+available for typed classification. Both legacy Go methods remain supported.

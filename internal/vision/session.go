@@ -768,9 +768,8 @@ func (s *Session) ClickContext(caller context.Context, selector string) (*SnapRe
 		return nil, fail("before_dispatch", err, false)
 	}
 	start := time.Now()
-	ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionInputTimeout)
-	stop := context.AfterFunc(caller, cancel)
-	defer func() { stop(); cancel() }()
+	ctx, cancel := sessionActionContext(s.page.GetContext(), caller, sessionInputTimeout)
+	defer cancel()
 	page := s.page.Context(ctx)
 	element, err := actionElement(page, selector)
 	if err != nil {
@@ -869,103 +868,6 @@ func (s *Session) Type(selector, text string) (*SnapResult, error) {
 	}
 	time.Sleep(100 * time.Millisecond)
 	return s.snap(start)
-}
-
-// Eval runs JavaScript and returns the result string + a screenshot.
-func (s *Session) Eval(js string) (string, *SnapResult, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.page == nil {
-		return "", nil, fmt.Errorf("session closed")
-	}
-
-	start := time.Now()
-
-	result, err := s.page.Timeout(30 * time.Second).Eval(`() => { ` + js + ` }`)
-	jsResult := ""
-	if err != nil {
-		jsResult = "error: " + err.Error()
-	} else if result != nil {
-		jsResult = result.Value.Str()
-		if jsResult == "" {
-			raw, _ := result.Value.MarshalJSON()
-			jsResult = string(raw)
-		}
-		jsResult = sanitizeDiagnosticText(jsResult)
-	}
-
-	time.Sleep(100 * time.Millisecond) // let DOM settle after JS execution
-
-	data, snapErr := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
-		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(60),
-	})
-	if snapErr != nil {
-		return jsResult, nil, nil // return JS result even if screenshot fails
-	}
-
-	s.URL = safeEvalStr(s.page, `() => window.location.href`)
-	s.Title = safeEvalStr(s.page, `() => document.title`)
-	s.touch()
-
-	return jsResult, &SnapResult{
-		Screenshot: base64.StdEncoding.EncodeToString(data),
-		Width:      s.Width,
-		Height:     s.Height,
-		Format:     "jpeg",
-		Size:       len(data),
-		URL:        s.URL,
-		Title:      s.Title,
-		Duration:   time.Since(start).Milliseconds(),
-	}, nil
-}
-
-// EvalAsync runs bounded async JavaScript and returns the awaited result string + a screenshot.
-func (s *Session) EvalAsync(js string, timeoutMs int) (string, *SnapResult, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.page == nil {
-		return "", nil, fmt.Errorf("session closed")
-	}
-	if timeoutMs <= 0 {
-		timeoutMs = 5000
-	}
-	if timeoutMs > 15000 {
-		timeoutMs = 15000
-	}
-
-	start := time.Now()
-	wrapper := fmt.Sprintf(`async () => {
-		const __timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("eval_async timeout after %dms")), %d));
-		const __work = (async () => { %s })();
-		return await Promise.race([__work, __timeout]);
-	}`, timeoutMs, timeoutMs, js)
-	// Bug fix (#45 family): long async evals let the TTL reaper fire mid-work —
-	// session vanished from the registry while in use.
-	s.touch()
-	result, err := s.page.Timeout(time.Duration(timeoutMs+1000) * time.Millisecond).Eval(wrapper)
-	s.touch()
-	jsResult := ""
-	if err != nil {
-		jsResult = "error: " + err.Error()
-	} else if result != nil {
-		jsResult = result.Value.Str()
-		if jsResult == "" {
-			raw, _ := result.Value.MarshalJSON()
-			jsResult = string(raw)
-		}
-		jsResult = sanitizeDiagnosticText(jsResult)
-	}
-
-	time.Sleep(100 * time.Millisecond)
-	data, snapErr := s.page.Screenshot(false, &proto.PageCaptureScreenshot{Format: proto.PageCaptureScreenshotFormatJpeg, Quality: gson(60)})
-	if snapErr != nil {
-		return jsResult, nil, nil
-	}
-	s.URL = safeEvalStr(s.page, `() => window.location.href`)
-	s.Title = safeEvalStr(s.page, `() => document.title`)
-	s.touch()
-	return jsResult, &SnapResult{Screenshot: base64.StdEncoding.EncodeToString(data), Width: s.Width, Height: s.Height, Format: "jpeg", Size: len(data), URL: s.URL, Title: s.Title, Duration: time.Since(start).Milliseconds()}, nil
 }
 
 // Navigate goes to a new URL within the same session.

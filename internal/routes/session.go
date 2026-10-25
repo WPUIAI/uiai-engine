@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -365,7 +364,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 
-			jsResult, snap, err := sess.Eval(body.JS)
+			jsResult, snap, err := sess.EvalContext(req.Context(), body.JS)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess)
 				return
@@ -395,13 +394,9 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 
-			jsResult, snap, err := sess.EvalAsync(body.JS, body.TimeoutMs)
+			jsResult, snap, err := sess.EvalAsyncContext(req.Context(), body.JS, body.TimeoutMs)
 			if err != nil {
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "eval_async", "timeout_ms": body.TimeoutMs})
-				return
-			}
-			if strings.HasPrefix(jsResult, "error:") {
-				writeSessionError(w, 500, "eval_failed", fmt.Errorf("%s", jsResult), sess, map[string]any{"action": "eval_async", "timeout_ms": body.TimeoutMs})
 				return
 			}
 			if snap == nil {
@@ -967,6 +962,7 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 	var actionError *vision.SessionActionError
 	if errors.As(err, &actionError) {
 		details["action_phase"] = actionError.Phase
+		details["cause_class"] = actionError.CauseClass()
 		details["side_effects_may_have_occurred"] = actionError.EffectsPossible
 		details["retry_requires_reobservation"] = actionError.EffectsPossible
 	}
@@ -1073,10 +1069,16 @@ func classifySessionError(err error) string {
 		return "operation_cancelled"
 	}
 	var actionError *vision.SessionActionError
-	if errors.As(err, &actionError) && actionError.EffectsPossible {
-		return "pending_side_effect_unknown"
+	classificationError := err
+	if errors.As(err, &actionError) {
+		if actionError.EffectsPossible {
+			return "pending_side_effect_unknown"
+		}
+		if actionError.Cause != nil {
+			classificationError = actionError.Cause
+		}
 	}
-	msg := strings.ToLower(err.Error())
+	msg := strings.ToLower(classificationError.Error())
 	switch {
 	case strings.Contains(msg, "selector") || strings.Contains(msg, "element"):
 		return "selector_not_found"

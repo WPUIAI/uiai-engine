@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -20,6 +21,7 @@ func TestActionErrorHTTPPreservesEffectAndCancellationSemantics(t *testing.T) {
 		status  int
 	}{
 		{"uncertain dispatch", context.DeadlineExceeded, true, "pending_side_effect_unknown", 409},
+		{"selector absent before dispatch", errors.New("element not found"), false, "selector_not_found", 404},
 		{"cancelled before dispatch", context.Canceled, false, "operation_cancelled", 408},
 		{"cancelled after dispatch", context.Canceled, true, "operation_cancelled", 408},
 	} {
