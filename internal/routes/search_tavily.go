@@ -39,10 +39,11 @@ func searchTavily(ctx context.Context, cfg *config.Config, query string, limit i
 	req.Header.Set("Accept", "application/json")
 	var decoded struct {
 		Results []struct {
-			Title         string `json:"title"`
-			URL           string `json:"url"`
-			Content       string `json:"content"`
-			PublishedDate string `json:"published_date"`
+			Score         *float64 `json:"score"`
+			Title         string   `json:"title"`
+			URL           string   `json:"url"`
+			Content       string   `json:"content"`
+			PublishedDate string   `json:"published_date"`
 		} `json:"results"`
 	}
 	if err := searchJSON(req, &decoded); err != nil {
@@ -53,7 +54,7 @@ func searchTavily(ctx context.Context, cfg *config.Config, query string, limit i
 		if strings.TrimSpace(item.URL) == "" {
 			continue
 		}
-		results = append(results, sanitizeSearchResult(searchResult{Title: item.Title, URL: item.URL, Description: item.Content, Source: "Tavily", Age: item.PublishedDate}))
+		results = append(results, sanitizeSearchResult(searchResult{Title: item.Title, Score: item.Score, URL: item.URL, Description: item.Content, Source: "Tavily", Age: item.PublishedDate}))
 		if len(results) >= normalizeSearchLimit(limit) {
 			break
 		}

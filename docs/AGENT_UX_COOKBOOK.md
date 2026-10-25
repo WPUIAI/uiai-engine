@@ -500,3 +500,17 @@ cloned; provider/query/limit identity and existing disabled-provider checks rema
 Search pressure reports `cache_max_entries` and prunes expired entries before
 reporting occupancy. This bounds entry count, not an exact measured byte quota or
 per-account credit ledger. No duplicate result-cache store was introduced.
+
+### Compatible normalized search-result fields
+
+`uiai.search_results.v1` adds `snippet` (same normalized/redacted text as legacy
+`description`) and canonical `provider` id alongside legacy display `source`.
+`published_at` is present only for a source-supplied RFC3339 timestamp or date;
+relative `age` strings are preserved without inventing publication dates/timezones.
+A finite provider-supplied `score` is optional; absent is not fabricated as0 and
+scores are not calibrated/comparable between providers. Tavily/Exa/SearxNG can
+supply scores; no new provider retrieval or full-page content was enabled.
+Legacy fields remain available. Score values are copied at normalization and
+cache boundaries so caller mutation cannot change cached results. `content_md`
+remains absent because full-content retrieval is intentionally disabled. This
+compatible result extension is not multi-provider fusion or provider acceptance.

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -37,13 +38,17 @@ type searchRequest struct {
 }
 
 type searchResult struct {
-	Title       string `json:"title"`
-	URL         string `json:"url"`
-	Description string `json:"description,omitempty"`
-	Source      string `json:"source,omitempty"`
-	Age         string `json:"age,omitempty"`
-	Rank        int    `json:"rank,omitempty"`
-	EvidenceRef string `json:"evidence_ref,omitempty"`
+	Title       string   `json:"title"`
+	URL         string   `json:"url"`
+	Description string   `json:"description,omitempty"`
+	Snippet     string   `json:"snippet"`
+	Provider    string   `json:"provider"`
+	Score       *float64 `json:"score,omitempty"`
+	PublishedAt string   `json:"published_at,omitempty"`
+	Source      string   `json:"source,omitempty"`
+	Age         string   `json:"age,omitempty"`
+	Rank        int      `json:"rank,omitempty"`
+	EvidenceRef string   `json:"evidence_ref,omitempty"`
 }
 
 type searchResponse struct {
@@ -310,6 +315,12 @@ func searchCacheKey(provider, query string, limit int) string {
 func cloneSearchResults(results []searchResult) []searchResult {
 	cloned := make([]searchResult, len(results))
 	copy(cloned, results)
+	for i := range cloned {
+		if results[i].Score != nil {
+			score := *results[i].Score
+			cloned[i].Score = &score
+		}
+	}
 	return cloned
 }
 
@@ -403,10 +414,25 @@ func sanitizeSearchURL(raw string) string {
 }
 
 func sanitizeSearchResult(result searchResult) searchResult {
+	description := result.Description
+	if description == "" {
+		description = result.Snippet
+	}
+	description = truncateSearchField(secrettext.Text(description), maxSearchDescriptionChars)
+	published := result.PublishedAt
+	if published == "" {
+		published = result.Age
+	}
+	published = searchPublishedAt(published)
+	var score *float64
+	if result.Score != nil && !math.IsNaN(*result.Score) && !math.IsInf(*result.Score, 0) {
+		copy := *result.Score
+		score = &copy
+	}
 	return searchResult{
 		Title:       truncateSearchField(secrettext.Text(result.Title), maxSearchTitleChars),
 		URL:         sanitizeSearchURL(result.URL),
-		Description: truncateSearchField(secrettext.Text(result.Description), maxSearchDescriptionChars),
+		Description: description, Snippet: description, Provider: truncateSearchField(secrettext.Text(result.Provider), maxSearchSourceChars), Score: score, PublishedAt: published,
 		Source:      truncateSearchField(secrettext.Text(result.Source), maxSearchSourceChars),
 		Age:         truncateSearchField(secrettext.Text(result.Age), maxSearchAgeChars),
 		Rank:        result.Rank,
@@ -428,6 +454,18 @@ func annotateSearchEvidence(results []searchResult, provider, query string) {
 	for i := range results {
 		rank := i + 1
 		results[i].Rank = rank
+		results[i].Provider = provider
 		results[i].EvidenceRef = searchEvidenceRef(provider, query, rank)
 	}
+}
+
+// Relative ages remain in the legacy age field; no date or timezone is invented.
+func searchPublishedAt(raw string) string {
+	if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return parsed.Format(time.RFC3339Nano)
+	}
+	if parsed, err := time.Parse("2006-01-02", raw); err == nil {
+		return parsed.Format("2006-01-02")
+	}
+	return ""
 }

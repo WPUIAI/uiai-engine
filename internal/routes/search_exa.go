@@ -39,6 +39,7 @@ func searchExa(ctx context.Context, cfg *config.Config, query string, limit int)
 	req.Header.Set("Accept", "application/json")
 	var decoded struct {
 		Results []struct {
+			Score         *float64 `json:"score"`
 			Title         string   `json:"title"`
 			URL           string   `json:"url"`
 			PublishedDate string   `json:"publishedDate"`
@@ -53,7 +54,7 @@ func searchExa(ctx context.Context, cfg *config.Config, query string, limit int)
 		if strings.TrimSpace(item.URL) == "" {
 			continue
 		}
-		results = append(results, sanitizeSearchResult(searchResult{Title: item.Title, URL: item.URL, Description: strings.Join(item.Highlights, " "), Source: "Exa", Age: item.PublishedDate}))
+		results = append(results, sanitizeSearchResult(searchResult{Title: item.Title, Score: item.Score, URL: item.URL, Description: strings.Join(item.Highlights, " "), Source: "Exa", Age: item.PublishedDate}))
 		if len(results) >= normalizeSearchLimit(limit) {
 			break
 		}

@@ -52,10 +52,11 @@ func searchSearxNG(ctx context.Context, cfg *config.Config, query string, limit 
 	req.Header.Set("Accept", "application/json")
 	var decoded struct {
 		Results []struct {
-			Title         string `json:"title"`
-			URL           string `json:"url"`
-			Content       string `json:"content"`
-			PublishedDate string `json:"publishedDate"`
+			Score         *float64 `json:"score"`
+			Title         string   `json:"title"`
+			URL           string   `json:"url"`
+			Content       string   `json:"content"`
+			PublishedDate string   `json:"publishedDate"`
 		} `json:"results"`
 	}
 	if err := searchJSON(req, &decoded); err != nil {
@@ -66,7 +67,7 @@ func searchSearxNG(ctx context.Context, cfg *config.Config, query string, limit 
 		if strings.TrimSpace(item.URL) == "" {
 			continue
 		}
-		results = append(results, sanitizeSearchResult(searchResult{Title: item.Title, URL: item.URL, Description: item.Content, Age: item.PublishedDate, Source: "SearxNG"}))
+		results = append(results, sanitizeSearchResult(searchResult{Title: item.Title, Score: item.Score, URL: item.URL, Description: item.Content, Age: item.PublishedDate, Source: "SearxNG"}))
 		if len(results) >= normalizeSearchLimit(limit) {
 			break
 		}
