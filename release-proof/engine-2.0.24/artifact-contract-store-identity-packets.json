@@ -1,0 +1,43 @@
+{
+  "schema": "uiai.artifact_packet_verification.v1",
+  "source_head": "7f5248707f3537550ea34a6e4a5bd7ea3a9f8d3f",
+  "packets": [
+    {
+      "issue": 108,
+      "implementation_commit": "f9e73de4e77b3a8f03f00d4623ec6ca6563a0878",
+      "original_new_file_allowlist_exact": true
+    },
+    {
+      "issue": 111,
+      "implementation_commit": "7bad720402998a72b467aaf5a4c503933689a1ef",
+      "original_new_file_allowlist_exact": true
+    },
+    {
+      "issue": 114,
+      "implementation_commit": "e9736e244360f3fb2c70f555003f3e79a64d28dd",
+      "original_new_file_allowlist_exact": true
+    }
+  ],
+  "commands": [
+    "CC=clang go test -race ./internal/evidenceartifact -count=30 -coverprofile=/tmp/uiai-artifact-contract.cover -timeout=150s",
+    "go vet ./internal/evidenceartifact",
+    "GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go test -c ./internal/evidenceartifact",
+    "GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go test -c ./internal/evidenceartifact"
+  ],
+  "results": {
+    "repeat_30_race": "passed",
+    "vet": "passed",
+    "windows_amd64_compile": "passed",
+    "darwin_arm64_compile": "passed",
+    "statement_coverage_percent": 79.2,
+    "manifest_golden_sha256": "e26c8e759e2fc496eaacc353e870e064e94935fc63d9345c984c73f4ca9a5806"
+  },
+  "scope": "Existing isolated contract, crash-safe store and authority-neutral signature packets; no implementation edits needed for these closures",
+  "exclusions": [
+    "Native Windows/Darwin execution is not asserted",
+    "No new deployment is required by these source-only packets",
+    "No provider, architecture, Focusa completion or settlement authority is granted",
+    "No parent Evidence PWA completion or sealed delivery readiness claimed",
+    "Store111 proof does not claim a restore mutation or multi-process coordination"
+  ]
+}
