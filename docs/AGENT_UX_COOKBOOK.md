@@ -439,3 +439,29 @@ use the existing normalized/redacted result fields. Generated answers, entities,
 subpages and full-page extraction are not requested.
 Protocol source: https://exa.ai/docs/reference/search (reviewed2026-10-25;
 synthetic protocol/HTTP consumer tests only, no real provider query or fee).
+
+### Search-provider cooldowns
+
+Each mounted search router owns bounded, in-memory circuit state for its installed
+providers; it is neither a credential store nor a cross-instance quota ledger.
+Two consecutive upstream429/408/5xx responses open a cooldown:30s initially,
+exponential backoff capped at5min. A valid upstream `Retry-After` is a minimum,
+including a future HTTP date. Caller cancellation/deadlines and non-transient
+responses do not open circuits. After cooldown, only one caller-triggered probe
+is admitted; no background/provider probes are generated. A successful probe
+resets the circuit. Older in-flight completions cannot clear a newer circuit.
+
+Approved fallback continues past cooling providers; an explicitly pinned
+provider never discloses the query to an alternate. If its circuit is cooling,
+the pinned call returns503 `search_provider_circuit_open`, `retryable:true` and
+`Retry-After`. Cached hits can still serve without contacting the upstream.
+`GET /api/search/providers` adds per-provider `circuit` state, failure count,
+retry delay and probe-in-flight status. Configured-but-cooling providers remain
+`configured:true`, but are degraded and omitted from `ready_providers` until a
+recovery probe can be attempted. Aggregate browser pressure remains a
+configuration-only view; no remaining-credit or all-surface health claim is made.
+Circuit state resets with that router/runtime, not with a durable quota ledger.
+
+Proof uses fake clocks, concurrent probe admission and local synthetic HTTP
+providers (no actual paid provider calls). Issue90 remains open for other
+adapters, richer results/fusion, quota/health integration and zero-key acceptance.

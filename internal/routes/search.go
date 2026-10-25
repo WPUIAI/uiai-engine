@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -93,9 +94,13 @@ type braveWebResponse struct {
 // Brave is the default provider, but the public contract stays provider-neutral
 // so other providers can be added without changing browser/session semantics.
 func MountSearchRoutes(r chi.Router, cfg *config.Config) {
-	r.Get("/providers", func(w http.ResponseWriter, _ *http.Request) { handleSearchProviders(w, cfg) })
-	r.Get("/", func(w http.ResponseWriter, req *http.Request) { handleSearchGET(w, req, cfg) })
-	r.Post("/", func(w http.ResponseWriter, req *http.Request) { handleSearchPOST(w, req, cfg) })
+	breakers := newSearchBreakers(time.Now)
+	bind := func(req *http.Request) *http.Request {
+		return req.WithContext(context.WithValue(req.Context(), searchBreakersKey{}, breakers))
+	}
+	r.Get("/providers", func(w http.ResponseWriter, _ *http.Request) { handleSearchProviders(w, cfg, breakers) })
+	r.Get("/", func(w http.ResponseWriter, req *http.Request) { handleSearchGET(w, bind(req), cfg) })
+	r.Post("/", func(w http.ResponseWriter, req *http.Request) { handleSearchPOST(w, bind(req), cfg) })
 }
 
 func handleSearchGET(w http.ResponseWriter, r *http.Request, cfg *config.Config) {
@@ -160,10 +165,27 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 				return
 			}
 		}
+		breakers := searchBreakersFor(httpReq)
+		attempt, wait := breakers.acquire(provider)
+		if wait > 0 {
+			err = &searchCircuitOpenError{retryAfter: wait}
+			continue
+		}
 		results, err = adapter(httpReq.Context(), cfg, query, limit)
+		if httpReq.Context().Err() != nil {
+			err = httpReq.Context().Err()
+		}
+		breakers.complete(provider, attempt, err)
 		if err == nil {
 			break
 		}
+	}
+	var circuit *searchCircuitOpenError
+	if errors.As(err, &circuit) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Retry-After", strconv.Itoa(circuit.retryAfter))
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "search_provider_circuit_open", "provider": provider, "message": circuit.Error(), "retryable": true})
+		return
 	}
 	var use *upstreamSearchError
 	if errors.As(err, &use) {
@@ -179,7 +201,7 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 		}
 		writeJSON(w, code, map[string]any{
 			"error": errCode, "provider": provider, "message": use.message,
-			"upstream_status": use.status, "retryable": use.status == http.StatusTooManyRequests || use.status == http.StatusRequestTimeout || use.status >= 500,
+			"upstream_status": use.status, "retryable": retryableSearchStatus(use.status),
 		})
 		return
 	}

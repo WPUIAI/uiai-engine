@@ -122,18 +122,26 @@ func resolveDefaultSearchProvider(cfg *config.Config) string {
 	return ""
 }
 
-func handleSearchProviders(w http.ResponseWriter, cfg *config.Config) {
+func handleSearchProviders(w http.ResponseWriter, cfg *config.Config, states ...*searchBreakers) {
+	var breakers *searchBreakers
+	if len(states) > 0 {
+		breakers = states[0]
+	}
 	ids := searchProviderIDs(cfg)
 	providers := make([]map[string]any, 0, len(ids))
 	ready := make([]string, 0, len(ids))
 	for _, id := range ids {
 		meta := searchProviderMeta(id)
 		configured, reason := searchProviderConfigured(cfg, id)
+		circuit := breakers.status(id)
 		status := "ready"
 		degradedReason := ""
 		if !configured {
 			status = "degraded"
 			degradedReason = reason
+		} else if circuit.RetryAfterSeconds > 0 {
+			status = "degraded"
+			degradedReason = "circuit_open"
 		} else {
 			ready = append(ready, id)
 		}
@@ -145,6 +153,7 @@ func handleSearchProviders(w http.ResponseWriter, cfg *config.Config) {
 			"degraded_reason":   degradedReason,
 			"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
 			"capabilities":      meta.capabilities,
+			"circuit":           circuit,
 		})
 	}
 
