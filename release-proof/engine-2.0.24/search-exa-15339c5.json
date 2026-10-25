@@ -1,0 +1,34 @@
+{
+  "schema": "uiai.search_exa_proof.v1",
+  "issue": 90,
+  "source_revision": "15339c5",
+  "version": "2.0.24",
+  "build": "2026-10-25T21:53:40Z+15339c5",
+  "running_sha256": "6a3fc9211dc354ca110ce991251b7d10d15d7f1996a87271cb28302ac083d058",
+  "workers": [
+    7456,
+    7460
+  ],
+  "protocol_source": {
+    "url": "https://exa.ai/docs/reference/search",
+    "retrieved": "2026-10-25T21:48:38Z",
+    "ref": "uiai-source-markdown:sha256:15249171b6f5211f",
+    "posture": "unsealed public documentation, not sealed evidence"
+  },
+  "verified": [
+    "Exa POST x-api-key header only, query/numResults/typeauto/highlights request",
+    "normalized redacted highlights/title/URL/date and bounded result count",
+    "Brave429 to explicitly approved Exa alternate preserves winning-provider evidence",
+    "shared credential resolution, origin-confined2MiB complete JSON transport and value-free errors reused unchanged",
+    "search+AI race5x/fullGo/vet/prepush pass on OVH",
+    "Windowsamd64/Darwinarm64 main cross-build, not native execution",
+    "canonical idle-safe rollback-preserving rollout, both active/healthy running hashes verified",
+    "owned ordinary browser/read/snapshot/eval/diagnostics/screenshot generation/redaction/close consumers pass both installed workers"
+  ],
+  "limits": [
+    "Issue90 remains OPEN: other adapters, breakers, fusion, quota ledger and zero-key web-search acceptance incomplete",
+    "All Exa protocol/consumer tests use synthetic local HTTP providers; no real Exa query, credential, credit or entitlement acceptance",
+    "No production credential/fallback configuration changed",
+    "No public Release, sealed EPWA or native Pi reload claim"
+  ]
+}
