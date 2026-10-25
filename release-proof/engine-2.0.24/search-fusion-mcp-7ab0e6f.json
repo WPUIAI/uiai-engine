@@ -1,0 +1,36 @@
+{
+  "schema": "uiai.search_fusion_mcp_proof.v1",
+  "issue": 90,
+  "source_revision": "7ab0e6f",
+  "version": "2.0.24",
+  "build": "2026-10-25T23:34:54Z+7ab0e6f",
+  "running_sha256": "c9943a46adb43907dfe30b540d94eaac9adaa3d569e64170a02a6af4f0fc3bcd",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "MCP forwards omitted/pinned/research/conflicting provider parameters unchanged; engine remains sole policy/execution owner",
+    "engine catalog and fallback schema expose optional2..3unique providers; no forced single-provider default",
+    "updated source subprocess tests and fresh subprocess from ACTUALinstalled4-filebundle pass on OVH",
+    "5xsearch/tool race, fullGo/vet/prepush pass; Windowsamd64/Darwinarm64 cross-build only",
+    "MCP-only canonical installer used before engine schema rollout; actual gateway reconnect refreshed toolregistration",
+    "ACTUALcurrentgateway browser_search advertises providers; exact search metadata shows minItems2/maxItems3/uniqueItems true",
+    "ACTUALcurrentMCP conflicting pin/list returns expected400conflicting_search_providers, not silent provider-list drop or outside query",
+    "canonical idle-safe rollout, both active/healthy running hashes and owned ordinary-browser/redaction/cleanup consumers verified"
+  ],
+  "installed_mcp": {
+    "script_sha256": "e744293f730434b0177dde8771eac3a6450422eeb950a50a139ec51e3079d53d",
+    "backup": "/tmp/uiai-mcp-before-fusion-7ab0e6f.tar",
+    "backup_sha256": "eb3344ea68bf6ff224fe27c42a4bf401c081eb09d98409942ce55b305eb94219",
+    "root_gateway_config_changed": false,
+    "native_pi_extension_reloaded": false
+  },
+  "limits": [
+    "Native Pi research parameter schema still separate/unverified, not claimed activated",
+    "Actual successful multi-provider external query not performed; successful fusion/forwarding proof uses local synthetic services",
+    "No paid/provider query, credential/fallback/endpoint config or service provisioning changes",
+    "Issue90 staysOPEN for remaining adapters/native binding/account quota/Cockpit/actualzero-keyWEBservice acceptance",
+    "No public Release/scoped sealed EPWA/nativePi reload/pixelinspection claim"
+  ]
+}
