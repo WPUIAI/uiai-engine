@@ -320,7 +320,8 @@ func (s *Session) TextContent(selector string) (string, error) {
 	}
 
 	s.touch()
-	return text, nil
+	_, values := safePageProjection(s.page, text)
+	return values[0], nil
 }
 
 // CookieAction represents a cookie operation.

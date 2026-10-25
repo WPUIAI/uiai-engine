@@ -1375,7 +1375,8 @@ func (s *Session) TextIntent(selector string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return val, nil
+	_, values := safePageProjection(s.page, val)
+	return values[0], nil
 }
 
 // InputIntent types a value into a selector (values are never logged).

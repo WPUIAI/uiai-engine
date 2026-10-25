@@ -63,6 +63,16 @@ func TestSemanticSecretNeighborsBrowserOutputs(t *testing.T) {
 		}
 	}
 	check("open title", map[string]any{"title": sess.Title})
+	text, err := sess.TextContent("dd code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("element text", text)
+	text, err = sess.TextIntent("dd code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("intent text", text)
 	for _, format := range []string{"text", "markdown"} {
 		result, err := sess.ReadPage(ReadOptions{Format: format, Mode: "full", MaxChars: 8000})
 		if err != nil {
