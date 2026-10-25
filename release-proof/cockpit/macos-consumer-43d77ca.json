@@ -1,0 +1,19 @@
+{
+  "schema": "uiai.cockpit_macos_consumer_proof.v1",
+  "source_commit": "43d77ca87b2bdd36b23adb0426816abf9204c54c",
+  "run_url": "https://github.com/WPUIAI/uiai-engine/actions/runs/40179128883",
+  "conclusion": "success",
+  "native_rss_test": "passed on macOS arm64",
+  "system_bash": "3.2.57(1)-release (arm64-apple-darwin25)",
+  "optional_auth_tests": 6,
+  "typecheck_errors": 0,
+  "typecheck_warnings": 0,
+  "unit_tests_passed": 206,
+  "web_build": "passed",
+  "functional_ui_proof": "passed",
+  "tauri_package_proof": "passed",
+  "critical_high_dependency_gate": "passed",
+  "public_release_published": false,
+  "production_cockpit_deployment_claim": false,
+  "remaining_audit": {"moderate": 3, "low": 6}
+}

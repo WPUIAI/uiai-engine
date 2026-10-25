@@ -25,13 +25,14 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Native macOS RSS sampling proof
-        run: go test ./internal/vision -run 'Test(DarwinNativeRSS|PSProcessTreeRSS|RSSPressureSnapshot)' -count=1 -timeout=45s
+        run: go test ./internal/vision -run 'Test(DarwinNativeRSS|PSProcessTreeRSS|RSSPressureSnapshot|TreeRSSKBSelfPositive|ShouldRecycleByPressureThreshold)' -count=1 -timeout=45s
       - name: Native macOS Bash 3.2 compatibility proof
         env:
           UIAI_TEST_BASH: /bin/bash
         run: |
           /bin/bash --version
           python3 -m unittest discover -s tests -p test_cli_optional_auth.py -v
+          python3 -m unittest discover -s tests -p test_go_format_gate.py -v
       - name: Install dependencies
         working-directory: apps/cockpit
         run: npm ci

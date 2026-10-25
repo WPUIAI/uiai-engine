@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+import os
 import tempfile
 import unittest
 
@@ -30,7 +31,7 @@ class GoFormatGateTests(unittest.TestCase):
 
     def check(self, success):
         before = self.snapshot()
-        result = subprocess.run(["bash", str(SCRIPT), str(self.repo)], capture_output=True, text=True, timeout=10)
+        result = subprocess.run([os.environ.get("UIAI_TEST_BASH", "bash"), str(SCRIPT), str(self.repo)], capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
         self.assertEqual(self.snapshot(), before, "gate changed source or index")
         if not success:
