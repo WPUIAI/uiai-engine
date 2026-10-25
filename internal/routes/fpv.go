@@ -20,6 +20,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/epwadelivery"
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
+	fpvassets "github.com/WPUIAI/uiai-engine/web/fpv"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -164,12 +165,13 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 	fpvLoadRegistry()
 	r.Get("/assets/{file}", func(w http.ResponseWriter, req *http.Request) {
-		assetPath, ok := fpvAssetPath(filepath.Base(chi.URLParam(req, "file")))
+		file := filepath.Base(chi.URLParam(req, "file"))
+		data, ok := fpvassets.Asset(file)
 		if !ok {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset not found"})
 			return
 		}
-		http.ServeFile(w, req, assetPath)
+		http.ServeContent(w, req, file, time.Time{}, bytes.NewReader(data))
 	})
 	r.Get("/{token}", func(w http.ResponseWriter, req *http.Request) {
 		entry, ok := fpvEntry(chi.URLParam(req, "token"))
@@ -194,7 +196,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		tmpl, err := template.ParseFiles(filepath.Join("web", "fpv", "index.html"))
+		tmpl, err := template.ParseFS(fpvassets.Files, "index.html")
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "fpv template unavailable"})
 			return
@@ -205,7 +207,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			return
 		}
 		markFPVOperationalMirror(w)
-		_ = tmpl.Execute(w, map[string]any{"Token": entry.Token, "SessionID": entry.SessionID})
+		_ = tmpl.Execute(w, map[string]any{"Token": entry.Token, "SessionID": entry.SessionID, "AssetVersion": fpvassets.AssetVersion()})
 	})
 	r.Get("/{token}/events", func(w http.ResponseWriter, req *http.Request) {
 		entry, ok := fpvEntry(chi.URLParam(req, "token"))
@@ -380,9 +382,18 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 	})
 
 	r.Get("/{token}/stream.cdp.mjpg", func(w http.ResponseWriter, req *http.Request) {
+		fps, err := fpvRequestedFPS(req)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "fps must be between1 and30"})
+			return
+		}
 		entry, ok := fpvEntry(chi.URLParam(req, "token"))
 		if !ok {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share not found or expired"})
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "fpv share unavailable"})
+			return
+		}
+		if sm == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "session manager unavailable"})
 			return
 		}
 		sess, ok := sm.Get(entry.SessionID)
@@ -395,37 +406,13 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			return
 		}
 		defer fpvReleaseViewer(entry.Token, entry.SessionID)
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "streaming unsupported"})
-			return
-		}
-		markFPVOperationalMirror(w)
-		w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary=frame")
-		w.Header().Set("X-Accel-Buffering", "no")
 		frames, stop, err := sess.CDPScreencast(req.Context(), 60, 1)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "screencast unavailable", "error_class": "fpv_stream_unavailable"})
 			return
 		}
 		defer stop()
-		for {
-			select {
-			case <-req.Context().Done():
-				return
-			case data, ok := <-frames:
-				if !ok {
-					return
-				}
-				if _, alive := fpvEntry(entry.Token); !alive {
-					return
-				}
-				_, _ = fmt.Fprintf(w, "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))
-				_, _ = w.Write(data)
-				_, _ = fmt.Fprint(w, "\r\n")
-				flusher.Flush()
-			}
-		}
+		fpvWriteStream(w, req, frames, fps)
 	})
 
 	r.Get("/{token}/stream.mjpg", func(w http.ResponseWriter, req *http.Request) {
@@ -473,21 +460,6 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			}
 		}
 	})
-}
-
-func fpvAssetPath(file string) (string, bool) {
-	switch file {
-	case "fpv.css", "fpv.js", "fpv-assets.json":
-	default:
-		return "", false
-	}
-	for _, dir := range []string{filepath.Join("web", "fpv", "dist"), filepath.Join("web", "fpv")} {
-		path := filepath.Join(dir, file)
-		if _, err := os.Stat(path); err == nil {
-			return path, true
-		}
-	}
-	return "", false
 }
 
 func fpvCreateShare(sessionID string, expiresMinutes int, controls, oneTime bool, maxViews int) (map[string]any, error) {

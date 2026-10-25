@@ -154,7 +154,7 @@ func TestFPVViewerHTTPConsumerAndClosedSession(t *testing.T) {
 	if os.Getenv("UIAI_AUTH_TESTS") == "" {
 		t.Skip("set UIAI_AUTH_TESTS=1 for actual Chromium session")
 	}
-	t.Chdir("../..")
+	t.Chdir(t.TempDir())
 	t.Setenv("FOCUSA_DAEMON_URL", "")
 	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "<!doctype html><title>Owned viewer event fixture</title>")

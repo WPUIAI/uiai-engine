@@ -390,3 +390,15 @@ with `fpv_control_approval_required`; self-asserted confirmation booleans do not
 supply an operator grant. A separate canonical control-approval resolver remains
 required before that stronger capability can be exposed. This does not claim the
 remaining origin/consent/revocation work complete or weaken evidence publication.
+
+
+FPV CDP streaming uses one session-owned Chrome pump with latest-frame fanout;
+disconnecting one viewer cannot stop capture for another. `stream.cdp.mjpg?fps=8`
+accepts1–30FPS, rejects malformed/out-of-range values, and bounds writes to2seconds.
+No first frame within3seconds returns typed `fpv_stream_stalled` rather than a
+successful empty stream. Static pages need not repaint continuously. Native
+multipart `<img>` load events do not measure per-frame FPS or glass-to-glass delay;
+the viewer reports Live/Not measured instead of invented numbers. Local conformance
+measures mutation-to-received-decoded-JPEG separately from public-network latency.
+The same binary embeds the canonical FPV template and generated asset bundle;
+`bash scripts/build-fpv-assets.sh` is its sole generated-asset writer.

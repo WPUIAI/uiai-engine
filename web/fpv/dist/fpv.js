@@ -81,9 +81,9 @@
     addStream('Control key', key, '⌨'); await statusTick();
   }
   function setQuality(q) {
-    frameMs = q === 'smooth' ? 250 : q === 'balanced' ? 500 : 1000;
+    frameMs = q === 'smooth' ? 125 : q === 'balanced' ? 250 : 1000;
     document.querySelectorAll('.quality-switch button').forEach(b => b.classList.toggle('active', b.dataset.quality === q));
-    if (streamMode === 'polling') { clearInterval(frameTimer); frameTimer = setInterval(frameTick, frameMs); }
+    if (streamMode === 'polling') { clearInterval(frameTimer); frameTimer = setInterval(frameTick, frameMs); } else if (active) { startMJPEG(); }
     addStream('Stream quality', `${q} mode`, '⌁');
   }
   function renderSeismo() {
@@ -136,30 +136,34 @@
   function render(st) {
     const mode = st.mode === 'control' ? 'Control enabled' : 'Read-only';
     text('mode', mode); text('modeCard', mode); text('address', st.url); text('pageUrl', st.url); text('pageTitle', st.title); text('viewportSize', `${st.width || '?'} × ${st.height || '?'}`); text('expires', new Date(st.expires_at).toLocaleString()); text('views', st.views); text('chromeMeta', st.title || 'FPV Live');
-    if (st.transport?.stream_url) { streamUrl = st.transport.stream_url; streamMode = st.transport.primary || streamMode; } const d = st.diagnostics || {}, errTotal = (d.console_errors || 0) + (d.failed_requests || 0) + (d.http_4xx || 0) + (d.http_5xx || 0);
+    if (st.transport?.stream_url) { streamUrl = st.transport.stream_url; if (streamMode !== 'polling') streamMode = st.transport.primary || streamMode; } const d = st.diagnostics || {}, errTotal = (d.console_errors || 0) + (d.failed_requests || 0) + (d.http_4xx || 0) + (d.http_5xx || 0);
     renderGlyph('healthGrid', Math.min(8, errTotal || 1), (d.http_5xx || 0) > 0);
     text('consoleErrors', d.console_errors || 0); text('failedRequests', d.failed_requests || 0); text('httpErrors', `${d.http_4xx || 0} / ${d.http_5xx || 0}`); text('requests', d.requests || 0);
     tone('consoleErrors', (d.console_errors || 0) === 0); tone('failedRequests', (d.failed_requests || 0) === 0); tone('httpErrors', (d.http_4xx || 0) + (d.http_5xx || 0) === 0, (d.http_5xx || 0) > 0);
+    if (streamMode !== 'polling' && $('shot').naturalWidth > 0) {
+      text('fps', 'Live'); text('fpsNum', '—'); text('latencyMs', 'Not measured'); text('streamQuality', 'Native stream');
+    }
     renderContext(st.context || {});
     const audit = st.audit || [], last = audit[audit.length - 1];
     if (last) { const msg = `${last.action}: ${last.message || last.selector || last.key || last.error || ''}`; if (!stream[0] || stream[0].msg !== msg) addStream('Audit event', msg, '✓'); }
   }
   function startMJPEG() {
-    streamMode = 'mjpeg';
+    streamMode = streamUrl.includes('stream.cdp') ? 'cdp_screencast' : 'mjpeg';
     clearInterval(frameTimer);
     const img = $('shot');
     img.onload = () => {
       const now = Date.now();
       frames++;
-      if (lastFrameAt) text('latencyMs', `${now - lastFrameAt} ms`);
       lastFrameAt = now;
-      const fps = (frames / ((now - started) / 1000)).toFixed(1);
-      text('fps', `${fps} FPS`); text('fpsNum', fps); text('transportMode', streamMode === 'cdp_screencast' ? 'CDP screencast' : 'MJPEG stream'); text('streamQuality', Number(fps) > 2 ? 'Excellent' : 'Healthy');
-      renderSeismo(); renderGlyph('glyphGrid', Math.max(1, Math.min(8, Math.round(Number(fps) || 1)))); sweepCards();
+      // Native multipart images do not fire load for every JPEG. Do not turn
+      // one load event into a fabricated FPS or glass-to-glass latency value.
+      text('latencyMs', 'Not measured'); text('fps', 'Live'); text('fpsNum', '—');
+      text('transportMode', streamMode === 'cdp_screencast' ? 'CDP screencast' : 'MJPEG stream'); text('streamQuality', 'Native stream');
+      renderSeismo(); renderGlyph('glyphGrid', 1); sweepCards();
       if (frames % 16 === 0) addStream('Frame stream', 'MJPEG frame received', '↻');
     };
     img.onerror = () => { frameErrors++; text('transportMode', 'Polling fallback'); addStream('Frame stream', 'MJPEG unavailable; using polling fallback', '⚠'); startPolling(); };
-    img.src = `${streamUrl}?t=${Date.now()}`;
+    img.src = `${streamUrl}?fps=${Math.max(1, Math.round(1000 / frameMs))}&t=${Date.now()}`;
   }
   function startPolling() {
     streamMode = 'polling';
