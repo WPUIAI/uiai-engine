@@ -1,0 +1,49 @@
+{
+  "schema": "uiai.search_result_fields_proof.v1",
+  "issue": 90,
+  "source_revision": "e4ea61b",
+  "version": "2.0.24",
+  "build": "2026-10-25T22:32:50Z+e4ea61b",
+  "running_sha256": "4edda54ecfce31232df00b02faa62f98a5185b4e3ad21b48276b2d7d6ed1f3cc",
+  "workers": [
+    7456,
+    7460
+  ],
+  "contract": {
+    "artifact_schema": "uiai.search_results.v1",
+    "http_envelope": "uiai.artifact_result.v2",
+    "compatible_fields": "snippet matches legacy description, provider canonical id; legacy source/age retained",
+    "unknowns": "optional finite provider-supplied score and absolute published_at; absent is not fabricated as zero/date",
+    "date_precision": "source date-only remains date-only, RFC3339 offset/fraction retained; relative age not coerced",
+    "cache": "score pointer copied on normalization/write/read",
+    "content_md": "absent; no full-content retrieval enabled"
+  },
+  "verified": [
+    "normalized/legacy aliases redacted consistently; explicit zero score retained, absent/nonfinite scores omitted",
+    "date-only/timestamp precision retained, invalid/relative dates not invented",
+    "score input and returned cache pointers cannot mutate stored results",
+    "synthetic Exa/Tavily/SearxNG observed score/date mapping",
+    "HTTP consumer retains legacy fields with correct envelope/artifact schema distinction",
+    "5x search/breaker/AI race, fullGo/vet/prepush pass on OVH with isolated GOCACHE",
+    "Windowsamd64/Darwinarm64 cross-build only, not native execution",
+    "canonical idle-safe rollback-preserving deployment and both active/healthy running hashes verified",
+    "both installed ordinary-browser/redaction/owned cleanup consumers pass",
+    "actual current native UIAI Wikipedia search querySearxNG limit2 returned provider+snippet, absent unknown score/date, cachedfalse TTL3600",
+    "actual installed MCP repeated same query returned same results/evidence with cachedtrue TTL3600"
+  ],
+  "live_free_search": {
+    "provider": "wikipedia",
+    "native_artifact_ref": "uiai-artifact:sha256:a52dc13811a9ee205598232bb49e5d46a86dea53148b6a8fe500b478ec432dbd",
+    "mcp_cached_artifact_ref": "uiai-artifact:sha256:2a8d38317b663e94a882eee7508e52af531defc9ac18a82c21dfdb571b4a6bdb",
+    "evidence_ref": "uiai-search:wikipedia:7da65835ed9c2ecb:1",
+    "posture": "actual free keyless knowledge search, unsealed_no_epwa_scope; publication/deliveryblocked, no scoped EPWA readiness claimed"
+  },
+  "validation_recovery": [
+    "Initial new HTTP fixture incorrectly expected search schema at HTTProot; corrected test to existing artifact_result.v2 root plus artifact_schema search_results.v1; no envelope bypass/change"
+  ],
+  "limits": [
+    "Issue90 remains OPEN for remaining adapters, fusion, quota/all-surface circuit health and out-of-box zero-key WEB search acceptance",
+    "No paid-provider queries/account/credential/fallback configuration changes; actual free Wikipedia call is not live acceptance for Exa/Tavily/SearxNG",
+    "No new native Pi reload, public Release, sealed EPWA or pixel inspection claim"
+  ]
+}
