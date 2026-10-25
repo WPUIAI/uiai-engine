@@ -1,0 +1,35 @@
+{
+  "observed_at": "2026-10-25T08:11:19Z",
+  "workers": [
+    {
+      "port": 7456,
+      "revision": "067b94c",
+      "version": "2.0.24",
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    },
+    {
+      "port": 7460,
+      "revision": "067b94c",
+      "version": "2.0.24",
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    }
+  ]
+}
