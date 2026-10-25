@@ -1,0 +1,10 @@
+{
+  "workflow": "Cockpit CI",
+  "run_id": "33481517478",
+  "head_sha": "1e68fc00f48a7efc1086e3f0667d3e1a29fa2eba",
+  "branch": "fix/cockpit-main-conflicts",
+  "event": "pull_request",
+  "log_url": "https://github.com/WPUIAI/uiai-engine/actions/runs/33481517478",
+  "at": "2026-09-01T07:25:14Z",
+  "conclusion": "failure"
+}

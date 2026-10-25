@@ -1,5 +1,7 @@
 from pathlib import Path
 import shutil
+import json
+import os
 import subprocess
 import tempfile
 import textwrap
@@ -74,6 +76,27 @@ class CockpitAuditWorkflowTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("no audit changes", result.stdout)
             self.assertEqual(git("rev-parse", "HEAD"), before)
+
+    def test_real_qualifying_failure_through_checked_in_producer(self):
+        metadata = json.loads((ROOT / "release-proof/cockpit/qualifying-failure-replay.json").read_text())
+        self.assertEqual(metadata["conclusion"], "failure")
+        self.assertIn(metadata["workflow"], ("Cockpit CI", "Cockpit Release", "Deploy Cockpit"))
+        block = WORKFLOW.read_text().split("- name: Record CI failure", 1)[1].split("- name: Validate audit JSONL shape", 1)[0]
+        command = textwrap.dedent(block.split("run: |\n", 1)[1]).split("python3 apps/cockpit/scripts/auto-heal-cockpit-audit.py", 1)[0]
+        # Exercise the real recorder only; branch creation/re-dispatch is not
+        # authorized or needed by this isolated parser/producer regression.
+        env = dict(os.environ, RUN_ID=metadata["run_id"], WORKFLOW=metadata["workflow"], HEAD_SHA=metadata["head_sha"], BRANCH=metadata["branch"], EVENT=metadata["event"], ATTEMPT="1", LOG_URL=metadata["log_url"], TS=metadata["at"])
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run(["bash", "-euc", command], cwd=tmp, env=env, capture_output=True, text=True, timeout=8)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            data = (Path(tmp) / "release-proof/cockpit/audit.jsonl").read_text()
+            self.assertLessEqual(len(data.encode()), 4096)
+            rows = [json.loads(line) for line in data.splitlines() if line.strip()]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["run_id"], metadata["run_id"])
+            validation = self.validate(data)
+            self.assertEqual(validation.returncode, 0, validation.stderr)
+            self.assertIn("audit schema OK (1 rows", validation.stdout)
 
 
 if __name__ == "__main__":

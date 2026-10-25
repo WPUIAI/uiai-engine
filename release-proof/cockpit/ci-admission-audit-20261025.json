@@ -1,0 +1,47 @@
+{
+  "schema": "uiai.ci_admission_and_audit_proof.v1",
+  "browser_run_url": "https://github.com/WPUIAI/uiai-engine/actions/runs/40186188777",
+  "jobs": [
+    {
+      "completed_at": "2026-10-25T10:48:42Z",
+      "conclusion": "success",
+      "labels": [
+        "self-hosted",
+        "ovh",
+        "uiai-engine"
+      ],
+      "name": "Browser Reliability (browser)",
+      "runner_name": "ovh-uiai-builder",
+      "started_at": "2026-10-25T10:47:15Z"
+    },
+    {
+      "completed_at": "2026-10-25T10:47:18Z",
+      "conclusion": "success",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "name": "Browser Reliability (queue-guard)",
+      "runner_name": "GitHub Actions 1000003317",
+      "started_at": "2026-10-25T10:47:06Z"
+    }
+  ],
+  "artifacts": [
+    {
+      "expired": false,
+      "id": 12595708652,
+      "name": "uiai-browser-reliability-40186188777",
+      "size_in_bytes": 12240
+    }
+  ],
+  "queue_guard_regressions_passed": 5,
+  "queue_admin_or_cancel_api_calls": false,
+  "manual_audit_run_url": "https://github.com/WPUIAI/uiai-engine/actions/runs/40185670595",
+  "manual_audit_conclusion": "success",
+  "manual_audit_changed_or_committed_rows": false,
+  "scheduled_audit_run_url": "https://github.com/WPUIAI/uiai-engine/actions/runs/40167714037",
+  "scheduled_audit_conclusion": "success",
+  "audit_workflow_regressions_passed": 6,
+  "real_failure_replayed_in_isolation": "33481517478",
+  "self_heal_branch_or_redispatch_exercised": false,
+  "public_release_published": false
+}
