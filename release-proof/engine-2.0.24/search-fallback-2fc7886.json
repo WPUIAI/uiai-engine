@@ -1,0 +1,30 @@
+{
+  "schema": "uiai.search_fallback_proof.v1",
+  "issue": 90,
+  "source_revision": "2fc7886",
+  "version": "2.0.24",
+  "running_sha256": "6dc04117c909b7f9cced0a65b050390560c2d215ae91e194cbf5e91b3376c9ad",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "operator-configured ordered fallback from429Brave to Wikipedia with winning-provider evidence provenance",
+    "explicit provider pinned and original429/Retry-After preserved",
+    "no implicit fallback without opt-in",
+    "disabled/unknown/duplicate alternates skipped; unsupported configured adapter not falsely ready",
+    "disabled provider cannot serve old cached results",
+    "caller cancellation/deadline reaches upstream and prevents alternate dispatch",
+    "origin-bound redirects shared with AI credential fetch without mutating inference client",
+    "search+AI tests5x/race5x, fullGo/vet/pre-push gates pass on OVH",
+    "Windowsamd64/Darwinarm64 main cross-build pass, not native execution",
+    "canonical idle-safe rollout; both running executable hashes and health verified",
+    "owned ordinary browser/read/snapshot/eval/diagnostics/screenshot-generation/redaction/cleanup consumers pass both installed workers"
+  ],
+  "activation": "Production fallback configuration not changed; feature is opt-in and remains inactive until operator configures approved alternates.",
+  "limits": [
+    "Issue90 remains OPEN: other adapters, breaker/fusion/quota and zero-key web-search service acceptance incomplete",
+    "Successful fallback consumer tests use synthetic local providers and scoped fixture metadata, not real provider or sealed EPWA acceptance",
+    "No actual paid inference/search provider call, new credentials, public Release or native Pi reload"
+  ]
+}
