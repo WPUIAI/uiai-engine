@@ -1,0 +1,35 @@
+{
+  "schema": "uiai.search_cache_bounds_proof.v1",
+  "issue": 90,
+  "source_revision": "ffbcf85",
+  "version": "2.0.24",
+  "build": "2026-10-25T22:25:02Z+ffbcf85",
+  "running_sha256": "1fea6b2da87d61d545f386844ab082902e08818faaaf6fb2ad5e1ed05ecdc617",
+  "workers": [
+    7456,
+    7460
+  ],
+  "contract": {
+    "default_ttl_seconds": 3600,
+    "max_entries": 512,
+    "override": "UIAI_SEARCH_CACHE_TTL_SECONDS;0 disables",
+    "eviction": "prune expired first, earliest expiry next, deterministic key tie-break; replacing existing key does not evict another",
+    "ownership": "existing shared searchCache only; results cloned, provider/query/limit identity retained"
+  },
+  "verified": [
+    "burst beyond512 entries remains bounded and retains newer results",
+    "existing-entry replacement does not evict unrelated entries",
+    "expired entries removed on writes and pressure reporting",
+    "one-hour default, disable/explicit override, clone and expiry regressions pass",
+    "5x search/breaker/AI race, fullGo/vet/prepush pass on OVH with isolated GOCACHE",
+    "Windowsamd64/Darwinarm64 cross-build only, not native execution",
+    "canonical idle-safe rollback-preserving rollout and both active/healthy running hashes verified",
+    "both installed ordinary browser/redaction/owned cleanup consumers pass",
+    "both actual installed browser-health endpoints report cache_max_entries512, occupancy0 and effective TTL3600; no search query needed"
+  ],
+  "limits": [
+    "512 is an entry bound, not measured byte quota or account credit balance",
+    "Issue90 remains OPEN: remaining adapters, richer result/fusion contract, quota/all-surface circuit health and actual zero-key acceptance",
+    "No real provider/paid query, credential/production endpoint/fallback configuration change, public Release/sealed EPWA/native Pi reload claim"
+  ]
+}
