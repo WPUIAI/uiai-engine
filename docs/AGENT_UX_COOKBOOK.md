@@ -550,7 +550,7 @@ must also be the operator's resolved default or named in the approved fallback
 configuration. Unsupported/unapproved/disabled members and a simultaneous pinned
 `provider` are rejected before traffic. Merely possessing another key never
 authorizes fanout. Ordinary requests and explicit single-provider pins do not fan
-out. HTTP, installed MCP and fresh native Pi source support this field; the current Pi process still requires native reload before activation can be claimed.
+out. HTTP, installed MCP and fresh native Pi source support this field; actual native integration installation and a current-process native reload remain separate before activation can be claimed.
 
 At most three provider calls run concurrently under one12s overall context, using
 exactly the existing per-provider cache/circuit/normalization path. Successes are

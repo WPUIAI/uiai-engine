@@ -1,0 +1,21 @@
+{
+  "schema": "uiai.search_native_research_source_proof.v1",
+  "issue": 90,
+  "source_revision": "a011457",
+  "runtime_unchanged": "both installed engines2.0.24 source7ab0e6f; MCP7ab0e6f active",
+  "verified": [
+    "native source TypeBox schema exposes optional2..3unique research IDs without forced default",
+    "fresh native module executes ordinary/pinned/research/conflicting provider requests with exact JSON parameter omission/preservation",
+    "complete synthetic caller evidence scope forwarded by existing canonical wrapper, no new grants/authority created",
+    "canonical installer fixture produces a fresh native module with bounded research schema",
+    "15 fresh native/shared response/MCP tests pass on OVH Node with API credential env blank",
+    "normal pre-push checks pass; all own source changes committed/pushed"
+  ],
+  "limits": [
+    "SOURCE-ONLYnative schema change; actual root native extension installation and current-process reload NOT performed/claimed",
+    "Existing/root/.pi/agent/extensions/uiai-engine.ts file inspected read-only; not assumed to be refreshed or current loaded source",
+    "No new engine rollout required for native-only source; prior running7ab0e6f receipt remains runtime authority",
+    "No live native research call, real paid provider query, credential/fallback/config change, service provisioning or scoped sealed EPWA claim",
+    "Issue90 staysOPEN for actual native activation/remaining adapters/account quota/Cockpit/zero-keyWEBservice acceptance"
+  ]
+}
