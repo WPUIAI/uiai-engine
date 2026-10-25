@@ -1,0 +1,77 @@
+{
+  "observed_at": "2026-10-25T11:08:09Z",
+  "workers": [
+    {
+      "port": 7456,
+      "revision": "61d100a",
+      "version": "2.0.24",
+      "oauth_url_surfaces": [
+        "eval",
+        "read",
+        "snapshot",
+        "dom",
+        "diagnostics"
+      ],
+      "raw_navigation_preserved": true,
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "semantic_redaction_surfaces": [
+        "read",
+        "snapshot",
+        "dom",
+        "text",
+        "diagnostics",
+        "eval",
+        "title"
+      ],
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    },
+    {
+      "port": 7460,
+      "revision": "61d100a",
+      "version": "2.0.24",
+      "oauth_url_surfaces": [
+        "eval",
+        "read",
+        "snapshot",
+        "dom",
+        "diagnostics"
+      ],
+      "raw_navigation_preserved": true,
+      "health": true,
+      "open": true,
+      "read": true,
+      "snapshot": true,
+      "typed_eval_error": true,
+      "literal_result": true,
+      "screenshot_artifact": true,
+      "diagnostics": true,
+      "semantic_redaction_surfaces": [
+        "read",
+        "snapshot",
+        "dom",
+        "text",
+        "diagnostics",
+        "eval",
+        "title"
+      ],
+      "evidence_delivery_state": "blocked",
+      "owned_probe_closed": true
+    }
+  ],
+  "binary_sha256": "f7be3ec3051b754dc6e29a799de4753fe4effcace99b91412d01347b55302603",
+  "running_process_hashes_verified": true,
+  "installed_owner": "wpuiai:wpuiai",
+  "installed_mode": "0755",
+  "synthetic_callback_absent_from_current_invocation_journal": true,
+  "remaining_sessions_per_worker": 0,
+  "historical_private_archives_scrubbed": false,
+  "public_release_published": false
+}
