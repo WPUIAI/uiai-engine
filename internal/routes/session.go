@@ -66,6 +66,9 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			writeSessionError(w, 500, classifySessionError(err), err, sess)
 			return
 		}
+		// Delivery recovery is bound to this newly created session only. This is
+		// an identity hint, never a credential or authority grant.
+		w.Header().Set("X-UIAI-Created-Session-ID", sess.ID)
 		sess.SetActorRef(body.ActorRef)
 		sess.SetFocusaScope(resolveFocusaScope(body.FocusaScope, body.WorkpointID, body.ContinuityID, body.ProjectRoot, body.EvidenceRef))
 		_, _ = sess.DetectAuthChallenge()
@@ -73,7 +76,9 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		if !writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusCreated, map[string]any{"session": sessionInfoPayload(sess)}) {
 			// The caller never received a session id, so the session would
 			// leak until TTL and hold a per-scope slot; close it now.
-			sm.Close(sess.ID)
+			if cleanupErr := sm.Close(sess.ID); cleanupErr != nil && !errors.Is(cleanupErr, vision.ErrSessionNotFound) {
+				observability.Record(observability.ErrorEvent{Source: "browser_session", Class: "session_cleanup_failed", Status: 500, SessionID: sess.ID, Message: "New session cleanup failed after response publication failure", Context: map[string]any{"action": "open_cleanup"}})
+			}
 		}
 	})
 
@@ -82,7 +87,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
-				if !ok || sess.LeaseState() != vision.LeaseAwaitingAuth || req.Method == http.MethodGet || strings.HasSuffix(req.URL.Path, "/auth/resolve") || strings.HasSuffix(req.URL.Path, "/auth/cancel") {
+				if !ok || sess.LeaseState() != vision.LeaseAwaitingAuth || req.Method == http.MethodGet || req.Method == http.MethodDelete || strings.HasSuffix(req.URL.Path, "/auth/resolve") || strings.HasSuffix(req.URL.Path, "/auth/cancel") {
 					next.ServeHTTP(w, req)
 					return
 				}

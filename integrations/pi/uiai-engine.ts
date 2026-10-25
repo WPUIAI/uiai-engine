@@ -4,6 +4,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { assertEvidenceDelivery, evidenceRecoveryHint, evidenceScopeHeaders, findNonReadyArtifactDelivery } from "./uiai/epwa-contract.mjs";
+import { readEngineResponse } from "./uiai/engine-response.mjs";
 
 const evidenceRequestScope = new AsyncLocalStorage<unknown>();
 
@@ -101,17 +102,14 @@ async function callEngine(path: string, init?: RequestInit, requiresEvidence = f
 			signal: controller.signal,
 			headers: { "Content-Type": "application/json", ...authHeaders(), ...evidenceScopeHeaders(evidenceRequestScope.getStore()), ...(init?.headers || {}) },
 		});
-		const text = await res.text();
-		let data: any = text;
-		try {
-			data = text ? JSON.parse(text) : {};
-		} catch {
-			// Keep raw text for non-JSON responses.
-		}
+		const data = await readEngineResponse(res, {
+      opening: path === "/api/session" && init?.method === "POST",
+      validate: data => { if (!skipEvidence) assertEvidenceDelivery(data, requiresEvidence); },
+      closeSession: id => callEngine(`/api/session/${encodeURIComponent(id)}`, { method: "DELETE" }, false, true),
+    });
 		if (!res.ok) {
 			throw Object.assign(new Error(formatEngineError(data, res.status, path)), { status: res.status });
 		}
-		if (!skipEvidence) assertEvidenceDelivery(data, requiresEvidence);
 		return data;
 	} finally {
 		clearTimeout(timeout);

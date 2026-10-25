@@ -24,6 +24,7 @@
 
 import { createInterface } from "readline";
 import { evidenceScopeHeaders, assertEvidenceDelivery } from "./epwa-contract.mjs";
+import { readEngineResponse } from "../integrations/pi/uiai/engine-response.mjs";
 
 const ENGINE = (process.env.UIAI_ENGINE_URL || "http://localhost:7456").replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = Number(process.env.UIAI_MCP_TIMEOUT_MS || 60000);
@@ -36,18 +37,15 @@ function authHeaders() {
   return headers;
 }
 
-async function fetchJSON(url, options = {}) {
+async function fetchJSON(url, options = {}, contract = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const res = await fetch(url, { ...options, signal: controller.signal, headers: { ...authHeaders(), ...(options.headers || {}) } });
-    const text = await res.text();
-    let data = text;
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      // Keep text for non-JSON upstream errors.
-    }
+    const data = await readEngineResponse(res, { ...contract, closeSession: async id => {
+      const closed = await fetchJSON(`${ENGINE}/api/session/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!closed.res.ok) throw new Error("session cleanup failed");
+    }});
     return { res, data };
   } finally {
     clearTimeout(timeout);
@@ -560,7 +558,10 @@ async function toolsCall(name, args) {
 
   let res, data;
   try {
-    ({ res, data } = await fetchJSON(url, fetchOpts));
+    ({ res, data } = await fetchJSON(url, fetchOpts, {
+      opening: name === "browser_open",
+      validate: data => assertEvidenceDelivery(data, name === "screenshot" || name === "browser_screenshot"),
+    }));
   } catch (err) {
     return {
       content: [{ type: "text", text: `UIAI request failed: ${err.message}` }],
@@ -575,11 +576,6 @@ async function toolsCall(name, args) {
     };
   }
 
-  try {
-    assertEvidenceDelivery(data, name === "screenshot" || name === "browser_screenshot");
-  } catch (error) {
-    return { content: [{ type: "text", text: error.message }], isError: true };
-  }
   const content = [];
   const summary = { ...data };
   if (Object.keys(summary).length > 0) {

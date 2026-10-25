@@ -345,3 +345,16 @@ Errors expose a bounded `cause_class` (such as `javascript_exception`,
 `execution_context_changed` or `deadline_exceeded`), not submitted scripts,
 exception values or protocol parameters. The internal wrapped cause remains
 available for typed classification. Both legacy Go methods remain supported.
+
+### Open response recovery
+
+Open responses include `X-UIAI-Created-Session-ID`, identifying only the newly
+allocated session; it is not a credential or capability grant. Native Pi and MCP
+use the same strict JSON/session decoder. Fetch decodes HTTP gzip once; malformed,
+numeric-byte-map and missing-identity responses are errors, never spread as
+numeric object properties. A rejected response closes its header-bound created
+session (or a valid body identity on older servers); cleanup failure or unknown
+identity remains explicit. Full transport loss before any identity arrives remains
+unknown and must be reconciled, never guessed from another session's identity.
+Closing an awaiting-auth session remains permitted as resource cleanup; it does
+not resolve the challenge or grant resumed actuation.
