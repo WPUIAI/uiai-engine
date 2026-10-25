@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -100,5 +101,84 @@ func TestCredentialSettingsCanceledContextNeverUsesTransport(t *testing.T) {
 	cancel()
 	if !errors.Is(p.ensureKeysContext(ctx), context.Canceled) || called {
 		t.Fatal("canceled lookup reached transport")
+	}
+}
+
+func TestCredentialSettingsRedirectCannotForwardWebhookSecret(t *testing.T) {
+	var received atomic.Int32
+	destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received.Add(1)
+		if r.Header.Get("X-Webhook-Secret") != "" {
+			t.Error("unexpected credential header reached redirect destination")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer destination.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, destination.URL, http.StatusFound) }))
+	defer source.Close()
+	p := boundaryProvider(source.URL)
+	p.cfg.WordPress.WebhookSecret = "synthetic-webhook-fixture"
+	_ = p.ensureKeys()
+	if received.Load() != 0 {
+		t.Fatal("credential refresh followed a redirect outside the approved origin")
+	}
+}
+
+func TestCredentialSettingsSameOriginRedirectPreservesPolicy(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/fixture-settings" {
+			http.Redirect(w, r, "/fixture-settings", http.StatusFound)
+			return
+		}
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer server.Close()
+	p := boundaryProvider(server.URL)
+	policyCalls := 0
+	p.client.CheckRedirect = func(*http.Request, []*http.Request) error { policyCalls++; return nil }
+	if err := p.ensureKeys(); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || policyCalls != 1 {
+		t.Fatal("same-origin redirect or existing client policy regressed")
+	}
+}
+
+func TestCredentialSettingsRejectsSchemeAndUserinfoRedirects(t *testing.T) {
+	for _, tc := range []struct{ name, location string }{{"downgrade", "http://approved.invalid/next"}, {"userinfo", "https://synthetic-user:synthetic-password@approved.invalid/next"}} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := boundaryProvider("https://approved.invalid")
+			calls := 0
+			p.client.Transport = credentialBoundaryTransport(func(*http.Request) (*http.Response, error) {
+				calls++
+				return &http.Response{StatusCode: http.StatusFound, Header: http.Header{"Location": []string{tc.location}}, Body: io.NopCloser(strings.NewReader(""))}, nil
+			})
+			_ = p.ensureKeys()
+			if calls != 1 {
+				t.Fatal("credential redirect widened authority scope")
+			}
+			if p.client.CheckRedirect != nil {
+				t.Fatal("credential refresh mutated shared inference redirect policy")
+			}
+		})
+	}
+}
+
+func TestCredentialSettingsRetainsDefaultRedirectBound(t *testing.T) {
+	p := boundaryProvider("https://approved.invalid")
+	calls := 0
+	p.client.Transport = credentialBoundaryTransport(func(*http.Request) (*http.Response, error) {
+		calls++
+		return &http.Response{StatusCode: http.StatusFound, Header: http.Header{"Location": []string{"https://approved.invalid/loop"}}, Body: io.NopCloser(strings.NewReader(""))}, nil
+	})
+	if err := p.ensureKeys(); err == nil {
+		t.Fatal("credential redirect loop accepted")
+	}
+	if calls != 10 {
+		t.Fatalf("default redirect bound changed: %d requests", calls)
 	}
 }

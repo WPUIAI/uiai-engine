@@ -391,3 +391,8 @@ responses at 1 MiB. Transport/read failures expose bounded value-free errors, no
 URLs, headers, or provider bodies. Rejected or partial responses never populate
 the cache. This is transport hardening, not broker revocation, secret-heap wiping,
 or authority to retrieve/use new provider credentials.
+
+Credential-settings redirects may remain within the configured scheme/host only;
+credentials are never forwarded to another origin, a downgraded scheme, or a
+redirect URL containing user information. Same-origin redirects retain any
+existing client policy; the inference client itself is not reconfigured.

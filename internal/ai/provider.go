@@ -603,7 +603,23 @@ func (p *Provider) ensureKeysContext(ctx context.Context) error {
 	}
 	req.Header.Set("X-Webhook-Secret", p.cfg.WordPress.WebhookSecret)
 
-	resp, err := p.client.Do(req)
+	// Credential headers are authorized for the configured settings origin only.
+	// A per-request client copy leaves inference/client redirect policy unchanged.
+	client := *p.client
+	redirectPolicy := client.CheckRedirect
+	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+		if len(via) == 0 || next.URL.Scheme != via[0].URL.Scheme || !strings.EqualFold(next.URL.Host, via[0].URL.Host) || next.URL.User != nil {
+			return http.ErrUseLastResponse
+		}
+		if redirectPolicy != nil {
+			return redirectPolicy(next, via)
+		}
+		if len(via) >= 10 {
+			return fmt.Errorf("credential settings redirect limit exceeded")
+		}
+		return nil
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
