@@ -20,6 +20,7 @@ set -euo pipefail
 : "${REMOTE_EXTRA_SERVICES:=}"
 : "${REMOTE_SMOKE_BASE_URLS:=http://127.0.0.1:7460}"
 : "${RELEASE_TAG:=manual}"
+: "${UPDATE_WARMUP_HELPER:=0}"
 : "${REMOTE_IDLE_BASE_URLS:=${REMOTE_HEALTH_URL%/health}}"
 
 if [[ ! -f "$ASSET_PATH" ]]; then
@@ -75,7 +76,17 @@ REMOTE_PREFLIGHT
 
 "${SCP[@]}" "$ASSET_PATH" "${REMOTE_TARGET}:${REMOTE_TMP}"
 
-DEPLOY_ARGS=(bash -s -- "$REMOTE_TMP" "$REMOTE_INSTALL_ROOT" "$REMOTE_SERVICE_NAME" "$REMOTE_OWNER" "$REMOTE_GROUP" "$LOCAL_SHA" "$RELEASE_TAG" "$REMOTE_HEALTH_URL" "$REMOTE_UIAI_EPWA_PUBLIC_BASE_URL" "$REMOTE_EXTRA_SERVICES" "$REMOTE_IDLE_BASE_URLS")
+warmup_tmp=""
+warmup_sha=""
+if [[ "$UPDATE_WARMUP_HELPER" == 1 ]]; then
+  warmup_source="$(dirname "$0")/warm-browser-session.sh"
+  test -f "$warmup_source"
+  warmup_sha=$(sha256sum "$warmup_source" | awk '{print $1}')
+  warmup_tmp="/tmp/uiai-warmup.${warmup_sha}.sh"
+  "${SCP[@]}" "$warmup_source" "${REMOTE_TARGET}:${warmup_tmp}"
+fi
+
+DEPLOY_ARGS=(bash -s -- "$REMOTE_TMP" "$REMOTE_INSTALL_ROOT" "$REMOTE_SERVICE_NAME" "$REMOTE_OWNER" "$REMOTE_GROUP" "$LOCAL_SHA" "$RELEASE_TAG" "$REMOTE_HEALTH_URL" "$REMOTE_UIAI_EPWA_PUBLIC_BASE_URL" "$REMOTE_EXTRA_SERVICES" "$REMOTE_IDLE_BASE_URLS" "$warmup_tmp" "$warmup_sha")
 printf -v REMOTE_DEPLOY_COMMAND '%q ' "${DEPLOY_ARGS[@]}"
 "${SSH[@]}" "$REMOTE_DEPLOY_COMMAND" <<"REMOTE_DEPLOY"
 set -euo pipefail
@@ -90,6 +101,8 @@ health_url=$8
 epwa_base_url=$9
 extra_services=${10}
 idle_bases=${11}
+warmup_tmp=${12}
+warmup_sha=${13}
 binary_path="$install_root/uiai-engine"
 backup_dir="$install_root/backups"
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
@@ -130,6 +143,16 @@ fi
 owner_run install -m 0755 "$remote_tmp" "$binary_path"
 [[ $(stat -c %U "$binary_path") == "$owner" && $(stat -c %G "$binary_path") == "$group" ]] || { echo "installed ownership mismatch" >&2; exit 4; }
 rm -f "$remote_tmp"
+if [[ -n "$warmup_tmp" ]]; then
+  warmup_target=/usr/local/sbin/uiai-ovh-warm-session.sh
+  test -f "$warmup_target"
+  [[ $(sha256sum "$warmup_tmp" | awk '{print $1}') == "$warmup_sha" ]] || { echo "warmup artifact hash mismatch" >&2; exit 4; }
+  install -d -m 0700 /var/backups/uiai-engine
+  cp -a "$warmup_target" "/var/backups/uiai-engine/warm-session.${stamp}.sh"
+  install -o root -g root -m 0755 "$warmup_tmp" "$warmup_target"
+  echo "warmup_helper_verified_sha256=$warmup_sha"
+  rm -f "$warmup_tmp"
+fi
 if [[ -n "$epwa_base_url" ]]; then
   # Configure the engine's own durable HTTPS evidence base (public routing is not rewired here).
   dropin_dir="/etc/systemd/system/${service_name}.d"

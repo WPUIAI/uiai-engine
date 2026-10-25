@@ -245,3 +245,11 @@ when `REMOTE_EXTRA_SERVICES=uiai-engine-ovh-w2.service` is selected. Never add a
 unrelated service to a rollout. Home-directory backup/install writes run as the
 owning account; backups, health readiness and running-process hashes remain
 mandatory. Sealed evidence readiness is reported separately from API health.
+
+
+The registered startup warmer is derived from `scripts/warm-browser-session.sh`;
+`UPDATE_WARMUP_HELPER=1` installs that exact hashed artifact to the existing
+`/usr/local/sbin/uiai-ovh-warm-session.sh` hook while preserving rollback. No unit
+configuration is changed. Both201/202 and malformed deliveries with an exact
+created-session header are cleaned up; absent identity remains explicitly unknown.
+Warm-up uses `system:uiai-warmup` as provenance, never an authorization grant.
