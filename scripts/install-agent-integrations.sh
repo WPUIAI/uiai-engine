@@ -7,6 +7,8 @@ PI_EXT_SRC="$ROOT_DIR/integrations/pi/uiai-engine.ts"
 PI_EXT_DEST="${UIAI_PI_EXTENSION_DEST:-$HOME/.pi/agent/extensions/uiai-engine.ts}"
 PI_CONTRACT_SRC="$ROOT_DIR/integrations/pi/uiai/epwa-contract.mjs"
 PI_CONTRACT_DEST="$(dirname "$PI_EXT_DEST")/uiai/epwa-contract.mjs"
+PI_RESPONSE_SRC="$ROOT_DIR/integrations/pi/uiai/engine-response.mjs"
+PI_RESPONSE_DEST="$(dirname "$PI_EXT_DEST")/uiai/engine-response.mjs"
 MCP_CONFIG_DEST="${UIAI_MCP_CONFIG_DEST:-$HOME/.pi/agent/mcp.json}"
 MCP_SERVER_NAME="${UIAI_MCP_SERVER_NAME:-uiai-browser}"
 DRY_RUN="${DRY_RUN:-0}"
@@ -21,14 +23,17 @@ if [[ -n "${UIAI_API_KEY:-}" || -n "${UIAI_BEARER_TOKEN:-}" ]]; then
   say "auth_env=client credentials will be passed to MCP config (values redacted)"
 fi
 
-if [[ ! -f "$PI_EXT_SRC" || ! -f "$PI_CONTRACT_SRC" ]]; then
-  say "missing Pi extension source: $PI_EXT_SRC" >&2
-  exit 1
-fi
+for source in "$PI_EXT_SRC" "$PI_CONTRACT_SRC" "$PI_RESPONSE_SRC"; do
+  if [[ ! -f "$source" ]]; then
+    say "missing Pi runtime dependency: $source" >&2
+    exit 1
+  fi
+done
 
 run mkdir -p "$(dirname "$PI_EXT_DEST")"
 run mkdir -p "$(dirname "$PI_CONTRACT_DEST")"
 run cp "$PI_CONTRACT_SRC" "$PI_CONTRACT_DEST"
+run cp "$PI_RESPONSE_SRC" "$PI_RESPONSE_DEST"
 run cp "$PI_EXT_SRC" "$PI_EXT_DEST"
 say "Pi extension installed: $PI_EXT_DEST"
 

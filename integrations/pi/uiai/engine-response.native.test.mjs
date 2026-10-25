@@ -78,3 +78,31 @@ test("native capture and packet tools preserve complete caller scope without inv
   await new Promise(resolve=>server.close(resolve));
  }
 });
+
+test("canonical installer ships every native adapter runtime dependency",async()=>{
+ const {mkdtemp,readFile,rm,mkdir,copyFile}=await import('node:fs/promises');
+ const {tmpdir}=await import('node:os');
+ const {join}=await import('node:path');
+ const {spawnSync}=await import('node:child_process');
+ const {fileURLToPath}=await import('node:url');
+ const home=await mkdtemp(join(tmpdir(),'uiai-owned-install-fixture-'));
+ const dest=join(home,'extensions','uiai-engine.ts');
+ try{
+  const script=fileURLToPath(new URL('../../../scripts/install-agent-integrations.sh',import.meta.url));
+  const result=spawnSync('bash',[script],{encoding:'utf8',env:{...process.env,HOME:home,UIAI_PI_EXTENSION_DEST:dest,UIAI_MCP_CONFIG_DEST:join(home,'mcp.json'),UIAI_ENGINE_URL:'http://127.0.0.1:1',UIAI_API_KEY:'',UIAI_BEARER_TOKEN:'',DRY_RUN:'0'}});
+  assert.equal(result.status,0,result.stderr);
+  const actual=await readFile(join(home,'extensions','uiai','engine-response.mjs'));
+  assert.deepEqual(actual,await readFile(new URL('./engine-response.mjs',import.meta.url)));
+  const installed=(await import(pathToFileURL(dest).href)).default;
+  const installedTools=new Map();installed({on(){},registerCommand(){},registerTool(tool){installedTools.set(tool.name,tool)}});
+  assert.ok(installedTools.get('uiai_browser_open').parameters.properties.focusa_scope);
+  assert.ok(installedTools.get('uiai_browser_screenshot'));
+  const broken=join(home,'broken-source');await mkdir(join(broken,'scripts'),{recursive:true});await mkdir(join(broken,'integrations','pi','uiai'),{recursive:true});
+  await copyFile(script,join(broken,'scripts','install-agent-integrations.sh'));
+  await copyFile(dest,join(broken,'integrations','pi','uiai-engine.ts'));
+  await copyFile(join(home,'extensions','uiai','epwa-contract.mjs'),join(broken,'integrations','pi','uiai','epwa-contract.mjs'));
+  const rejected=spawnSync('bash',[join(broken,'scripts','install-agent-integrations.sh')],{encoding:'utf8',env:{...process.env,HOME:home,UIAI_PI_EXTENSION_DEST:join(home,'must-not-install','extension.ts'),UIAI_MCP_CONFIG_DEST:join(home,'must-not-install','mcp.json'),UIAI_API_KEY:'',UIAI_BEARER_TOKEN:'',DRY_RUN:'0'}});
+  assert.notEqual(rejected.status,0);assert.match(rejected.stderr,/missing Pi runtime dependency:.*engine-response\.mjs/);
+
+ }finally{await rm(home,{recursive:true})}
+});
