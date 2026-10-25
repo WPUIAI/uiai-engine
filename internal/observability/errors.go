@@ -39,7 +39,7 @@ type ErrorEnvelope struct {
 	Status              int                  `json:"status,omitempty"`
 	ActorRef            string               `json:"actor_ref,omitempty"`
 	SuggestedNextAction string               `json:"suggested_next_action,omitempty"`
-	Retryable           bool                 `json:"retryable,omitempty"`
+	Retryable           bool                 `json:"retryable"`
 	Recover             []string             `json:"recover,omitempty"`
 	Diagnostics         string               `json:"diagnostics,omitempty"`
 	Details             map[string]any       `json:"details,omitempty"`
