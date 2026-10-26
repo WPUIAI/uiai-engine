@@ -288,3 +288,68 @@ func TestStableErrorsAreValueFree(t *testing.T) {
 		}
 	}
 }
+
+func TestT07AEffectTargetsCannotEscapePreviewAtoms(t *testing.T) {
+	p, _, v, _, _, _, _, now := validContracts(t)
+	v.ExpectedEffects[0].TargetRef = "atom:outside"
+	if !errors.Is(ValidateActionPreviewAgainst(v, p, now), ErrPreviewMismatch) {
+		t.Fatal("preview effects escaped its declared atom targets")
+	}
+}
+
+func TestT07AResultCannotBorrowAnotherProposalPreview(t *testing.T) {
+	p, _, v, _, r, _, _, _ := validContracts(t)
+	other := p
+	other.ProposalID = "proposal:other"
+	v.ProposalRef = other.ProposalID
+	v.ProposalSHA256, _ = DigestActionProposal(other)
+	v.NormalizedRequestSHA256 = v.ProposalSHA256
+	r.PreviewSHA256, _ = DigestActionPreview(v)
+	if !errors.Is(ValidateActionResultAgainst(r, p, &v), ErrPreviewMismatch) {
+		t.Fatal("result borrowed another proposal's preview")
+	}
+}
+
+func TestT07APartialEffectsCannotEscapePreview(t *testing.T) {
+	p, _, v, _, r, _, _, _ := validContracts(t)
+	r.Status = StatusPartiallyApplied
+	r.AppliedEffects = r.AppliedEffects[:1]
+	r.AppliedEffects[0].TargetRef = "atom:outside"
+	if !errors.Is(ValidateActionResultAgainst(r, p, &v), ErrActionScopeMismatch) {
+		t.Fatal("partial result accepted out-of-scope effects")
+	}
+}
+
+func TestT07ANonRequiredConfirmationStillValidatesPreview(t *testing.T) {
+	_, _, v, c, _, _, _, now := validContracts(t)
+	v.ConfirmationRequired = false
+	v.Schema = "unknown"
+	if !errors.Is(ValidateConfirmationAgainst(c, v, c.ActorRef, nil, now), ErrActionContractInvalid) {
+		t.Fatal("invalid preview bypassed confirmation boundary")
+	}
+}
+
+func TestT07AReviewCannotSupersedeItself(t *testing.T) {
+	_, _, _, _, _, _, thread, _ := validContracts(t)
+	thread.Entries[0].SupersedesRef = thread.Entries[0].EntryID
+	if !errors.Is(ValidateReviewThread(thread), ErrActionContractInvalid) {
+		t.Fatal("self-superseding review accepted")
+	}
+}
+
+func TestT07AResultRequiresMutationConfirmationPolicy(t *testing.T) {
+	p, _, v, _, r, _, _, _ := validContracts(t)
+	v.ConfirmationRequired = false
+	r.PreviewSHA256, _ = DigestActionPreview(v)
+	if !errors.Is(ValidateActionResultAgainst(r, p, &v), ErrConfirmationRequired) {
+		t.Fatal("mutation result ignored preview confirmation policy")
+	}
+}
+
+func TestT07AResultMayBeObservedAfterAdmissionExpiry(t *testing.T) {
+	p, _, v, _, r, _, _, _ := validContracts(t)
+	r.ObservedAt = p.ExpiresAt.Add(time.Minute)
+	if err := ValidateActionResultAgainst(r, p, &v); err != nil {
+		t.Fatalf("late observation confused with new admission: %v", err)
+	}
+}

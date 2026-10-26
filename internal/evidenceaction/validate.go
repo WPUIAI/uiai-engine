@@ -99,6 +99,17 @@ func ValidateActionPreview(preview ActionPreview) error {
 }
 
 func ValidateActionPreviewAgainst(preview ActionPreview, proposal ActionProposal, now time.Time) error {
+	if err := validatePreviewBinding(preview, proposal); err != nil {
+		return err
+	}
+	if !now.Before(preview.ExpiresAt) {
+		return ErrActionExpired
+	}
+	return nil
+}
+
+// Binding is independent of observation time: a receipt may arrive after admission expired.
+func validatePreviewBinding(preview ActionPreview, proposal ActionProposal) error {
 	if err := ValidateActionPreview(preview); err != nil {
 		return err
 	}
@@ -116,8 +127,15 @@ func ValidateActionPreviewAgainst(preview ActionPreview, proposal ActionProposal
 		preview.ExpectedStateVersion != proposal.ExpectedStateVersion {
 		return ErrPreviewMismatch
 	}
-	if !now.Before(preview.ExpiresAt) || preview.ExpiresAt.After(proposal.ExpiresAt) {
+	if preview.ExpiresAt.After(proposal.ExpiresAt) {
 		return ErrActionExpired
+	}
+	effectTargets := make([]string, 0, len(preview.ExpectedEffects))
+	for _, effect := range preview.ExpectedEffects {
+		effectTargets = append(effectTargets, effect.TargetRef)
+	}
+	if !subset(effectTargets, preview.TargetRefs) {
+		return ErrPreviewMismatch
 	}
 	if proposal.SideEffect != EffectReadOnly && len(preview.ExpectedEffects) == 0 {
 		return ErrPreviewMismatch
@@ -129,6 +147,9 @@ func ValidateActionPreviewAgainst(preview ActionPreview, proposal ActionProposal
 }
 
 func ValidateConfirmationAgainst(confirmation ActionConfirmation, preview ActionPreview, actorRef string, usedNonces map[string]struct{}, now time.Time) error {
+	if err := ValidateActionPreview(preview); err != nil {
+		return err
+	}
 	if !preview.ConfirmationRequired {
 		return nil
 	}
@@ -207,7 +228,7 @@ func ValidateActionResultAgainst(result ActionResult, proposal ActionProposal, p
 		return ErrPreviewRequired
 	}
 	if preview != nil {
-		if err := ValidateActionPreview(*preview); err != nil {
+		if err := validatePreviewBinding(*preview, proposal); err != nil {
 			return err
 		}
 		previewDigest, err := DigestActionPreview(*preview)
@@ -216,6 +237,9 @@ func ValidateActionResultAgainst(result ActionResult, proposal ActionProposal, p
 		}
 		if result.PreviewRef != preview.PreviewID || result.PreviewSHA256 != previewDigest {
 			return ErrPreviewMismatch
+		}
+		if !effectsWithin(preview.ExpectedEffects, result.AppliedEffects) {
+			return ErrActionScopeMismatch
 		}
 		if result.Status == StatusSucceeded && !effectsMatch(preview.ExpectedEffects, result.AppliedEffects) {
 			return ErrActionContractInvalid
@@ -284,6 +308,9 @@ func ValidateReviewThread(thread ReviewThread) error {
 			return ErrActionContractInvalid
 		}
 		if !blank(entry.SupersedesRef) {
+			if entry.SupersedesRef == entry.EntryID {
+				return ErrActionContractInvalid
+			}
 			if _, exists := seen[entry.SupersedesRef]; !exists {
 				return ErrActionContractInvalid
 			}
@@ -398,9 +425,9 @@ func subset(values, allowed []string) bool {
 	return true
 }
 func effectsMatch(expected []ExpectedEffect, actual []AppliedEffect) bool {
-	if len(expected) != len(actual) {
-		return false
-	}
+	return len(expected) == len(actual) && effectsWithin(expected, actual)
+}
+func effectsWithin(expected []ExpectedEffect, actual []AppliedEffect) bool {
 	byRef := make(map[string]ExpectedEffect, len(expected))
 	for _, effect := range expected {
 		byRef[effect.EffectRef] = effect
