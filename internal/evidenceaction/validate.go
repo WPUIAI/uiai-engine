@@ -188,8 +188,9 @@ func ValidateActionResult(result ActionResult) error {
 			return ErrActionContractInvalid
 		}
 	}
+	compensationIDs := make(map[string]struct{}, len(result.Compensations))
 	for _, compensation := range result.Compensations {
-		if blank(compensation.EffectRef) || blank(compensation.CompensationRef) ||
+		if blank(compensation.EffectRef) || blank(compensation.CompensationRef) || !addUnique(compensationIDs, compensation.CompensationRef) ||
 			(compensation.Status != "pending" && compensation.Status != "succeeded" && compensation.Status != "failed" && compensation.Status != "outcome_unknown") ||
 			(compensation.Status == "succeeded" && blank(compensation.EvidenceRef)) {
 			return ErrActionContractInvalid
@@ -213,6 +214,9 @@ func ValidateActionResultAgainst(result ActionResult, proposal ActionProposal, p
 	}
 	if err := ValidateActionProposal(proposal); err != nil {
 		return err
+	}
+	if proposal.SideEffect == EffectReadOnly && len(result.Compensations) > 0 {
+		return ErrActionScopeMismatch
 	}
 	proposalDigest, err := DigestActionProposal(proposal)
 	if err != nil {
@@ -238,7 +242,7 @@ func ValidateActionResultAgainst(result ActionResult, proposal ActionProposal, p
 		if result.PreviewRef != preview.PreviewID || result.PreviewSHA256 != previewDigest {
 			return ErrPreviewMismatch
 		}
-		if !effectsWithin(preview.ExpectedEffects, result.AppliedEffects) {
+		if !effectsWithin(preview.ExpectedEffects, result.AppliedEffects, result.Compensations...) {
 			return ErrActionScopeMismatch
 		}
 		if result.Status == StatusSucceeded && !effectsMatch(preview.ExpectedEffects, result.AppliedEffects) {
@@ -427,7 +431,7 @@ func subset(values, allowed []string) bool {
 func effectsMatch(expected []ExpectedEffect, actual []AppliedEffect) bool {
 	return len(expected) == len(actual) && effectsWithin(expected, actual)
 }
-func effectsWithin(expected []ExpectedEffect, actual []AppliedEffect) bool {
+func effectsWithin(expected []ExpectedEffect, actual []AppliedEffect, compensations ...Compensation) bool {
 	byRef := make(map[string]ExpectedEffect, len(expected))
 	for _, effect := range expected {
 		byRef[effect.EffectRef] = effect
@@ -435,6 +439,11 @@ func effectsWithin(expected []ExpectedEffect, actual []AppliedEffect) bool {
 	for _, effect := range actual {
 		want, ok := byRef[effect.EffectRef]
 		if !ok || want.TargetRef != effect.TargetRef {
+			return false
+		}
+	}
+	for _, compensation := range compensations {
+		if _, ok := byRef[compensation.EffectRef]; !ok {
 			return false
 		}
 	}

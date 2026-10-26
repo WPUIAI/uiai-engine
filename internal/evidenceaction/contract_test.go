@@ -353,3 +353,59 @@ func TestT07AResultMayBeObservedAfterAdmissionExpiry(t *testing.T) {
 		t.Fatalf("late observation confused with new admission: %v", err)
 	}
 }
+
+func TestT07ACompensationTargetsStayInsidePreview(t *testing.T) {
+	proposal, _, preview, _, result, _, _, _ := validContracts(t)
+	result.Status = StatusPartiallyApplied
+	result.AppliedEffects = result.AppliedEffects[:1]
+	result.Compensations = []Compensation{{EffectRef: "effect:foreign", CompensationRef: "compensation:1", Status: "pending"}}
+	if !errors.Is(ValidateActionResultAgainst(result, proposal, &preview), ErrActionScopeMismatch) {
+		t.Fatal("foreign compensation escaped preview scope")
+	}
+	result.Status = StatusOutcomeUnknown
+	result.ErrorCodes = []string{"response_lost"}
+	if !errors.Is(ValidateActionResultAgainst(result, proposal, &preview), ErrActionScopeMismatch) {
+		t.Fatal("unknown outcome hid foreign compensation")
+	}
+}
+
+func TestT07ACompensationIdentitiesCannotAlias(t *testing.T) {
+	_, _, preview, _, result, _, _, _ := validContracts(t)
+	result.Status = StatusPartiallyApplied
+	result.Compensations = []Compensation{{EffectRef: preview.ExpectedEffects[0].EffectRef, CompensationRef: "compensation:duplicate", Status: "pending"}, {EffectRef: preview.ExpectedEffects[1].EffectRef, CompensationRef: "compensation:duplicate", Status: "failed"}}
+	if !errors.Is(ValidateActionResult(result), ErrActionContractInvalid) {
+		t.Fatal("one compensation identity represented conflicting effects")
+	}
+}
+
+func TestT07AReadOnlyResultCannotClaimCompensation(t *testing.T) {
+	proposal, _, _, _, result, _, _, _ := validContracts(t)
+	proposal.Action = ActionInspect
+	proposal.SideEffect = EffectReadOnly
+	result.ProposalSHA256, _ = DigestActionProposal(proposal)
+	result.PreviewRef = ""
+	result.PreviewSHA256 = ""
+	result.AppliedEffects = nil
+	result.Compensations = []Compensation{{EffectRef: "effect:1", CompensationRef: "compensation:1", Status: "pending"}}
+	if !errors.Is(ValidateActionResultAgainst(result, proposal, nil), ErrActionScopeMismatch) {
+		t.Fatal("read-only result claimed mutation compensation")
+	}
+}
+
+func TestT07AKnownPreviewCompensationCanDescribeUnobservedEffect(t *testing.T) {
+	proposal, _, preview, _, result, _, _, _ := validContracts(t)
+	result.Status = StatusPartiallyApplied
+	result.AppliedEffects = result.AppliedEffects[:1]
+	result.Compensations = []Compensation{{EffectRef: preview.ExpectedEffects[1].EffectRef, CompensationRef: "compensation:1", Status: "pending"}}
+	if err := ValidateActionResultAgainst(result, proposal, &preview); err != nil {
+		t.Fatal("known preview effect lost pending compensation", err)
+	}
+	result.Compensations[0].Status = "succeeded"
+	if !errors.Is(ValidateActionResult(result), ErrActionContractInvalid) {
+		t.Fatal("rollback success claimed without evidence")
+	}
+	result.Compensations[0].EvidenceRef = "evidence:compensation:1"
+	if err := ValidateActionResultAgainst(result, proposal, &preview); err != nil {
+		t.Fatal("evidence-backed compensation rejected", err)
+	}
+}
