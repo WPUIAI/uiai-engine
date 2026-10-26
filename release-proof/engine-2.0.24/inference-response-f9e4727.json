@@ -1,0 +1,29 @@
+{
+  "schema": "uiai.inference_response_validation_proof.v1",
+  "issue": 268,
+  "implementation_revision": "f9e4727",
+  "version": "2.0.24",
+  "build": "2026-10-26T09:05:13Z+f9e4727",
+  "running_sha256": "72eaf83be116d390bcaaa436a36b15ffdb87dc98b33ae52d6e4d9373f6c81070",
+  "verified": [
+    "RED12false-success cases: OpenAI/Anthropic malformedJSON/null/emptyobject, all3dialects typedJSON decode errors and validJSON followed by readerfailure were published as successful responses",
+    "GREEN one checked decoder/required-text owner rejects reader errors, invalidJSON/types/missing/whitespace-only text before response publication; safe phase/IO classification reuses existing failure owner",
+    "Owned read buffers wiped best-effort after decoding/error; no raw parser/read cause retained; read context identity preserved",
+    "Actual Complete fixture malformed protocol failure is nonretryable and sends zero configured fallback requests; transient unexpectedEOF reader failure invokes exactly one configured fixture fallback",
+    "Anthropic text blocks collected after thinking/nontext blocks, missing-type legacy fixtures accepted, multiple text fragments concatenate without rewriting whitespace; OpenAI text whitespace and existing VLM trim behavior preserved",
+    "Numeric HTTP status failures retain precedence and existing application failure/transport/context/default/initialorigin/redirect/cache/wipe/failover regressions remain green",
+    "20 repeated allAI race runs,fullGo/vet,17native-shared-MCPclient tests,prepush andWindowsamd64/Darwinarm64 crossbuilds passed",
+    "Canonical idle-safe rollback-preserving deploy verified both named workers active/healthy/running executable hashes",
+    "Both installed-worker ordinary source/browser/security/search/cleanup regression probes passed; paid_provider_probes_performed=false and owned sessions closed"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-f9e4727.json",
+  "live_probe_observed_at": "2026-10-26T09:05:53Z",
+  "limits": [
+    "Controlled provider/read/parse/cancellation fixtures only, no real paid inference/provider availability/realcredentialexposure evidence",
+    "Response-size admission/general initial URL policy/full86broker ref/lease/events/revocationSLA/twofactor/wholeheapwipe remain outside acceptance",
+    "Existing MiniMax VLM-to-text fallback remains eligible; invalid individual responses are not published as successful completion",
+    "No provider/key/account/config/default/fallbackpolicy/dependency/service/monitor change; Brave retained/Jina absent",
+    "No scopedEPWA/pixel/nativeOS/publicRelease/current native research-array activation proof; browser artifacts unsealed/deliveryblocked",
+    "Original unrelated dirt preserved, ownerwrites/OVHpayload only, no duplicate checkout/Focusa repair/green admission/accepted background-job claim; standing UIAI-only scoped continuation receipt retained in cache foundation proof"
+  ]
+}
