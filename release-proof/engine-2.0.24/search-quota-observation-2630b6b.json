@@ -1,0 +1,36 @@
+{
+  "schema": "uiai.search_quota_observation_proof.v1",
+  "issue": 90,
+  "work_item": "uiai-engine-8v56",
+  "source_revision": "2630b6b",
+  "version": "2.0.24",
+  "build": "2026-10-26T04:15:32Z+2630b6b",
+  "running_sha256": "f8d2a063faa00b1b1570aa956ee37dc83b4b30503cb8e28f1a3c66405cdc3d67",
+  "protocol_source": "https://api-dashboard.search.brave.com/documentation/guides/rate-limiting",
+  "protocol_source_ref": "uiai-source-markdown:sha256:7e8c59a2eaf6f8e7",
+  "verified": [
+    "Source-verified Brave multi-window Limit/Policy/Remaining/Reset contract; initial guessedresourcesURL404 was a wrong-path probe, not a provider/product outage; correctguide found using actualDDGpublicresearch",
+    "Shared SearchRuntime retains at most one latest-valid numeric observation per supported provider slot, no new permanent ledger/account/secret store or policy authority",
+    "Internal execution-context provider/requestsequence binding, never URL/header credential inference; earlier-started responses cannot overwrite newer attempt observations",
+    "Strict coherent atmost8windows,1024byteperheader,53bitdecimalcounts/boundedresetseconds; malformed/missing/mismatched/negative/overflow/rawprivate headers rejected without leaking rawstrings",
+    "Quota fields explicitly as-observed/advisory_only, scopeengine_runtime_provider_slot, accountbindingnot_verified, currentremainingunknown; zero limit denotes documentedunlimited only",
+    "Local received_at notproviderbillingtime; snapshot stale after5min orclockuncertainty; resetelapsed flag cannot replenish counts or mint credit/permission",
+    "Cachehit/discovery/health never send providerquery, refreshquota timestamp orsimulatebilling; cloned windowprojection cannotmutateruntime;50concurrentrequests keepbounded state",
+    "Existing providerinventory owns optionalquota, setup/agent-card quota_observations, and browserhealth reuse the same snapshot; globalremaining_quota_statusremainsunknown",
+    "SharedHTTP fixture observation was REDbefore/GREENafter; malformed/unlimited/repeatedheaders/response429/sequence/stale/clock/clone/cache/unbound/wrongprovider/concurrency cases pass",
+    "Quota10xrace plus allselectedSearch/DDG/Research5xrace,fullGo,vetroutes/server/config,17native/shared/MCPtests,canonicalprepush,Windowsamd64/Darwinarm64crossbuildspass",
+    "Both named workers canonicalidle-safe/rollback-preserving deployed,active/healthy/runninghashverified; current defaultBrave unchanged,DDG admitted",
+    "Both installed workers card/providerquota projections present but empty, unknown preserved; ordinary browser/citation/inline/semanticcanary/OAuthURL/search-preflight/ownedcleanup regressionspass withNOpaidproviderquery",
+    "ACTUALCURRENTMCPagentcard exposes quota_observations:{} and remaining_quota_status:unknown withoutclientinstall/reload/providercall"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-2630b6b.json",
+  "live_probe_observed_at": "2026-10-26T04:16:15Z",
+  "live_quota_observed_provider_ids": [],
+  "limits": [
+    "Positive Brave observations are LOOPBACKFIXTURE proof, not actual account quota/paidprovider acceptance",
+    "No verified accountbinding/currentspendingauthority, autoquota admission, replenishment, durablehistoryledger or full90/91closure",
+    "No additional dependencies/accounts/credentials/config/default/fallback/serviceprovisioning; original unrelated dirt preserved",
+    "Earlier DDG real validation5221be2 plus subsequent genuine public-doc lookup succeeded, but current2630b6b deliveryregression did not issue anotherexternalproviderquery",
+    "Unsealed/deliveryblocked browserartifacts, no scopedEPWA/pixel/publicRelease/nativeOS/newnative-researchschemaactivation proof"
+  ]
+}
