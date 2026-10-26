@@ -1274,9 +1274,16 @@ func (s *Session) ReadPageContext(caller context.Context, opts ReadOptions) (*Pa
 	}
 	text := strings.TrimSpace(raw.Text)
 	truncated := false
-	if len(text) > opts.MaxChars {
-		text = text[:opts.MaxChars]
-		truncated = true
+	chars := 0
+	// The public budget counts Unicode code points, not UTF-8 bytes. Stop at
+	// the first excess rune without allocating a copy of an unbounded page.
+	for index := range text {
+		if chars == opts.MaxChars {
+			text = text[:index]
+			truncated = true
+			break
+		}
+		chars++
 	}
 
 	s.Title = raw.Title
@@ -1291,7 +1298,7 @@ func (s *Session) ReadPageContext(caller context.Context, opts ReadOptions) (*Pa
 		Format:      format,
 		Mode:        mode,
 		Text:        text,
-		Chars:       len(text),
+		Chars:       chars,
 		Truncated:   truncated,
 		Headings:    raw.Headings,
 		Metadata: map[string]any{
@@ -1301,7 +1308,7 @@ func (s *Session) ReadPageContext(caller context.Context, opts ReadOptions) (*Pa
 			"site_name":     raw.SiteName,
 			"captured_at":   time.Now().UTC().Format(time.RFC3339),
 		},
-		Focusa: buildReadFocusaMetadata(s.ID, readSeq, raw.URL, raw.Title, raw.Selector, len(text), truncated, format, s.FocusaScope),
+		Focusa: buildReadFocusaMetadata(s.ID, readSeq, raw.URL, raw.Title, raw.Selector, chars, truncated, format, s.FocusaScope),
 	}
 	if opts.IncludeLinks {
 		out.Links = raw.Links

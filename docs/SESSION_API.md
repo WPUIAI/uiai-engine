@@ -53,7 +53,7 @@ Exact grants/limits come from the signed authority policy.
 | `POST` | `/api/session/{id}/press` | keypress | action scope |
 | `POST` | `/api/session/{id}/scroll` | scroll | action scope |
 | `POST` | `/api/session/{id}/screenshot` | capture current page (artifact-ref default: metadata + artifact_url, no inline pixels) | screenshot feature/limit |
-| `GET` | `/api/session/{id}/read` | compact page text (query: selector, max_chars, include_links, include_images, format, mode) | session feature/scope |
+| `GET` | `/api/session/{id}/read` | compact page text (query: selector, max_chars (Unicode code points, not bytes), include_links, include_images, format, mode) | session feature/scope |
 | `GET` | `/api/session/{id}/diagnostics` | console/exceptions/network/failures | diagnostics feature and redaction |
 | `POST` | `/api/session/{id}/eval` | run bounded JavaScript | sensitive feature; may be excluded from Evaluation |
 | `POST` | `/api/session/{id}/css` | inject CSS | sensitive action scope |
