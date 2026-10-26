@@ -432,3 +432,21 @@ func TestSanitizeMarkdownPayloadRedactsLinksMetadataAndText(t *testing.T) {
 		t.Fatalf("missing redaction markers: %+v", got)
 	}
 }
+
+func TestMarkdownTokenTypeDocsUseSharedCredentialRedaction(t *testing.T) {
+	docs := "case html.ErrorToken:\nreturn z.Err()\ncase html.TextToken:\nif depth > 0 { emit(z.Text()) }\nspecification"
+	if got := sanitizeMarkdownText(docs); got != docs {
+		t.Fatal("Markdown conversion independently masks public token-type docs")
+	}
+	for _, label := range []string{"token", "authToken", "sessionToken", "api_key", "password"} {
+		for _, value := range []string{"if", "UIAI_SYNTHETIC_DOCS_VALUE_0123456789"} {
+			got := sanitizeMarkdownText(label + "=" + value)
+			if !strings.Contains(got, label+"=REDACTED") || strings.HasSuffix(got, "="+value) {
+				t.Fatal("shared Markdown redaction lost labelled credential or legacy marker")
+			}
+			if sanitizeMarkdownText(got) != got {
+				t.Fatal("Markdown legacy marker is not idempotent")
+			}
+		}
+	}
+}

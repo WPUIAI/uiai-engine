@@ -15,6 +15,7 @@ import (
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
+	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
@@ -953,8 +954,8 @@ func sanitizeMarkdownText(value string) string {
 		return value
 	}
 	out := markdownURLRe.ReplaceAllStringFunc(value, sanitizeMarkdownURLForFocusa)
-	out = regexp.MustCompile(`(?i)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|cookie|set-cookie)\s*[:=]\s*)[^\s,;&)\]]+`).ReplaceAllString(out, `${1}REDACTED`)
-	return out
+	// Shared credential recognition; preserve this surface's legacy marker.
+	return strings.ReplaceAll(secrettext.Text(out), secrettext.Marker, "REDACTED")
 }
 
 func sanitizeMarkdownLinks(links []map[string]any) []map[string]any {
