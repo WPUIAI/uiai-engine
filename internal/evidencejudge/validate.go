@@ -41,7 +41,7 @@ func digestContract(value any) (string, error) {
 }
 
 func ValidateJudgeView(view JudgeView) error {
-	if view.Schema != JudgeViewSchema || blank(view.ViewID) {
+	if view.Schema != JudgeViewSchema || !validJudgeRef(view.ViewID) {
 		return ErrJudgeViewInvalid
 	}
 	if err := errSize(view); err != nil {
@@ -50,8 +50,8 @@ func ValidateJudgeView(view JudgeView) error {
 	if err := validateArtifact(view.Artifact); err != nil {
 		return err
 	}
-	if blank(view.CompletionContractRef) || blank(view.CompletionContractRevision) ||
-		blank(view.InformationSetRef) || !validSHA256(view.InformationSetSHA256) {
+	if !validJudgeRef(view.CompletionContractRef) || blank(view.CompletionContractRevision) ||
+		!validJudgeRef(view.InformationSetRef) || !validSHA256(view.InformationSetSHA256) {
 		return ErrJudgeViewInvalid
 	}
 	if view.CreatedAt.IsZero() || !view.ExpiresAt.After(view.CreatedAt) {
@@ -105,10 +105,10 @@ func ValidateJudgeViewAt(view JudgeView, now time.Time) error {
 }
 
 func ValidateJudgeRequest(req JudgeRequest) error {
-	if req.Schema != JudgeRequestSchema || blank(req.RequestID) || blank(req.IdempotencyRef) ||
-		blank(req.ViewRef) || !validSHA256(req.ViewSHA256) || blank(req.InformationSetRef) ||
-		!validSHA256(req.InformationSetSHA256) || blank(req.AssignmentRef) ||
-		blank(req.ExecutorIdentityRef) || blank(req.VerifierIdentityRef) || req.ExpiresAt.IsZero() {
+	if req.Schema != JudgeRequestSchema || !validJudgeRef(req.RequestID) || !validJudgeRef(req.IdempotencyRef) ||
+		!validJudgeRef(req.ViewRef) || !validSHA256(req.ViewSHA256) || !validJudgeRef(req.InformationSetRef) ||
+		!validSHA256(req.InformationSetSHA256) || !validJudgeRef(req.AssignmentRef) ||
+		!validJudgeRef(req.ExecutorIdentityRef) || !validJudgeRef(req.VerifierIdentityRef) || req.ExpiresAt.IsZero() {
 		return ErrJudgeRequestInvalid
 	}
 	if err := errSize(req); err != nil {
@@ -117,9 +117,9 @@ func ValidateJudgeRequest(req JudgeRequest) error {
 	if req.ExecutorIdentityRef == req.VerifierIdentityRef {
 		return ErrJudgeAssignmentInvalid
 	}
-	if len(req.PolicyRefs) == 0 || len(req.PolicyRefs) > MaxRefs || hasBlankOrDuplicate(req.PolicyRefs) ||
+	if len(req.PolicyRefs) == 0 || len(req.PolicyRefs) > MaxRefs || !validJudgeRefs(req.PolicyRefs, MaxRefs) ||
 		len(req.AcceptanceAtomRefs) == 0 || len(req.AcceptanceAtomRefs) > MaxAcceptanceAtoms ||
-		hasBlankOrDuplicate(req.AcceptanceAtomRefs) {
+		!validJudgeRefs(req.AcceptanceAtomRefs, MaxAcceptanceAtoms) {
 		return ErrJudgeRequestInvalid
 	}
 	if len(req.RequiredModalities) == 0 || len(req.RequiredModalities) > MaxModalities {
@@ -127,7 +127,7 @@ func ValidateJudgeRequest(req JudgeRequest) error {
 	}
 	seenRequirements := make(map[string]struct{}, len(req.RequiredModalities))
 	for _, requirement := range req.RequiredModalities {
-		if !validRequirementShape(requirement) {
+		if !validRequirementShape(requirement) || !contains(req.AcceptanceAtomRefs, requirement.AtomRef) {
 			return ErrJudgeRequestInvalid
 		}
 		if _, exists := seenRequirements[requirement.RequirementID]; exists {
@@ -188,9 +188,9 @@ func ValidateJudgeRequestAgainst(req JudgeRequest, view JudgeView) error {
 }
 
 func ValidateJudgeResult(result JudgeResult) error {
-	if result.Schema != JudgeResultSchema || blank(result.ResultID) || blank(result.RequestID) ||
-		!validSHA256(result.RequestSHA256) || blank(result.ViewRef) || !validSHA256(result.ViewSHA256) ||
-		!validSHA256(result.InformationSetSHA256) || blank(result.JudgeIdentityRef) ||
+	if result.Schema != JudgeResultSchema || !validJudgeRef(result.ResultID) || !validJudgeRef(result.RequestID) ||
+		!validSHA256(result.RequestSHA256) || !validJudgeRef(result.ViewRef) || !validSHA256(result.ViewSHA256) ||
+		!validSHA256(result.InformationSetSHA256) || !validJudgeRef(result.JudgeIdentityRef) ||
 		blank(result.ModelProvider) || blank(result.ModelVersion) || !validSHA256(result.CapabilityDigest) ||
 		blank(result.PolicyRevision) || result.EvaluatedAt.IsZero() || !validOutcome(result.Outcome) ||
 		result.ConfidencePPM > 1_000_000 {
@@ -200,18 +200,18 @@ func ValidateJudgeResult(result JudgeResult) error {
 		return err
 	}
 	if len(result.AtomDecisions) == 0 || len(result.AtomDecisions) > MaxAcceptanceAtoms ||
-		len(result.CitationIDs) > MaxCitations || hasBlankOrDuplicate(result.CitationIDs) ||
+		len(result.CitationIDs) > MaxCitations || !validJudgeRefs(result.CitationIDs, MaxCitations) ||
 		len(result.Rationales) > MaxRationales || len(result.ContradictionRefs) > MaxRefs ||
 		len(result.OmissionRefs) > MaxRefs || len(result.DisagreementRefs) > MaxRefs ||
 		len(result.AppealRefs) > MaxRefs || len(result.ErrorCodes) > MaxRefs ||
-		hasBlankOrDuplicate(result.ContradictionRefs) || hasBlankOrDuplicate(result.OmissionRefs) ||
-		hasBlankOrDuplicate(result.DisagreementRefs) || hasBlankOrDuplicate(result.AppealRefs) {
+		!validJudgeRefs(result.ContradictionRefs, MaxRefs) || !validJudgeRefs(result.OmissionRefs, MaxRefs) ||
+		!validJudgeRefs(result.DisagreementRefs, MaxRefs) || !validJudgeRefs(result.AppealRefs, MaxRefs) {
 		return ErrJudgeResultInvalid
 	}
 	decisions := make(map[string]Verdict, len(result.AtomDecisions))
 	for _, decision := range result.AtomDecisions {
-		if blank(decision.AtomRef) || !validVerdict(decision.Verdict) || blank(decision.ReasonCode) ||
-			hasBlankOrDuplicate(decision.CitationIDs) {
+		if !validJudgeRef(decision.AtomRef) || !validVerdict(decision.Verdict) || blank(decision.ReasonCode) ||
+			!validJudgeRefs(decision.CitationIDs, MaxCitations) {
 			return ErrJudgeResultInvalid
 		}
 		if _, exists := decisions[decision.AtomRef]; exists {
@@ -226,7 +226,7 @@ func ValidateJudgeResult(result JudgeResult) error {
 	for _, rationale := range result.Rationales {
 		if _, ok := decisions[rationale.AtomRef]; !ok || blank(rationale.Summary) ||
 			utf8.RuneCountInString(rationale.Summary) > MaxRationaleRunes ||
-			len(rationale.CitationIDs) == 0 || hasBlankOrDuplicate(rationale.CitationIDs) {
+			len(rationale.CitationIDs) == 0 || !validJudgeRefs(rationale.CitationIDs, MaxCitations) {
 			return ErrJudgeResultInvalid
 		}
 		if _, duplicate := rationaleAtoms[rationale.AtomRef]; duplicate {
@@ -274,7 +274,7 @@ func ValidateJudgeResultAgainst(result JudgeResult, req JudgeRequest, view Judge
 	if result.JudgeIdentityRef != req.VerifierIdentityRef || result.JudgeIdentityRef == req.ExecutorIdentityRef {
 		return ErrJudgeAssignmentInvalid
 	}
-	if result.EvaluatedAt.After(req.ExpiresAt) || result.EvaluatedAt.Before(view.CreatedAt) {
+	if !result.EvaluatedAt.Before(req.ExpiresAt) || result.EvaluatedAt.Before(view.CreatedAt) {
 		return ErrJudgeExpired
 	}
 	if result.PolicyRevision != view.Policy.PolicyRevision {
@@ -284,9 +284,13 @@ func ValidateJudgeResultAgainst(result JudgeResult, req JudgeRequest, view Judge
 	for _, atom := range view.AcceptanceAtoms {
 		atoms[atom.AtomRef] = struct{}{}
 	}
-	citations := make(map[string]struct{}, len(view.Citations))
+	citations := make(map[string]Citation, len(view.Citations))
 	for _, citation := range view.Citations {
-		citations[citation.CitationID] = struct{}{}
+		citations[citation.CitationID] = citation
+	}
+	allowed := make(map[Verdict]struct{}, len(view.AllowedVerdicts))
+	for _, verdict := range view.AllowedVerdicts {
+		allowed[verdict] = struct{}{}
 	}
 	resultCitations := stringSet(result.CitationIDs)
 	if len(result.AtomDecisions) != len(atoms) || !allExist(result.CitationIDs, citations) {
@@ -296,12 +300,18 @@ func ValidateJudgeResultAgainst(result JudgeResult, req JudgeRequest, view Judge
 		if _, ok := atoms[decision.AtomRef]; !ok || !allExist(decision.CitationIDs, citations) || !allExist(decision.CitationIDs, resultCitations) {
 			return ErrJudgeResultInvalid
 		}
+		if !hasVerdict(allowed, decision.Verdict) {
+			return ErrJudgeResultInvalid
+		}
+		if !citationsBindAtom(decision.CitationIDs, decision.AtomRef, citations) {
+			return ErrCitationInvalid
+		}
 		if view.Policy.RequiredCitations && len(decision.CitationIDs) == 0 {
 			return ErrCitationInvalid
 		}
 	}
 	for _, rationale := range result.Rationales {
-		if !allExist(rationale.CitationIDs, citations) || !allExist(rationale.CitationIDs, resultCitations) {
+		if !allExist(rationale.CitationIDs, citations) || !allExist(rationale.CitationIDs, resultCitations) || !citationsBindAtom(rationale.CitationIDs, rationale.AtomRef, citations) {
 			return ErrCitationInvalid
 		}
 	}
@@ -320,11 +330,26 @@ func validateArtifact(binding ArtifactBinding) error {
 		!validSHA256(binding.ManifestSHA256) || blank(binding.Scope.ProjectRef) ||
 		blank(binding.Scope.WorkstreamRef) || blank(binding.Scope.WorksetRef) ||
 		blank(binding.Scope.CallGraphRef) || blank(binding.Scope.WorkpointRef) ||
-		blank(binding.Scope.WorkItemRef) || hasBlankOrDuplicate(binding.AttestationRefs) ||
-		hasBlankOrDuplicate(binding.TrustRefs) || hasBlankOrDuplicate(binding.SecurityRefs) {
+		blank(binding.Scope.WorkItemRef) || !validJudgeRefs(binding.AttestationRefs, MaxRefs) ||
+		!validJudgeRefs(binding.TrustRefs, MaxRefs) || !validJudgeRefs(binding.SecurityRefs, MaxRefs) {
 		return ErrJudgeViewInvalid
 	}
+	for _, ref := range []string{binding.ArtifactRef, binding.Scope.ProjectRef, binding.Scope.WorkstreamRef, binding.Scope.WorksetRef, binding.Scope.CallGraphRef, binding.Scope.WorkpointRef, binding.Scope.WorkItemRef} {
+		if !validJudgeRef(ref) {
+			return ErrJudgeViewInvalid
+		}
+	}
 	return nil
+}
+
+func citationsBindAtom(ids []string, atom string, citations map[string]Citation) bool {
+	for _, id := range ids {
+		c, ok := citations[id]
+		if !ok || (!contains(c.SupportsAtoms, atom) && !contains(c.RebutsAtoms, atom)) {
+			return false
+		}
+	}
+	return true
 }
 
 func validateAtoms(in []AcceptanceAtom) (map[string]struct{}, error) {
@@ -333,16 +358,18 @@ func validateAtoms(in []AcceptanceAtom) (map[string]struct{}, error) {
 	}
 	out := make(map[string]struct{}, len(in))
 	for _, atom := range in {
-		if blank(atom.AtomRef) || atom.Revision == 0 || blank(atom.Question) || len(atom.RequiredModalities) > MaxModalities {
+		if !validJudgeRef(atom.AtomRef) || atom.Revision == 0 || blank(atom.Question) || len(atom.RequiredModalities) > MaxModalities {
 			return nil, ErrJudgeViewInvalid
 		}
 		if _, exists := out[atom.AtomRef]; exists {
 			return nil, ErrJudgeViewInvalid
 		}
+		seenModalities := make(map[Modality]bool, len(atom.RequiredModalities))
 		for _, modality := range atom.RequiredModalities {
-			if !validModality(modality) {
+			if !validModality(modality) || seenModalities[modality] {
 				return nil, ErrJudgeViewInvalid
 			}
+			seenModalities[modality] = true
 		}
 		out[atom.AtomRef] = struct{}{}
 	}
@@ -355,7 +382,7 @@ func validateSources(in []EvidenceSource) (map[string]EvidenceSource, error) {
 	}
 	out := make(map[string]EvidenceSource, len(in))
 	for _, source := range in {
-		if blank(source.SourceRef) || !validSHA256(source.SHA256) || !validModality(source.Modality) {
+		if !validJudgeRef(source.SourceRef) || !validSHA256(source.SHA256) || !validModality(source.Modality) {
 			return nil, ErrJudgeViewInvalid
 		}
 		if _, exists := out[source.SourceRef]; exists {
@@ -373,10 +400,10 @@ func validateCitations(in []Citation, sources map[string]EvidenceSource, atoms m
 	out := make(map[string]Citation, len(in))
 	for _, citation := range in {
 		source, ok := sources[citation.SourceRef]
-		if citation.Schema != JudgeCitationSchema || blank(citation.CitationID) || !ok ||
+		if citation.Schema != JudgeCitationSchema || !validJudgeRef(citation.CitationID) || !ok ||
 			citation.SourceSHA256 != source.SHA256 || citation.Modality != source.Modality ||
-			!validLocator(citation.Locator) || (len(citation.SupportsAtoms) == 0 && len(citation.RebutsAtoms) == 0) ||
-			hasBlankOrDuplicate(citation.SupportsAtoms) || hasBlankOrDuplicate(citation.RebutsAtoms) {
+			!validLocator(citation.Locator) || !locatorMatchesModality(citation.Locator, citation.Modality) || (len(citation.SupportsAtoms) == 0 && len(citation.RebutsAtoms) == 0) ||
+			!validJudgeRefs(citation.SupportsAtoms, MaxAcceptanceAtoms) || !validJudgeRefs(citation.RebutsAtoms, MaxAcceptanceAtoms) {
 			return nil, ErrCitationInvalid
 		}
 		if _, exists := out[citation.CitationID]; exists || !allExist(citation.SupportsAtoms, atoms) ||
@@ -394,9 +421,9 @@ func validateRequirements(in []ModalityRequirement, atoms map[string]struct{}, c
 	}
 	seen := make(map[string]struct{}, len(in))
 	for _, requirement := range in {
-		if requirement.Schema != JudgeModalitySchema || blank(requirement.RequirementID) ||
+		if requirement.Schema != JudgeModalitySchema || !validJudgeRef(requirement.RequirementID) ||
 			!validModality(requirement.Modality) || !validModalityStatus(requirement.Status) ||
-			hasBlankOrDuplicate(requirement.CitationIDs) {
+			!validJudgeRefs(requirement.CitationIDs, MaxCitations) {
 			return ErrJudgeViewInvalid
 		}
 		if _, ok := atoms[requirement.AtomRef]; !ok {
@@ -437,8 +464,8 @@ func requirementsCoverAtoms(atoms []AcceptanceAtom, requirements []ModalityRequi
 }
 
 func validatePolicy(policy JudgePolicy) error {
-	if blank(policy.PolicyRef) || blank(policy.PolicyRevision) || blank(policy.RubricRef) ||
-		blank(policy.ContradictionPolicyRef) || len(policy.ForbiddenAssumptions) > MaxForbiddenAssumptions ||
+	if !validJudgeRef(policy.PolicyRef) || blank(policy.PolicyRevision) || !validJudgeRef(policy.RubricRef) ||
+		!validJudgeRef(policy.ContradictionPolicyRef) || (policy.BlindingProfileRef != "" && !validJudgeRef(policy.BlindingProfileRef)) || len(policy.ForbiddenAssumptions) > MaxForbiddenAssumptions ||
 		hasBlankOrDuplicate(policy.ForbiddenAssumptions) {
 		return ErrJudgeViewInvalid
 	}

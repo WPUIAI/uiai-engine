@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -291,4 +292,225 @@ func deepCopy[T any](in T) T {
 	var out T
 	_ = json.Unmarshal(body, &out)
 	return out
+}
+
+func TestT06ACrossAtomEvidenceCannotVerify(t *testing.T) {
+	for name, mutate := range map[string]func(*JudgeResult){
+		"decision":  func(r *JudgeResult) { r.AtomDecisions[0].CitationIDs = []string{"citation:video"} },
+		"rationale": func(r *JudgeResult) { r.Rationales[0].CitationIDs = []string{"citation:video"} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			v, q, r := validContracts(t)
+			mutate(&r)
+			if !errors.Is(ValidateJudgeResultAgainst(r, q, v), ErrCitationInvalid) {
+				t.Fatal("unrelated atom evidence accepted")
+			}
+		})
+	}
+}
+
+func TestT06AExpiryAndAllowedVerdictsBind(t *testing.T) {
+	v, q, r := validContracts(t)
+	r.EvaluatedAt = q.ExpiresAt
+	if !errors.Is(ValidateJudgeResultAgainst(r, q, v), ErrJudgeExpired) {
+		t.Fatal("result evaluated at expired boundary accepted")
+	}
+	v, q, r = validContracts(t)
+	v.AllowedVerdicts = []Verdict{VerdictBlocked}
+	q.ViewSHA256, _ = DigestJudgeView(v)
+	r.ViewSHA256 = q.ViewSHA256
+	r.RequestSHA256, _ = DigestJudgeRequest(q)
+	if !errors.Is(ValidateJudgeResultAgainst(r, q, v), ErrJudgeResultInvalid) {
+		t.Fatal("policy-forbidden supported verdict accepted")
+	}
+}
+
+func TestT06ALocatorCannotInventSourceModality(t *testing.T) {
+	for name, locator := range map[string]CitationLocator{
+		"image_with_media_time": {Type: LocatorMediaTime, Start: 1, End: 2},
+		"image_with_receipt":    {Type: LocatorReceiptRef, Value: "receipt:1"},
+		"image_with_custody":    {Type: LocatorCustodyOrdinal, Start: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			v, _, _ := validContracts(t)
+			v.Citations[0].Locator = locator
+			if !errors.Is(ValidateJudgeView(v), ErrCitationInvalid) {
+				t.Fatal("locator invented unsupported modality")
+			}
+		})
+	}
+}
+
+func TestT06ADeclaredBoundsAndAmbiguousRequirements(t *testing.T) {
+	v, _, _ := validContracts(t)
+	v.AcceptanceAtoms[0].RequiredModalities = append(v.AcceptanceAtoms[0].RequiredModalities, ModalityStaticImage)
+	if ValidateJudgeView(v) == nil {
+		t.Fatal("duplicate required modality accepted")
+	}
+	v, q, _ := validContracts(t)
+	q.RequiredModalities[0].AtomRef = "atom:missing"
+	if ValidateJudgeRequest(q) == nil {
+		t.Fatal("request contains dangling requirement atom")
+	}
+	// Distinct requirement IDs may require different evidence for the same atom/modality.
+	v, _, _ = validContracts(t)
+	v.Artifact.TrustRefs = nil
+	for i := 0; i <= MaxRefs; i++ {
+		v.Artifact.TrustRefs = append(v.Artifact.TrustRefs, fmt.Sprintf("trust:%d", i))
+	}
+	if ValidateJudgeView(v) == nil {
+		t.Fatal("unbounded artifact refs accepted")
+	}
+	_, q, _ = validContracts(t)
+	q.RequiredModalities[0].CitationIDs = nil
+	for i := 0; i <= MaxCitations; i++ {
+		q.RequiredModalities[0].CitationIDs = append(q.RequiredModalities[0].CitationIDs, fmt.Sprintf("citation:%d", i))
+	}
+	if ValidateJudgeRequest(q) == nil {
+		t.Fatal("unbounded request citations accepted")
+	}
+}
+
+func TestT06ACitationPolarityMustMatchVerdict(t *testing.T) {
+	v, q, r := validContracts(t)
+	v.Citations[0].SupportsAtoms = nil
+	v.Citations[0].RebutsAtoms = []string{"atom:layout"}
+	v.Modalities[0].Status = ModalityBlocked
+	v.Modalities[0].CitationIDs = nil
+	q.RequiredModalities = append([]ModalityRequirement(nil), v.Modalities...)
+	q.ViewSHA256, _ = DigestJudgeView(v)
+	r.ViewSHA256 = q.ViewSHA256
+	r.RequestSHA256, _ = DigestJudgeRequest(q)
+	r.AtomDecisions[0].Verdict = VerdictRebutted
+	r.Outcome = OutcomeRejected
+	if err := ValidateJudgeResultAgainst(r, q, v); err != nil {
+		t.Fatalf("legitimate rebuttal rejected: %v", err)
+	}
+	r.AtomDecisions[0].CitationIDs = []string{"citation:video"}
+	if !errors.Is(ValidateJudgeResultAgainst(r, q, v), ErrCitationInvalid) {
+		t.Fatal("unrelated rebuttal citation accepted")
+	}
+}
+
+func TestT06AGoldenRoundTrips(t *testing.T) {
+	v, _, _ := validContracts(t)
+	for _, name := range []string{"judge-request.golden.json", "judge-result.golden.json"} {
+		raw, err := os.ReadFile(filepath.Join("testdata", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var value any
+		if name == "judge-request.golden.json" {
+			var q JudgeRequest
+			if err = json.Unmarshal(raw, &q); err != nil {
+				t.Fatal(err)
+			}
+			if err = ValidateJudgeRequestAgainst(q, v); err != nil {
+				t.Fatal(err)
+			}
+			value = q
+		} else {
+			var r JudgeResult
+			if err = json.Unmarshal(raw, &r); err != nil {
+				t.Fatal(err)
+			}
+			_, q, _ := validContracts(t)
+			if err = ValidateJudgeResultAgainst(r, q, v); err != nil {
+				t.Fatal(err)
+			}
+			value = r
+		}
+		next, err := json.MarshalIndent(value, "", "  ")
+		if err != nil || !bytes.Equal(append(next, '\n'), raw) {
+			t.Fatal("golden roundtrip drift")
+		}
+	}
+}
+
+func TestT06AOpaqueRefsRejectPrivateCredentialURLs(t *testing.T) {
+	for _, bad := range []string{"/tmp/private", "file:///private/source", `C:\\private\\source`, "C:/private/source", "https://user:fixture@example.invalid/path?token=fixture"} {
+		v, q, r := validContracts(t)
+		v.Artifact.Scope.WorkItemRef = bad
+		if ValidateJudgeView(v) == nil {
+			t.Fatal("unsafe lineage ref accepted")
+		}
+		q.AssignmentRef = bad
+		if ValidateJudgeRequest(q) == nil {
+			t.Fatal("unsafe request ref accepted")
+		}
+		r.Rationales[0].CitationIDs = []string{bad}
+		if ValidateJudgeResult(r) == nil {
+			t.Fatal("unsafe rationale citation ref accepted")
+		}
+	}
+	// JSON pointers are selectors, not filesystem refs; their root-relative syntax remains valid.
+	v, _, _ := validContracts(t)
+	v.Sources[0].Modality = ModalityStructuredData
+	v.Citations[0].Modality = ModalityStructuredData
+	v.Citations[0].Locator = CitationLocator{Type: LocatorJSONPointer, Value: "/items/a~1b/~0"}
+	v.Modalities[0].Modality = ModalityStructuredData
+	v.AcceptanceAtoms[0].RequiredModalities = []Modality{ModalityStructuredData}
+	if err := ValidateJudgeView(v); err != nil {
+		t.Fatal(err)
+	}
+	for _, ptr := range []string{"no-leading-slash", "/bad~2", "/bad~"} {
+		v.Citations[0].Locator.Value = ptr
+		if !errors.Is(ValidateJudgeView(v), ErrCitationInvalid) {
+			t.Fatal("invalid JSON pointer accepted")
+		}
+	}
+}
+
+func TestT06ALocatorAndNestedCitationBounds(t *testing.T) {
+	for _, locator := range []CitationLocator{{Type: LocatorAssetID, Value: strings.Repeat("x", MaxLocatorRunes+1)}, {Type: LocatorMediaTime, Start: 1, End: MaxLocatorOffset + 1}} {
+		if validLocator(locator) {
+			t.Fatal("unbounded locator accepted")
+		}
+	}
+	_, _, r := validContracts(t)
+	r.AtomDecisions[0].CitationIDs = nil
+	for i := 0; i <= MaxCitations; i++ {
+		r.AtomDecisions[0].CitationIDs = append(r.AtomDecisions[0].CitationIDs, fmt.Sprintf("citation:%d", i))
+	}
+	if ValidateJudgeResult(r) == nil {
+		t.Fatal("unbounded decision citations accepted")
+	}
+	oversized := r.AtomDecisions[0].CitationIDs
+	_, _, r = validContracts(t)
+	r.Rationales[0].CitationIDs = oversized
+	if ValidateJudgeResult(r) == nil {
+		t.Fatal("unbounded rationale citations accepted")
+	}
+	// A valid immutable artifact anchor remains admissible, without altering its digest spelling.
+	if !validJudgeRef("github:WPUIAI/uiai-engine#115") {
+		t.Fatal("existing issue handle rejected")
+	}
+}
+
+func TestT06AAllLineageFieldsInvalidateOldRequest(t *testing.T) {
+	for _, mutate := range []func(*ScopeBinding){func(s *ScopeBinding) { s.ProjectRef = "project:other" }, func(s *ScopeBinding) { s.WorkstreamRef = "workstream:other" }, func(s *ScopeBinding) { s.WorksetRef = "workset:other" }, func(s *ScopeBinding) { s.CallGraphRef = "callgraph:other" }, func(s *ScopeBinding) { s.WorkpointRef = "workpoint:other" }, func(s *ScopeBinding) { s.WorkItemRef = "item:other" }} {
+		v, q, r := validContracts(t)
+		mutate(&v.Artifact.Scope)
+		if !errors.Is(ValidateJudgeResultAgainst(r, q, v), ErrJudgeRequestInvalid) {
+			t.Fatal("changed lineage retained previous result")
+		}
+	}
+}
+
+func TestT06APolicyVerdictRejectionAndPartialCitations(t *testing.T) {
+	v, q, r := validContracts(t)
+	v.AllowedVerdicts = []Verdict{VerdictBlocked}
+	q.ViewSHA256, _ = DigestJudgeView(v)
+	r.ViewSHA256 = q.ViewSHA256
+	r.RequestSHA256, _ = DigestJudgeRequest(q)
+	if !errors.Is(ValidateJudgeResultAgainst(r, q, v), ErrJudgeResultInvalid) {
+		t.Fatal("policy-forbidden verdict accepted")
+	}
+	// Judges may reject evidence even when its producer tagged it as supporting: do not inherit producer verdicts.
+	v, q, r = validContracts(t)
+	r.Outcome = OutcomeRejected
+	r.AtomDecisions[0].Verdict = VerdictRebutted
+	if err := ValidateJudgeResultAgainst(r, q, v); err != nil {
+		t.Fatalf("independent disagreement suppressed: %v", err)
+	}
 }

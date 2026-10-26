@@ -3,6 +3,7 @@ package evidencejudge
 import (
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -12,14 +13,16 @@ const (
 	JudgeCitationSchema = "uiai.evidence_judge_citation.v1"
 	JudgeModalitySchema = "uiai.evidence_judge_modality.v1"
 
-	MaxContractBytes        = 1 << 20
-	MaxRefs                 = 256
-	MaxCitations            = 512
-	MaxModalities           = 32
-	MaxAcceptanceAtoms      = 256
-	MaxRationales           = 256
-	MaxRationaleRunes       = 2000
-	MaxForbiddenAssumptions = 64
+	MaxContractBytes              = 1 << 20
+	MaxRefs                       = 256
+	MaxCitations                  = 512
+	MaxModalities                 = 32
+	MaxAcceptanceAtoms            = 256
+	MaxRationales                 = 256
+	MaxRationaleRunes             = 2000
+	MaxForbiddenAssumptions       = 64
+	MaxLocatorRunes               = 2000
+	MaxLocatorOffset        int64 = 1<<53 - 1
 )
 
 type Verdict string
@@ -278,19 +281,65 @@ func validModalityStatus(value ModalityStatus) bool {
 	return value == ModalitySatisfied || value == ModalityInsufficient || value == ModalityBlocked || value == ModalityNotApplicable
 }
 func validRequirementShape(value ModalityRequirement) bool {
-	return value.Schema == JudgeModalitySchema && !blank(value.RequirementID) && !blank(value.AtomRef) &&
-		validModality(value.Modality) && validModalityStatus(value.Status) && !hasBlankOrDuplicate(value.CitationIDs) &&
+	return value.Schema == JudgeModalitySchema && validJudgeRef(value.RequirementID) && validJudgeRef(value.AtomRef) &&
+		validModality(value.Modality) && validModalityStatus(value.Status) && validJudgeRefs(value.CitationIDs, MaxCitations) &&
 		!(value.Required && value.Status == ModalityNotApplicable) &&
 		(value.Status != ModalitySatisfied || len(value.CitationIDs) > 0)
 }
 func validLocator(value CitationLocator) bool {
+	if utf8.RuneCountInString(value.Value) > MaxLocatorRunes || value.Start > MaxLocatorOffset || value.End > MaxLocatorOffset {
+		return false
+	}
+	if value.Type == LocatorJSONPointer {
+		if !strings.HasPrefix(value.Value, "/") {
+			return false
+		}
+		for i := 0; i < len(value.Value); i++ {
+			if value.Value[i] == '~' {
+				i++
+				if i >= len(value.Value) || (value.Value[i] != '0' && value.Value[i] != '1') {
+					return false
+				}
+			}
+		}
+		return true
+	}
 	if value.Type == LocatorTextLines || value.Type == LocatorMediaTime {
 		return value.Start >= 0 && value.End > value.Start
 	}
 	if value.Type == LocatorImageRegion {
 		return value.X >= 0 && value.Y >= 0 && value.Width > 0 && value.Height > 0 && value.X+value.Width <= 1 && value.Y+value.Height <= 1
 	}
-	return (value.Type == LocatorClaimID || value.Type == LocatorAssetID || value.Type == LocatorReceiptRef || value.Type == LocatorJSONPointer) && !blank(value.Value) || value.Type == LocatorCustodyOrdinal && value.Start >= 0
+	return (value.Type == LocatorClaimID || value.Type == LocatorAssetID || value.Type == LocatorReceiptRef) && validJudgeRef(value.Value) || value.Type == LocatorCustodyOrdinal && value.Start >= 0
+}
+
+// Judge refs also admit immutable issue/anchor handles; reuse the existing opaque-ref boundary.
+func validJudgeRef(value string) bool {
+	return validAssignmentRef(strings.ReplaceAll(value, "#", "%23")) && !(len(value) > 2 && value[1] == ':' && value[2] == '/')
+}
+func validJudgeRefs(values []string, limit int) bool {
+	if len(values) > limit || hasBlankOrDuplicate(values) {
+		return false
+	}
+	for _, value := range values {
+		if !validJudgeRef(value) {
+			return false
+		}
+	}
+	return true
+}
+func locatorMatchesModality(locator CitationLocator, modality Modality) bool {
+	switch locator.Type {
+	case LocatorMediaTime:
+		return modality == ModalitySynchronizedVideo
+	case LocatorImageRegion:
+		return modality == ModalityStaticImage
+	case LocatorReceiptRef:
+		return modality == ModalityActionReceipt
+	case LocatorCustodyOrdinal:
+		return modality == ModalityCustodyEvent
+	}
+	return true
 }
 func hasVerdict(seen map[Verdict]struct{}, value Verdict) bool { _, ok := seen[value]; return ok }
 func hasBlankOrDuplicate(values []string) bool {
@@ -309,7 +358,7 @@ func hasBlankOrDuplicate(values []string) bool {
 func hasBlankOrDuplicateOmissions(values []Omission) bool {
 	seen := map[string]struct{}{}
 	for _, value := range values {
-		if blank(value.Ref) || blank(value.ReasonCode) {
+		if !validJudgeRef(value.Ref) || blank(value.ReasonCode) {
 			return true
 		}
 		if _, ok := seen[value.Ref]; ok {
