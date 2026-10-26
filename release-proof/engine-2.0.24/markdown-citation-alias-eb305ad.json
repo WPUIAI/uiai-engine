@@ -1,0 +1,43 @@
+{
+  "schema": "uiai.markdown_citation_redaction_proof.v1",
+  "issues": [
+    259,
+    260
+  ],
+  "source_revisions": [
+    "c174b37",
+    "eb305ad"
+  ],
+  "running_source_revision": "eb305ad",
+  "version": "2.0.24",
+  "build": "2026-10-26T02:59:23Z+eb305ad",
+  "running_sha256": "45d225adafdfdaef29037bfc8103c37161c93fe3a638ab9535c121aedfe086fb",
+  "verified": [
+    "259 actual native official Go/Google docs had missing Markdown closing delimiters and merged citations; ten direct boundary cases plus long adjacent-citation/OAuth protection regressions RED-before/GREEN-after",
+    "Shared free-text URL recognizer now advances linearly by scheme prefix and balanced URL path/IPv6 brackets; preserves surrounding Markdown/prose/image/inline-code delimiters and Unicode whitespace",
+    "Markdown route consumes shared text sanitizer instead of independent URL regex, keeping legacy marker-only formatting",
+    "Browser read retains original fields for alias inference and sanitizes URL rendering before credential replacement can consume URL closing punctuation",
+    "260 synthetic actual Chromium mixed-field fixture exposed underscore-escaped Markdown credential alias remaining unescaped in page title; unit RED-before/GREEN-after covers escaped-to-raw and raw-to-escaped aliases, punctuation/backslash and short credential",
+    "Known-value alias matching stays transient in existing secrettext owner; credential-detection thresholds and disable/default/disclosure controls unchanged",
+    "Full Go suite, targeted vet, allReadPage actualChromium race3x, URL/Markdown/source/secrettext repeatedrace10x,17native/shared/MCP client tests, canonicalprepush pass",
+    "Windowsamd64/Darwinarm64 build only passed; canonical idle-safe rollback-preserving BOTHnamedworker rollout health/active/runninghashverified",
+    "Both installed workers actual official Go tokenizer docs have intact links/citations AND code keywords; no encoded merged link artifacts",
+    "Both installed workers owned mixed Markdown fixture preserves adjacent links with query credentials/fragments/userinfo withheld and known escaped credential title alias absent",
+    "Both installed workers ordinary browser/read/snapshot/typed errors/literal result/screenshotartifact/semanticcanary/OAuthURL/rawnavigation/discovery/search-preflight/cleanup regressions pass",
+    "ACTUAL current native same Google docs now retains JSON glossary link closing parenthesis; session x0zOws1B closed; no diagnostic errors"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-eb305ad.json",
+  "observed_at": "2026-10-26T03:00:04Z",
+  "official_go_after_ref": "uiai-source-markdown:sha256:3fb9f57aeb8d1983",
+  "native_google_before_ref": "uiai-source-markdown:sha256:83e70934f8c926fc",
+  "native_google_after_ref": "uiai-source-markdown:sha256:435e1ca13478de81",
+  "native_google_after_artifact_ref": "uiai-artifact:sha256:dcfe8d8b9868cc48beb6db7f324f4adc2827b6dc725e61048a95288cf13be64d",
+  "limits": [
+    "All canaries synthetic; no real credential access/auth mutation/provider search probe",
+    "No new dependency/accounts/services/configuration/defaults/fallback approval",
+    "Public captures unsealed/deliveryblocked, no scoped EPWA/publicRelease/pixel/nativeOS proof",
+    "No new native research-array schema activation; existing client tests do not prove current-process schema installation",
+    "Search90/91remainOPEN; Google official overview now says existing-customers-only until2027-01-01, not a new-user availability guarantee",
+    "Original unrelated sixhistorydeletions/datausage preserved"
+  ]
+}
