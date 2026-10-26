@@ -1,0 +1,33 @@
+{
+  "schema": "uiai.search_endpoint_setup_proof.v1",
+  "issue": 90,
+  "source_revision": "f38b2a3",
+  "version": "2.0.24",
+  "build": "2026-10-26T00:54:58Z+f38b2a3",
+  "running_sha256": "0701f7e8ab839306d78b3b51bb20205bc2e876893f93e011c57b97c02b2af43d",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "Regression reproduced before fix: bad Brave endpoint plus credential falsely advertised ready",
+    "Single endpoint registry/resolver consumed by readiness and Brave/Exa/Tavily/Wikipedia execution; SearxNG retains approved endpoint owner and shares common URL syntax validator",
+    "Shared validator rejects userinfo/query/fragment including empty markers and invalid port; existing HTTPS/host/loopback policy preserved",
+    "Brave config-over-env endpoint precedence and Wikipedia legacy env-only endpoint override preserved",
+    "Invalid endpoint setup gives value-free provider-correct repair fields/environment fallback, not SearxNG-only instructions",
+    "Explicit configured default stays selected even when unusable; no silent query retarget; unapproved local fallback gets zero requests, explicitly approved local fallback works",
+    "No discovery provider requests; canceled adapter contexts fence regression test external traffic while proving local rejection",
+    "Fivefold search/tool race, fullGo, targeted vet pass OVH; canonical prepush checks pass",
+    "Windowsamd64/Darwinarm64 cross-build pass only",
+    "Canonical idle-safe rollback-preserving deployment: both active healthy running executable hashes verified; existing Brave remains locally configured/admitted",
+    "Both worker setup/provider/card parity, tool discovery and owned browser/read/snapshot/eval/error/screenshot-artifact/redaction/diagnostics/cleanup probes pass",
+    "Actual current native Pi and current MCP cards return setup after rollout without client changes/reload"
+  ],
+  "limits": [
+    "Local endpoint validity/configured admission is NOT real provider availability, entitlement or remaining quota; no paid search probe performed",
+    "No actual credentials, accounts, endpoints/default/fallback configuration or service provisioning changed",
+    "No new config writer, account acquisition, public Release, scoped sealed EPWA delivery, pixel inspection or nativeOS execution claim",
+    "Issue90 staysOPEN for remaining adapters/quotas/onboarding/zero-setup general-web acceptance; unrelated pre-existing changes preserved"
+  ],
+  "probe_ref": "OVH/tmp/uiai-live-f38b2a3.json"
+}
