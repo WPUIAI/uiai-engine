@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -320,13 +319,14 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 	}
 	b, _ := json.Marshal(body)
 
-	httpReq, _ := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(b))
-	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq, err := newProviderRequest(ctx, providerName, apiURL, b)
+	if err != nil {
+		return nil, err
+	}
 	httpReq.Header.Set("x-api-key", key.value())
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
-	client := httpboundary.OriginBoundClient(p.client)
-	resp, err := client.Do(httpReq)
+	resp, err := p.doProviderRequest(providerName, httpReq)
 	if err != nil {
 		return nil, err
 	}
@@ -446,16 +446,17 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 		endpoint = baseURL + "/text/chatcompletion_v2"
 	}
 
-	httpReq, _ := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(b))
-	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq, err := newProviderRequest(ctx, req.Provider, endpoint, b)
+	if err != nil {
+		return nil, err
+	}
 	httpReq.Header.Set("Authorization", "Bearer "+key.value())
 	if req.Provider == "openrouter" {
 		httpReq.Header.Set("HTTP-Referer", "https://wpuiai.com")
 		httpReq.Header.Set("X-Title", "WPUIAI AI Cloud")
 	}
 
-	client := httpboundary.OriginBoundClient(p.client)
-	resp, err := client.Do(httpReq)
+	resp, err := p.doProviderRequest(req.Provider, httpReq)
 	if err != nil {
 		return nil, err
 	}
@@ -514,13 +515,14 @@ func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, bas
 	}
 	b, _ := json.Marshal(payload)
 
-	httpReq, _ := http.NewRequestWithContext(ctx, "POST", apiHost+"/v1/coding_plan/vlm", bytes.NewReader(b))
-	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq, err := newProviderRequest(ctx, "minimax coding_plan_vlm", apiHost+"/v1/coding_plan/vlm", b)
+	if err != nil {
+		return nil, err
+	}
 	httpReq.Header.Set("Authorization", "Bearer "+key)
 	httpReq.Header.Set("MM-API-Source", "Minimax-MCP")
 
-	client := httpboundary.OriginBoundClient(p.client)
-	resp, err := client.Do(httpReq)
+	resp, err := p.doProviderRequest("minimax coding_plan_vlm", httpReq)
 	if err != nil {
 		return nil, err
 	}

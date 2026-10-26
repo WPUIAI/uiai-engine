@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,13 +14,35 @@ type providerFailure struct {
 	code      int
 	http      bool
 	retryable bool
+	phase     string
+	canceled  bool
+	deadline  bool
 }
 
 func (e *providerFailure) Error() string {
+	if e.phase != "" {
+		return fmt.Sprintf("%s %s failed", e.provider, e.phase)
+	}
 	if e.http {
 		return fmt.Sprintf("%s returned HTTP %d", e.provider, e.code)
 	}
 	return fmt.Sprintf("%s %d: provider request failed", e.provider, e.code)
+}
+
+// Context identity is projected as safe flags, never a retained private cause.
+func (e *providerFailure) Is(target error) bool {
+	return e.canceled && target == context.Canceled || e.deadline && target == context.DeadlineExceeded
+}
+
+func providerRequestFailure(provider string) error {
+	return &providerFailure{provider: provider, phase: "request construction"}
+}
+
+func providerTransportFailure(provider string, err error) error {
+	return &providerFailure{
+		provider: provider, phase: "transport", retryable: isRetryableMessage(err.Error()),
+		canceled: errors.Is(err, context.Canceled), deadline: errors.Is(err, context.DeadlineExceeded),
+	}
 }
 
 func providerHTTPFailure(provider string, code int) error {

@@ -433,6 +433,14 @@ existing configured AI failover chain, while HTTP401/403 do not trigger failover
 Application failures retain legacy retry signals without retaining or logging the
 untrusted message. This adds no provider, credential, setup probe or fallback
 configuration; positive failure/failover tests use synthetic upstream fixtures.
+Inference request construction is checked before attaching credentials: malformed
+URLs return a safe, non-retryable error rather than a panic. One shared send
+boundary projects transport errors into value-free failure classification; it
+retains cancellation/deadline `errors.Is` identity as flags, not raw URL/error
+causes. Legacy retry signals and configured failover remain intact, and canceled
+completion does not start another provider request. Response-body decoding and
+general initial endpoint admission are separate concerns, not acceptance claims
+of this failure-boundary change.
 
 ### Configured search fallback
 
