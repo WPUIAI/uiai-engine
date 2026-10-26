@@ -1,0 +1,26 @@
+{
+  "schema": "uiai.auth_metadata_batch_proof.v1",
+  "issue": 269,
+  "implementation_revision": "1a086ba",
+  "version": "2.0.24",
+  "build": "2026-10-26T09:24:18Z+1a086ba",
+  "running_sha256": "e49bebcb3afca79a81c571cc5de05feda923b35df339453ec6e6e52709f8df11",
+  "verified": [
+    "Two focused RED regressions: private URL material persisted into challenge/current-state/event JSON; first returned pointer could mutate pending token/class/URL",
+    "GREEN challenge hints pass existing canonical vision URL redactor before admission; synthetic userinfo/query/fragment absent from returned/stored/event JSON, safe route retained",
+    "GREEN first return is detached copy; caller metadata mutation cannot alter pending state; forged copy token rejected and original token still resolves",
+    "Focused AuthChallenge race runs x5 and actual Chromium login-wall detector/idempotence test passed; no real provider auth/OTP/credentials used",
+    "One full validation pass for both fixes: full vision race suite,fullGo/vet,17native-shared-MCPclient tests,Windowsamd64/Darwinarm64 crossbuilds; source/doc/task diff checked",
+    "One canonical batch deployment retained idle/rollback checks; both named workers active/healthy/running executable hashes verified",
+    "Both installed-worker ordinary source/browser/security/search/cleanup probes passed; paid_provider_probes_performed=false and owned browser sessions closed"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-1a086ba.json",
+  "live_probe_observed_at": "2026-10-26T09:24:57Z",
+  "limits": [
+    "In-process Go caller aliasing/controlled synthetic URL reproduction, not evidence of remote unauthenticated compromise or real credential exposure",
+    "No new resolve/control/lease grant or detector policy; full82human-FPV/broker/ten-minute lease/end-to-end acceptance remains open",
+    "No provider/key/account/config/default/dependency/service/monitor changes; Brave retained/Jina absent; full86broker/wholeheap acceptance still open",
+    "No scopedEPWA/pixel/nativeOS/publicRelease/current native research-array activation claim; ordinary browser artifacts unsealed/deliveryblocked",
+    "Original unrelated dirt preserved; no duplicate checkout/Focusa repair/green admission/accepted background-job claim; scoped UIAI continuation receipt retained in cache foundation proof"
+  ]
+}
