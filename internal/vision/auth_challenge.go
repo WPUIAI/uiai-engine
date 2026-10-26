@@ -81,6 +81,7 @@ func (s *Session) DetectAuthChallenge() (*AuthChallenge, error) {
 }
 
 func (s *Session) raiseAuthChallenge(class, urlHint string) *AuthChallenge {
+	urlHint = redactURL(urlHint)
 	s.mu.Lock()
 	if s.authChallenge != nil && s.authChallenge.Class == class {
 		challenge := *s.authChallenge
@@ -93,11 +94,12 @@ func (s *Session) raiseAuthChallenge(class, urlHint string) *AuthChallenge {
 		s.timer.Stop()
 	}
 	actor := s.ActorRef
+	copy := *challenge
 	s.mu.Unlock()
 	events.Emit("auth_challenge_required", map[string]any{"session_id": s.ID, "actor": actor}, nil, map[string]any{
 		"type": "auth_challenge_required", "class": class, "url_hint": urlHint, "session_id": s.ID, "actor": actor, "resume_token": challenge.ResumeToken,
 	})
-	return challenge
+	return &copy
 }
 
 func (s *Session) ResolveAuthChallenge(resumeToken string) error {

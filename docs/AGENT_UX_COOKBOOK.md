@@ -354,6 +354,14 @@ Symptoms of stale MCP metadata:
 - [Endpoint Auth Matrix](ENDPOINT_AUTH_MATRIX.md)
 
 
+### Authentication challenge metadata
+
+Challenge URL hints use the same URL redactor as browser diagnostics before
+storage, return, or event emission. Returned challenge metadata is a detached
+copy: editing it cannot alter the pending resume token or session state. This
+changes no resolve/control grant or lease policy; broader auth protocol acceptance
+remains tracked under #82.
+
 ### Viewer-aware FPV collaboration
 
 Poll the authenticated `/api/fpv/events?session_id=<owned-session>&since_seq=<cursor>`
