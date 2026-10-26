@@ -35,16 +35,16 @@ def run():
         first = request("POST", "/api/session", {"url": "https://example.com", "width": 800, "height": 600})
         sid = first["session"]["id"]
         sessions.append(sid)
-        request("POST", f"/api/session/{sid}/eval", {"js": "window.__uiaiKeys=[]; document.addEventListener('keydown', e=>window.__uiaiKeys.push(e.key)); document.body.tabIndex=0; document.body.focus(); return 'probe-ready';"})
+        request("POST", f"/api/session/{sid}/eval", {"js": "window.__uiaiKeys=[]; window.__uiaiKeyFocus=[]; document.addEventListener('keydown', e=>{window.__uiaiKeys.push(e.key);window.__uiaiKeyFocus.push(document.hasFocus());}); document.body.tabIndex=0; document.body.focus(); return 'probe-ready';"})
         second = request("POST", "/api/session", {"url": "https://example.com", "width": 800, "height": 600})
         sessions.append(second["session"]["id"])
         for key in ("a", "Enter"):
             request("POST", f"/api/session/{sid}/press", {"key": key})
-        result = request("POST", f"/api/session/{sid}/eval", {"js": "return JSON.stringify({keys:window.__uiaiKeys,focused:document.hasFocus()});"})
+        result = request("POST", f"/api/session/{sid}/eval", {"js": "return JSON.stringify({keys:window.__uiaiKeys,focused:document.hasFocus(),keydown_focus:window.__uiaiKeyFocus});"})
         observed = json.loads(result["result"])
-        if observed.get("keys") != ["a", "Enter"] or observed.get("focused") is not True:
+        if observed.get("keys") != ["a", "Enter"] or observed.get("focused") is not True or observed.get("keydown_focus") != [True, True]:
             raise RuntimeError("engine acknowledged keyboard input without focused DOM keydown delivery")
-        return {"schema": "uiai.keyboard_probe.v1", "input_delivery": "verified", "keys": observed["keys"], "focused": observed["focused"], "engine_version": status.get("version"), "source_commit": status.get("source_commit"), "artifact_delivery_state": result.get("delivery_state"), "truth_notice": "Input delivery only; not proof of EPWA publication or visual correctness."}
+        return {"schema": "uiai.keyboard_probe.v1", "input_delivery": "verified", "keys": observed["keys"], "focused": observed["focused"], "keydown_focus": observed["keydown_focus"], "engine_version": status.get("version"), "source_commit": status.get("source_commit"), "artifact_delivery_state": result.get("delivery_state"), "truth_notice": "Input delivery only; not proof of EPWA publication or visual correctness."}
     finally:
         for sid in reversed(sessions):
             try:

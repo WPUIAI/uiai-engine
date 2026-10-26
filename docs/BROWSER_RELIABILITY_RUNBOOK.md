@@ -123,12 +123,17 @@ Run `UIAI_ENGINE_URL=http://127.0.0.1:7456 python3
 scripts/smoke-keyboard-delivery.py` on an authorized single worker, not the load
 balancer. It needs two free session slots, opens only anonymous example.com
 fixtures, installs a page-local key recorder, backgrounds the first page, and
-requires real `a`/`Enter` DOM events before success. Both sessions close in a
+requires real `a`/`Enter` DOM events with focus recorded at each keydown before
+success; focus observed only after the action screenshot is insufficient. Both sessions close in a
 finally block, including failed probes. It does not claim visual correctness or
 EPWA readiness; the receipt preserves the observed delivery state. The local
 browser regression is `UIAI_INPUT_TESTS=1 go test ./internal/vision -run
 TestPressReactivatesBackgroundSessionBrowser -count=3`. A passing current probe
 does not by itself prove the historical no-delivery failure root cause.
+`TestPressRequiresActivationBeforeInput` separately enforces target activation
+before input and zero dispatch when activation fails using a synthetic transport.
+The probe's optional version fields may be null on a schema-only status endpoint;
+verify installed revision/hash independently before attributing a live result.
 
 ## Memory-pressure measurement posture
 

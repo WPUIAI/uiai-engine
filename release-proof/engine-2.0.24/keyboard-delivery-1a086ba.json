@@ -1,0 +1,23 @@
+{
+  "schema": "uiai.keyboard_delivery_proof.v1",
+  "issue": 228,
+  "issue_closure_supported": false,
+  "runtime_revision": "1a086ba",
+  "running_sha256": "e49bebcb3afca79a81c571cc5de05feda923b35df339453ec6e6e52709f8df11",
+  "existing_implementation": "85109fd",
+  "existing_browser_regression": "ff94c2c",
+  "verified": [
+    "Both installed workers7456/7460 deliver actual a/Enter DOM keydown to first session after opening a second session; focused=true and keydown_focus=[true,true]; each probe closes its own sessions",
+    "Synthetic transport verifies target activation precedes input and failed activation prevents any dispatch; removing activation in isolated OVH test payload causes both contract cases to fail; production never modified by negative control",
+    "New smoke negative fixture shows post-screenshot focused=true can mask unfocused keydown; RED old helper accepted it, GREEN new keydown_focus requirement rejects it and cleans sessions",
+    "Current actual Chromium focus/input/browser tests passed race3; allGo/vet and3Pythonprobe tests pass; normal prepush applies",
+    "No runtime implementation changed in this slice: no rebuild/restart/deployment needed; running binary version/hash independently checked for both active workers"
+  ],
+  "limits": [
+    "Historical long-running Chromium no-delivery root cause remains unisolated: removing activation still passes real current-browser test, so guard-contract negative control is not a replay of original failure",
+    "228 remains open, no false historical root-cause/complete-acceptance claim",
+    "Probe status optional version/source_commit fields null, attribution is independently verified through running /proc executable, not inferred from probe JSON",
+    "Input delivery only, not EPWA publication or screenshot pixel verification; current artifacts deliveryblocked",
+    "No provider authentication/OTP/paid query/new provider/account/key/config/dependency/service/default change; original dirt preserved; no new checkout/Focusa repair/green admission/acceptedbg claim"
+  ]
+}

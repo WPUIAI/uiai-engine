@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -28,7 +27,7 @@ func TestPressReactivatesBackgroundSessionBrowser(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer manager.Close(first.ID)
-	if _, err = first.page.Eval(`() => { window.__keys=[]; document.addEventListener('keydown',e=>window.__keys.push(e.key)); document.body.focus(); }`); err != nil {
+	if _, err = first.page.Eval(`() => { window.__keys=[]; window.__keyFocus=[]; document.addEventListener('keydown',e=>{window.__keys.push(e.key);window.__keyFocus.push(document.hasFocus());}); document.body.focus(); }`); err != nil {
 		t.Fatal(err)
 	}
 	second, _, err := manager.Open(site.URL, 800, 600)
@@ -44,11 +43,11 @@ func TestPressReactivatesBackgroundSessionBrowser(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	result, err := first.page.Eval(`() => JSON.stringify({keys:window.__keys,focused:document.hasFocus()})`)
+	result, err := first.page.Eval(`() => JSON.stringify({keys:window.__keys,keydown_focus:window.__keyFocus})`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(result.Value.Str(), `"a"`) || !strings.Contains(result.Value.Str(), `"Enter"`) || !strings.Contains(result.Value.Str(), `"focused":true`) {
+	if result.Value.Str() != `{"keys":["a","Enter"],"keydown_focus":[true,true]}` {
 		t.Fatalf("key delivery to background session failed: %s", result.Value.Str())
 	}
 }

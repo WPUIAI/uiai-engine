@@ -11,7 +11,7 @@ spec.loader.exec_module(smoke)
 
 
 class KeyboardSmokeTests(unittest.TestCase):
-    def probe(self, keys):
+    def probe(self, keys, focus=None):
         opened, closed = [], []
         def fake(method, path, body=None):
             if path == "/api/status":
@@ -24,12 +24,19 @@ class KeyboardSmokeTests(unittest.TestCase):
                 closed.append(path.rsplit("/", 1)[-1])
                 return {"status": "closed"}
             if path.endswith("/eval") and "JSON.stringify" in body["js"]:
-                return {"result": json.dumps({"keys": keys, "focused": True}), "delivery_state": "blocked"}
+                return {"result": json.dumps({"keys": keys, "focused": True, "keydown_focus": [True, True] if focus is None else focus}), "delivery_state": "blocked"}
             return {"result": "probe-ready"}
         return fake, opened, closed
 
     def test_acknowledgement_alone_cannot_pass(self):
         fake, opened, closed = self.probe([])
+        with patch.object(smoke, "request", fake):
+            with self.assertRaisesRegex(RuntimeError, "without focused DOM keydown"):
+                smoke.run()
+        self.assertEqual(closed, list(reversed(opened)))
+
+    def test_post_snapshot_focus_cannot_mask_unfocused_keydown(self):
+        fake, opened, closed = self.probe(["a", "Enter"], [False, False])
         with patch.object(smoke, "request", fake):
             with self.assertRaisesRegex(RuntimeError, "without focused DOM keydown"):
                 smoke.run()
