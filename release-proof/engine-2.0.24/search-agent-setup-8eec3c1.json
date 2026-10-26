@@ -1,0 +1,38 @@
+{
+  "schema": "uiai.search_agent_setup_proof.v1",
+  "issues": [
+    90,
+    91
+  ],
+  "source_revision": "8eec3c1",
+  "version": "2.0.24",
+  "build": "2026-10-26T00:25:02Z+8eec3c1",
+  "running_sha256": "4afbd31c219bb059c4fab131e0610280b1669f557eb87dfb5bd0530e662c0569",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "existing agent card and provider discovery share one typed value-free setup projection, config and observed circuit owners",
+    "actual current native Pi pi_uiai_agent_card AND current MCP uiai_agent_card return new setup; no native install/reload or MCP change required",
+    "setup tool discovery selects existing agent card; existing card workflow explains capability selection and safe next action",
+    "clean no-key/no-endpoint fixture reports Wikipedia encyclopedia only, general_web_search_ready false, and exact existing-secret/endpoint next actions",
+    "explicit disabled/unsupported/unreadable credential/invalid endpoint/cooling actions preserve existing choices; conventional fallback cannot override explicit empty config",
+    "sentinel credential, private path and private endpoint absent from full card/provider JSON",
+    "discovery counter fixture makes ZERO upstream requests; no config write/account/signup/provision/probe performed",
+    "OVH: 5x targeted search/tool race, fullGo suite, targeted vet and focusedsetup5x pass; standard prepush checks pass on canonical workspace",
+    "Windowsamd64/Darwinarm64 cross-builds pass, not native OS runs",
+    "canonical idle-safe rollback-preserving rollout; both active healthy running executable hashes verified",
+    "both installed worker card/provider setup parity and setup tool discovery verified; owned browser/read/snapshot/eval/error/screenshot artifact/redaction/diagnostics/cleanup regression probes pass"
+  ],
+  "limits": [
+    "Only discover/detect/guide, not complete configuration application, key acquisition, quota ledger, Cockpit or zero-setup general-web acceptance",
+    "configuration_write_supported false; actual configuration activation must use existing approved deployment mechanism",
+    "configured/admitted does not prove external provider availability, account entitlement or remaining quota",
+    "No new search provider queries, credentials, accounts, endpoint/default/fallback changes or service provisioning; no public Release",
+    "No native research provider-array activation claim; this is existing card response data, not new native parameter schema",
+    "Screenshot artifacts in ordinary consumer probes unsealed/no scope, delivery blocked; no scoped EPWA or pixel-inspection claim",
+    "Issues90/91 remain OPEN; original unrelated working tree changes preserved"
+  ],
+  "probe_ref": "OVH/tmp/uiai-live-8eec3c1.json"
+}
