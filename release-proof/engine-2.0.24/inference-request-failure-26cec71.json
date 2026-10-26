@@ -1,0 +1,32 @@
+{
+  "schema": "uiai.inference_request_failure_proof.v1",
+  "issue": 267,
+  "implementation_revisions": [
+    "cf1a3f2",
+    "26cec71"
+  ],
+  "version": "2.0.24",
+  "build": "2026-10-26T08:44:58Z+26cec71",
+  "running_sha256": "8db90208a77244e7097d12d83cccd5a8c3b5637af8df9915b41b1757e2a1bf1e",
+  "verified": [
+    "RED malformed configured endpoint panicked in all3inference dialects; raw transport causes/URL userinfo exposed in errors/error chains/Go-syntax and actual MiniMax vision fallback log, all synthetic/nonnetwork",
+    "GREEN one shared checked JSON request constructor fails safely before credential attachment/transport; no panic, no private endpoint text, no retry classification for malformed request",
+    "GREEN shared origin-bound send projects only provider/phase/retry/context flags through existing providerFailure; no raw URL/error/cause retained, including Go-syntax/unwrap/log surfaces",
+    "18transport fixture cases preserve direct/wrapped legacy retry classification and errors.Is cancellation/deadline identities, including joined context sentinels",
+    "Actual Complete controlled connection-refused primary uses exactly one configured Anthropic fallback; canceled primary sends no fallback and preserves context identity; all failure/failover logs masked",
+    "Additional RED already-canceled requests still entered custom transports in all3dialects and canceled MiniMax vision initiated its text attempt; GREEN shared send precheck yields0transport entries and1total actual canceled MiniMax attempt",
+    "20 repeated allAI race runs including all prior cache/wipe/appfailure/HTTPfallback/origin/default/redirect regressions passed; fullGo/vet,17native-shared-MCPclient tests,prepush,Windowsamd64/Darwinarm64 crossbuilds passed",
+    "Canonical idle-safe rollback-preserving deploy verified both named workers active/healthy/running executable hashes",
+    "Both installed workers ordinary source/browser/security/search/cleanup regression probe passed; paid_provider_probes_performed=false and owned probe sessions closed"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-26cec71.json",
+  "live_probe_observed_at": "2026-10-26T08:45:41Z",
+  "limits": [
+    "Positive error/provider/cancellation cases use controlled synthetic transports/fixtures, not paid external inference or real credential exposure evidence",
+    "Cancellation prevents entry when context is already done at send boundary; no atomic cancellation/no-side-effect guarantee for already-started remote inference",
+    "Response-body parsing/size limits and general initial endpoint admission are separate, not claimed fixed",
+    "No full86broker/ref/lease/events/revocationSLA/twofactor/wholeheapwipe acceptance",
+    "No provider/key/account/config/default/fallbackpolicy/dependency/service/monitor change; Brave retained,Jina absent; no scopedEPWA/pixel/nativeOS/publicRelease/current native research-array activation claim",
+    "Original unrelated dirt preserved, canonical ownerwrites/OVH payload only; no duplicate checkout, Focusa repair, green admission or accepted background job claim; standing scoped UIAI continuation receipt retained in cache foundation proof"
+  ]
+}
