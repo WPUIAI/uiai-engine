@@ -1,0 +1,33 @@
+{
+  "schema": "uiai.markdown_inline_spacing_proof.v1",
+  "issue": 261,
+  "work_item": "uiai-engine-pnpg",
+  "source_revision": "cd38547",
+  "version": "2.0.24",
+  "build": "2026-10-26T03:06:59Z+cd38547",
+  "running_sha256": "3dcda59eef52bd61e037ed4bcda0dde82944bfb1080dfb0dbccc5dd48332f3db",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "Actual native official Google API docs showed missing spaces around link/emphasis nodes after citation repair, e.g. in[JSON](...)data and either**web search**or",
+    "Real Chromium inline strong/emphasis/link/code/span fixture RED-before/GREEN-after; text-node whitespace normalization retains sibling boundaries while block-edge trimming and one Markdown escaping function remain",
+    "All ReadPage Chromium regressions race3x pass including public tokenizer code, credential-before-truncation, URL citation boundaries and escaped/raw credential title aliases",
+    "FullGo, targetedvet, canonicalprepush pass; Windowsamd64/Darwinarm64 cross-builds only",
+    "Canonical idle-safe rollback-preserving BOTHnamedworker deploy with active/healthy/runninghashverified",
+    "Both installed workers independently prove actual official Google docs word boundaries and glossary link plus official Go docs links/code; owned inline fixture and existing semantic/OAuthURL/discovery/search-preflight/cleanup regressions pass",
+    "ACTUAL CURRENT native Source-to-Markdown same Google doc returns either **web search** or **image search** results and in [JSON](...) data format; zero diagnostic errors and created session uJpPobbq closed"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-cd38547.json",
+  "observed_at": "2026-10-26T03:07:42Z",
+  "native_after_ref": "uiai-source-markdown:sha256:6b6f2dd8cd93f1b0",
+  "native_after_artifact_ref": "uiai-artifact:sha256:7a707565d31dd95f914d88664dafdab845ac0f2fad4a1976b45c09f14e6c5771",
+  "limits": [
+    "Not a full CommonMark or HTML-layout fidelity claim",
+    "Unsealed public source captures; no scoped EPWA/pixel/publicRelease/nativeOS proof",
+    "No dependencies/credentials/accounts/services/config/default/fallback approval changed",
+    "90/91 remain OPEN; no keyless general-web adapter acceptance or native research schema activation claimed",
+    "Original unrelated sixhistorydeletions/datausage preserved"
+  ]
+}
