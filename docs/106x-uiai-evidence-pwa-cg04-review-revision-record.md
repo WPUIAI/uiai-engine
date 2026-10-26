@@ -38,11 +38,13 @@
 
 ## Hardening carried forward (non-blocking; next repair cycle's test additions)
 
-1. **CSRF:** no committed test evidence; structural token-auth/no-cookie mitigation only — add an explicit CSRF no-cookie invariant test.
-2. **CORS:** control untested; SSE wildcard origin on a read-only stream — add a CORS header test.
-3. **OCR leak checks:** no committed test evidence; `internal/reference` untested — add OCR-output-through-inspector test.
-4. **Transcript body-content leak checks:** no dedicated test — add transcript body scan test.
-5. The 14 typed `uncovered_hardening` attacker classes in the corpus remain documented exposure surfaces.
+Follow-up **#222** pins these boundaries without changing auth/CORS defaults:
+
+1. **CSRF:** `auth.TestMutationRoutesRejectCookieOnlyIdentity` checks remote mutation paths/methods with valid-token cookies rejected and an explicit Bearer identity accepted; existing loopback exemptions are not reclassified as cookie auth.
+2. **CORS:** `server.TestCORSAllowlistDoesNotAuthorizeForeignCookieOrigins` pins allowlist/preflight headers; `routes.TestStandaloneReadOnlySSEDoesNotAddCredentialHeader` pins the standalone read-only SSE wildcard and absence of credential advertisement. `server.TestSSECORSCompositionDoesNotReflectForeignOrigins` also pins the legacy wrapper combination (`*` plus credentials), which is not browser permission for credentialed cross-origin reads; header authentication remains separate.
+3. **OCR:** `reference.TestExtractedOCROutputPassesCanonicalInspector` sends actual `ExtractText` output from a local provider fixture through the canonical public-evidence inspector: secrets/PII rejected, active content marked untrusted. This is not OCR accuracy or a new automatic route-level sanitizer.
+4. **Transcript:** `evidenceartifact.TestTranscriptBodiesUseCanonicalLeakAndActiveContentScan` checks VTT/plain transcript bodies through the same inspector.
+5. The 14 typed `uncovered_hardening` attacker classes in the corpus remain documented exposure surfaces; these regression tests do not promote any class without byte-exact defender fixtures. CI acceptance is tracked in #222.
 
 ## Disposition
 
