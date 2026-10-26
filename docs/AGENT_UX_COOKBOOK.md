@@ -81,6 +81,7 @@ Rules:
 - Public-only by default.
 - Return structured `source_blocked` / `auth_required` failures instead of inventing content.
 - Preserve public tokenizer type labels such as `html.ErrorToken:` and `html.TextToken:`; their following `return`/`if` keywords are not secret aliases. Bare token labels and explicit credential-role assignments, including short actual values, still receive redaction.
+- URL redaction preserves Markdown link/image/inline-code boundaries and adjacent citations, including balanced URL path parentheses and IPv6 brackets. Credentials, userinfo, fragments and nested OAuth redirect values still pass through the canonical safeguards; punctuation is not part of a credential value to discard.
 - Preserve Focusa-ready `target_ref`, `evidence_ref`, `summary`, and next tools.
 
 ## Recipe 2: Persistent browser loop with @refs

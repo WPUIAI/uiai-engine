@@ -96,3 +96,41 @@ func TestReadPageKeepsTokenTypeDocsAndWithholdsRealCredentialsBrowser(t *testing
 		}
 	}
 }
+
+func TestReadPageMarkdownCitationBoundariesBrowser(t *testing.T) {
+	if os.Getenv("UIAI_AUTH_TESTS") == "" {
+		t.Skip("set UIAI_AUTH_TESTS=1 for browser regression")
+	}
+	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><head><title>SYNTHETIC_CROSS_FIELD</title></head><body><main><p>API key: SYNTHETIC_CROSS_FIELD</p><p><a href="https://one.test/docs#SYNTHETIC_FRAGMENT">overview</a><a href="https://dummy-user:dummy-pass@two.test/path_(balanced)?token=SYNTHETIC_TOKEN#SYNTHETIC_FRAGMENT">reference</a></p><p><a href="https://three.test/">https://three.test/</a></p></main></body></html>`))
+	}))
+	defer site.Close()
+	pool, err := NewPoolWithConfig(PoolConfig{MaxPages: 1, AllowPrivateURLs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	manager := NewSessionManager(pool)
+	sess, _, err := manager.Open(site.URL, 800, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.Close(sess.ID)
+	result, err := sess.ReadPage(ReadOptions{Format: "markdown", IncludeLinks: true, MaxChars: 8000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"[overview](https://one.test/docs)", "[reference](https://two.test/path_(balanced)?token=REDACTED)", "[https://three.test/](https://three.test/)"} {
+		if !strings.Contains(result.Text, want) {
+			t.Fatalf("browser lost citation boundary: %q", result.Text)
+		}
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "SYNTHETIC") || strings.Contains(string(encoded), "dummy-user") || strings.Contains(string(encoded), "dummy-pass") {
+		t.Fatal("browser citation repair lost credential/fragment/userinfo protection")
+	}
+}

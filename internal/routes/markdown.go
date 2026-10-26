@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,8 +18,6 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
-
-var markdownURLRe = regexp.MustCompile(`https?://[^\s)\]"'<>]+`)
 
 // MountMarkdownRoutes registers the one-shot Source-to-Markdown API.
 func MountMarkdownRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager) {
@@ -953,9 +950,9 @@ func sanitizeMarkdownText(value string) string {
 	if value == "" {
 		return value
 	}
-	out := markdownURLRe.ReplaceAllStringFunc(value, sanitizeMarkdownURLForFocusa)
-	// Shared credential recognition; preserve this surface's legacy marker.
-	return strings.ReplaceAll(secrettext.Text(out), secrettext.Marker, "REDACTED")
+	// Shared URL boundaries and credential recognition; marker formatting is
+	// the only surface-specific adaptation, not a second redaction policy.
+	return strings.ReplaceAll(focusapacket.SanitizeText(value), secrettext.Marker, "REDACTED")
 }
 
 func sanitizeMarkdownLinks(links []map[string]any) []map[string]any {

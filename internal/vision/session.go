@@ -1162,7 +1162,15 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 	// of the shorter diagnostics-preview budget.
 	var redaction secrettext.Summary
 	_, redaction = secrettext.Redact(raw.Text)
-	fragments := secrettext.Fragments([]string{raw.Text, raw.Title, raw.Description, raw.SiteName})
+	// Infer aliases from the original fields as well as the safe rendering.
+	// URL query credentials must be removed before their replacement can consume
+	// Markdown delimiters; retaining originals preserves cross-field inference.
+	fields := []string{raw.Text, raw.Title, raw.Description, raw.SiteName}
+	originalCount := len(fields)
+	for i := 0; i < originalCount; i++ {
+		fields = append(fields, sanitizeBrowserContent(fields[i]))
+	}
+	fragments := secrettext.Fragments(fields)[originalCount:]
 	raw.Text, raw.Title, raw.Description, raw.SiteName = fragments[0], fragments[1], fragments[2], fragments[3]
 	raw.Text = sanitizeBrowserContent(raw.Text)
 	raw.URL = focusapacket.SanitizeURL(raw.URL)
