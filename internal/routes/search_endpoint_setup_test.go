@@ -108,7 +108,7 @@ func TestSearchBadDefaultDoesNotDiscloseToUnapprovedProvider(t *testing.T) {
 	defer wiki.Close()
 	t.Setenv("UIAI_WIKIPEDIA_SEARCH_API_URL", wiki.URL)
 	cfg := &config.Config{Search: config.SearchConfig{DefaultProvider: "brave", Providers: map[string]config.SearchProviderConfig{"brave": {APIKey: "synthetic-key", APIURL: "http://outside.example/search"}}}}
-	isolateSearchPublicationStorage(t, cfg)
+	isolateEvidencePublicationStorage(t, cfg)
 	if resolveDefaultSearchProvider(cfg) != "brave" {
 		t.Fatal("broken explicit default silently replaced")
 	}

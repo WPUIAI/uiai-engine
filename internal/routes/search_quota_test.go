@@ -26,7 +26,7 @@ func TestSearchQuotaObservedThroughSharedDiscovery(t *testing.T) {
 	}))
 	defer upstream.Close()
 	cfg := &config.Config{Search: config.SearchConfig{DefaultProvider: "brave", Providers: map[string]config.SearchProviderConfig{"brave": {APIURL: upstream.URL, APIKey: "synthetic-key"}}}}
-	isolateSearchPublicationStorage(t, cfg)
+	isolateEvidencePublicationStorage(t, cfg)
 	now := time.Now()
 	state := newSearchBreakers(func() time.Time { return now })
 	router := setupRouter(cfg, state)

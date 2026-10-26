@@ -33,7 +33,9 @@ func TestPacingHTTPProfileSequenceAndAuthGuard(t *testing.T) {
 		t.Fatal("explicit pacing HTTP fixture unavailable")
 	}
 	router := chi.NewRouter()
-	MountSessionRoutes(router, &config.Config{}, manager)
+	cfg := &config.Config{}
+	isolateEvidencePublicationStorage(t, cfg)
+	MountSessionRoutes(router, cfg, manager)
 	call := func(action, body string) *httptest.ResponseRecorder {
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, httptest.NewRequest("POST", "/"+session.ID+"/"+action, bytes.NewBufferString(body)))

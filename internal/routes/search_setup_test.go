@@ -43,17 +43,6 @@ func setupAction(t *testing.T, guide map[string]any, id string) string {
 	return guide["provider_setup"].(map[string]any)[id].(map[string]any)["next_action"].(string)
 }
 
-// A successful search fixture must never publish into the installed engine store.
-func isolateSearchPublicationStorage(t *testing.T, cfg *config.Config) {
-	t.Helper()
-	cfg.Storage.DataDir = t.TempDir()
-	blocked := filepath.Join(t.TempDir(), "default-store-is-not-a-directory")
-	if err := os.WriteFile(blocked, []byte("fixture"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("UIAI_SCREENSHOT_DIR", blocked)
-}
-
 func clearSearchSetupCredentials(t *testing.T) {
 	t.Helper()
 	for _, env := range config.BuiltinSearchProviderEnv {

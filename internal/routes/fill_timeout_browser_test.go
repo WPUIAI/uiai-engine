@@ -42,7 +42,9 @@ func TestFillHTTPTimeoutIsObservableAndSessionClosable(t *testing.T) {
 	}
 	pid := pool.Stats()["browser_pid"]
 	router := chi.NewRouter()
-	router.Route("/api/session", func(r chi.Router) { MountSessionRoutes(r, &config.Config{}, manager) })
+	cfg := &config.Config{}
+	isolateEvidencePublicationStorage(t, cfg)
+	router.Route("/api/session", func(r chi.Router) { MountSessionRoutes(r, cfg, manager) })
 	start := time.Now()
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest("POST", "/api/session/"+session.ID+"/fill", strings.NewReader(`{"selector":"#slow","text":"SYNTHETIC_FILL_CANARY"}`)))
