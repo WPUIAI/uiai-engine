@@ -34,13 +34,13 @@ func (e *providerFailure) Is(target error) bool {
 	return e.canceled && target == context.Canceled || e.deadline && target == context.DeadlineExceeded
 }
 
-func providerRequestFailure(provider string) error {
-	return &providerFailure{provider: provider, phase: "request construction"}
+func providerPhaseFailure(provider, phase string) error {
+	return &providerFailure{provider: provider, phase: phase}
 }
 
-func providerTransportFailure(provider string, err error) error {
+func providerIOFailure(provider, phase string, err error) error {
 	return &providerFailure{
-		provider: provider, phase: "transport", retryable: isRetryableMessage(err.Error()),
+		provider: provider, phase: phase, retryable: isRetryableMessage(err.Error()),
 		canceled: errors.Is(err, context.Canceled), deadline: errors.Is(err, context.DeadlineExceeded),
 	}
 }

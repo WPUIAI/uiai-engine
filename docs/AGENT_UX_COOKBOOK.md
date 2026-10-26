@@ -438,9 +438,14 @@ URLs return a safe, non-retryable error rather than a panic. One shared send
 boundary projects transport errors into value-free failure classification; it
 retains cancellation/deadline `errors.Is` identity as flags, not raw URL/error
 causes. Legacy retry signals and configured failover remain intact, and canceled
-completion does not start another provider request. Response-body decoding and
-general initial endpoint admission are separate concerns, not acceptance claims
-of this failure-boundary change.
+completion does not start another provider request. A shared response decoder
+rejects read failures, invalid JSON/types, and missing textual content before
+publishing completion. Parse/content failures are non-retryable; transient read
+failures retain existing retry/context classification. Anthropic text blocks are
+collected after non-text blocks (legacy type-omitted text remains supported),
+without rewriting successful text whitespace; MiniMax VLM retains its existing
+trim behavior. Owned decoding buffers are wiped best-effort, not whole-heap copies.
+Response-size admission and general initial endpoint policy remain separate.
 
 ### Configured search fallback
 

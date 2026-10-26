@@ -13,7 +13,7 @@ import (
 func newProviderRequest(ctx context.Context, provider, endpoint string, body []byte) (*http.Request, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return nil, providerRequestFailure(provider)
+		return nil, providerPhaseFailure(provider, "request construction")
 	}
 	request.Header.Set("Content-Type", "application/json")
 	return request, nil
@@ -23,12 +23,12 @@ func newProviderRequest(ctx context.Context, provider, endpoint string, body []b
 // across inference dialects without changing the caller's client or policies.
 func (p *Provider) doProviderRequest(provider string, request *http.Request) (*http.Response, error) {
 	if err := request.Context().Err(); err != nil {
-		return nil, providerTransportFailure(provider, err)
+		return nil, providerIOFailure(provider, "transport", err)
 	}
 	client := httpboundary.OriginBoundClient(p.client)
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, providerTransportFailure(provider, err)
+		return nil, providerIOFailure(provider, "transport", err)
 	}
 	return response, nil
 }

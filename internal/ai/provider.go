@@ -331,7 +331,6 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 		return nil, err
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != 200 {
 		return nil, providerHTTPFailure(providerName, resp.StatusCode)
@@ -339,6 +338,7 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 
 	var data struct {
 		Content []struct {
+			Type string `json:"type"`
 			Text string `json:"text"`
 		} `json:"content"`
 		Usage struct {
@@ -346,11 +346,19 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 			OutputTokens int `json:"output_tokens"`
 		} `json:"usage"`
 	}
-	json.Unmarshal(respBody, &data)
+	if err := decodeProviderResponse(providerName, resp.Body, &data); err != nil {
+		return nil, err
+	}
 
-	text := ""
-	if len(data.Content) > 0 {
-		text = data.Content[0].Text
+	var textBlocks []string
+	for _, block := range data.Content {
+		if block.Type == "text" || block.Type == "" {
+			textBlocks = append(textBlocks, block.Text)
+		}
+	}
+	text, err := providerResponseText(providerName, strings.Join(textBlocks, ""))
+	if err != nil {
+		return nil, err
 	}
 	cost := calcCost(req.Model, data.Usage.InputTokens, data.Usage.OutputTokens)
 
@@ -461,7 +469,6 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 		return nil, err
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != 200 {
 		return nil, providerHTTPFailure(req.Provider, resp.StatusCode)
@@ -482,7 +489,9 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 			StatusMsg  string `json:"status_msg"`
 		} `json:"base_resp"`
 	}
-	json.Unmarshal(respBody, &data)
+	if err := decodeProviderResponse(req.Provider, resp.Body, &data); err != nil {
+		return nil, err
+	}
 	if data.BaseResp.StatusCode != 0 {
 		return nil, providerApplicationFailure(req.Provider, data.BaseResp.StatusCode, data.BaseResp.StatusMsg)
 	}
@@ -490,6 +499,10 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 	text := ""
 	if len(data.Choices) > 0 {
 		text = data.Choices[0].Message.Content
+	}
+	text, err = providerResponseText(req.Provider, text)
+	if err != nil {
+		return nil, err
 	}
 	cost := calcCost(req.Model, data.Usage.PromptTokens, data.Usage.CompletionTokens)
 
@@ -527,7 +540,6 @@ func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, bas
 		return nil, err
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		return nil, providerHTTPFailure("minimax coding_plan_vlm", resp.StatusCode)
 	}
@@ -539,16 +551,19 @@ func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, bas
 			StatusMsg  string `json:"status_msg"`
 		} `json:"base_resp"`
 	}
-	json.Unmarshal(respBody, &data)
+	if err := decodeProviderResponse("minimax coding_plan_vlm", resp.Body, &data); err != nil {
+		return nil, err
+	}
 	if data.BaseResp.StatusCode != 0 {
 		return nil, providerApplicationFailure("minimax", data.BaseResp.StatusCode, data.BaseResp.StatusMsg)
 	}
-	if strings.TrimSpace(data.Content) == "" {
-		return nil, fmt.Errorf("minimax coding_plan_vlm returned empty content")
+	text, err := providerResponseText("minimax coding_plan_vlm", data.Content)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Response{
-		Content: strings.TrimSpace(data.Content),
+		Content: strings.TrimSpace(text),
 		Model:   req.Model,
 	}, nil
 }
