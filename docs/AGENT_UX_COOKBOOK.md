@@ -393,8 +393,19 @@ AI credential-settings refresh inherits the completion caller deadline and
 cancellation, rejects malformed endpoints without a panic, and caps complete
 responses at 1 MiB. Transport/read failures expose bounded value-free errors, not
 URLs, headers, or provider bodies. Rejected or partial responses never populate
-the cache. This is transport hardening, not broker revocation, secret-heap wiping,
-or authority to retrieve/use new provider credentials.
+the cache. Cached AI settings are reused for at most 60 seconds; shorter configured
+TTLs still win, nonpositive TTLs disable reuse, and backward clock jumps expire the
+snapshot. Local `Provider.InvalidateCredentialCache()` clears cached keys and model
+metadata and fences older in-flight responses, including environment-fallback
+responses. Cancellation is checked before publishing a refreshed snapshot.
+
+This is local cache/transport hardening, not a broker revocation endpoint or lease
+contract. No broker event subscription or credential-reference binding is added;
+existing environment fallback is unchanged. Already-started provider requests are
+not cancelled. Clearing immutable Go string references is not a heap-wipe guarantee.
+Full broker revocation timing and memory-wipe acceptance remain open under #86
+(credential revocation and memory hygiene); this change grants no authority to
+retrieve/use new provider credentials.
 
 Credential-settings redirects may remain within the configured scheme/host only;
 credentials are never forwarded to another origin, a downgraded scheme, or a

@@ -92,13 +92,15 @@ type ProviderModel struct {
 }
 
 type Provider struct {
-	cfg      *config.Config
-	keys     aiKeys
-	keysMu   sync.RWMutex
-	keysTTL  time.Duration
-	client   *http.Client
-	models   []ProviderModel // populated from WP settings
-	modelsMu sync.RWMutex
+	cfg       *config.Config
+	keys      aiKeys
+	keysMu    sync.RWMutex
+	keysTTL   time.Duration
+	keysEpoch uint64           // guarded by keysMu; invalidation fences in-flight refreshes
+	now       func() time.Time // immutable after construction; injectable in tests
+	client    *http.Client
+	models    []ProviderModel // populated from WP settings
+	modelsMu  sync.RWMutex
 }
 
 // AvailableModels returns the model list built from WP settings.
@@ -142,12 +144,14 @@ func (p *Provider) Complete(ctx context.Context, req Request) (*Response, error)
 	if req.Temperature == 0 {
 		req.Temperature = 0.7
 	}
+	p.keysMu.RLock()
 	if req.Model == "" {
 		req.Model = p.cfg.AI.DefaultModel
 	}
 	if req.Provider == "" {
 		req.Provider = p.cfg.AI.DefaultProvider
 	}
+	p.keysMu.RUnlock()
 	if req.Provider == "" {
 		return nil, fmt.Errorf("no AI provider configured — set default_provider in WP Settings or UIAI_DEFAULT_PROVIDER env")
 	}
@@ -591,10 +595,11 @@ func (p *Provider) ensureKeysContext(ctx context.Context) error {
 		return err
 	}
 	p.keysMu.RLock()
-	if time.Since(p.keys.fetchedAt) < p.keysTTL && p.keys.fetchedAt.Unix() > 0 {
+	if p.credentialCacheFreshLocked() {
 		p.keysMu.RUnlock()
 		return nil
 	}
+	epoch := p.keysEpoch
 	p.keysMu.RUnlock()
 
 	url := p.cfg.RESTURL("ai-settings")
@@ -636,15 +641,29 @@ func (p *Provider) ensureKeysContext(ctx context.Context) error {
 		MiniMax         struct{ Key, Model string } `json:"minimax"`
 		Qwen            struct{ Key, Model string } `json:"qwen"`
 	}
+	var decodeErr error
+	if resp.StatusCode == http.StatusOK {
+		decodeErr = json.Unmarshal(body, &settings)
+	}
+	// Publish keys, defaults and the model projection as one generation. Both
+	// successful settings and legacy env fallback obey cancellation/invalidation.
+	p.keysMu.Lock()
+	defer p.keysMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if epoch != p.keysEpoch {
+		return errCredentialCacheInvalidated
+	}
 	if resp.StatusCode != 200 {
 		log.Printf("[ai] WARNING: WP /ai-settings returned HTTP %d — falling back to env vars", resp.StatusCode)
-		p.loadKeysFromEnv()
+		p.loadKeysFromEnvLocked()
 		return nil
 	}
 
-	if err := json.Unmarshal(body, &settings); err != nil {
-		log.Printf("[ai] WARNING: WP /ai-settings returned invalid JSON: %v — falling back to env vars", err)
-		p.loadKeysFromEnv()
+	if decodeErr != nil {
+		log.Printf("[ai] WARNING: WP /ai-settings returned invalid JSON — falling back to env vars")
+		p.loadKeysFromEnvLocked()
 		return nil
 	}
 
@@ -673,7 +692,6 @@ func (p *Provider) ensureKeysContext(ctx context.Context) error {
 		return fallback
 	}
 
-	p.keysMu.Lock()
 	p.keys = aiKeys{
 		Anthropic:  redactedString(merge(settings.Anthropic.Key, envOr("ANTHROPIC_API_KEY", ""))),
 		OpenAI:     redactedString(merge(settings.OpenAI.Key, envOr("OPENAI_API_KEY", ""))),
@@ -682,9 +700,8 @@ func (p *Provider) ensureKeysContext(ctx context.Context) error {
 		Kimi:       redactedString(merge(settings.Kimi.Key, envOr("KIMI_API_KEY", ""))),
 		MiniMax:    redactedString(merge(settings.MiniMax.Key, envOr("MINIMAX_API_KEY", ""))),
 		Qwen:       redactedString(merge(settings.Qwen.Key, envOr("QWEN_API_KEY", ""))),
-		fetchedAt:  time.Now(),
+		fetchedAt:  p.credentialTime(),
 	}
-	p.keysMu.Unlock()
 
 	// Build available models list from WP settings.
 	// Only include providers that have an API key configured.
@@ -727,7 +744,8 @@ func (p *Provider) ensureKeysContext(ctx context.Context) error {
 	return nil
 }
 
-func (p *Provider) loadKeysFromEnv() {
+// Caller holds keysMu and has checked the refresh generation/context.
+func (p *Provider) loadKeysFromEnvLocked() {
 	keys := aiKeys{
 		Anthropic:  redactedString(envOr("ANTHROPIC_API_KEY", "")),
 		OpenAI:     redactedString(envOr("OPENAI_API_KEY", "")),
@@ -736,7 +754,7 @@ func (p *Provider) loadKeysFromEnv() {
 		Kimi:       redactedString(envOr("KIMI_API_KEY", "")),
 		MiniMax:    redactedString(envOr("MINIMAX_API_KEY", "")),
 		Qwen:       redactedString(envOr("QWEN_API_KEY", "")),
-		fetchedAt:  time.Now(),
+		fetchedAt:  p.credentialTime(),
 	}
 	if v := envOr("UIAI_DEFAULT_PROVIDER", ""); v != "" {
 		p.cfg.AI.DefaultProvider = v
@@ -745,9 +763,7 @@ func (p *Provider) loadKeysFromEnv() {
 		p.cfg.AI.DefaultModel = v
 	}
 
-	p.keysMu.Lock()
 	p.keys = keys
-	p.keysMu.Unlock()
 
 	models := []ProviderModel{}
 	if p.cfg.AI.DefaultProvider != "" && p.cfg.AI.DefaultModel != "" {
