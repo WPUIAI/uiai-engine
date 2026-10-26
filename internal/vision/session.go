@@ -1085,16 +1085,18 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 			const style = window.getComputedStyle(el);
 			return style.display === 'none' || style.visibility === 'hidden' || el.getAttribute('aria-hidden') === 'true';
 		};
-		const clean = (s) => (s || '').replace(/[ \t\n]+/g, ' ').trim();
+		const spaces = (s) => (s || '').replace(/[ \t\n]+/g, ' ');
+		const clean = (s) => spaces(s).trim();
 		const tick = String.fromCharCode(96);
-		const esc = (s) => clean(s).replace(/\\/g, '\\\\').replace(new RegExp('([*_\\x60~\\[\\]#])', 'g'), '\\$1');
+		const escapeMarkdown = (s) => s.replace(/\\/g, '\\\\').replace(new RegExp('([*_\\x60~\\[\\]#])', 'g'), '\\$1');
+		const esc = (s) => escapeMarkdown(clean(s));
 		const clone = root.cloneNode(true);
 		clone.querySelectorAll('script,style,noscript,svg,canvas,iframe,template').forEach(e => e.remove());
 		if (mode !== 'full') clone.querySelectorAll('nav,footer,header,aside').forEach(e => e.remove());
 		clone.querySelectorAll('[hidden],[aria-hidden="true"]').forEach(e => e.remove());
 		const mdNode = (node, depth = 0) => {
 			if (!node) return '';
-			if (node.nodeType === Node.TEXT_NODE) return esc(node.textContent);
+			if (node.nodeType === Node.TEXT_NODE) return escapeMarkdown(spaces(node.textContent));
 			if (node.nodeType !== Node.ELEMENT_NODE || hidden(node)) return '';
 			const tag = node.tagName.toLowerCase();
 			const kids = () => Array.from(node.childNodes).map(n => mdNode(n, depth)).join('').replace(/[ \t]+\n/g, '\n').trim();

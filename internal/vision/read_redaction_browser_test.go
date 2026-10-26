@@ -134,3 +134,33 @@ func TestReadPageMarkdownCitationBoundariesBrowser(t *testing.T) {
 		t.Fatal("browser citation repair lost credential/fragment/userinfo protection")
 	}
 }
+
+func TestReadPageMarkdownInlineWhitespaceBrowser(t *testing.T) {
+	if os.Getenv("UIAI_AUTH_TESTS") == "" {
+		t.Skip("set UIAI_AUTH_TESTS=1 for browser regression")
+	}
+	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body><main><p>Read <strong>bold</strong> and <em>italic</em> with <a href="https://example.test/">a link</a> plus <code>code</code>.</p><p>Words <span>inside</span> spans.</p></main></body></html>`))
+	}))
+	defer site.Close()
+	pool, err := NewPoolWithConfig(PoolConfig{MaxPages: 1, AllowPrivateURLs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	manager := NewSessionManager(pool)
+	sess, _, err := manager.Open(site.URL, 800, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.Close(sess.ID)
+	result, err := sess.ReadPage(ReadOptions{Format: "markdown", MaxChars: 8000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "Read **bold** and *italic* with [a link](https://example.test/) plus `code`."
+	if !strings.Contains(result.Text, want) || !strings.Contains(result.Text, "Words inside spans.") {
+		t.Fatalf("inline whitespace lost: %q", result.Text)
+	}
+}
