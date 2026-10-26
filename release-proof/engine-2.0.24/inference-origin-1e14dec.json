@@ -1,0 +1,29 @@
+{
+  "schema": "uiai.inference_origin_proof.v1",
+  "issue": 265,
+  "source_revision": "1e14dec",
+  "version": "2.0.24",
+  "build": "2026-10-26T06:48:54Z+1e14dec",
+  "running_sha256": "d63f707df14c2960ab358e3cd3c538df46ed1d8c9d22f397defbe93a6f95a7e0",
+  "verified": [
+    "RED controlled HTTP307 foreign-origin targets each received1request with credential_header=true and prompt_or_image=true for OpenAI,Anthropic and MiniMax vision dialects; no real keys/provider endpoints involved",
+    "RED fake transports followed changed scheme and userinfo-bearing redirects before the fix",
+    "GREEN all three inference paths reuse canonical httpboundary.OriginBoundClient per-request copies; no duplicate redirect validator or base-client mutation",
+    "Foreign origin/changed scheme/redirect URL userinfo blocked before target contact; zero redirected requests/headers/payloads observed",
+    "Same-origin inference still succeeds with expected credential header; custom callback invoked exactly once and original shared-client callback pointer unchanged",
+    "Existing rejection callback and default ten-request redirect loop bound preserved for all three dialects",
+    "20 repeated allAI race runs,fullGo/vet,17native-shared-MCP client tests,prepush and Windowsamd64/Darwinarm64 crossbuilds passed; cache/wipe/error/failover regressions remain green",
+    "Both named workers canonical idle-safe/rollback-preserving deployed; active/healthy/running executable hashes verified",
+    "Both installed workers pass ordinary source/browser/security/search/cleanup regressions; paid provider probes false and owned browser sessions closed"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-1e14dec.json",
+  "live_probe_observed_at": "2026-10-26T06:49:32Z",
+  "limits": [
+    "Controlled fixture disclosure reproduction only, not evidence that real production credentials/prompts were exposed",
+    "Redirect confinement only; initial configured endpoint validation and existing MiniMax endpoint derivation are separate, not claimed fixed",
+    "No real paid-provider availability/quotas or authenticated external-inference proof; no full86 broker/lease/revoke/heap-wipe closure",
+    "Existing providers/credentials/config/default/fallback/dependencies/services unchanged, Brave retained/Jina absent",
+    "No scopedEPWA/pixel/nativeOS/current native research-array activation/publicRelease claim; live browser artifacts unsealed/deliveryblocked",
+    "Original unrelated dirt preserved, no duplicatecheckout or Focusa repair/green background acceptance claim; existing direct UIAI-only continuation execution receipt retained in cache foundation proof"
+  ]
+}
