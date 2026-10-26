@@ -1,0 +1,42 @@
+{
+  "schema": "uiai.focusa_evidence_reconciliation.v1",
+  "reconciliation_id": "fixture:reconciliation:1",
+  "handoff_ref": "fixture:handoff:1",
+  "handoff_sha256": "15e61b39b4fff002fc4ade1f1ec38dcc70b54e9fbf49ea10902fc0d4045e9f7b",
+  "scope": {
+    "project_ref": "fixture:project:uiai",
+    "workstream_ref": "fixture:workstream:1",
+    "workset_ref": "fixture:workset:1",
+    "callgraph_ref": "fixture:callgraph:1",
+    "workpoint_ref": "fixture:workpoint:1",
+    "work_item_ref": "fixture:work-item:1"
+  },
+  "operation_binding_sha256": "0470055fc9e0471f9807c5465fd36f50754cf1489bfe38767970b4f1c8268e10",
+  "idempotency_key": "fixture:request:1",
+  "state": "reconciled",
+  "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "response_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "receipt_refs": [
+    "fixture:receipt:1"
+  ],
+  "evidence_refs": [
+    "fixture:effect-evidence:1"
+  ],
+  "authority_evidence_refs": [
+    "fixture:authority-observation:1"
+  ],
+  "observed_version": 1,
+  "effects": [
+    {
+      "effect_ref": "fixture:effect:1",
+      "target_ref": "fixture:workpoint:1",
+      "kind": "workpoint_evidence_link",
+      "observed_version": 1,
+      "evidence_ref": "fixture:effect-evidence:1"
+    }
+  ],
+  "partial_effects": [],
+  "transport_outcome": "response",
+  "next_action": "retry_authorized",
+  "observed_at": "2026-10-26T16:02:00Z"
+}

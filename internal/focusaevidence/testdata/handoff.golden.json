@@ -1,0 +1,65 @@
+{
+  "schema": "uiai.focusa_evidence_handoff.v1",
+  "handoff_id": "fixture:handoff:1",
+  "artifact": {
+    "artifact_ref": "fixture:artifact:1",
+    "revision": 1,
+    "bundle_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "scope": {
+      "project_ref": "fixture:project:uiai",
+      "workstream_ref": "fixture:workstream:1",
+      "workset_ref": "fixture:workset:1",
+      "callgraph_ref": "fixture:callgraph:1",
+      "workpoint_ref": "fixture:workpoint:1",
+      "work_item_ref": "fixture:work-item:1"
+    },
+    "attestation_refs": [
+      "fixture:attestation:1"
+    ],
+    "trust_refs": [
+      "fixture:trust:1"
+    ],
+    "security_refs": [
+      "fixture:inspection:1"
+    ]
+  },
+  "judge_result_refs": [
+    "fixture:judge-result:1"
+  ],
+  "acceptance_atom_refs": [
+    "fixture:atom:1"
+  ],
+  "observed_at": "2026-10-26T16:01:00Z",
+  "expires_at": "2026-10-26T16:45:00Z",
+  "freshness_policy_ref": "fixture:freshness-policy:1",
+  "idempotency_key": "fixture:request:1",
+  "confirmation_evidence_ref": "fixture:confirmation:1",
+  "operation": {
+    "schema": "uiai.focusa_evidence_operation_binding.v1",
+    "operation_id": "fixture.workpoint.link",
+    "operation_version": "v1",
+    "request_schema_ref": "fixture:schema:request",
+    "response_schema_ref": "fixture:schema:response",
+    "capability_snapshot_ref": "fixture:capability:1",
+    "capability_snapshot_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "authority_scope": {
+      "project_ref": "fixture:project:uiai",
+      "workstream_ref": "fixture:workstream:1",
+      "workset_ref": "fixture:workset:1",
+      "callgraph_ref": "fixture:callgraph:1",
+      "workpoint_ref": "fixture:workpoint:1",
+      "work_item_ref": "fixture:work-item:1"
+    },
+    "consumer_role": "workpoint_evidence_link",
+    "confirmation_required": true,
+    "idempotency_required": true,
+    "receipt_required": true,
+    "approval_evidence_refs": [
+      "fixture:approval-evidence:1"
+    ],
+    "observed_at": "2026-10-26T16:00:00Z",
+    "expires_at": "2026-10-26T17:00:00Z"
+  },
+  "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
