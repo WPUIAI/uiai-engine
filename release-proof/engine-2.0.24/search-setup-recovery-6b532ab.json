@@ -1,0 +1,32 @@
+{
+  "schema": "uiai.search_setup_recovery_proof.v1",
+  "issue": 90,
+  "source_revision": "6b532ab",
+  "version": "2.0.24",
+  "build": "2026-10-26T01:07:06Z+6b532ab",
+  "running_sha256": "a6bb2b91a09cd89042445362277521f1149890f3ab46d412f8358bd9a698772b",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "Before-fix HTTP tests reproduced missing recovery guidance for missing/disabled/unreadable/invalid-endpoint/unsupported setups",
+    "Errors reuse canonical setup owner via existing suggested_next_action plus structured per-provider setup; no client runtime/schema changes or tool installation needed",
+    "Unsupported error suggestions list installed adapters, not unimplemented configured/default identifiers",
+    "Circuit errors preserve status/retryable/Retry-After while adding wait guidance; fixture verifies zero probe requests",
+    "Malformed upstream response is not misdiagnosed as setup; empty provider inventory directs discovery instead of automatic key acquisition",
+    "Static safe config field names retained; synthetic secret/private URL/private reference not disclosed",
+    "OVH fullGo/race5x/vet and17native/shared/MCP tests plus CLI renderer fixture pass; canonical prepush passes",
+    "Windowsamd64/Darwinarm64 cross-build pass only",
+    "Canonical idle-safe rollback-preserving rollout both worker active/healthy running executable hashes verified; existing Brave setup stays locally admitted",
+    "Both installed worker setup/card/provider parity, discovery, negative recovery and owned ordinary browser/redaction/error/diagnostics/screenshot-artifact/cleanup consumers pass",
+    "ACTUAL CURRENT native Pi uiai_search and ACTUAL CURRENT MCP browser_search deliberately unsupported provider return expected400 plus Next: choose_supported_provider; no external provider path executed and no client install/reload performed"
+  ],
+  "limits": [
+    "Negative actual calls intentionally test local rejection, not successful real provider queries; success/cost/account access are not asserted",
+    "No credential/account/signup/config/default/fallback/endpoint changes or service provisioning performed",
+    "No privileged config writer, Cockpit, public Release, scoped EPWA publication, pixel inspection, independent-model usability or nativeOS execution proof",
+    "Broad90/91 acceptance remains OPEN; original unrelated changes preserved"
+  ],
+  "probe_ref": "OVH/tmp/uiai-live-6b532ab.json"
+}
