@@ -18,11 +18,7 @@ func searchTavily(ctx context.Context, cfg *config.Config, query string, limit i
 	if err != nil {
 		return nil, err
 	}
-	base := "https://api.tavily.com/search"
-	if cfg != nil && strings.TrimSpace(cfg.Search.Providers["tavily"].APIURL) != "" {
-		base = cfg.Search.Providers["tavily"].APIURL
-	}
-	endpoint, err := searchAPIURL(base, "https://api.tavily.com/search", []string{"api.tavily.com"})
+	endpoint, err := searchProviderEndpoint(cfg, "tavily")
 	if err != nil {
 		return nil, fmt.Errorf("invalid Tavily API URL")
 	}

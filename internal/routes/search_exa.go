@@ -18,11 +18,7 @@ func searchExa(ctx context.Context, cfg *config.Config, query string, limit int)
 	if err != nil {
 		return nil, err
 	}
-	base := "https://api.exa.ai/search"
-	if cfg != nil && strings.TrimSpace(cfg.Search.Providers["exa"].APIURL) != "" {
-		base = cfg.Search.Providers["exa"].APIURL
-	}
-	endpoint, err := searchAPIURL(base, "https://api.exa.ai/search", []string{"api.exa.ai"})
+	endpoint, err := searchProviderEndpoint(cfg, "exa")
 	if err != nil {
 		return nil, fmt.Errorf("invalid Exa API URL")
 	}

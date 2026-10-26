@@ -11,22 +11,31 @@ import (
 
 // builtinSearchProvider describes a search provider the engine ships with.
 type builtinSearchProvider struct {
-	id           string
-	name         string
-	keyless      bool
-	configured   func(*config.Config) (bool, string)
-	capabilities []string
-	search       func(context.Context, *config.Config, string, int) ([]searchResult, error)
+	id            string
+	name          string
+	keyless       bool
+	configured    func(*config.Config) (bool, string)
+	capabilities  []string
+	defaultAPIURL string
+	apiURLEnv     string
+	apiHosts      []string
+	configAPIURL  bool
+	search        func(context.Context, *config.Config, string, int) ([]searchResult, error)
 }
 
-var builtinSearchProviders = []builtinSearchProvider{
-	{id: "searxng", name: "SearxNG", keyless: true, configured: searxSearchConfigured, search: searchSearxNG, capabilities: []string{"web_search", "source_urls", "snippets", "keyless_configured_endpoint"}},
-	{id: "exa", name: "Exa Search", search: searchExa, capabilities: []string{"web_search", "source_urls", "snippets"}},
-	{id: "tavily", name: "Tavily Search", search: searchTavily, capabilities: []string{"web_search", "source_urls", "snippets"}},
-	{id: "brave", name: "Brave Search", search: searchBraveContext, capabilities: []string{"web_search", "source_urls", "snippets"}},
-	{id: "wikipedia", name: "Wikipedia OpenSearch", search: func(ctx context.Context, _ *config.Config, query string, limit int) ([]searchResult, error) {
-		return searchWikipediaContext(ctx, query, limit)
-	}, keyless: true, capabilities: []string{"encyclopedia_search", "source_urls", "snippets", "keyless_public"}},
+// Initialize once after declarations: adapters consult this same registry at runtime.
+var builtinSearchProviders []builtinSearchProvider
+
+func init() {
+	builtinSearchProviders = []builtinSearchProvider{
+		{id: "searxng", name: "SearxNG", keyless: true, configured: searxSearchConfigured, search: searchSearxNG, capabilities: []string{"web_search", "source_urls", "snippets", "keyless_configured_endpoint"}},
+		{id: "exa", defaultAPIURL: "https://api.exa.ai/search", apiHosts: []string{"api.exa.ai"}, configAPIURL: true, name: "Exa Search", search: searchExa, capabilities: []string{"web_search", "source_urls", "snippets"}},
+		{id: "tavily", defaultAPIURL: "https://api.tavily.com/search", apiHosts: []string{"api.tavily.com"}, configAPIURL: true, name: "Tavily Search", search: searchTavily, capabilities: []string{"web_search", "source_urls", "snippets"}},
+		{id: "brave", defaultAPIURL: "https://api.search.brave.com/res/v1/web/search", apiURLEnv: "UIAI_BRAVE_SEARCH_API_URL", apiHosts: []string{"api.search.brave.com"}, configAPIURL: true, name: "Brave Search", search: searchBraveContext, capabilities: []string{"web_search", "source_urls", "snippets"}},
+		{id: "wikipedia", defaultAPIURL: "https://en.wikipedia.org/w/api.php", apiURLEnv: "UIAI_WIKIPEDIA_SEARCH_API_URL", apiHosts: []string{"en.wikipedia.org", "wikipedia.org"}, name: "Wikipedia OpenSearch", search: func(ctx context.Context, _ *config.Config, query string, limit int) ([]searchResult, error) {
+			return searchWikipediaContext(ctx, query, limit)
+		}, keyless: true, capabilities: []string{"encyclopedia_search", "source_urls", "snippets", "keyless_public"}},
+	}
 }
 
 // searchProviderIDs returns every provider this deployment can serve: the built-in
@@ -46,6 +55,7 @@ func searchProviderIDs(cfg *config.Config) []string {
 		add(provider.id)
 	}
 	if cfg != nil {
+		add(strings.ToLower(strings.TrimSpace(cfg.Search.DefaultProvider)))
 		for id := range cfg.Search.Providers {
 			add(strings.TrimSpace(id))
 		}
@@ -82,6 +92,9 @@ func searchProviderConfigured(cfg *config.Config, id string) (bool, string) {
 	if meta.configured != nil {
 		return meta.configured(cfg)
 	}
+	if _, err := searchProviderEndpoint(cfg, id); err != nil {
+		return false, "invalid_endpoint"
+	}
 	if meta.keyless {
 		return true, ""
 	}
@@ -102,21 +115,15 @@ func searchProviderConfigured(cfg *config.Config, id string) (bool, string) {
 }
 
 // resolveDefaultSearchProvider returns the provider a request should use when it
-// names none: the operator's explicit default when it can serve, otherwise the
-// first provider that can genuinely serve. Empty means nothing can serve, and the
-// caller must say so instead of advertising a provider that would 503.
+// names none: an explicit default is query-disclosure intent, not permission to
+// silently choose another configured provider when it is broken. Only the
+// approved fallback plan can move its queries. Without an explicit default,
+// preserve the existing first-ready built-in selection; empty means none ready.
 func resolveDefaultSearchProvider(cfg *config.Config) string {
 	ids := searchProviderIDs(cfg)
 	if cfg != nil {
-		if wanted := strings.TrimSpace(cfg.Search.DefaultProvider); wanted != "" {
-			for _, id := range ids {
-				if id == wanted {
-					if configured, _ := searchProviderConfigured(cfg, id); configured {
-						return id
-					}
-					break
-				}
-			}
+		if wanted := strings.ToLower(strings.TrimSpace(cfg.Search.DefaultProvider)); wanted != "" {
+			return wanted
 		}
 	}
 	for _, id := range ids {

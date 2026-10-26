@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -17,11 +16,7 @@ func searchWikipedia(query string, limit int) ([]searchResult, error) {
 }
 
 func searchWikipediaContext(ctx context.Context, query string, limit int) ([]searchResult, error) {
-	base := strings.TrimSpace(os.Getenv("UIAI_WIKIPEDIA_SEARCH_API_URL"))
-	if base == "" {
-		base = "https://en.wikipedia.org/w/api.php"
-	}
-	u, err := searchAPIURL(base, "https://en.wikipedia.org/w/api.php", []string{"en.wikipedia.org", "wikipedia.org"})
+	u, err := searchProviderEndpoint(nil, "wikipedia")
 	if err != nil {
 		return nil, fmt.Errorf("invalid Wikipedia API URL")
 	}
@@ -79,6 +74,15 @@ func searchAPIURL(raw, fallback string, allowedHosts []string) (*url.URL, error)
 	u, err := url.Parse(raw)
 	if err != nil {
 		return nil, fmt.Errorf("invalid search API URL")
+	}
+	if u.RawQuery != "" || u.ForceQuery || strings.Contains(raw, "#") {
+		return nil, fmt.Errorf("search API URL cannot contain query or fragment")
+	}
+	if port := u.Port(); port != "" {
+		value, err := strconv.Atoi(port)
+		if err != nil || value < 1 || value > 65535 {
+			return nil, fmt.Errorf("invalid search API port")
+		}
 	}
 	if u.User != nil {
 		return nil, fmt.Errorf("search API URL cannot contain user information")
@@ -158,19 +162,7 @@ func searchBraveContext(ctx context.Context, cfg *config.Config, query string, l
 		return nil, err
 	}
 
-	base := ""
-	if cfg != nil {
-		if provider, ok := cfg.Search.Providers["brave"]; ok {
-			base = strings.TrimSpace(provider.APIURL)
-		}
-	}
-	if base == "" {
-		base = strings.TrimSpace(os.Getenv("UIAI_BRAVE_SEARCH_API_URL"))
-	}
-	if base == "" {
-		base = "https://api.search.brave.com/res/v1/web/search"
-	}
-	u, err := searchAPIURL(base, "https://api.search.brave.com/res/v1/web/search", []string{"api.search.brave.com"})
+	u, err := searchProviderEndpoint(cfg, "brave")
 	if err != nil {
 		return nil, fmt.Errorf("invalid Brave API URL")
 	}

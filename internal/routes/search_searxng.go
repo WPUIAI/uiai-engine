@@ -25,7 +25,7 @@ func searxSearchEndpoint(cfg *config.Config) (*url.URL, string) {
 		return nil, "missing_endpoint"
 	}
 	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Hostname() == "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+	if err != nil || parsed.Hostname() == "" {
 		return nil, "invalid_endpoint"
 	}
 	endpoint, err := searchAPIURL(raw, "", []string{parsed.Hostname()})

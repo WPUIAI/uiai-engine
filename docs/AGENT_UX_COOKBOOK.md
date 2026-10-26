@@ -623,3 +623,37 @@ synthetic provider search. It verifies that discovery sends no queries and that
 neither configuration nor responses contain the credential value. It is not an
 independent-model usability test or an actual account/paid-provider proof; no new
 privileged configuration-writing API is needed for that existing-file workflow.
+
+
+### Local endpoint validation and explicit-default intent
+
+Readiness now applies the same endpoint resolver used by Brave, Exa, Tavily and
+Wikipedia before advertising them as configured/ready. Defaults, allowed hosts,
+override source and precedence live in the existing provider registry, not a
+second setup-only table. No DNS lookup, account check or search query is sent.
+An invalid endpoint yields `invalid_endpoint` / `repair_existing_endpoint` with
+only safe field names; private URLs and credential-looking URL text stay out of
+discovery and adapter errors.
+
+API URLs require HTTPS except loopback development, a valid port, their existing
+approved host policy, and no userinfo, query or fragment (including empty `?`/`#`
+markers). Request parameters belong to the adapter protocol, not the base API
+URL. SearxNG retains its explicit approved-instance policy and reuses the common
+syntax validator. Brave keeps configuration-over-environment URL precedence;
+Wikipedia keeps its legacy `UIAI_WIKIPEDIA_SEARCH_API_URL` endpoint override
+rather than interpreting a previously unused provider configuration field.
+
+An explicit `search.default_provider` remains the selected intent even when its
+adapter is unsupported, disabled, missing a credential or misconfigured. It is
+not silently replaced by another configured provider. Only explicitly approved
+`search.fallback_providers` can receive its unnamed-request queries; an explicit
+request `provider` stays pinned. With no configured default, the existing
+first-ready selection remains unchanged. Provider discovery includes unsupported
+default identifiers so agents can diagnose them rather than see a hidden swap.
+
+Regression tests reproduce the previous false-ready endpoint, compare setup and
+adapter rejection for all four adapters, fence unwanted outbound calls with
+canceled contexts, preserve override precedence, verify zero discovery traffic,
+and prove that a broken explicit default sends no query to an unapproved local
+provider while an explicitly approved fallback works. These are synthetic/local
+proofs, not real provider availability, quota or paid-query acceptance.

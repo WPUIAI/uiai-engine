@@ -9,6 +9,7 @@ type searchProviderSetup struct {
 	Message                 string   `json:"message"`
 	ConfigurationFields     []string `json:"configuration_fields,omitempty"`
 	ConventionalEnvFallback string   `json:"conventional_env_fallback,omitempty"`
+	EndpointEnvFallback     string   `json:"endpoint_env_fallback,omitempty"`
 	RetryAfterSeconds       int      `json:"retry_after_seconds,omitempty"`
 }
 
@@ -30,13 +31,18 @@ func buildSearchProviderSetup(id, reason string, retry int) searchProviderSetup 
 		prefix := "search.providers." + id + "."
 		s.ConfigurationFields = []string{prefix + "api_key_env", prefix + "api_key_file"}
 		s.ConventionalEnvFallback = config.BuiltinSearchProviderEnv[id]
-	case "missing_endpoint", "invalid_endpoint":
+	case "missing_endpoint":
 		s.NextAction = "connect_existing_endpoint"
-		if reason == "invalid_endpoint" {
-			s.NextAction = "repair_existing_endpoint"
-		}
 		s.Message = "Use an approved JSON-enabled SearxNG search endpoint: HTTPS (HTTP only for loopback development), no userinfo, query, or fragment. Do not pick a public instance or provision a service automatically."
 		s.ConfigurationFields = []string{"search.providers.searxng.api_url"}
+	case "invalid_endpoint":
+		s.NextAction = "repair_existing_endpoint"
+		s.Message = "Repair the existing provider API URL using its approved host policy: HTTPS (HTTP only for loopback development), valid port, no userinfo, query, or fragment. Discovery does not return private URL values or select another provider."
+		meta := searchProviderMeta(id)
+		if meta.configAPIURL || id == "searxng" {
+			s.ConfigurationFields = []string{"search.providers." + id + ".api_url"}
+		}
+		s.EndpointEnvFallback = meta.apiURLEnv
 	case "circuit_open":
 		s.NextAction = "wait_then_retry"
 		s.Message = "Respect the reported delay; do not replace credentials or run background probes."
