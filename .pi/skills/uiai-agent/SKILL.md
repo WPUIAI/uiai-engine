@@ -46,6 +46,24 @@ CLI equivalents:
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai status && scripts/uiai health && scripts/uiai tools search diagnostics'
 ```
 
+## Choose the browser operating mode
+
+Read the current agent card's `browser_modes` (also `/api/tools/docs`) before
+changing modes. This is the canonical decision card, not a second skill-owned
+matrix: choose by best use, cost, persistence and security, and follow its bounded
+state-routing hints/recipes. `registered_tools` is registration only, never proof
+of runtime readiness, credentials, control authority or evidence publication.
+External/unsupported attach, mesh, privileged transaction and full-context scrub
+routes remain explicitly limited; do not invent tools or SSH/CDP workarounds.
+
+An `auth_challenge_pending` error's `next_mode` is guidance, not permission to
+resume. Require an approved private context, renewable broker/human resolution,
+fresh observation/authority and truthful cleanup receipts. Never use public demo
+profiles for credentials. Recovery codes/finite break-glass assets are forbidden;
+unknown renewability blocks use. Receipt requirements are not actual receipts.
+Source skill edits require native reload/fresh-session loading before claiming
+that another running agent received them; the live card is independently queried.
+
 ## Default agent web workflow
 
 Use this sequence for research or page inspection:

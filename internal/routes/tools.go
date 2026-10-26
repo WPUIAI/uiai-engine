@@ -94,9 +94,10 @@ func MountToolsDiscovery(r chi.Router, cfg *config.Config, states ...*SearchRunt
 
 func agentBootstrapCard() map[string]any {
 	return map[string]any{
-		"service":  "uiai-engine",
-		"purpose":  "Lightweight browser, web search, Source-to-Markdown, screenshot, visual QA, and diagnostics backend for local and remote agents.",
-		"base_url": "http://localhost:7456",
+		"service":       "uiai-engine",
+		"purpose":       "Lightweight browser, web search, Source-to-Markdown, screenshot, visual QA, and diagnostics backend for local and remote agents.",
+		"base_url":      "http://localhost:7456",
+		"browser_modes": browserModeDecisionCard(openAITools()),
 		"top_benefits": []string{
 			"Discover UIAI features quickly through agent cards, tool search, graph routing, docs metadata, Pi cards, MCP cards, and CLI discovery.",
 			"Convert public sources into Markdown, metadata, optional JSONL records/chunks, diagnostics, Focusa evidence refs, and WPUIAI research cards/reports.",
@@ -156,11 +157,12 @@ func agentBootstrapCard() map[string]any {
 
 func agentDocsExamples() map[string]any {
 	return map[string]any{
-		"schema":       "uiai.agent_docs.v1",
-		"version":      "2026-06-05",
-		"service":      "uiai-engine",
-		"purpose":      "Lightweight public docs and copy-safe examples for agents without loading full markdown files.",
-		"top_benefits": []string{"agent discovery", "Source-to-Markdown / Web Memory Capture", "persistent browser sessions", "diagnostics-first debugging", "Focusa/Pi/MCP handoff", "visual proof", "WPUIAI research cards/reports"},
+		"schema":        "uiai.agent_docs.v1",
+		"browser_modes": browserModeDecisionCard(openAITools()),
+		"version":       "2026-06-05",
+		"service":       "uiai-engine",
+		"purpose":       "Lightweight public docs and copy-safe examples for agents without loading full markdown files.",
+		"top_benefits":  []string{"agent discovery", "Source-to-Markdown / Web Memory Capture", "persistent browser sessions", "diagnostics-first debugging", "Focusa/Pi/MCP handoff", "visual proof", "WPUIAI research cards/reports"},
 		"doc_links": []map[string]string{
 			{"title": "Agent discovery index", "path": "docs/AGENT_DISCOVERY_INDEX.md", "summary": "Cards, tool search, graph, docs endpoint, Pi/MCP/CLI discovery, feature index, and known gaps."},
 			{"title": "Agent quickstart", "path": "docs/UIAI_FOR_AGENTS_QUICKSTART.md", "summary": "Pi, MCP, CLI, HTTP, browser workflow, Source-to-Markdown, and Focusa packet handoff."},

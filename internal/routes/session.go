@@ -91,7 +91,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 					next.ServeHTTP(w, req)
 					return
 				}
-				writeJSON(w, http.StatusConflict, map[string]any{"state": vision.LeaseAwaitingAuth, "code": "auth_challenge_pending", "session": sessionInfoPayload(sess)})
+				writeJSON(w, http.StatusConflict, map[string]any{"state": vision.LeaseAwaitingAuth, "code": "auth_challenge_pending", "next_mode": browserModePrivateAuth, "session": sessionInfoPayload(sess)})
 			})
 		})
 
@@ -116,7 +116,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			_ = json.NewDecoder(req.Body).Decode(&body)
 			if err := sess.ResolveAuthChallenge(body.ResumeToken); err != nil {
-				writeJSON(w, http.StatusConflict, map[string]any{"state": vision.LeaseAwaitingAuth, "code": "auth_challenge_pending", "error": err.Error()})
+				writeJSON(w, http.StatusConflict, map[string]any{"state": vision.LeaseAwaitingAuth, "code": "auth_challenge_pending", "next_mode": browserModePrivateAuth, "error": err.Error()})
 				return
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"resolved": true, "session": sessionInfoPayload(sess)})

@@ -79,6 +79,28 @@ Lead public docs with the highest-value agent/product features:
 
 Deemphasize legacy/backward-compatibility topics. Keep them as maintenance references, not top-level product positioning.
 
+## Browser operating modes and secure combinations
+
+Read `browser_modes` from `/api/tools/agent-card` (also `/api/tools/docs`).
+`uiai.browser_modes.v1` is the single decision-card implementation in
+`internal/routes/browser_modes.go`; do not maintain a separate mode matrix.
+It supplies best use, cost posture, persistence, security, state-routing hints,
+six composable recipes, and privileged cleanup/receipt requirements.
+
+`registered_tools` means names exist in the tool registry, not that a runtime,
+credential, control lease, or evidence publisher is ready. `not_registered`,
+`not_first_class`, and `external_system` are explicit limits, not invitations to
+invent APIs or execute hand-written CDP/SSH/auth workarounds. Privileged receipt
+requirements are not emitted or verified receipts. Unsupported attach, mesh,
+transaction and full-context scrub work remains in its existing owning issues.
+
+Pending-auth errors include `next_mode` pointing to the same private-auth entry;
+that hint grants nothing and does not unpause the session. Public/shared/demo
+contexts cannot receive credentials. Use only approved renewable broker/human
+routes, with fresh observation and authority before resuming. Recovery codes and
+other finite break-glass assets are permanently excluded, regardless of historical
+incident descriptions or older issue proposals. Unknown renewability blocks use.
+
 ## Known gaps worth filling
 
 | Gap | Why it matters | Suggested next gate |
