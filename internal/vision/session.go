@@ -1046,6 +1046,15 @@ type ReadFocusaMetadata struct {
 
 // ReadPage extracts bounded, readable page text without taking a screenshot.
 func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
+	return s.ReadPageContext(context.Background(), opts)
+}
+
+// ReadPageContext preserves caller cancellation through the canonical reader,
+// without changing the shared page lifetime or bypassing redaction.
+func (s *Session) ReadPageContext(caller context.Context, opts ReadOptions) (*PageReadResult, error) {
+	if err := caller.Err(); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.page == nil {
@@ -1133,7 +1142,15 @@ func (s *Session) ReadPage(opts ReadOptions) (*PageReadResult, error) {
 		return JSON.stringify({ url: location.href, canonical_url: canonical, site_name: siteName, title: document.title, description, selector, format, mode, text, headings, links });
 	}`, string(selectorJSON), string(formatJSON), string(modeJSON), string(includeImagesJSON))
 
-	result, err := s.page.Timeout(5 * time.Second).Eval(js)
+	if err := caller.Err(); err != nil {
+		return nil, err
+	}
+	ctx, cancel := sessionActionContext(s.page.GetContext(), caller, 5*time.Second)
+	defer cancel()
+	result, err := s.page.Context(ctx).Eval(js)
+	if caller.Err() != nil {
+		return nil, caller.Err()
+	}
 	if err != nil {
 		return nil, err
 	}

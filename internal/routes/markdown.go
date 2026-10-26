@@ -1,9 +1,11 @@
 package routes
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -93,6 +95,10 @@ func handleMarkdownRequest(w http.ResponseWriter, req *http.Request, body markdo
 		body.MaxChars = 30000
 	}
 	started := time.Now()
+	if err := req.Context().Err(); err != nil {
+		writeJSON(w, http.StatusRequestTimeout, markdownFailure("source_read_cancelled", err, body.URL, started))
+		return
+	}
 	sess, _, err := sm.Open(body.URL, body.Width, body.Height)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, markdownFailure("source_open_failed", err, body.URL, started))
@@ -105,7 +111,7 @@ func handleMarkdownRequest(w http.ResponseWriter, req *http.Request, body markdo
 	if body.IncludeLinks != nil {
 		includeLinks = *body.IncludeLinks
 	}
-	read, err := sess.ReadPage(vision.ReadOptions{
+	read, err := readSourcePageReady(req.Context(), sess, vision.ReadOptions{
 		Selector:      body.Selector,
 		MaxChars:      body.MaxChars,
 		IncludeLinks:  includeLinks,
@@ -115,8 +121,24 @@ func handleMarkdownRequest(w http.ResponseWriter, req *http.Request, body markdo
 	})
 	diagnostics := sanitizedMarkdownDiagnosticsSnapshot(sess.Diagnostics(25, "", false))
 	if err != nil {
-		_ = sm.Close(sess.ID)
-		writeJSON(w, http.StatusBadGateway, markdownFailure("source_read_failed", err, body.URL, started))
+		status, class := http.StatusBadGateway, "source_read_failed"
+		if errors.Is(err, errNoReadableSourceContent) {
+			status, class = http.StatusUnprocessableEntity, "source_content_unavailable"
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			status, class = http.StatusRequestTimeout, "source_read_cancelled"
+		}
+		failure := markdownFailure(class, err, body.URL, started)
+		if closeErr := sm.Close(sess.ID); closeErr == nil {
+			cleanup["closed"] = true
+		} else {
+			failure["cleanup_error"] = "owned_session_close_failed"
+		}
+		failure["cleanup"] = cleanup
+		if class == "source_content_unavailable" {
+			failure["suggested_next_action"] = "Use a persistent browser session, inspect diagnostics, and wait for the intended content selector; do not infer a complete source snapshot from empty text."
+		}
+		writeJSON(w, status, failure)
 		return
 	}
 	if err := sm.Close(sess.ID); err == nil {
