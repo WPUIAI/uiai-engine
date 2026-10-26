@@ -419,6 +419,14 @@ credentials are never forwarded to another origin, a downgraded scheme, or a
 redirect URL containing user information. Same-origin redirects retain any
 existing client policy; the inference client itself is not reconfigured.
 
+AI upstream HTTP/application failure responses expose a provider label and numeric
+code, never the upstream application message. Retry classification is carried
+separately from display text and survives error wrapping: HTTP429/5xx can use the
+existing configured AI failover chain, while HTTP401/403 do not trigger failover.
+Application failures retain legacy retry signals without retaining or logging the
+untrusted message. This adds no provider, credential, setup probe or fallback
+configuration; positive failure/failover tests use synthetic upstream fixtures.
+
 ### Configured search fallback
 
 Unnamed search requests may use an operator-approved ordered fallback list:

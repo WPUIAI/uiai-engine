@@ -255,35 +255,6 @@ func (p *Provider) buildFallbackChain(skipProvider string) []fallbackProvider {
 	return chain
 }
 
-// isRetryableError returns true for errors that warrant trying another provider.
-func isRetryableError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	// 5xx server errors
-	for _, code := range []string{"500:", "502:", "503:", "504:", "520:", "521:", "522:", "529:"} {
-		if strings.Contains(msg, code) {
-			return true
-		}
-	}
-	// Rate limits
-	if strings.Contains(msg, "429:") || strings.Contains(msg, "rate limit") || strings.Contains(msg, "Rate limit") {
-		return true
-	}
-	// Timeouts and connection errors
-	if strings.Contains(msg, "context deadline exceeded") || strings.Contains(msg, "context canceled") {
-		return true
-	}
-	if strings.Contains(msg, "connection refused") || strings.Contains(msg, "no such host") {
-		return true
-	}
-	if strings.Contains(msg, "EOF") || strings.Contains(msg, "broken pipe") {
-		return true
-	}
-	return false
-}
-
 // summarizeError returns a short version of the error for logging.
 func summarizeError(err error) string {
 	s := err.Error()
@@ -362,7 +333,7 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s returned HTTP %d", providerName, resp.StatusCode)
+		return nil, providerHTTPFailure(providerName, resp.StatusCode)
 	}
 
 	var data struct {
@@ -490,7 +461,7 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s returned HTTP %d", req.Provider, resp.StatusCode)
+		return nil, providerHTTPFailure(req.Provider, resp.StatusCode)
 	}
 
 	var data struct {
@@ -510,11 +481,7 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 	}
 	json.Unmarshal(respBody, &data)
 	if data.BaseResp.StatusCode != 0 {
-		msg := strings.TrimSpace(data.BaseResp.StatusMsg)
-		if msg == "" {
-			msg = fmt.Sprintf("MiniMax API error %d", data.BaseResp.StatusCode)
-		}
-		return nil, fmt.Errorf("%s %d: %s", req.Provider, data.BaseResp.StatusCode, msg)
+		return nil, providerApplicationFailure(req.Provider, data.BaseResp.StatusCode, data.BaseResp.StatusMsg)
 	}
 
 	text := ""
@@ -559,7 +526,7 @@ func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, bas
 	defer resp.Body.Close()
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("minimax coding_plan_vlm returned HTTP %d", resp.StatusCode)
+		return nil, providerHTTPFailure("minimax coding_plan_vlm", resp.StatusCode)
 	}
 
 	var data struct {
@@ -571,11 +538,7 @@ func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, bas
 	}
 	json.Unmarshal(respBody, &data)
 	if data.BaseResp.StatusCode != 0 {
-		msg := strings.TrimSpace(data.BaseResp.StatusMsg)
-		if msg == "" {
-			msg = fmt.Sprintf("MiniMax API error %d", data.BaseResp.StatusCode)
-		}
-		return nil, fmt.Errorf("minimax %d: %s", data.BaseResp.StatusCode, msg)
+		return nil, providerApplicationFailure("minimax", data.BaseResp.StatusCode, data.BaseResp.StatusMsg)
 	}
 	if strings.TrimSpace(data.Content) == "" {
 		return nil, fmt.Errorf("minimax coding_plan_vlm returned empty content")
