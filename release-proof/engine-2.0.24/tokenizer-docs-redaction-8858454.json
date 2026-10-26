@@ -1,0 +1,41 @@
+{
+  "schema": "uiai.tokenizer_docs_redaction_proof.v1",
+  "issue": 258,
+  "work_item": "uiai-engine-nkm5",
+  "source_revisions": [
+    "c80240a",
+    "8858454"
+  ],
+  "running_source_revision": "8858454",
+  "version": "2.0.24",
+  "build": "2026-10-26T02:26:14Z+8858454",
+  "running_sha256": "b2c9ed8f75c98f3e0250191a0ad6fdba90b0c1e81e1aa619fa128d6699bb157f",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "Actual current native Source-to-Markdown official Go html docs initially replaced if/return and portions of ordinary words with secret markers",
+    "Direct/fragment regression reproduced before fix: generic token assignment matched suffix of ErrorToken:/TextToken: and collected following public keywords",
+    "Bare token label now has identifier boundary; explicit credential-role aliases retain auth/bearer/session/csrf/id camelCase assignments and actual short token/key/password values",
+    "Direct/fragment tests preserve public code and protect synthetic short/long labelled values; no global short-secret exemption or secret-redaction disable",
+    "Real Chromium text/Markdown mixed fixture preserves public tokenizer code while withholding actual labelled API-key canary; existing browser truncation/semantic protections pass",
+    "First deployed shared-owner fix c80240a improved aliases but actual same docs revealed duplicate independent Markdown regex still corrupting local code; issue stayed open",
+    "Duplicate Markdown credential regex removed in8858454; delegates to canonical secrettext recognizer and translates marker only for legacy output compatibility",
+    "Independent Markdown regression failed before consolidation then passed; existing URL/query/credential sanitization tests remain green",
+    "20fold secrettext race,3fold actual browser-read races,10fold Markdown/source/shared-redaction races, fullGo/targetedvet/17native-shared-MCP tests/prepush pass; final Windowsamd64/Darwinarm64 cross-builds pass only",
+    "Canonical idle-safe rollback-preserving deployment both named worker active/healthy running executable hashes verified",
+    "ACTUAL current native Source-to-Markdown same official URL now retains case labels followed by return z.Err(), if depth and tn variable; ordinary specification prose intact; redaction count0; owned temporary session closed",
+    "Both installed workers independently assert same official docs no REDACTED text and intact code, plus discovery/card/search-preflight/ordinary browser/error/screenshot-artifact/semantic/OAuthURL redaction/diagnostics/cleanup regressions pass"
+  ],
+  "before_ref": "uiai-source-markdown:sha256:7f11ee9302ab1990",
+  "intermediate_ref_not_full_acceptance": "uiai-source-markdown:sha256:974ca939c9df468a",
+  "after_ref": "uiai-source-markdown:sha256:809f44b40f2d4e91",
+  "probe_ref": "OVH/tmp/uiai-live-8858454.json",
+  "limits": [
+    "All credentials/canaries synthetic; no real credential retrieval or provider-auth mutation",
+    "Public documentation captures unsealed/deliveryblocked; no scoped EPWA publication/pixel/publicRelease/nativeOS proof",
+    "Googletagmanager analytics connection refused in public docs diagnostics is unrelated to fetched200 documentation and unchanged before/after",
+    "Broad90/91remainOPEN; no new dependencies/accounts/config/endpoints/services; original unrelated dirt preserved"
+  ]
+}
