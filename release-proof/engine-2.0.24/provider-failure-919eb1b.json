@@ -1,0 +1,29 @@
+{
+  "schema": "uiai.provider_failure_proof.v1",
+  "issue": 264,
+  "source_revision": "919eb1b",
+  "version": "2.0.24",
+  "build": "2026-10-26T06:29:18Z+919eb1b",
+  "running_sha256": "eb5c3a4569c640e0b11bf0ebff6608f302ebc258947db2ffddfed870878c092f",
+  "verified": [
+    "RED HTTP200 MiniMax/OpenAI-compatible base_resp.status_msg echoed synthetic credential into returned error and vision-fallback log",
+    "RED redacted HTTP429/500/503 errors lost retry classification and actual Provider.Complete did not use its configured fixture fallback",
+    "GREEN one typed providerFailure owner contains only provider/code/HTTP-kind/retryability, never raw application message; legacy text classifier moved/reused, not duplicated",
+    "HTTP429/all5xx classification derives from numeric status, survives wrapping and keeps safe display text; HTTP401/403/418 are not retryable",
+    "Application rate-limit/transport/numeric legacy retry signals preserved as a boolean, without retaining/logging upstream text; returned error, fallback log and Go-syntax formatting contain no dummy secret",
+    "Actual Provider.Complete synthetic HTTP429/503 primary failure -> exactly one configured Anthropic fixture fallback success;401/403 -> exactly one primary and zero fallback",
+    "Anthropic/OpenAI-compatible/MiniMax vision HTTP paths, wrapper behavior, eight representative HTTP statuses and legacy context/transport signals verified",
+    "20 repeated fullAI race runs including all cache/owned-buffer/generation/Complete regressions;fullGo/vet,17native-shared-MCP client tests,prepush,Windowsamd64/Darwinarm64 crossbuilds passed",
+    "Both named workers canonical idle-safe/rollback-preserving deployed; active/healthy/running executable hash verified",
+    "Both installed workers pass ordinary source/browser/security/search/cleanup regressions, paid provider probes false and owned browser sessions closed"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-919eb1b.json",
+  "live_probe_observed_at": "2026-10-26T06:29:58Z",
+  "limits": [
+    "All positive provider failure/fallback acceptance uses controlled synthetic upstream fixtures, not paid live-provider availability/quotas",
+    "Existing configured AI fallback chain/backoff/deadline rules unchanged; no new provider/key/account/credit/config/default/fallback disclosure/dependency/service changes; Brave retained/Jina absent",
+    "No full86 broker lease/ref/event/revoke SLA or whole-Go-heap memory-wipe claim",
+    "No scopedEPWA/pixels/nativeOS/current native research-array activation/publicRelease claim; live browser artifacts unsealed/deliveryblocked",
+    "Original unrelated dirt preserved; no duplicatecheckout or Focusa repair/green background-job acceptance claim; direct UIAI-only continuation verification receipt retained in cache foundation proof"
+  ]
+}
