@@ -63,6 +63,7 @@ type DiagnosticsSummary struct {
 }
 
 type DiagnosticsSnapshot struct {
+	Pacing         *PaceStats                 `json:"pacing,omitempty"`
 	SessionID      string                     `json:"session_id"`
 	ActorRef       string                     `json:"actor_ref,omitempty"`
 	URL            string                     `json:"url"`
@@ -162,6 +163,7 @@ func (s *Session) Diagnostics(limit int, level string, failedOnly bool) Diagnost
 func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSnapshot {
 	s.mu.Lock()
 	title := s.Title
+	pacing := s.pacingStatsLocked()
 	s.mu.Unlock()
 	limit := opts.Limit
 	if limit <= 0 || limit > 300 {
@@ -226,6 +228,7 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 		format = "full"
 	}
 	return DiagnosticsSnapshot{
+		Pacing:      pacing,
 		SessionID:   s.ID,
 		ActorRef:    s.ActorRef,
 		URL:         redactURL(s.URL),

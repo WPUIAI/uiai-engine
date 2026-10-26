@@ -181,6 +181,13 @@ func (s *Session) Press(key string) (*SnapResult, error) {
 		return nil, fmt.Errorf("unknown key: %q (supported: %s)", key, pressSupportedKeys)
 	}
 
+	if s.pacer != nil {
+		ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionInputTimeout)
+		defer cancel()
+		if err := s.waitPaceLocked(ctx, "press"); err != nil {
+			return nil, err
+		}
+	}
 	// Focus the page first: engine-launched browsers can leave the target
 	// backgrounded, silently dropping Input.dispatchKeyEvent (#228).
 	if _, err := s.page.Activate(); err != nil {

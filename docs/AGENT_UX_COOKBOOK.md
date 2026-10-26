@@ -829,3 +829,41 @@ cancellation and deadlines are not misdiagnosed as missing credentials, even
 when local configuration is incomplete; an otherwise configured provider's
 response failure likewise gets no invented setup diagnosis. No probe or
 configuration/credential mutation is performed to generate guidance.
+
+### Opt-in session pacing and bounded sequences
+
+HTTP advanced controls (no new Pi/MCP tool or client installation):
+
+```text
+POST /api/session/{id}/pace
+{"mode":"human","seed":7}
+GET /api/session/{id}/pace
+POST /api/session/{id}/sequence
+{"total_budget_ms":4000,"operations":[{"action":"type","selector":"#name","text":"synthetic"},{"action":"click","selector":"#submit"}]}
+POST /api/session/{id}/pace
+{"mode":"instant"}
+```
+
+Profiles are session-local and opt-in. Omitted/instant profiles retain the existing
+unpaced action path and omit pacing diagnostics. `human`/`custom` accept
+`median_ms` (default 200, 1–2000), `min_click_ms` (default 50, maximum 2000),
+`cps_min`/`cps_max` (default 8–16, finite ordered 1–1000), and an optional integer
+`seed`. Seeded sampling is reproducible, not a stealth or anti-bot claim. Instant
+rejects timing options. Click, key press, scroll and type use bounded action waits;
+type additionally waits between Unicode code points. Diagnostics expose opt-in
+scheduled/elapsed timing and cancellation counters, never typed values or seeds.
+
+Sequence v1 admits 1–32 `type`/`fill`/`click` operations with explicit CSS selectors
+and a 1–10000ms total budget. It rejects unsupported operations/refs before input,
+uses existing action/context owners, and rechecks auth state after each operation.
+Canceled or incomplete results retain completed/attempted counts and conservative
+`effects_possible`; they are not atomic, exclusive control leases, rollback,
+settlement, or permission to retry side effects. A successful action sequence is
+not proof of screenshot/EPWA delivery; the existing delivery envelope still applies.
+Ordinary profile configuration/action use remains subject to the existing session
+and auth guards. Pending auth is never resolved by pacing or batching.
+
+Tests use owned synthetic forms only. Broker-bound just-in-time OTP resolution and
+actual credential-period handoff remain under #84/#85; no real OTP/provider login,
+full broker acceptance, cross-period credential success or whole #85 closure is
+claimed by this timing foundation.

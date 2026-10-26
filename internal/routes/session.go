@@ -95,6 +95,8 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			})
 		})
 
+		mountSessionPaceRoutes(r, cfg, sm)
+
 		// Get session info
 		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))

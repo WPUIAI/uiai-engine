@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -46,13 +47,25 @@ func (s *Session) CurrentAuthChallenge() *AuthChallenge {
 // DetectAuthChallenge inspects only page metadata and visible challenge markers.
 // It never reads credentials or challenge values.
 func (s *Session) DetectAuthChallenge() (*AuthChallenge, error) {
+	return s.DetectAuthChallengeContext(context.Background())
+}
+
+func (s *Session) DetectAuthChallengeContext(caller context.Context) (*AuthChallenge, error) {
+	if err := caller.Err(); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	page := s.page
 	s.mu.Unlock()
 	if page == nil {
 		return nil, fmt.Errorf("session page unavailable")
 	}
-	result, err := page.Eval(`() => {
+	ctx, cancel := sessionActionContext(page.GetContext(), caller, sessionInputTimeout)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	result, err := page.Context(ctx).Eval(`() => {
 		const url = location.href || '';
 		const text = (document.body?.innerText || '').toLowerCase();
 		const has = selector => Boolean(document.querySelector(selector));

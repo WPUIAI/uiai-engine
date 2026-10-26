@@ -128,6 +128,7 @@ type Session struct {
 	diagnostics       *diagnosticsRecorder
 	diagnosticsCancel func()
 	authChallenge     *AuthChallenge
+	pacer             *sessionPacer
 	screencast        *screencastHub
 }
 
@@ -620,6 +621,13 @@ func (s *Session) Scroll(deltaX, deltaY int) (*SnapResult, error) {
 
 	start := time.Now()
 
+	if s.pacer != nil {
+		ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionInputTimeout)
+		defer cancel()
+		if err := s.waitPaceLocked(ctx, "scroll"); err != nil {
+			return nil, err
+		}
+	}
 	js := fmt.Sprintf(`() => { window.scrollBy(%d, %d); return JSON.stringify({x: window.scrollX, y: window.scrollY}); }`, deltaX, deltaY)
 	s.page.Eval(js)
 	time.Sleep(100 * time.Millisecond) // let repaint happen
@@ -753,6 +761,9 @@ func (s *Session) ClickContext(caller context.Context, selector string) (*SnapRe
 	ctx, cancel := sessionActionContext(s.page.GetContext(), caller, sessionInputTimeout)
 	defer cancel()
 	page := s.page.Context(ctx)
+	if err := s.waitPaceLocked(ctx, "click"); err != nil {
+		return nil, fail("pace", err, false)
+	}
 	element, err := actionElement(page, selector)
 	if err != nil {
 		return nil, fail("locate", err, false)
@@ -764,7 +775,9 @@ func (s *Session) ClickContext(caller context.Context, selector string) (*SnapRe
  }`); err != nil {
 		return nil, fail("dispatch", err, true)
 	}
-	time.Sleep(300 * time.Millisecond)
+	if err := waitSessionDelay(ctx, 300*time.Millisecond); err != nil {
+		return nil, fail("settle", err, true)
+	}
 	settleErr := page.Timeout(2*time.Second).WaitDOMStable(100*time.Millisecond, 0.2)
 	// An ongoing animation can exhaust the settle window; still capture a fresh
 	// bounded observation unless the action expired or another protocol error arose.
@@ -830,14 +843,31 @@ func (s *Session) Hover(selector string) (*SnapResult, error) {
 
 // Type types text into a CSS-selected input element.
 func (s *Session) Type(selector, text string) (*SnapResult, error) {
+	return s.typeContext(context.Background(), selector, text, false)
+}
+
+func (s *Session) TypeContext(caller context.Context, selector, text string) (*SnapResult, error) {
+	return s.typeContext(caller, selector, text, true)
+}
+
+func (s *Session) typeContext(caller context.Context, selector, text string, boundedSnapshot bool) (*SnapResult, error) {
+	if err := caller.Err(); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.page == nil {
 		return nil, fmt.Errorf("session closed")
 	}
 	start := time.Now()
-	ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionInputTimeout)
+	ctx, cancel := sessionActionContext(s.page.GetContext(), caller, sessionInputTimeout)
 	defer cancel()
+	if err := caller.Err(); err != nil {
+		return nil, err
+	}
+	if err := s.waitPaceLocked(ctx, "type"); err != nil {
+		return nil, fmt.Errorf("type pace failed: %w", err)
+	}
 	el, err := inputElement(s.page.Context(ctx), selector)
 	if err != nil {
 		return nil, fmt.Errorf("type locate failed: %w", err)
@@ -845,10 +875,23 @@ func (s *Session) Type(selector, text string) (*SnapResult, error) {
 	if err := el.SelectAllText(); err != nil {
 		return nil, fmt.Errorf("type selection failed: %w", err)
 	}
-	if err := el.Timeout(3 * time.Second).Input(text); err != nil {
+	if s.pacer != nil {
+		if err := s.pacedInputLocked(ctx, el, text); err != nil {
+			return nil, fmt.Errorf("type input failed: %w", err)
+		}
+	} else if err := el.Timeout(3 * time.Second).Input(text); err != nil {
 		return nil, fmt.Errorf("type input failed: %w", err)
 	}
-	time.Sleep(100 * time.Millisecond)
+	if boundedSnapshot || s.pacer != nil {
+		if err := waitSessionDelay(ctx, 100*time.Millisecond); err != nil {
+			return nil, err
+		}
+	} else {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if boundedSnapshot || s.pacer != nil {
+		return s.snapWithPage(s.page.Context(ctx), start)
+	}
 	return s.snap(start)
 }
 
