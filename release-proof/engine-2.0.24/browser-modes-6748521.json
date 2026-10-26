@@ -1,0 +1,30 @@
+{
+  "schema": "uiai.browser_modes_proof.v1",
+  "issue": 102,
+  "issue_closure_supported": false,
+  "implementation_revision": "6748521",
+  "version": "2.0.24",
+  "build": "2026-10-26T10:27:02Z+6748521",
+  "running_sha256": "194122c08a9452942924ed4958b76ee8bde8e7644a027f9c314cae24ab535ab9",
+  "verified": [
+    "RED real HTTP agent-card lacked browser_modes; GREEN single UIAI-owned uiai.browser_modes.v1 factory shared exactly by agent-card/docs",
+    "10 modes with registry-derived registered status, cost/persistence/security/bestuse; external computer and unsupported CDP/mesh/private transaction remain explicitly external/notfirstclass",
+    "Bounded card<=8192bytes, no invented tool refs or dangling routing modes; discovery grants_authority=false and performs_upstream_probes=false; finite/recovery-code automation forbidden, unknown renewabilityblocked",
+    "Six bounded composable recipes and receipt requirements labeled as requirements NOT emitted/verified receipts; no second authority/store/policy engine",
+    "Pending-auth/invalid-resume responses offer next_mode=private_auth_transaction WITHOUT resuming; actual synthetic Chromium route race3 passes",
+    "20 focused metadata races, full route race suite/fullGo/vet/17native-shared-MCPtests/docs completeness/toolparity/Windowsamd64+Darwinarm64crossbuild passed",
+    "Canonical both-worker idle-safe rollback-preserving deployment active/healthy/running executable hashes verified; both live HTTP card/docs identical, all6implemented-mode tool groups registered and3unsupportedgroups remainnotfirstclass",
+    "Actual CURRENT NATIVE pi_uiai_agent_card and INSTALLED MCP uiai-browser_uiai_agent_card both return browser_modes including all10modes/security/recipes/receiptposture; no client install/config changes",
+    "Both workers ordinary source/browser/security/search/cleanup probes pass; no paidprovider probes and own sessions closed; source skill/index refer single card rather than duplicating matrix"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-6748521.json",
+  "live_probe_observed_at": "2026-10-26T10:27:42Z",
+  "limits": [
+    "102 stays OPEN: privileged transaction cleanup receipts/whole caller-mode lifecycle not proven or implemented; attach/mesh/contextscrub/privatebroker epics remain separate",
+    "Registered tools are NOT runtime/entitlement/credential/control/EPWA readiness; state hints grant nothing and do not change lease policy",
+    "Source project skill updated/versioned; no claim every running agent natively reloaded it; actual live Pi/MCP card receipt verified independently",
+    "No recovery-code/finite-resource support: historical issue requirement explicitly superseded in issuecomment by existing owner hard stop",
+    "No provider/account/key/config/default/dependency/service/monitor changes; Brave retained/Jina absent; noOTP/providerlogin/paidprobe",
+    "No scopedEPWA/pixel/nativeOS/publicRelease/native research-array activation claim; original dirt preserved; no duplicatecheckout/Focusarepair/greenadmission/acceptedbg claim"
+  ]
+}
