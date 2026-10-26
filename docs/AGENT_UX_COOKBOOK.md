@@ -687,4 +687,16 @@ possession is not research disclosure approval. `request_provider_disclosure_app
 asks for that separate authorization or a narrower already-approved request;
 it never changes defaults/fallbacks, enables a provider, or acquires an account.
 Unsupported alternatives list installed adapters only. Validation order, valid
-research execution, caching, partial results and per-lane errors are unchanged.
+research execution and caching remain unchanged.
+
+For valid research requests, `provider_errors[]` may additionally carry `setup`
+and `suggested_next_action` when a lane has a known configuration problem or
+circuit cooldown. Partial success still delivers the successful results and
+per-lane recovery; it does not refill, retry or hide failures. If every lane
+fails, the existing top-level `suggested_next_action` combines available recovery
+steps with their provider names so current client error renderers retain them.
+HTTP status/error codes and retry metadata are unchanged. Upstream responses,
+cancellation and deadlines are not misdiagnosed as missing credentials, even
+when local configuration is incomplete; an otherwise configured provider's
+response failure likewise gets no invented setup diagnosis. No probe or
+configuration/credential mutation is performed to generate guidance.

@@ -22,11 +22,13 @@ type searchResultSource struct {
 	Rank        int    `json:"rank"`
 }
 type searchResearchFailure struct {
-	Provider       string `json:"provider"`
-	Code           string `json:"code"`
-	UpstreamStatus int    `json:"upstream_status,omitempty"`
-	Retryable      bool   `json:"retryable"`
-	RetryAfter     string `json:"retry_after,omitempty"`
+	Provider            string               `json:"provider"`
+	Code                string               `json:"code"`
+	UpstreamStatus      int                  `json:"upstream_status,omitempty"`
+	Retryable           bool                 `json:"retryable"`
+	RetryAfter          string               `json:"retry_after,omitempty"`
+	Setup               *searchProviderSetup `json:"setup,omitempty"`
+	SuggestedNextAction string               `json:"suggested_next_action,omitempty"`
 }
 type searchResearchDetails struct {
 	Providers []string
@@ -83,8 +85,9 @@ func researchSearchPlan(cfg *config.Config, req searchRequest) ([]string, *searc
 	}
 	return ids, nil
 }
-func researchSearchFailure(provider string, err error) searchResearchFailure {
+func researchSearchFailure(cfg *config.Config, provider string, err error) searchResearchFailure {
 	failure := searchResearchFailure{Provider: provider, Code: "search_provider_unavailable"}
+	var setup *searchProviderSetup
 	var upstream *upstreamSearchError
 	var circuit *searchCircuitOpenError
 	if errors.As(err, &upstream) {
@@ -96,10 +99,19 @@ func researchSearchFailure(provider string, err error) searchResearchFailure {
 		failure.Code = "search_provider_circuit_open"
 		failure.Retryable = true
 		failure.RetryAfter = strconv.Itoa(circuit.retryAfter)
+		step := buildSearchProviderSetup(provider, "circuit_open", circuit.retryAfter)
+		setup = &step
 	} else if errors.Is(err, context.Canceled) {
 		failure.Code = "search_cancelled"
 	} else if errors.Is(err, context.DeadlineExceeded) {
 		failure.Code = "search_deadline"
+	} else if configured, reason := searchProviderConfigured(cfg, provider); !configured {
+		step := buildSearchProviderSetup(provider, reason, 0)
+		setup = &step
+	}
+	if setup != nil {
+		failure.Setup = setup
+		failure.SuggestedNextAction = searchSetupRecoveryHint(*setup)
 	}
 	return failure
 }
@@ -147,7 +159,7 @@ func runResearchSearch(w http.ResponseWriter, parent *http.Request, cfg *config.
 			continue
 		}
 		allCached = false
-		failure := researchSearchFailure(lane.provider, lane.err)
+		failure := researchSearchFailure(cfg, lane.provider, lane.err)
 		details.Failures = append(details.Failures, failure)
 		allLimited = allLimited && failure.UpstreamStatus == 429
 		retryable = retryable || failure.Retryable
@@ -171,7 +183,17 @@ func runResearchSearch(w http.ResponseWriter, parent *http.Request, cfg *config.
 				w.Header().Set("Retry-After", same)
 			}
 		}
-		writeJSON(w, status, map[string]any{"error": code, "provider_errors": details.Failures, "retryable": retryable})
+		body := map[string]any{"error": code, "provider_errors": details.Failures, "retryable": retryable}
+		hints := []string{}
+		for _, failure := range details.Failures {
+			if failure.SuggestedNextAction != "" {
+				hints = append(hints, failure.Provider+": "+failure.SuggestedNextAction)
+			}
+		}
+		if len(hints) > 0 {
+			body["suggested_next_action"] = strings.Join(hints, "\n")
+		}
+		writeJSON(w, status, body)
 		return
 	}
 	results := fuseSearchResults(lanes, limit)

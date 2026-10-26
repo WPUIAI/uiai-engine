@@ -184,6 +184,7 @@ test("MCP search preserves omission and explicit provider pinning", async (t) =>
 test("MCP search errors retain safe setup next action",async(t)=>{
  for(const tc of [
   {status:503,code:"search_provider_unavailable",action:"connect_existing_credential_reference",hint:"configure search.providers.brave.api_key_env",args:{query:"fixture",provider:"brave"}},
+  {status:502,code:"search_providers_failed",action:"exa: connect_existing_credential_reference",hint:"search.providers.exa.api_key_env; tavily: connect_existing_credential_reference search.providers.tavily.api_key_env",args:{query:"fixture",providers:["exa","tavily"]}},
   {status:400,code:"conflicting_search_providers",action:"choose_search_mode",hint:"use provider or providers, not both",args:{query:"fixture",provider:"brave",providers:["brave","wikipedia"]}},
   {status:403,code:"search_provider_not_approved",action:"request_provider_disclosure_approval",hint:"obtain query disclosure authorization; no automatic config or account changes",args:{query:"fixture",providers:["brave","tavily"]}},
  ]){

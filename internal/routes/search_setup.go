@@ -116,6 +116,10 @@ func searchSetupGuide(inventory searchProviderInventory, observed bool) map[stri
 // never private configured references, endpoint values, or credentials.
 func addSearchSetupRecovery(body map[string]any, setup searchProviderSetup) {
 	body["setup"] = setup
+	body["suggested_next_action"] = searchSetupRecoveryHint(setup)
+}
+
+func searchSetupRecoveryHint(setup searchProviderSetup) string {
 	hint := setup.NextAction + ": " + setup.Message
 	if len(setup.ConfigurationFields) > 0 {
 		hint += " Configuration fields: " + strings.Join(setup.ConfigurationFields, ", ") + "."
@@ -127,5 +131,5 @@ func addSearchSetupRecovery(body map[string]any, setup searchProviderSetup) {
 		hint += " Endpoint env fallback: " + setup.EndpointEnvFallback + "."
 	}
 	hint += " Inspect current setup with the agent card or GET /api/search/providers."
-	body["suggested_next_action"] = hint
+	return hint
 }
