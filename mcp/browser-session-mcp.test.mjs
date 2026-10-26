@@ -182,10 +182,16 @@ test("MCP search preserves omission and explicit provider pinning", async (t) =>
 
 
 test("MCP search errors retain safe setup next action",async(t)=>{
- const server=createServer((req,res)=>{req.resume();res.writeHead(503,{"content-type":"application/json"});res.end(JSON.stringify({error:"search_provider_unavailable",message:"Existing credential reference missing",suggested_next_action:"connect_existing_credential_reference: configure search.providers.brave.api_key_env; inspect /api/search/providers",private_extra:"synthetic-private-extra-never-echo"}))});
- server.listen(0,"127.0.0.1");await once(server,"listening");
- const child=spawn(process.execPath,[process.env.UIAI_TEST_MCP_SCRIPT || "mcp/browser-session-mcp.mjs"],{cwd:root,env:{...process.env,UIAI_ENGINE_URL:`http://127.0.0.1:${server.address().port}`},stdio:["pipe","pipe","pipe"]});
- t.after(()=>{child.kill();server.close()});
- const reply=await callMcp(child,{jsonrpc:"2.0",id:20,method:"tools/call",params:{name:"browser_search",arguments:{query:"fixture",provider:"brave"}}});
- assert.equal(reply.error,undefined);assert.equal(reply.result.isError,true);const text=reply.result.content[0].text;assert.match(text,/Next: connect_existing_credential_reference/);assert.match(text,/search.providers.brave.api_key_env/);assert.doesNotMatch(text,/synthetic-private-extra-never-echo/);
+ for(const tc of [
+  {status:503,code:"search_provider_unavailable",action:"connect_existing_credential_reference",hint:"configure search.providers.brave.api_key_env",args:{query:"fixture",provider:"brave"}},
+  {status:400,code:"conflicting_search_providers",action:"choose_search_mode",hint:"use provider or providers, not both",args:{query:"fixture",provider:"brave",providers:["brave","wikipedia"]}},
+  {status:403,code:"search_provider_not_approved",action:"request_provider_disclosure_approval",hint:"obtain query disclosure authorization; no automatic config or account changes",args:{query:"fixture",providers:["brave","tavily"]}},
+ ]){
+  const server=createServer((req,res)=>{req.resume();res.writeHead(tc.status,{"content-type":"application/json"});res.end(JSON.stringify({error:tc.code,suggested_next_action:`${tc.action}: ${tc.hint}; inspect /api/search/providers`,private_extra:"synthetic-private-extra-never-echo"}))});
+  server.listen(0,"127.0.0.1");await once(server,"listening");
+  const child=spawn(process.execPath,[process.env.UIAI_TEST_MCP_SCRIPT || "mcp/browser-session-mcp.mjs"],{cwd:root,env:{...process.env,UIAI_ENGINE_URL:`http://127.0.0.1:${server.address().port}`},stdio:["pipe","pipe","pipe"]});
+  t.after(()=>{child.kill();server.close()});
+  const reply=await callMcp(child,{jsonrpc:"2.0",id:20,method:"tools/call",params:{name:"browser_search",arguments:tc.args}});
+  assert.equal(reply.error,undefined);assert.equal(reply.result.isError,true);const text=reply.result.content[0].text;assert.ok(text.includes(`Next: ${tc.action}`));assert.ok(text.includes(tc.hint));assert.doesNotMatch(text,/synthetic-private-extra-never-echo/);
+ }
 });

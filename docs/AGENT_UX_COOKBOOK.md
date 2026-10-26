@@ -661,9 +661,9 @@ proofs, not real provider availability, quota or paid-query acceptance.
 
 ### Setup recovery directly in search errors
 
-Single-provider configuration errors now carry both structured `setup` (one
-provider's step, not the full card projection) and the existing cross-client
-`suggested_next_action` string. Missing/unreadable references, invalid endpoints,
+Search configuration and research-preflight errors carry structured `setup`
+(a single recovery step, not the full card projection) and the existing
+cross-client `suggested_next_action` string. Missing/unreadable references, invalid endpoints,
 explicit disables and unsupported adapters reuse the same setup owner as the
 card. Unsupported-provider suggestions list installed adapters, not unsupported
 configuration/default identifiers. Cooling errors keep their HTTP status,
@@ -676,3 +676,15 @@ response improvement, not a new client schema/tool or installation requirement.
 A correctly configured provider's malformed response is not mislabeled as a
 configuration problem. Guidance never grants permission, echoes private
 references/URL values, creates accounts, changes configuration, or sends probes.
+
+Research preflight uses the same formatter for conflicting search modes,
+excessive or duplicate provider selections, unsupported adapters, unapproved
+query disclosure, and explicit disables. It preserves the first rejection's
+HTTP status and error code, adds the normalized failing provider where relevant,
+and runs **zero provider requests**. Conflicts require choosing `provider` or
+`providers`; research needs two to three distinct approved providers. Credential
+possession is not research disclosure approval. `request_provider_disclosure_approval`
+asks for that separate authorization or a narrower already-approved request;
+it never changes defaults/fallbacks, enables a provider, or acquires an account.
+Unsupported alternatives list installed adapters only. Validation order, valid
+research execution, caching, partial results and per-lane errors are unchanged.

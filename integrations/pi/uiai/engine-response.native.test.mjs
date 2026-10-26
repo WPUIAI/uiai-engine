@@ -131,8 +131,14 @@ test("native search research schema and HTTP forwarding preserve caller routing"
 
 
 test("native search errors retain safe setup next action",async()=>{
- const server=createServer((req,res)=>{req.resume();res.writeHead(503,{"content-type":"application/json"});res.end(JSON.stringify({error:"search_provider_unavailable",message:"Existing credential reference missing",suggested_next_action:"connect_existing_credential_reference: configure search.providers.brave.api_key_env; inspect /api/search/providers",private_extra:"synthetic-private-extra-never-echo"}))});
- await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));const prior=process.env.UIAI_ENGINE_URL;process.env.UIAI_ENGINE_URL=`http://127.0.0.1:${server.address().port}`;
- try{await assert.rejects(()=>tools.get("uiai_search").execute("recovery",{query:"fixture",provider:"brave"}),err=>err.status===503 && err.message.includes("Next: connect_existing_credential_reference") && err.message.includes("search.providers.brave.api_key_env") && !err.message.includes("synthetic-private-extra-never-echo"))}
- finally{if(prior===undefined)delete process.env.UIAI_ENGINE_URL;else process.env.UIAI_ENGINE_URL=prior;await new Promise(resolve=>server.close(resolve))}
+ for(const tc of [
+  {status:503,code:"search_provider_unavailable",action:"connect_existing_credential_reference",hint:"configure search.providers.brave.api_key_env",args:{query:"fixture",provider:"brave"}},
+  {status:400,code:"conflicting_search_providers",action:"choose_search_mode",hint:"use provider or providers, not both",args:{query:"fixture",provider:"brave",providers:["brave","wikipedia"]}},
+  {status:403,code:"search_provider_not_approved",action:"request_provider_disclosure_approval",hint:"obtain query disclosure authorization; no automatic config or account changes",args:{query:"fixture",providers:["brave","tavily"]}},
+ ]){
+  const server=createServer((req,res)=>{req.resume();res.writeHead(tc.status,{"content-type":"application/json"});res.end(JSON.stringify({error:tc.code,suggested_next_action:`${tc.action}: ${tc.hint}; inspect /api/search/providers`,private_extra:"synthetic-private-extra-never-echo"}))});
+  await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));const prior=process.env.UIAI_ENGINE_URL;process.env.UIAI_ENGINE_URL=`http://127.0.0.1:${server.address().port}`;
+  try{await assert.rejects(()=>tools.get("uiai_search").execute("recovery",tc.args),err=>err.status===tc.status && err.message.includes(`Next: ${tc.action}`) && err.message.includes(tc.hint) && !err.message.includes("synthetic-private-extra-never-echo"))}
+  finally{if(prior===undefined)delete process.env.UIAI_ENGINE_URL;else process.env.UIAI_ENGINE_URL=prior;await new Promise(resolve=>server.close(resolve))}
+ }
 });

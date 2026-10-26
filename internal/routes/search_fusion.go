@@ -39,12 +39,20 @@ type searchResearchLane struct {
 	err      error
 }
 
-func researchSearchPlan(cfg *config.Config, req searchRequest) ([]string, int, string) {
+// searchResearchRejection retains the first validation failure and its provider
+// from the policy owner; recovery must not re-run a divergent approval check.
+type searchResearchRejection struct {
+	status   int
+	code     string
+	provider string
+}
+
+func researchSearchPlan(cfg *config.Config, req searchRequest) ([]string, *searchResearchRejection) {
 	if strings.TrimSpace(req.Provider) != "" {
-		return nil, 400, "conflicting_search_providers"
+		return nil, &searchResearchRejection{status: http.StatusBadRequest, code: "conflicting_search_providers"}
 	}
 	if len(req.Providers) > maxSearchResearchProviders {
-		return nil, 400, "too_many_search_providers"
+		return nil, &searchResearchRejection{status: http.StatusBadRequest, code: "too_many_search_providers"}
 	}
 	approved := map[string]bool{resolveDefaultSearchProvider(cfg): true}
 	if cfg != nil {
@@ -57,13 +65,13 @@ func researchSearchPlan(cfg *config.Config, req searchRequest) ([]string, int, s
 	for _, raw := range req.Providers {
 		id := strings.ToLower(strings.TrimSpace(raw))
 		if searchProviderMeta(id).search == nil {
-			return nil, 400, "unsupported_provider"
+			return nil, &searchResearchRejection{status: http.StatusBadRequest, code: "unsupported_provider", provider: id}
 		}
 		if !approved[id] {
-			return nil, 403, "search_provider_not_approved"
+			return nil, &searchResearchRejection{status: http.StatusForbidden, code: "search_provider_not_approved", provider: id}
 		}
 		if cfg != nil && cfg.Search.Providers[id].Disabled {
-			return nil, 403, "search_provider_disabled"
+			return nil, &searchResearchRejection{status: http.StatusForbidden, code: "search_provider_disabled", provider: id}
 		}
 		if !seen[id] {
 			ids = append(ids, id)
@@ -71,9 +79,9 @@ func researchSearchPlan(cfg *config.Config, req searchRequest) ([]string, int, s
 		}
 	}
 	if len(ids) < 2 {
-		return nil, 400, "research_requires_distinct_providers"
+		return nil, &searchResearchRejection{status: http.StatusBadRequest, code: "research_requires_distinct_providers"}
 	}
-	return ids, 0, ""
+	return ids, nil
 }
 func researchSearchFailure(provider string, err error) searchResearchFailure {
 	failure := searchResearchFailure{Provider: provider, Code: "search_provider_unavailable"}
@@ -96,9 +104,17 @@ func researchSearchFailure(provider string, err error) searchResearchFailure {
 	return failure
 }
 func runResearchSearch(w http.ResponseWriter, parent *http.Request, cfg *config.Config, query string, req searchRequest) {
-	ids, status, code := researchSearchPlan(cfg, req)
-	if status != 0 {
-		writeJSON(w, status, map[string]any{"error": code})
+	ids, rejection := researchSearchPlan(cfg, req)
+	if rejection != nil {
+		body := map[string]any{"error": rejection.code}
+		if rejection.provider != "" {
+			body["provider"] = rejection.provider
+		}
+		if rejection.code == "unsupported_provider" {
+			body["supported_providers"] = searchProviderIDs(nil)
+		}
+		addSearchSetupRecovery(body, buildSearchProviderSetup(rejection.provider, rejection.code, 0))
+		writeJSON(w, rejection.status, body)
 		return
 	}
 	ctx, cancel := context.WithTimeout(parent.Context(), searchResearchTimeout)
@@ -137,8 +153,7 @@ func runResearchSearch(w http.ResponseWriter, parent *http.Request, cfg *config.
 		retryable = retryable || failure.Retryable
 	}
 	if successes == 0 {
-		status = 502
-		code = "search_providers_failed"
+		status, code := 502, "search_providers_failed"
 		if allLimited {
 			status = 429
 			code = "search_provider_limited"

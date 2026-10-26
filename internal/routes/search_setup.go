@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"strings"
 )
@@ -19,7 +20,19 @@ type searchProviderSetup struct {
 func buildSearchProviderSetup(id, reason string, retry int) searchProviderSetup {
 	s := searchProviderSetup{}
 	switch reason {
-	case "disabled":
+	case "conflicting_search_providers":
+		s.NextAction = "choose_search_mode"
+		s.Message = "Send either provider for a pinned single-provider search or providers for explicitly approved research, not both; do not silently choose between them."
+	case "too_many_search_providers":
+		s.NextAction = "reduce_research_provider_count"
+		s.Message = fmt.Sprintf("Use two to %d distinct explicitly approved providers; narrow the request without adding or substituting a provider automatically.", maxSearchResearchProviders)
+	case "research_requires_distinct_providers":
+		s.NextAction = "choose_distinct_approved_providers"
+		s.Message = "Research requires at least two distinct explicitly approved providers. For one provider, use provider instead of providers; do not add a provider without disclosure authorization."
+	case "search_provider_not_approved":
+		s.NextAction = "request_provider_disclosure_approval"
+		s.Message = "The requested provider is outside the explicitly approved research set. Obtain the user's authorization for query disclosure or narrow the request to already approved providers; do not change defaults or fallbacks, enable providers, acquire keys, or send the query automatically."
+	case "disabled", "search_provider_disabled":
 		s.NextAction = "keep_disabled"
 		s.Message = "Explicitly disabled; do not enable or replace configuration without the user's direction."
 	case "unsupported_provider":
