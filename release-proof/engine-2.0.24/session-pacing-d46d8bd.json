@@ -1,0 +1,31 @@
+{
+  "schema": "uiai.session_pacing_proof.v1",
+  "issue": 85,
+  "issue_closure_supported": false,
+  "implementation_revision": "d46d8bd",
+  "version": "2.0.24",
+  "build": "2026-10-26T11:08:01Z+d46d8bd",
+  "running_sha256": "002514fb7551e28bd9817246a22f29c2ecc3bdfd0cc74c1ab858f4496dc2dbab",
+  "verified": [
+    "Opt-in session-local instant/human/custom profile, bounded log-normal action waits/click minimums, per-Unicode-codepoint cps range, optional deterministic seed; default profile nil/no RNG/waits/new diagnostics; invalid profile preserves prior state",
+    "Existing Click/Press/Scroll/Type consume configured waits; default Type retains legacy snapshot path; new TypeContext/bounded sequences use shared action-context and cancellable settle-delay owners, no duplicate clock/retry/secret resolver",
+    "POST/GET session/pace plus POST session/sequence: strict bounded JSON, 1..32 type/fill/click operations, explicit CSS only, 1..10000ms caller budget, unsupported auth/navigation/JS/control changes rejected; no exclusive control lease/atomicity/rollback claim",
+    "Pending auth blocks profile/sequence routes and direct pacing wait; sequence rechecks bounded auth detection after each operation; failure retains completed/attempted/conservative effects_possible without raw input values",
+    "20 focused race runs prove deterministic nonuniform 200-sample bounded delays, cps bounds, invalid config rollback, cancellation and auth pause, instant diagnostics byte shape; real Unicode input/keywait count/browser and HTTP synthetic 3field+submit/deadline/no-click/reset/auth-guard tests race3 passed",
+    "One full vision+routes race suite/fullGo/vet/17native-shared-MCPtests/docscompleteness/toolparity/Windowsamd64+Darwinarm64 crossbuild passed",
+    "Canonical bothworker idle-safe rollback-preserving deployment active/healthy/running executable hashes verified; both installed workers complete synthetic3field+click external predicate in1687/1669ms within4000ms, telemetry observed,1ms budget preventsclick,instant removes telemetry,owned sessions closed",
+    "Both-worker broad source/browser/security/search/cleanup regression probes passed; no paidprovider/credential/OTP probes"
+  ],
+  "live_pacing_probe_ref": "OVH/tmp/uiai-pacing-live-d46d8bd.json",
+  "live_pacing_observed_at": "2026-10-26T11:09:19Z",
+  "live_regression_probe_ref": "OVH/tmp/uiai-live-d46d8bd.json",
+  "live_regression_observed_at": "2026-10-26T11:09:35Z",
+  "limits": [
+    "85 remains OPEN: broker-bound just-in-time OTP/deadline handoff and actual credential period-boundary acceptance not implemented/proven; only synthetic input values used",
+    "Seeded scheduled-delay nonuniformity is not a statistical claim about real anti-bot detection; no stealth/evasion feature or bypass",
+    "HTTP advanced controls only; no new native Pi/MCP tool/install, per-request cps schema, actuator control/fencing/entitlement/credential grant or deployment default change",
+    "Sequences are interleavable, non-atomic, partial effects possible after dispatch and never automatically retried or rolled back; EPWA delivery remains separate/blocked",
+    "Initial live probe expected native JSON bool but existing eval returns string true; corrected probe accepts only exact true bool/string, then reran successfully; no production code change for fixture mismatch",
+    "No new provider/account/key/config/default/dependency/service/monitor change; Brave retained/Jina absent; no nativeOS/pixel/scopedEPWA/publicRelease/wholebroker/heap claim; original dirt preserved; no new checkout/Focusarepair/greenadmission/acceptedbg claim"
+  ]
+}
