@@ -402,7 +402,14 @@ responses. Cancellation is checked before publishing a refreshed snapshot.
 This is local cache/transport hardening, not a broker revocation endpoint or lease
 contract. No broker event subscription or credential-reference binding is added;
 existing environment fallback is unchanged. Already-started provider requests are
-not cancelled. Clearing immutable Go string references is not a heap-wipe guarantee.
+not cancelled. Cached key storage uses owned mutable bytes, overwritten on local
+invalidation, replacement, and on-demand expiry before refresh (even if refresh
+fails). Inference takes a detached copy while the cache lock is held and clears
+that mutable copy on return; the owned credential-settings response buffer is
+also cleared. Formatting (including numeric verbs), JSON and text serialization
+remain masked. This is best-effort buffer hygiene, not a whole-heap wipe: immutable
+strings, environment/configuration, decoded JSON and HTTP/runtime copies can remain.
+There is no background idle-cache eraser or upstream revoke/event implementation.
 Full broker revocation timing and memory-wipe acceptance remain open under #86
 (credential revocation and memory hygiene); this change grants no authority to
 retrieve/use new provider credentials.

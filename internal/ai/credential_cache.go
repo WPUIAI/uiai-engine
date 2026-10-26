@@ -25,6 +25,22 @@ func (p *Provider) credentialCacheFreshLocked() bool {
 	return ttl > 0 && !p.keys.fetchedAt.IsZero() && age >= 0 && age < ttl
 }
 
+// Wipe only owned mutable cache buffers; immutable/runtime copies are outside
+// this best-effort operation. The caller holds keysMu.
+func (k *aiKeys) wipe() {
+	for _, s := range []redactedString{k.Anthropic, k.OpenAI, k.OpenRouter, k.Fireworks, k.Kimi, k.MiniMax, k.Qwen} {
+		s.wipe()
+	}
+	*k = aiKeys{}
+}
+
+func (p *Provider) clearCredentialSnapshotLocked() {
+	p.keys.wipe()
+	p.modelsMu.Lock()
+	p.models = nil
+	p.modelsMu.Unlock()
+}
+
 // InvalidateCredentialCache invalidates the entire local settings snapshot and
 // fences refreshes that began before this call. It does not revoke credentials
 // upstream, erase immutable Go strings, or cancel already-started requests.
@@ -33,8 +49,5 @@ func (p *Provider) InvalidateCredentialCache() {
 	p.keysMu.Lock()
 	defer p.keysMu.Unlock()
 	p.keysEpoch++
-	p.keys = aiKeys{}
-	p.modelsMu.Lock()
-	p.models = nil
-	p.modelsMu.Unlock()
+	p.clearCredentialSnapshotLocked()
 }

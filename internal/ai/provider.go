@@ -244,7 +244,7 @@ func (p *Provider) buildFallbackChain(skipProvider string) []fallbackProvider {
 
 	var chain []fallbackProvider
 	for _, c := range all {
-		if c.provider == skipProvider || c.key == "" {
+		if c.provider == skipProvider || len(c.key) == 0 {
 			continue
 		}
 		chain = append(chain, fallbackProvider{provider: c.provider, model: c.model})
@@ -320,8 +320,10 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 			apiURL = "https://api.anthropic.com/v1/messages"
 		}
 	}
+	key = key.clone()
 	p.keysMu.RUnlock()
-	if key == "" {
+	defer key.wipe()
+	if len(key) == 0 {
 		return nil, fmt.Errorf("%s API key not configured", providerName)
 	}
 
@@ -422,9 +424,10 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 		key = p.keys.OpenAI
 		baseURL = p.cfg.AI.Providers["openai"].APIURL
 	}
+	key = key.clone()
 	p.keysMu.RUnlock()
-
-	if key == "" {
+	defer key.wipe()
+	if len(key) == 0 {
 		return nil, fmt.Errorf("%s API key not configured", req.Provider)
 	}
 	if baseURL == "" {
@@ -599,8 +602,20 @@ func (p *Provider) ensureKeysContext(ctx context.Context) error {
 		p.keysMu.RUnlock()
 		return nil
 	}
-	epoch := p.keysEpoch
 	p.keysMu.RUnlock()
+	p.keysMu.Lock()
+	if err := ctx.Err(); err != nil {
+		p.keysMu.Unlock()
+		return err
+	}
+	// Another refresh may have published while this caller waited for the lock.
+	if p.credentialCacheFreshLocked() {
+		p.keysMu.Unlock()
+		return nil
+	}
+	p.clearCredentialSnapshotLocked()
+	epoch := p.keysEpoch
+	p.keysMu.Unlock()
 
 	url := p.cfg.RESTURL("ai-settings")
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -620,6 +635,7 @@ func (p *Provider) ensureKeysContext(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxCredentialSettingsBytes+1))
+	defer redactedString(body).wipe()
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -692,6 +708,7 @@ func (p *Provider) ensureKeysContext(ctx context.Context) error {
 		return fallback
 	}
 
+	p.keys.wipe()
 	p.keys = aiKeys{
 		Anthropic:  redactedString(merge(settings.Anthropic.Key, envOr("ANTHROPIC_API_KEY", ""))),
 		OpenAI:     redactedString(merge(settings.OpenAI.Key, envOr("OPENAI_API_KEY", ""))),
@@ -763,6 +780,7 @@ func (p *Provider) loadKeysFromEnvLocked() {
 		p.cfg.AI.DefaultModel = v
 	}
 
+	p.keys.wipe()
 	p.keys = keys
 
 	models := []ProviderModel{}
