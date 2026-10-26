@@ -129,6 +129,7 @@ func handleMarkdownRequest(w http.ResponseWriter, req *http.Request, body markdo
 			status, class = http.StatusRequestTimeout, "source_read_cancelled"
 		}
 		failure := markdownFailure(class, err, body.URL, started)
+		failure["diagnostics"] = map[string]any{"failure_class": class, "browser": diagnostics}
 		if closeErr := sm.Close(sess.ID); closeErr == nil {
 			cleanup["closed"] = true
 		} else {

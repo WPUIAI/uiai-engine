@@ -9,7 +9,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 )
 
-const sourceReadinessBudget = 2 * time.Second
+const sourceReadinessBudget = 5 * time.Second
 const sourceReadinessInterval = 100 * time.Millisecond
 
 var errNoReadableSourceContent = errors.New("no readable page content within the source read budget")
