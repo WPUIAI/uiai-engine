@@ -1,0 +1,55 @@
+{
+  "schema": "uiai.ddg_search_adapter_proof.v1",
+  "issue": 90,
+  "work_item": "uiai-engine-8v56",
+  "source_revision": "5221be2",
+  "version": "2.0.24",
+  "build": "2026-10-26T03:49:54Z+5221be2",
+  "running_sha256": "9a4d692ef55f5cd1d1e6b7dff0cc04a3dbb270ba35dabb7d3363c579886b7c63",
+  "operator_grant": "yes amd keep moving \u2014 explicit approval of golang.org/x/net/html project build dependency",
+  "verified": [
+    "Newest baseline-compatible x/netv0.58.0 (Go1.25) added; project Go1.25.5 unchanged; v0.59\u20130.61needGo1.26; no other declared dependency upgraded",
+    "Go module checksums verified, upstream html+atom producer tests pass; only modulehtml/atom imported into engine; officiallatestHTMLsource differs only equivalent min refactor",
+    "One registry DDG adapter, same endpoint validation/normalized results/citations/cache/circuit/approved fallback/research path; sharedsearchBody bounded2MiB/12s/origin-confined transport extracted rather than copied",
+    "No API credentials, browser, result-link fetching, pagination, automatic retry or challenge-solving; tracking redirects locally decoded; ads/unsafe URLs omitted",
+    "Configured ready providers keep existing priority before implicit public keyless providers; explicitbroken/disabled defaults and pinned queries never auto-replaced; zero-key unconfigured default nowDDG",
+    "One uncached request per15s per engine runtime; local429/Retry-After/cross-clientNext, no upstream status or failure count fabricated; cached reads free of request spacing; mutex concurrency verified",
+    "Explicit no-results marker only empty success; markup drift fails closed; HTTP202/known verification forms produce safe nonretryable provider_challenge guidance; even mixed result/ad/challenge markup cannot become successful cached results",
+    "Discovery RED-before/GREEN-after; fixture protocol encoding/HTMLentities/nesting/limit/ads/query-userinfo-fragmentcredential redaction/unsafeendpoint/redirect/bodylimit/context/pacing/concurrency/cache/no-challenge-cache/fallback-pinning/research errors tested",
+    "FullGo, selected search/research race5x, isolatedDDGrace10x, routes/server/configvet,17native/shared/MCP tests, canonicalprepush, Windowsamd64/Darwinarm64 cross-builds pass",
+    "Both canonical named workers idle-safe/rollback-preserving deployed; active/healthy/running executable hashes verified",
+    "Both worker setup/card/provider inventory admitsDDG keyless but keeps installed defaultBrave and quota unknown; ordinary browser/citation/wordspacing/semanticcanary/OAuthURL/searchpreflight/cleanup regressions pass",
+    "ACTUAL CURRENT nativeuiai_search providerddg query Go programming language official documentation limit2 returnsGo.dev/doc andGo.dev/doc/tutorial, cachedfalse,653ms,no key, no challenge",
+    "Direct read-only cache observation uniquely identified warmworker7460; same query+limit servedcachedtrue viaHTTP with same ranks/URLs/ref; NOadditionalprovider query forcache proof",
+    "ACTUAL CURRENT MCP agent card exposesDDG/web_search/use_selected_provider with no client install/reload or provider request"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-5221be2.json",
+  "live_probe_observed_at": "2026-10-26T03:52:12Z",
+  "native_search_ref": "uiai-search:ddg:babc394225b88869:1",
+  "native_search_artifact_ref": "uiai-artifact:sha256:e18bd2ed30147a980e4b042569e1163361f62554b00a527a03a849e3de7abf04",
+  "cache_proof_ref": "OVH/tmp/uiai-ddg-live-cached-search.json",
+  "cached_artifact_ref": "uiai-artifact:sha256:d54e366c6c0dfc8e81356698bc00a672f0192124d7fbee5c828fb66ccf6a1122",
+  "robots_ref": "uiai-source-markdown:sha256:5449d0618efe478f",
+  "dependency_review": {
+    "source": "public OSV version query plus official golang/net comparison and actual engine dependency graph",
+    "unimported_http2_advisories": [
+      "GO-2026-6603",
+      "GO-2026-6610",
+      "GO-2026-6611",
+      "GO-2026-6612",
+      "GO-2026-6617"
+    ],
+    "upkeep_issue": 262,
+    "scope_limit": "No whole-project/compiler vulnerability-clean or govulncheck-reachability claim; exact imported module packages checked, stdlib vendoring belongs to existing compiler"
+  },
+  "limits": [
+    "One live benign validation search success is not a DDG SLA or independent fresh-agent usability proof",
+    "HTML challenge/markup/rate cases fixture-proven, not intentionally forced against actual provider",
+    "Native live search + directHTTPcached result + MCP live discovery, not new current-MCP query/schemaactivation proof",
+    "Unsealed deliveryblocked search/browser artifacts, no scopedEPWA/pixel/publicRelease/nativeOS proof",
+    "Full90/91 remainOPEN: remaining adapters/quota ledger/acquisition/fresh-agent acceptance incomplete",
+    "Initial upstream ./html/... probe included unimported charset package and failed missingx/text sums; narrowed to actual html+atom imports, no charset dependency added",
+    "Background dispatch rejected before job acceptance, no background completion receipt claimed; no Focusa repair performed",
+    "Original unrelated six history deletions/datausage preserved; no duplicate checkout/account/paid-provider query/config/default/fallback/service provisioning"
+  ]
+}
