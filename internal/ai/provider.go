@@ -502,10 +502,8 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 }
 
 func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, baseURL string, req Request) (*Response, error) {
-	apiHost := strings.TrimSuffix(baseURL, "/v1")
-	if apiHost == "" || apiHost == baseURL {
-		apiHost = "https://api.minimax.io"
-	}
+	// The caller resolves defaults; vision must retain its configured destination.
+	apiHost := strings.TrimSuffix(strings.TrimRight(baseURL, "/"), "/v1")
 	mediaType := req.ImageType
 	if mediaType == "" {
 		mediaType = "image/jpeg"

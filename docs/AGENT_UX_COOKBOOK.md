@@ -420,8 +420,11 @@ foreign origin, a changed scheme, or a redirect URL containing user information.
 All inference dialects reuse the canonical `httpboundary.OriginBoundClient` copy,
 not a second validator or a mutation of the shared client. Same-origin redirects
 retain existing caller policy, transport/timeout, and the default ten-request bound.
-This redirect guard does not validate the initial configured endpoint or change
-MiniMax endpoint derivation; those remain separate from redirect confinement.
+MiniMax vision derives its route only from the caller-resolved API base, retaining
+custom origins and ordinary path prefixes/trailing slashes instead of silently
+substituting the official host. The default official route and existing text
+fallback remain unchanged. General initial endpoint validation and query/fragment
+base-URL support remain outside these changes.
 
 AI upstream HTTP/application failure responses expose a provider label and numeric
 code, never the upstream application message. Retry classification is carried
