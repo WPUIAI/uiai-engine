@@ -80,6 +80,7 @@ Rules:
 
 - Public-only by default.
 - Return structured `source_blocked` / `auth_required` failures instead of inventing content.
+- Preserve public tokenizer type labels such as `html.ErrorToken:` and `html.TextToken:`; their following `return`/`if` keywords are not secret aliases. Bare token labels and explicit credential-role assignments, including short actual values, still receive redaction.
 - Preserve Focusa-ready `target_ref`, `evidence_ref`, `summary`, and next tools.
 
 ## Recipe 2: Persistent browser loop with @refs

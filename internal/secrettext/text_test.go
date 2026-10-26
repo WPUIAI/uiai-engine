@@ -55,3 +55,26 @@ func TestOrdinaryDocumentationRemainsReadable(t *testing.T) {
 		}
 	}
 }
+
+func TestTokenTypeDocumentationDoesNotSeedSecretAliases(t *testing.T) {
+	input := "switch tt {\ncase html.ErrorToken:\nreturn z.Err()\ncase html.TextToken:\nif depth > 0 { emit(z.Text()) }\n}\nspecification"
+	clean, report := Redact(input)
+	if clean != input || report.Count != 0 {
+		t.Fatal("public tokenizer type labels were treated as credentials")
+	}
+	fragments := strings.Split(input, "\n")
+	actual := Fragments(fragments)
+	for i := range fragments {
+		if actual[i] != fragments[i] {
+			t.Fatal("public code label seeded a false fragment secret alias")
+		}
+	}
+	for _, label := range []string{"token", "Token", "access_token", "authToken", "sessionToken", "csrfToken", "idToken", "dbPassword"} {
+		for _, value := range []string{"if", "return", "UIAI_SYNTHETIC_VALUE_0123456789"} {
+			clean, summary := Redact(label + "=" + value)
+			if strings.HasSuffix(clean, "="+value) || summary.Count == 0 {
+				t.Fatalf("actual labelled credential no longer protected: %s", label)
+			}
+		}
+	}
+}

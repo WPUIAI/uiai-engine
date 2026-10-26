@@ -17,9 +17,11 @@ type Summary struct {
 }
 
 var (
-	privateKey      = regexp.MustCompile(`(?s)-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----.*?(?:-----END (?:[A-Z]+ )?PRIVATE KEY-----|$)`)
-	neighbor        = regexp.MustCompile(`(?i)((?:api[\s_-]+key|(?:bearer|access|refresh|auth)[\s_-]+token)(?:\s*[:=]\s*|\s+)[\x60"']{0,3}\s*)([A-Za-z0-9._~+/=-]{12,})`)
-	assignment      = regexp.MustCompile(`(?i)((?:api[\s_-]*key|access[\s_-]*token|refresh[\s_-]*token|token|secret|password|passwd|cookie|set-cookie)\s*[:=]\s*)([^\s,;&]+)`)
+	privateKey = regexp.MustCompile(`(?s)-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----.*?(?:-----END (?:[A-Z]+ )?PRIVATE KEY-----|$)`)
+	neighbor   = regexp.MustCompile(`(?i)((?:api[\s_-]+key|(?:bearer|access|refresh|auth)[\s_-]+token)(?:\s*[:=]\s*|\s+)[\x60"']{0,3}\s*)([A-Za-z0-9._~+/=-]{12,})`)
+	// Bare token must be a label, not a suffix of code types like ErrorToken.
+	// Credential-role aliases still cover camelCase and prefixed assignments.
+	assignment      = regexp.MustCompile(`(?i)((?:api[\s_-]*key|access[\s_-]*token|refresh[\s_-]*token|(?:auth|bearer|session|csrf|id)[\s_-]*token|(?:^|[^\pL\pN])token|secret|password|passwd|cookie|set-cookie)\s*[:=]\s*)([^\s,;&]+)`)
 	bearer          = regexp.MustCompile(`(?i)(bearer\s+)([A-Za-z0-9._~+/=-]+)`)
 	recoverySection = regexp.MustCompile(`(?is)((?:recovery|backup)[ _-]+codes?\s*:)([\s\S]*)`)
 )
