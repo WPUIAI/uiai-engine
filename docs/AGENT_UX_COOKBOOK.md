@@ -657,3 +657,22 @@ canceled contexts, preserve override precedence, verify zero discovery traffic,
 and prove that a broken explicit default sends no query to an unapproved local
 provider while an explicitly approved fallback works. These are synthetic/local
 proofs, not real provider availability, quota or paid-query acceptance.
+
+
+### Setup recovery directly in search errors
+
+Single-provider configuration errors now carry both structured `setup` (one
+provider's step, not the full card projection) and the existing cross-client
+`suggested_next_action` string. Missing/unreadable references, invalid endpoints,
+explicit disables and unsupported adapters reuse the same setup owner as the
+card. Unsupported-provider suggestions list installed adapters, not unsupported
+configuration/default identifiers. Cooling errors keep their HTTP status,
+`Retry-After` and retryable flag, adding `wait_then_retry` guidance without probes.
+When no provider can serve, the error points to capability-specific discovery
+instead of assuming another key is always the remedy.
+
+Native Pi, MCP and CLI already render `suggested_next_action`; this is a backend
+response improvement, not a new client schema/tool or installation requirement.
+A correctly configured provider's malformed response is not mislabeled as a
+configuration problem. Guidance never grants permission, echoes private
+references/URL values, creates accounts, changes configuration, or sends probes.

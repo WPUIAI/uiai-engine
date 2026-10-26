@@ -1,6 +1,9 @@
 package routes
 
-import "github.com/WPUIAI/uiai-engine/internal/config"
+import (
+	"github.com/WPUIAI/uiai-engine/internal/config"
+	"strings"
+)
 
 // searchProviderSetup is guidance, not permission, a credential value, or a
 // configuration writer. It derives only from the canonical inventory decision.
@@ -92,4 +95,24 @@ func searchSetupGuide(inventory searchProviderInventory, observed bool) map[stri
 		"credential_precedence":         "Explicit provider configuration wins, even when empty. Conventional environment fallback applies only to undeclared providers.",
 		"safety_rules":                  []string{"Never reveal credential values; prefer existing approved secret references.", "Account creation, spending, provider disclosure changes, and service provisioning require their own authorization; discovery grants none."},
 	}
+}
+
+// addSearchSetupRecovery uses the existing cross-client suggested_next_action
+// field. Native/MCP/CLI error renderers already preserve it; no client upgrade
+// or privileged configuration API is required. Fields are static safe names,
+// never private configured references, endpoint values, or credentials.
+func addSearchSetupRecovery(body map[string]any, setup searchProviderSetup) {
+	body["setup"] = setup
+	hint := setup.NextAction + ": " + setup.Message
+	if len(setup.ConfigurationFields) > 0 {
+		hint += " Configuration fields: " + strings.Join(setup.ConfigurationFields, ", ") + "."
+	}
+	if setup.ConventionalEnvFallback != "" {
+		hint += " Conventional credential env (undeclared provider only): " + setup.ConventionalEnvFallback + "."
+	}
+	if setup.EndpointEnvFallback != "" {
+		hint += " Endpoint env fallback: " + setup.EndpointEnvFallback + "."
+	}
+	hint += " Inspect current setup with the agent card or GET /api/search/providers."
+	body["suggested_next_action"] = hint
 }

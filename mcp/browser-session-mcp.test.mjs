@@ -179,3 +179,13 @@ test("MCP search preserves omission and explicit provider pinning", async (t) =>
     assert.equal(Object.hasOwn(captured,"providers"),Object.hasOwn(args,"providers"));
   }
 });
+
+
+test("MCP search errors retain safe setup next action",async(t)=>{
+ const server=createServer((req,res)=>{req.resume();res.writeHead(503,{"content-type":"application/json"});res.end(JSON.stringify({error:"search_provider_unavailable",message:"Existing credential reference missing",suggested_next_action:"connect_existing_credential_reference: configure search.providers.brave.api_key_env; inspect /api/search/providers",private_extra:"synthetic-private-extra-never-echo"}))});
+ server.listen(0,"127.0.0.1");await once(server,"listening");
+ const child=spawn(process.execPath,[process.env.UIAI_TEST_MCP_SCRIPT || "mcp/browser-session-mcp.mjs"],{cwd:root,env:{...process.env,UIAI_ENGINE_URL:`http://127.0.0.1:${server.address().port}`},stdio:["pipe","pipe","pipe"]});
+ t.after(()=>{child.kill();server.close()});
+ const reply=await callMcp(child,{jsonrpc:"2.0",id:20,method:"tools/call",params:{name:"browser_search",arguments:{query:"fixture",provider:"brave"}}});
+ assert.equal(reply.error,undefined);assert.equal(reply.result.isError,true);const text=reply.result.content[0].text;assert.match(text,/Next: connect_existing_credential_reference/);assert.match(text,/search.providers.brave.api_key_env/);assert.doesNotMatch(text,/synthetic-private-extra-never-echo/);
+});

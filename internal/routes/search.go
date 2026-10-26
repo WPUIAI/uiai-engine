@@ -153,8 +153,9 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 	}
 	if provider == "" {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
-			"error":   "no_search_provider_available",
-			"message": "no search provider can serve: configure search.providers.<id>.api_key, api_key_file, or api_key_env in the engine config",
+			"error":                 "no_search_provider_available",
+			"message":               "no search provider can serve; inspect current setup before changing configuration",
+			"suggested_next_action": "Read the agent card setup or GET /api/search/providers for capability-specific readiness and safe next actions; do not acquire keys or provision services automatically.",
 		})
 		return
 	}
@@ -172,7 +173,9 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 		provider = candidate
 		adapter := searchProviderMeta(provider).search
 		if adapter == nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": searchProviderIDs(cfg)})
+			body := map[string]any{"error": "unsupported_provider", "provider": provider, "supported_providers": searchProviderIDs(nil)}
+			addSearchSetupRecovery(body, buildSearchProviderSetup(provider, "unsupported_provider", 0))
+			writeJSON(w, http.StatusBadRequest, body)
 			return
 		}
 		results, cached, err = executeSearchProvider(httpReq, cfg, provider, query, limit, ttl)
@@ -184,7 +187,9 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 	if errors.As(err, &circuit) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Retry-After", strconv.Itoa(circuit.retryAfter))
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "search_provider_circuit_open", "provider": provider, "message": circuit.Error(), "retryable": true})
+		body := map[string]any{"error": "search_provider_circuit_open", "provider": provider, "message": circuit.Error(), "retryable": true}
+		addSearchSetupRecovery(body, buildSearchProviderSetup(provider, "circuit_open", circuit.retryAfter))
+		writeJSON(w, http.StatusServiceUnavailable, body)
 		return
 	}
 	var use *upstreamSearchError
@@ -206,7 +211,11 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 		return
 	}
 	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "search_provider_unavailable", "provider": provider, "message": err.Error()})
+		body := map[string]any{"error": "search_provider_unavailable", "provider": provider, "message": err.Error()}
+		if configured, reason := searchProviderConfigured(cfg, provider); !configured {
+			addSearchSetupRecovery(body, buildSearchProviderSetup(provider, reason, 0))
+		}
+		writeJSON(w, http.StatusServiceUnavailable, body)
 		return
 	}
 	writeSearchResponse(w, httpReq, cfg, provider, query, results, cached, ttl)
