@@ -274,7 +274,16 @@ key is unchanged and a corrupted-signature control must fail before a valid
 automatic upgrade/relaunch and preservation/owned-fixture-rollback checks pass.
 Receipts identify source revisions, versions and actual candidate bytes. This is
 not a claim about an unidentified historical public binary or notarization;
-qualification artifacts are not automatically published or silently rebuilt.
+manual qualification artifacts are not automatically published.
+
+The release workflow calls that same native qualification workflow with the exact
+candidate SHA and version. It never rebuilds separate Mac packages for publication.
+Candidate metadata, DMG, updater bundle and signature are frozen before the baseline
+checkout. Only successful native checks upload the release artifacts. Before any
+staging, `scripts/verify-native-ota-artifact.py` binds both platform receipts to the
+source SHA, version, production feed, exact archive and native-running executable
+hashes, signature bytes and frozen DMG metadata. Missing, foreign or changed artifacts
+fail closed; the draft and mutable feed remain unchanged.
 
 Before claiming an existing-user Cockpit rollout is ready:
 

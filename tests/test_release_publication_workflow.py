@@ -194,7 +194,7 @@ class ReleasePublicationTests(unittest.TestCase):
         source=COCKPIT.read_text()
         create=source.split('  create-release:\n',1)[1].split('  publish-macos-ota:\n',1)[0]
         self.assertIn('draft: true',create)
-        self.assertIn('signed-macos-build-arm64',create)
+        self.assertIn('qualified-macos',create)
         promote=source.split('  promote-release:\n',1)[1]
         self.assertIn('needs: [create-release, publish-macos-ota, linux-binary]',promote)
         stage=command(COCKPIT,'Stage immutable proof (channel unchanged)')
