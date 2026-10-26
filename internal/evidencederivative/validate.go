@@ -1,10 +1,13 @@
 package evidencederivative
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
+	"mime"
 	"net/url"
 	"path"
 	"reflect"
@@ -55,6 +58,9 @@ func ValidateRequest(request DerivativeRequest) error {
 	}
 	selected := append(append(append([]string{}, request.ClaimRefs...), request.AssetRefs...), request.CitationRefs...)
 	selected = append(selected, request.OmissionRefs...)
+	if hasBlankOrDuplicate(selected) {
+		return ErrDerivativeSelectionIncomplete
+	}
 	if !subset(request.RequiredEvidenceRefs, selected) || !subset(request.TranscriptRefs, request.AssetRefs) ||
 		!subset(request.KeyframeRefs, request.AssetRefs) || intersects(request.TranscriptRefs, request.KeyframeRefs) {
 		return ErrDerivativeSelectionIncomplete
@@ -73,7 +79,7 @@ func ValidateManifest(manifest DerivativeManifest, request DerivativeRequest) er
 	}
 	if manifest.Schema != ManifestSchema || blank(manifest.DerivativeID) || blank(manifest.RequestRef) ||
 		!validSHA256(manifest.RequestSHA256) || blank(manifest.OutputRef) || !relativeRef(manifest.OutputRef) ||
-		!validSHA256(manifest.OutputSHA256) || manifest.OutputBytes == 0 || blank(manifest.OutputMIME) ||
+		!validSHA256(manifest.OutputSHA256) || manifest.OutputBytes == 0 || !validOutputMIME(request.DerivativeType, manifest.OutputMIME) ||
 		!validRenderer(manifest.Renderer) || !validAccessibility(manifest.AccessibilityTarget) ||
 		!validConformance(manifest.AccessibilityPosture) || !validArchive(manifest.ArchivePosture) ||
 		blank(manifest.ReceiptRef) || manifest.CreatedAt.IsZero() || !validLists(manifest.TranscriptRefs, manifest.KeyframeRefs,
@@ -85,7 +91,7 @@ func ValidateManifest(manifest DerivativeManifest, request DerivativeRequest) er
 		manifest.ArtifactSHA256 != request.ArtifactSHA256 || manifest.ProjectionRef != request.ProjectionRef ||
 		manifest.ProjectionSHA256 != request.ProjectionSHA256 || !reflect.DeepEqual(manifest.Rendering, request.Rendering) ||
 		!reflect.DeepEqual(manifest.TranscriptRefs, request.TranscriptRefs) || !reflect.DeepEqual(manifest.KeyframeRefs, request.KeyframeRefs) ||
-		manifest.AccessibilityTarget != request.AccessibilityTarget {
+		manifest.AccessibilityTarget != request.AccessibilityTarget || !reflect.DeepEqual(manifest.OmissionRefs, request.OmissionRefs) {
 		return ErrDerivativeScopeMismatch
 	}
 	if err := validateViewerMatrix(manifest.ViewerMatrix); err != nil {
@@ -154,6 +160,10 @@ func ValidateDelivery(receipt DeliveryReceipt) error {
 		len(receipt.ReconciliationRefs) > MaxRefs || hasBlankOrDuplicate(receipt.ReconciliationRefs) || receipt.ObservedAt.IsZero() {
 		return ErrDerivativeContractInvalid
 	}
+	if (receipt.AcceptedAt != nil && (receipt.AcceptedAt.IsZero() || receipt.ObservedAt.Before(*receipt.AcceptedAt))) ||
+		(receipt.DeliveredAt != nil && (receipt.State != DeliveryDelivered || receipt.DeliveredAt.IsZero())) {
+		return ErrDerivativeContractInvalid
+	}
 	if receipt.State == DeliveryAccepted && (receipt.AcceptedAt == nil || receipt.DeliveredAt != nil || blank(receipt.ProviderReceiptRef)) {
 		return ErrDerivativeContractInvalid
 	}
@@ -180,7 +190,7 @@ func validateViewerMatrix(matrix ViewerMatrix) error {
 	seen := map[string]struct{}{}
 	for _, entry := range matrix.Entries {
 		key := entry.Client + "\x00" + entry.Version
-		if blank(entry.Client) || blank(entry.Version) || !validViewer(entry.Status) || hasBlankOrDuplicate(entry.EvidenceRefs) || !addUnique(seen, key) ||
+		if blank(entry.Client) || blank(entry.Version) || !validViewer(entry.Status) || len(entry.EvidenceRefs) > MaxRefs || hasBlankOrDuplicate(entry.EvidenceRefs) || !addUnique(seen, key) ||
 			((entry.Status == ViewerSupported || entry.Status == ViewerDegraded) && len(entry.EvidenceRefs) == 0) {
 			return ErrDerivativeContractInvalid
 		}
@@ -201,6 +211,9 @@ func validateLicenses(licenses []LicenseAttestation, assets []string) error {
 	return nil
 }
 func validateArchive(posture ArchivePosture, entries []ArchiveEntry) error {
+	if len(entries) > MaxEntries {
+		return ErrDerivativeUnsafeArchive
+	}
 	if posture == ArchiveNotApplicable && len(entries) != 0 {
 		return ErrDerivativeUnsafeArchive
 	}
@@ -209,10 +222,12 @@ func validateArchive(posture ArchivePosture, entries []ArchiveEntry) error {
 	}
 	seen := map[string]struct{}{}
 	for _, entry := range entries {
-		if !relativeRef(entry.Path) || entry.Link || !validSHA256(entry.SHA256) || blank(entry.MIME) || entry.Bytes == 0 || !addUnique(seen, entry.Path) {
+		canonicalPath, pathOK := relativePath(entry.Path)
+		mediaType, _, mimeErr := mime.ParseMediaType(entry.MIME)
+		if !pathOK || entry.Link || !validSHA256(entry.SHA256) || mimeErr != nil || entry.Bytes == 0 || !addUnique(seen, canonicalPath) {
 			return ErrDerivativeUnsafeArchive
 		}
-		if strings.Contains(entry.MIME, "x-executable") || strings.Contains(entry.MIME, "x-sh") {
+		if strings.Contains(mediaType, "executable") || strings.Contains(mediaType, "x-sh") || mediaType == "application/x-msdownload" || mediaType == "application/vnd.microsoft.portable-executable" || mediaType == "application/x-dosexec" || mediaType == "application/x-csh" {
 			return ErrDerivativeUnsafeArchive
 		}
 	}
@@ -222,23 +237,60 @@ func validRenderer(value RendererIdentity) bool {
 	return !blank(value.RendererRef) && !blank(value.Version) && validSHA256(value.BinarySHA256)
 }
 func relativeRef(value string) bool {
+	_, ok := relativePath(value)
+	return ok
+}
+func relativePath(value string) (string, bool) {
 	if blank(value) || strings.ContainsAny(value, "\\\r\n\x00") || strings.HasPrefix(value, "/") {
-		return false
+		return "", false
 	}
 	parsed, err := url.Parse(value)
-	if err != nil || parsed.IsAbs() || parsed.Host != "" {
-		return false
+	if err != nil || parsed.IsAbs() || parsed.Host != "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.ForceQuery {
+		return "", false
+	}
+	if strings.HasPrefix(parsed.Path, "/") || strings.ContainsAny(parsed.Path, "\\\r\n\x00") {
+		return "", false
 	}
 	clean := path.Clean(parsed.Path)
 	if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
-		return false
+		return "", false
 	}
 	for _, part := range strings.Split(parsed.Path, "/") {
 		if part == ".." {
-			return false
+			return "", false
 		}
 	}
-	return true
+	return clean, true
+}
+
+func validOutputMIME(kind DerivativeType, value string) bool {
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return false
+	}
+	switch kind {
+	case DerivativePrint:
+		return mediaType == "application/pdf" || mediaType == "text/html"
+	case DerivativePDF, DerivativePresentationPDF:
+		return mediaType == "application/pdf"
+	case DerivativeHTML, DerivativeHTMLSlides, DerivativeEmailHTML:
+		return mediaType == "text/html"
+	case DerivativeEmailText:
+		return mediaType == "text/plain"
+	case DerivativeMarkdown:
+		return mediaType == "text/markdown"
+	case DerivativeRichText:
+		return mediaType == "application/rtf" || mediaType == "text/rtf"
+	case DerivativeJSON:
+		return mediaType == "application/json"
+	case DerivativeCSV:
+		return mediaType == "text/csv"
+	case DerivativeArchive:
+		return mediaType == "application/zip"
+	case DerivativePPTX:
+		return mediaType == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+	}
+	return false
 }
 func validLists(groups ...[]string) bool {
 	for _, values := range groups {
@@ -282,6 +334,23 @@ func sizeOK(value any) error {
 	body, err := json.Marshal(value)
 	if err != nil || len(body) > MaxContractBytes {
 		return ErrDerivativeContractInvalid
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	for {
+		token, err := decoder.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return ErrDerivativeContractInvalid
+		}
+		if text, ok := token.(string); ok {
+			text = strings.TrimSpace(text)
+			windows := len(text) > 2 && ((text[0] >= 'a' && text[0] <= 'z') || (text[0] >= 'A' && text[0] <= 'Z')) && text[1] == ':' && (text[2] == '/' || text[2] == '\\')
+			if strings.HasPrefix(text, "/") || strings.HasPrefix(text, `\\`) || strings.HasPrefix(strings.ToLower(text), "file:") || windows {
+				return ErrDerivativeContractInvalid
+			}
+		}
 	}
 	lower := strings.ToLower(string(body))
 	for _, marker := range []string{"/home/", "/root/", "file://", `c:\\users\\`, "authorization: bearer", "cookie:"} {

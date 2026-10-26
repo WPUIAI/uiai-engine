@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -200,5 +201,208 @@ func gold(t *testing.T, name string, v any) {
 	}
 	if !bytes.Equal(b, w) {
 		t.Fatal("golden drift")
+	}
+}
+
+// T09-A independent conformance vectors: source-only, exact issue124 allowlist.
+func TestT09AReceiptTimesAndDeliveredStateAreTruthful(t *testing.T) {
+	for name, mutate := range map[string]func(*DeliveryReceipt){
+		"future_acceptance": func(d *DeliveryReceipt) {
+			d.State = DeliveryAccepted
+			d.DeliveredAt = nil
+			v := d.ObservedAt.Add(time.Second)
+			d.AcceptedAt = &v
+		},
+		"zero_acceptance": func(d *DeliveryReceipt) {
+			d.State = DeliveryAccepted
+			d.DeliveredAt = nil
+			v := time.Time{}
+			d.AcceptedAt = &v
+		},
+		"queued_with_delivery":  func(d *DeliveryReceipt) { d.State = DeliveryQueued },
+		"unknown_with_delivery": func(d *DeliveryReceipt) { d.State = DeliveryOutcomeUnknown },
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, _, d := contracts()
+			mutate(&d)
+			if !errors.Is(ValidateDelivery(d), ErrDerivativeContractInvalid) {
+				t.Fatal("contradictory delivery receipt accepted")
+			}
+		})
+	}
+}
+
+func TestT09AArchiveAliasesAndExecutableMIMEFailClosed(t *testing.T) {
+	for name, entries := range map[string][]ArchiveEntry{
+		"normalized_duplicate":        {{Path: "a/b.txt", SHA256: da, MIME: "text/plain", Bytes: 1}, {Path: "a/./b.txt", SHA256: da, MIME: "text/plain", Bytes: 1}},
+		"encoded_duplicate":           {{Path: "a/b.txt", SHA256: da, MIME: "text/plain", Bytes: 1}, {Path: "a%2fb.txt", SHA256: da, MIME: "text/plain", Bytes: 1}},
+		"case_insensitive_executable": {{Path: "payload", SHA256: da, MIME: "Application/X-Executable", Bytes: 1}},
+		"windows_executable":          {{Path: "payload", SHA256: da, MIME: "application/x-msdownload", Bytes: 1}},
+		"path_query":                  {{Path: "proof.txt?other=1", SHA256: da, MIME: "text/plain", Bytes: 1}},
+		"path_fragment":               {{Path: "proof.txt#other", SHA256: da, MIME: "text/plain", Bytes: 1}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if !errors.Is(validateArchive(ArchiveSafe, entries), ErrDerivativeUnsafeArchive) {
+				t.Fatal("unsafe archive metadata accepted")
+			}
+		})
+	}
+}
+
+func TestT09ARequiredManifestOmissionsAndMIMEAreBound(t *testing.T) {
+	r, m, _ := contracts()
+	r.OmissionRefs = []string{"omission:explicit"}
+	r.RequiredEvidenceRefs = append(r.RequiredEvidenceRefs, r.OmissionRefs...)
+	m.RequestSHA256, _ = DigestRequest(r)
+	m.DerivativeID, _ = DerivativeID(r, m.Renderer, m.ViewerMatrix, m.Licenses)
+	if !errors.Is(ValidateManifest(m, r), ErrDerivativeScopeMismatch) {
+		t.Fatal("required request omission disappeared from manifest")
+	}
+	r, m, _ = contracts()
+	m.OutputMIME = "application/octet-stream"
+	if !errors.Is(ValidateManifest(m, r), ErrDerivativeContractInvalid) {
+		t.Fatal("PDF manifest accepted unrelated output MIME")
+	}
+}
+
+func TestT09AValidatorsDoNotMutateAndEveryLineageFieldBinds(t *testing.T) {
+	r, m, d := contracts()
+	beforeR, _ := json.Marshal(r)
+	beforeM, _ := json.Marshal(m)
+	beforeD, _ := json.Marshal(d)
+	_ = ValidateRequest(r)
+	_ = ValidateManifest(m, r)
+	_ = ValidateDelivery(d)
+	afterR, _ := json.Marshal(r)
+	afterM, _ := json.Marshal(m)
+	afterD, _ := json.Marshal(d)
+	if !bytes.Equal(beforeR, afterR) || !bytes.Equal(beforeM, afterM) || !bytes.Equal(beforeD, afterD) {
+		t.Fatal("validator mutated contract")
+	}
+	for _, mutate := range []func(*ScopeBinding){func(s *ScopeBinding) { s.ProjectRef = "project:other" }, func(s *ScopeBinding) { s.WorkstreamRef = "workstream:other" }, func(s *ScopeBinding) { s.WorksetRef = "workset:other" }, func(s *ScopeBinding) { s.CallGraphRef = "callgraph:other" }, func(s *ScopeBinding) { s.WorkpointRef = "workpoint:other" }, func(s *ScopeBinding) { s.WorkItemRef = "item:other" }} {
+		r, m, _ := contracts()
+		mutate(&r.Scope)
+		if !errors.Is(ValidateManifest(m, r), ErrDerivativeScopeMismatch) {
+			t.Fatal("lineage change retained old manifest binding")
+		}
+	}
+}
+
+func TestT09AAdditionalIdentityInputs(t *testing.T) {
+	for name, mutate := range map[string]func(*DerivativeRequest, *DerivativeManifest){
+		"font":            func(r *DerivativeRequest, _ *DerivativeManifest) { r.Rendering.FontRefs = []string{"font:other"} },
+		"color":           func(r *DerivativeRequest, _ *DerivativeManifest) { r.Rendering.ColorProfileRef = "display-p3" },
+		"accessibility":   func(r *DerivativeRequest, _ *DerivativeManifest) { r.AccessibilityTarget = AccessibilityPDFUA2 },
+		"locale":          func(r *DerivativeRequest, _ *DerivativeManifest) { r.Locale = "ar" },
+		"direction":       func(r *DerivativeRequest, _ *DerivativeManifest) { r.Direction = DirectionRTL },
+		"revision":        func(r *DerivativeRequest, _ *DerivativeManifest) { r.ArtifactRevision++ },
+		"projection":      func(r *DerivativeRequest, _ *DerivativeManifest) { r.ProjectionSHA256 = da },
+		"renderer_digest": func(_ *DerivativeRequest, m *DerivativeManifest) { m.Renderer.BinarySHA256 = db },
+		"viewer":          func(_ *DerivativeRequest, m *DerivativeManifest) { m.ViewerMatrix.Entries[0].Version = "other" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			r, m, _ := contracts()
+			old := m.DerivativeID
+			mutate(&r, &m)
+			next, err := DerivativeID(r, m.Renderer, m.ViewerMatrix, m.Licenses)
+			if err != nil || next == old {
+				t.Fatal("truth input did not bind identity")
+			}
+		})
+	}
+}
+
+func TestT09ABoundsVocabularyLicenseAndPrivatePaths(t *testing.T) {
+	r, m, _ := contracts()
+	r.AssetRefs = append(r.AssetRefs, r.ClaimRefs[0])
+	if ValidateRequest(r) == nil {
+		t.Fatal("cross-class duplicate selected ref accepted")
+	}
+	for _, value := range []string{"/tmp/private", "/etc/private", `Z:\\private\\proof`, "file:///private/proof"} {
+		r, _, _ := contracts()
+		r.LicensePolicyRef = value
+		if !errors.Is(ValidateRequest(r), ErrDerivativeContractInvalid) {
+			t.Fatal("private path accepted")
+		}
+	}
+	for _, mutate := range []func(*DerivativeRequest, *DerivativeManifest){
+		func(r *DerivativeRequest, _ *DerivativeManifest) { r.Direction = "future" },
+		func(r *DerivativeRequest, _ *DerivativeManifest) { r.AccessibilityTarget = "future" },
+		func(_ *DerivativeRequest, m *DerivativeManifest) { m.ArchivePosture = "future" },
+		func(_ *DerivativeRequest, m *DerivativeManifest) { m.AccessibilityPosture = "future" },
+		func(_ *DerivativeRequest, m *DerivativeManifest) { m.ViewerMatrix.Entries[0].Status = "future" },
+		func(_ *DerivativeRequest, m *DerivativeManifest) {
+			m.ViewerMatrix.Entries[0].EvidenceRefs = make([]string, MaxRefs+1)
+			for i := range m.ViewerMatrix.Entries[0].EvidenceRefs {
+				m.ViewerMatrix.Entries[0].EvidenceRefs[i] = fmt.Sprintf("evidence:%d", i)
+			}
+		},
+	} {
+		r, m, _ := contracts()
+		mutate(&r, &m)
+		if ValidateManifest(m, r) == nil {
+			t.Fatal("unknown or unbounded contract accepted")
+		}
+	}
+	entries := make([]ArchiveEntry, MaxEntries+1)
+	for i := range entries {
+		entries[i] = ArchiveEntry{Path: fmt.Sprintf("file-%d", i), SHA256: da, MIME: "text/plain", Bytes: 1}
+	}
+	if !errors.Is(validateArchive(ArchiveSafe, entries), ErrDerivativeUnsafeArchive) {
+		t.Fatal("unbounded archive entries accepted")
+	}
+	for _, mutate := range []func(*DerivativeManifest){func(m *DerivativeManifest) { m.Licenses[0].AttributionRef = "" }, func(m *DerivativeManifest) { m.Licenses[0].EvidenceRef = "" }, func(m *DerivativeManifest) { m.Licenses[0].DerivativePermitted = false }} {
+		r, m, _ := contracts()
+		mutate(&m)
+		if !errors.Is(ValidateManifest(m, r), ErrDerivativeLicenseMissing) {
+			t.Fatal("unproven licensed use accepted")
+		}
+	}
+	_ = r
+	_ = m
+}
+
+func TestT09AGoldenRoundTrips(t *testing.T) {
+	request, _, _ := contracts()
+	for _, name := range []string{"derivative-manifest.golden.json", "delivery-receipt.golden.json"} {
+		raw, err := os.ReadFile(filepath.Join("testdata", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var value any
+		if name == "derivative-manifest.golden.json" {
+			var v DerivativeManifest
+			if err = json.Unmarshal(raw, &v); err != nil {
+				t.Fatal(err)
+			}
+			if err = ValidateManifest(v, request); err != nil {
+				t.Fatal(err)
+			}
+			value = v
+		} else {
+			var v DeliveryReceipt
+			if err = json.Unmarshal(raw, &v); err != nil {
+				t.Fatal(err)
+			}
+			if err = ValidateDelivery(v); err != nil {
+				t.Fatal(err)
+			}
+			value = v
+		}
+		next, err := json.MarshalIndent(value, "", "  ")
+		if err != nil || !bytes.Equal(append(next, '\n'), raw) {
+			t.Fatal("golden roundtrip changed contract")
+		}
+	}
+}
+
+func TestT09AEncodedUnsafePathsFailClosed(t *testing.T) {
+	for _, value := range []string{"%2fetc/passwd", "a%00b", "a%5cb", "a%0ab"} {
+		if relativeRef(value) {
+			t.Fatal("encoded unsafe path accepted")
+		}
+	}
+	if validateArchive(ArchiveSafe, []ArchiveEntry{{Path: "payload", SHA256: da, MIME: "application/x-pie-executable", Bytes: 1}}) == nil {
+		t.Fatal("PIE executable MIME accepted")
 	}
 }
