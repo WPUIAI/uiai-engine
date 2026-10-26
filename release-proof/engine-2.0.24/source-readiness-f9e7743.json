@@ -1,0 +1,40 @@
+{
+  "schema": "uiai.source_readiness_proof.v1",
+  "issue": 263,
+  "work_item": "uiai-engine-xq1y",
+  "source_revisions": [
+    "890cb9f",
+    "f9e7743"
+  ],
+  "running_source_revision": "f9e7743",
+  "version": "2.0.24",
+  "build": "2026-10-26T04:51:05Z+f9e7743",
+  "running_sha256": "ef026a7dbb12385dc65cb49979bc2c3819927be9255477e3f0f771aeae6a5f4f",
+  "verified": [
+    "ACTUAL current native one-shot public docs.jina.ai returned0chars before client-rendering; samepage persistentread laterreturned5000chars; both ephemeral sessions closed, no auth/credential bypass",
+    "Deterministic realChromium1200msdelayedmaincontent regression failed before and passed after, with syntheticcredential redaction and owned-source cleanup",
+    "Canonical ReadPageContext reuses existing sessionActionContext cancellation owner, preserving caller/session lifetime; oldReadPage remains compatible wrapper; no duplicated DOM/redaction logic",
+    "Source workflow retries only empty read-only observations within one short budget; pre-cancelled entry does not navigate, mid-read deadline interrupts and sharedpage still works afterward",
+    "Still-empty document returns422source_content_unavailable plus safeNext and cleanup, not a successful empty artifact; cancelledread408; failure includes existing bounded/sanitized diagnostics",
+    "Initial2s candidate890cb9f passedfixtures but realJinadocs exceededbudget and correctlyreturned422/cleanupclosed; issue remainedOPEN and success was not claimed",
+    "Persistent measured network/readiness showedCDN/spec/fontload around3s withh1by5s; final5s budget aligned with existingread cap, avoiding blanket waits for nonempty text",
+    "Final delayed/empty/cancellation Chromium races3x, existingReadPagebrowser regressions, fullGo/vet/17native-shared-MCPtests/prepush and Windowsamd64/Darwinarm64crossbuildspass",
+    "Both named workers canonicalidle-safe/rollback-preserving deployed,active/healthy/running executable hashes verified",
+    "Both installed workers sameJinadocs nowreadable/nonempty withownedcleanup; allordinarySourceGo/Google/citation/inlineword/semanticcanary/OAuthURL/searchpreflight/DDGadmission/quotametadata/security/browser/cleanup checks pass",
+    "ACTUAL CURRENT native same publicdocs returns1500chars in3015ms, title/Reader/Search/API documentation present, zero diagnostics errors; owned session ZNNGtHTHclosed"
+  ],
+  "before_ref": "uiai-source-markdown:sha256:174373bd00e5b46d",
+  "persistent_diagnostics_ref": "uiai-diagnostics:session=6Fs5_cER:seq=8",
+  "native_after_ref": "uiai-source-markdown:sha256:1c8b30e4d2a6289c",
+  "native_after_artifact_ref": "uiai-artifact:sha256:47a906d70580d457c33cbaf66073ef1b784c28077bb33f37414be96e523f0789",
+  "live_probe_ref": "OVH/tmp/uiai-live-f9e7743.json",
+  "live_probe_observed_at": "2026-10-26T04:51:56Z",
+  "both_worker_after_ref": "uiai-source-markdown:sha256:ae8cd8f4b9068801",
+  "limits": [
+    "Budgetbeginsafterexistingnavigation/open, not an end-to-end5sSLA; onlyemptyobservationswait, nonemptytextnotsemantic completeness/fullJSreadiness",
+    "No authchallengebypass/provider signup/APIkeyretrieval or paidproviderquery; publicJina mainpage auth-form classification context K2g_sjSmclosedwithoutinteraction",
+    "Unsealed/deliveryblocked source/browser artifacts, no scopedEPWA/pixel/publicRelease/nativeOS/currentresearcharrayactivation proof",
+    "90/91 and dependencyupkeep262 remainOPEN; no Jina search adapter orpaidJinaacceptance implemented by this readiness fix",
+    "Original unrelated dirt preserved; no duplicatecheckout/dependenciesbeyondpreviouslyapprovedHTML/service/config/default/fallback changes"
+  ]
+}
