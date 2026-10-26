@@ -1,3 +1,4 @@
+import { getVersion } from '@tauri-apps/api/app';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import { pushToast } from '$lib/ui/toast';
@@ -142,24 +143,42 @@ export async function runCockpitUpdate(options: {
   }
 }
 
-/** Surface the durable activation receipt after the updater relaunch completes. */
-export function reportCompletedCockpitUpdate(): CockpitUpdateActivationReceipt | undefined {
+/** A stored installation intent is not activation proof: query the native process. */
+export async function reportCompletedCockpitUpdate(): Promise<CockpitUpdateActivationReceipt | undefined> {
+  if (!isTauriRuntime()) return undefined;
   try {
     const raw = window.localStorage.getItem(COCKPIT_UPDATE_RECEIPT_KEY);
     if (!raw) return undefined;
-    const receipt = JSON.parse(raw) as Partial<CockpitUpdateActivationReceipt>;
-    if (receipt.schema !== 'uiai.cockpit_ota_activation_receipt.v1' || receipt.status !== 'installed_relaunching' || !receipt.version) return undefined;
+    const receipt = JSON.parse(raw) as Partial<CockpitUpdateActivationReceipt> | null;
+    if (!receipt || receipt.schema !== 'uiai.cockpit_ota_activation_receipt.v1' ||
+      receipt.status !== 'installed_relaunching' || typeof receipt.version !== 'string' ||
+      !receipt.version || receipt.version.length > 256 || receipt.version.trim() !== receipt.version ||
+      receipt.activation !== 'signed_updater_install_and_relaunch') return undefined;
+    const runningVersion = await getVersion();
+    // An overlapping check must not remove or announce a newer pending update.
+    if (window.localStorage.getItem(COCKPIT_UPDATE_RECEIPT_KEY) !== raw) return undefined;
+    if (runningVersion !== receipt.version) {
+      pushToast({
+        id: 'cockpit-ota', level: 'info', title: 'Update activation not yet verified',
+        message: 'Restart Cockpit to verify the pending update.', durationMs: 0,
+      });
+      return undefined;
+    }
     window.localStorage.removeItem(COCKPIT_UPDATE_RECEIPT_KEY);
     pushToast({
       id: 'cockpit-ota',
       level: 'success',
-      title: `Cockpit ${receipt.version} updated`,
-      message: 'Background update completed and the desktop app relaunched successfully.',
+      title: `Cockpit ${runningVersion} updated`,
+      message: `Cockpit ${runningVersion} is running.`,
       progress: 1,
       durationMs: 8000,
     });
     return receipt as CockpitUpdateActivationReceipt;
   } catch {
+    pushToast({
+      id: 'cockpit-ota', level: 'error', title: 'Update activation unconfirmed',
+      message: 'Could not verify the running Cockpit version. The pending update remains unconfirmed.',
+    });
     return undefined;
   }
 }

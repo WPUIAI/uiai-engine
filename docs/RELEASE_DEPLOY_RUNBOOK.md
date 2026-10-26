@@ -262,3 +262,22 @@ GitHub's native matrix fail-fast cancels the still-queued sibling. It never call
 foreign-run cancellation or needs Actions-write/runner-administration credentials.
 Missing Chrome fails explicitly without installing packages. Per-run output paths
 and required artifact uploads prevent stale or absent JSON from becoming proof.
+
+## Cockpit over-the-air release gate
+
+Engine releases and signed Cockpit desktop updates are separate delivery lanes.
+Before claiming an existing-user Cockpit rollout is ready:
+
+- Inspect the actual updater feed and assets for every advertised platform; an
+  Intel Mac entry alone does not establish Apple Silicon or other-platform support.
+- On named, authorized native devices, verify the existing-version → signed
+  download → installation → relaunch → running-version path and data preservation.
+  Check failure/retry behavior and the supported rollback path as well.
+- A stored `installed_relaunching` receipt is only a pending installation intent.
+  Cockpit queries native `getVersion()` before announcing activation, preserves
+  pending receipts when the old process is still running or verification fails,
+  and never removes a newer receipt during an overlapping check.
+- Mocked updater tests, frontend builds and cross-compilation are not native OTA
+  receipts. Public evidence-delivery failures remain separate release blockers.
+- Use the actual authorized release channel, not probe releases or paid CI used
+  merely to obtain a test receipt; never upgrade unnamed customer devices.
