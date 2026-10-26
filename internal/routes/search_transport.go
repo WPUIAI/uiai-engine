@@ -37,6 +37,7 @@ func searchBody(req *http.Request) ([]byte, int, error) {
 		return nil, 0, fmt.Errorf("search provider transport failed")
 	}
 	defer resp.Body.Close()
+	observeSearchQuota(req, resp.Header, resp.StatusCode)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, resp.StatusCode, upstreamErr(resp)
 	}

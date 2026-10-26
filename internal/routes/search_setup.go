@@ -84,9 +84,13 @@ func buildSearchProviderSetup(id, reason string, retry int) searchProviderSetup 
 func searchSetupGuide(inventory searchProviderInventory, observed bool) map[string]any {
 	byCapability := map[string][]string{"web_search": {}, "encyclopedia_search": {}}
 	steps := make(map[string]any, len(inventory.providers))
+	observations := map[string]any{}
 	for _, p := range inventory.providers {
 		id := p["id"].(string)
 		steps[id] = p["setup"]
+		if quota, ok := p["quota"]; ok {
+			observations[id] = quota
+		}
 		if p["status"] == "ready" {
 			for _, capability := range p["capabilities"].([]string) {
 				if _, known := byCapability[capability]; known {
@@ -109,6 +113,7 @@ func searchSetupGuide(inventory searchProviderInventory, observed bool) map[stri
 		"provider_setup":                steps,
 		"readiness_basis":               basis,
 		"remaining_quota_status":        "unknown",
+		"quota_observations":            observations,
 		"requires_gui":                  false,
 		"configuration_write_supported": false,
 		"upstream_probes_performed":     false,

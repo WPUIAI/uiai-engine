@@ -185,6 +185,7 @@ func buildSearchProviderInventory(cfg *config.Config, breakers *SearchRuntime) s
 		if status == "ready" {
 			ready = append(ready, id)
 		}
+		quota := breakers.quotaProjection(id)
 		providers = append(providers, map[string]any{
 			"id":                id,
 			"name":              meta.name,
@@ -196,6 +197,9 @@ func buildSearchProviderInventory(cfg *config.Config, breakers *SearchRuntime) s
 			"capabilities":      meta.capabilities,
 			"circuit":           circuit,
 		})
+		if quota.Status != "unknown" {
+			providers[len(providers)-1]["quota"] = quota
+		}
 	}
 
 	return searchProviderInventory{defaultProvider: resolveDefaultSearchProvider(cfg), ids: ids, ready: ready, providers: providers}

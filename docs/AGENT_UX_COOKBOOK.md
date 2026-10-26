@@ -425,6 +425,37 @@ Issue90's remaining adapters, quota accounting and complete acceptance stay open
 the following sections describe implemented slices and their limits.
 No production fallback list is enabled by a code deployment alone.
 
+### Historical provider quota observations
+
+The existing search runtime can retain one latest valid numeric Brave header
+observation per provider slot. `/api/search/providers` and browser health expose
+it as provider `quota`; the same projection appears in agent-card/setup
+`quota_observations`. Other providers or missing/malformed headers stay unknown.
+Global `remaining_quota_status` deliberately remains `unknown`: an as-of response
+is neither a verified account balance nor permission to spend.
+
+`uiai.search_quota_observation.v1` is `advisory_only`, scoped to
+`engine_runtime_provider_slot`, with `account_binding:not_verified` and
+`current_remaining_status:unknown`. Its windows contain `limit_as_observed`,
+`window_seconds`, `remaining_as_observed`, `reset_after_seconds_as_observed` and
+`unlimited_as_observed` (documented zero limit). `received_at` is local header
+receipt time, not a provider billing timestamp. After five minutes or clock
+uncertainty the projection is stale; `reported_reset_elapsed` never refills a
+counter or proves quota restoration. Counts remain explicitly historical.
+
+Only the documented coherent Brave `X-RateLimit-Limit`, `-Policy`, `-Remaining`
+and `-Reset` contract is supported: at most eight aligned windows, bounded
+numeric/header sizes, no arbitrary header/body/query/credential strings retained.
+The execution owner supplies the internal provider binding; request URLs cannot
+mint it. Earlier-started responses cannot overwrite newer attempts' observations.
+Cache hits, inventory/card reads and health never query providers, refresh the
+observation timestamp or simulate billing. This is not a durable account ledger,
+credential-bound balance, automatic admission rule, authorization or full issue90
+completion. Validation uses loopback fixtures; no paid provider probe is needed.
+
+Protocol: https://api-dashboard.search.brave.com/documentation/guides/rate-limiting
+(reviewed2026-10-26, public source `uiai-source-markdown:sha256:7e8c59a2eaf6f8e7`).
+
 ### Keyless DuckDuckGo HTML search
 
 `provider: "ddg"` uses `https://html.duckduckgo.com/html/` without credentials,

@@ -32,10 +32,12 @@ type searchAttempt struct {
 // SearchRuntime belongs to one engine/search router, not a tenant-global map.
 // Only supported provider ids enter this bounded, value-free transient state.
 type SearchRuntime struct {
-	ddgNextRequest time.Time
-	mu             sync.Mutex
-	now            func() time.Time
-	circuits       map[string]searchCircuit
+	quotaSequences    map[string]uint64
+	quotaObservations map[string]searchQuotaObservation
+	ddgNextRequest    time.Time
+	mu                sync.Mutex
+	now               func() time.Time
+	circuits          map[string]searchCircuit
 }
 type searchCircuitStatus struct {
 	State               string `json:"state"`

@@ -46,7 +46,7 @@ func executeSearchProvider(req *http.Request, cfg *config.Config, provider, quer
 		}
 		runtime.complete(provider, attempt, err)
 	}()
-	results, err = adapter(req.Context(), cfg, query, limit)
+	results, err = adapter(runtime.bindQuotaObservation(req.Context(), provider), cfg, query, limit)
 	if req.Context().Err() != nil {
 		err = req.Context().Err()
 	}
