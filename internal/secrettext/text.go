@@ -117,6 +117,12 @@ func Fragments(input []string) []string {
 	redact(joined, func(value string) {
 		if value != "" {
 			values[value] = true
+			// A known credential can appear escaped in Markdown and raw in
+			// another field (or vice versa). These are rendering aliases of an
+			// already detected value, not new credential-detection rules.
+			plain := markdownAliasUnescape.Replace(value)
+			values[plain] = true
+			values[markdownAliasEscape.Replace(plain)] = true
 		}
 	})
 	ordered := make([]string, 0, len(values))
@@ -151,3 +157,12 @@ func SensitiveField(key string) bool {
 	}
 	return false
 }
+
+// Match the Markdown punctuation escaping used by browser text serialization.
+// Replacers are immutable; inferred values remain local to Fragments.
+var markdownAliasUnescape = strings.NewReplacer(
+	`\\`, `\`, `\_`, `_`, `\*`, `*`, "\\`", "`", `\~`, `~`, `\[`, `[`, `\]`, `]`, `\#`, `#`,
+)
+var markdownAliasEscape = strings.NewReplacer(
+	`\`, `\\`, `_`, `\_`, `*`, `\*`, "`", "\\`", `~`, `\~`, `[`, `\[`, `]`, `\]`, `#`, `\#`,
+)

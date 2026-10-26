@@ -78,3 +78,21 @@ func TestTokenTypeDocumentationDoesNotSeedSecretAliases(t *testing.T) {
 		}
 	}
 }
+
+func TestFragmentsMatchKnownMarkdownEscapedCredentialAlias(t *testing.T) {
+	for _, tc := range []struct{ escaped, plain string }{
+		{`SYNTHETIC\_CROSS\_FIELD`, `SYNTHETIC_CROSS_FIELD`},
+		{`Synthetic\*Actual\#Key123`, `Synthetic*Actual#Key123`},
+		{`Synthetic\\ActualKey123`, `Synthetic\ActualKey123`},
+		{`i\_f`, `i_f`},
+	} {
+		got := Fragments([]string{"API key: " + tc.escaped, tc.plain})
+		if strings.Contains(got[1], tc.plain) || !strings.Contains(got[1], Marker) {
+			t.Fatal("known Markdown-escaped credential alias escaped cross-field redaction")
+		}
+		got = Fragments([]string{"API key: " + tc.plain, tc.escaped})
+		if strings.Contains(got[1], tc.escaped) || !strings.Contains(got[1], Marker) {
+			t.Fatal("known raw credential alias escaped Markdown-field redaction")
+		}
+	}
+}
