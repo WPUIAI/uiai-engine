@@ -1,0 +1,31 @@
+{
+  "schema": "uiai.search_research_recovery_proof.v1",
+  "issue": 90,
+  "source_revision": "5488f7d",
+  "version": "2.0.24",
+  "build": "2026-10-26T01:48:20Z+5488f7d",
+  "running_sha256": "2ad3f75b0a8a380223490204d75f58adab953b12cbfa276ab03dad57d480515c",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "Research rejection recovery reproduced missing before fix:9 fixture cases over6 rejection reasons",
+    "Canonical plan returns first rejection and normalized failing provider; shared setup builder/formatter adds safe instructions without parallel approval validation",
+    "Conflict/excessive/unsupported/not-approved/disabled/distinct status/error codes and validation order preserved; approved defaults/fallbacks are not modified, no keys/accounts created",
+    "All9 rejection fixtures assert zero local provider calls, config immutability and private key/reference/query/URL canary absence; configured unknown IDs excluded from supported alternatives",
+    "Valid fanout, cache, partial success, throttling/deadline/fusion tests remain green",
+    "17 native/shared/MCP tests pass; existing error-render tests expanded to503configuration/400researchconflict/403disclosure approval; native tests use fresh source module, not current-process research-array installation",
+    "CLI shared recovery renderer fixture, fullGo, search/toolrace5x, targeted vet, canonical prepush pass OVH; Windowsamd64/Darwinarm64 cross-build pass only",
+    "Canonical idle-safe rollback-preserving deployment both named workers active/healthy running executable hashes verified",
+    "Both installed-worker HTTP probes pass: conflict/excessive/unsupported/duplicates/unapproved recovery; unapproved test uses unsupported tail to guarantee no provider lanes even with unexpected config; ordinary owned browser/read/snapshot/eval/error/screenshot-artifact/redaction/diagnostics/cleanup pass",
+    "ACTUAL CURRENT MCP browser_search returns expected400 choose_search_mode and403 request_provider_disclosure_approval with safe Next text; deliberate negative requests execute no outside provider query; no client installation/reload"
+  ],
+  "limits": [
+    "No paid provider queries, credential/account acquisition, config/default/fallback/provider endpoint changes, new services or package installation",
+    "No GUI/config-writer/publicRelease/scopedEPWA/pixel/nativeOS/independent-model usability proof",
+    "Current native research-array parameter schema remains source-only/uninstalled; fresh-source native error-render tests are not current-process array activation",
+    "Research lane error metadata and quota ledger remain separate unfinished work;90/91remainOPEN; original unrelated dirty files preserved"
+  ],
+  "probe_ref": "OVH/tmp/uiai-live-5488f7d.json"
+}
