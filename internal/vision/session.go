@@ -314,8 +314,7 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 	sess.Title = safePageTitle(page)
 	sess.NavCount = 1
 	sess.timer = time.AfterFunc(SessionTTL, func() {
-		log.Printf("[session] %s expired after %s idle", sess.ID, SessionTTL)
-		sm.Close(sess.ID)
+		sm.expireSession(sess.ID)
 	})
 
 	sm.mu.Lock()
@@ -404,18 +403,41 @@ func (sm *SessionManager) CountForScope(scope ScopeRef) int {
 // ErrSessionNotFound is returned when no live session matches the id.
 var ErrSessionNotFound = fmt.Errorf("session not found")
 
+func (sm *SessionManager) expireSession(id string) {
+	// An already-dispatched callback may run after Stop or Reset. Recheck the
+	// lease under the same lock as activity/auth changes before detaching it.
+	sm.closeSession(id, true)
+}
+
 func (sm *SessionManager) Close(id string) error {
-	sm.mu.Lock()
+	return sm.closeSession(id, false)
+}
+
+func (sm *SessionManager) closeSession(id string, idleOnly bool) error {
+	sm.mu.RLock()
 	sess, ok := sm.sessions[id]
+	sm.mu.RUnlock()
 	if !ok {
+		return ErrSessionNotFound
+	}
+
+	// Never wait for a session action while holding the manager lock.
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	sm.mu.Lock()
+	if sm.sessions[id] != sess {
 		sm.mu.Unlock()
 		return ErrSessionNotFound
 	}
+	if idleOnly && (sess.authChallenge != nil || time.Since(sess.LastUsed) < SessionTTL) {
+		sm.mu.Unlock()
+		return nil
+	}
 	delete(sm.sessions, id)
 	sm.mu.Unlock()
-
-	sess.mu.Lock()
-	defer sess.mu.Unlock()
+	if idleOnly {
+		log.Printf("[session] %s expired after %s idle", id, SessionTTL)
+	}
 	if sess.timer != nil {
 		sess.timer.Stop()
 	}

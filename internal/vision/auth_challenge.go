@@ -114,6 +114,7 @@ func (s *Session) ResolveAuthChallenge(resumeToken string) error {
 	}
 	challenge := *s.authChallenge
 	s.authChallenge = nil
+	s.LastUsed = time.Now()
 	if s.timer != nil {
 		s.timer.Reset(SessionTTL)
 	}

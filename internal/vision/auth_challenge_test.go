@@ -55,7 +55,7 @@ func TestAuthChallengeDetectorLoginWall(t *testing.T) {
 	sm := NewSessionManager(pool)
 	sess, _, err := sm.Open(server.URL, 800, 600)
 	if err != nil {
-		t.Skipf("browser unavailable: %v", err)
+		t.Fatalf("explicit auth browser gate unavailable: %v", err)
 	}
 	defer sm.Close(sess.ID)
 	before := events.LatestSeq()
@@ -72,6 +72,24 @@ func TestAuthChallengeDetectorLoginWall(t *testing.T) {
 	}
 	if got := len(events.Since(before)); got != 1 {
 		t.Fatalf("login wall emitted %d events, want exactly one", got)
+	}
+	// Simulate an already-dispatched callback, not a wall-clock ten-minute run.
+	sess.mu.Lock()
+	sess.LastUsed = time.Now().Add(-2 * SessionTTL)
+	sess.mu.Unlock()
+	sm.expireSession(sess.ID)
+	if _, ok := sm.Get(sess.ID); !ok {
+		t.Fatal("idle callback reaped live browser awaiting authentication")
+	}
+	if _, err := sess.page.Eval(`() => document.querySelector('input').type`); err != nil {
+		t.Fatal("pending-auth page no longer usable")
+	}
+	if err := sess.ResolveAuthChallenge(first.ResumeToken); err != nil {
+		t.Fatal(err)
+	}
+	sm.expireSession(sess.ID)
+	if _, ok := sm.Get(sess.ID); !ok {
+		t.Fatal("old callback reaped freshly resolved browser lease")
 	}
 }
 

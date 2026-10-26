@@ -362,6 +362,12 @@ copy: editing it cannot alter the pending resume token or session state. This
 changes no resolve/control grant or lease policy; broader auth protocol acceptance
 remains tracked under #82.
 
+Idle callbacks recheck pending authentication and recent activity under the session
+lock before detaching a session: stopping/resetting a timer cannot retract a
+callback already dispatched. Successful auth resolution records fresh activity
+and restarts the existing idle period. Explicit close/cancel remains available;
+this housekeeping protection is not an actuator-control lease or resume grant.
+
 ### Viewer-aware FPV collaboration
 
 Poll the authenticated `/api/fpv/events?session_id=<owned-session>&since_seq=<cursor>`
