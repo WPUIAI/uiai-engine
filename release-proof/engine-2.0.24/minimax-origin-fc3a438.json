@@ -1,0 +1,30 @@
+{
+  "schema": "uiai.minimax_initial_origin_proof.v1",
+  "issue": 266,
+  "implementation_revision": "fc3a438",
+  "manifest_revision": "3143630",
+  "version": "2.0.24",
+  "build": "2026-10-26T08:23:43Z+3143630",
+  "running_sha256": "d41c015e8dd35b39fa6ce5a4f89468b71fca29989b6c9b8fede2da3e8fe8be14",
+  "verified": [
+    "RED network-free actual Provider.completeOnce fixtures: five custom bare/prefix/trailing-slash/loopback bases silently retargeted VLM to official host; vision-to-text fixture also violated configured origin",
+    "GREEN initial VLM target derives only from caller-resolved base; no second default/host substitution; normal prefix and trailing-slash handling retained",
+    "Ten official/default/custom origin-path cases pass with expected synthetic Authorization and prompt/image payload; exactly one VLM call on success",
+    "Text-only behavior and VLM503->configured text fallback pass with one/two calls respectively; no new fallback policy",
+    "20 allAI race runs,fullGo/vet,17native-shared-MCP client tests,Windowsamd64/Darwinarm64 crossbuilds passed including prior cache/wipe/error/failover/redirect regressions",
+    "Pre-push initially rejected expired generated_at; canonical stamp-uiai-version.py at unchanged engine-v2.0.24 regenerated only manifest source/timestamp, normal hook then passed, no bypass/tag/release",
+    "Guardian reported exact worker not monitored before any build/restart; exact named systemctl checks and canonical deployment preflight proved workers active without monitor reconfiguration",
+    "Canonical deploy preserved idle-worker guards/rollback; both named installed workers active/healthy with running executable hashes verified",
+    "Both installed workers passed ordinary source/browser/security/search/cleanup regression probe; paid_provider_probes_performed=false and owned sessions closed"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-3143630.json",
+  "live_probe_observed_at": "2026-10-26T08:24:22Z",
+  "limits": [
+    "Provider origin/payload positives are fake RoundTripper fixtures with synthetic keys, zero DNS/network/paid provider queries; no evidence real production credentials were exposed",
+    "General initial URL validation/query/fragment endpoint support are outside this fix",
+    "No full86 broker ref/lease/event/revocation SLA/twofactor/wholeheap wipe acceptance claim",
+    "Brave retained; Jina absent; no new provider/credential/config/default/fallback/dependency/service or monitor change",
+    "No scopedEPWA/pixel/nativeOS/current native research-array activation/publicRelease claim; browser artifacts unsealed/deliveryblocked",
+    "Original unrelated dirt preserved; no duplicate checkout or Focusa repair/green background-job claim; scoped standing UIAI-only owner continuation receipt retained in cache foundation proof"
+  ]
+}
