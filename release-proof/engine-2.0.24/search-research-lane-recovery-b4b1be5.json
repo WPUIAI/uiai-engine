@@ -1,0 +1,33 @@
+{
+  "schema": "uiai.search_research_lane_recovery_proof.v1",
+  "issue": 90,
+  "source_revision": "b4b1be5",
+  "version": "2.0.24",
+  "build": "2026-10-26T02:03:11Z+b4b1be5",
+  "running_sha256": "fdd7e753644ebbcad98743be6820652baf7f51d354951affb74d12d398a70b02",
+  "workers": [
+    7456,
+    7460
+  ],
+  "verified": [
+    "Missing all-failed and partial-result lane recovery reproduced before fix; partial fixture uses existing HTTPS/evidence-scope test contract, not real provider/publication authority",
+    "Optional provider_errors[].setup/suggested_next_action reuse existing failure classifier/setup builder and one extracted common hint formatter",
+    "All-failed response aggregates available provider-labelled hints into existing top-level suggested_next_action; no invented top-level single-provider setup",
+    "Partial success retains actual successful fixture result plus failed-lane recovery; local Wikipedia1request, missing-keyExa0requests, no refill",
+    "Both configured-missing-key lanes fail502 with own endpoint counter0; per-lane/aggregate safe field names retained and private endpoint not echoed",
+    "8classification-priority fixtures: config missing/invalid URL and circuit receive known setup; upstream429/401/cancellation/deadline/configured response failure are NOT mislabeled as missing keys; private error/key/URL canary absent",
+    "Both cooling lanes preserve existing502/commonRetry-After60, per-lane retryability/delay and zero probe calls",
+    "FullGo/search-toolrace5x/targetedvet/prepush pass;17native/shared/MCP tests include new aggregate502renderer fixture; CLI shared recovery fixture pass",
+    "Windowsamd64/Darwinarm64 cross-build pass only",
+    "Canonical idle-safe rollback-preserving rollout both workers active/healthy running executable hashes verified",
+    "Both installed workers retain setup/card/provider parity, discovery,5safe negative research cases, ordinary owned browser/read/snapshot/eval/error/screenshot-artifact/redaction/diagnostics/cleanup probes"
+  ],
+  "limits": [
+    "Lane failure behavior is verified with isolated synthetic loopback fixtures and fresh-source client fixtures, NOT actual paid-provider/account/quota probes",
+    "Installed-runtime verification covers matching executable hashes/health and ordinary/preflight consumers; no real provider request was made to force a live lane error",
+    "No new keys/accounts/config/default/fallback/endpoints/packages/services; no publicRelease/scopedEPWA/pixel/nativeOS/independent-model proof",
+    "Current native research-array parameter schema remains source-only/uninstalled; no current-process array activation claim",
+    "Broad90/91remainOPEN; original6history deletions/datausage dirty preserved"
+  ],
+  "probe_ref": "OVH/tmp/uiai-live-b4b1be5.json"
+}
