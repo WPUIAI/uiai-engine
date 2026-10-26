@@ -325,7 +325,8 @@ func (p *Provider) anthropicComplete(ctx context.Context, req Request) (*Respons
 	httpReq.Header.Set("x-api-key", key.value())
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
-	resp, err := p.client.Do(httpReq)
+	client := httpboundary.OriginBoundClient(p.client)
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +454,8 @@ func (p *Provider) openaiComplete(ctx context.Context, req Request) (*Response, 
 		httpReq.Header.Set("X-Title", "WPUIAI AI Cloud")
 	}
 
-	resp, err := p.client.Do(httpReq)
+	client := httpboundary.OriginBoundClient(p.client)
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +521,8 @@ func (p *Provider) minimaxCodingPlanVisionComplete(ctx context.Context, key, bas
 	httpReq.Header.Set("Authorization", "Bearer "+key)
 	httpReq.Header.Set("MM-API-Source", "Minimax-MCP")
 
-	resp, err := p.client.Do(httpReq)
+	client := httpboundary.OriginBoundClient(p.client)
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}

@@ -414,10 +414,14 @@ Full broker revocation timing and memory-wipe acceptance remain open under #86
 (credential revocation and memory hygiene); this change grants no authority to
 retrieve/use new provider credentials.
 
-Credential-settings redirects may remain within the configured scheme/host only;
-credentials are never forwarded to another origin, a downgraded scheme, or a
-redirect URL containing user information. Same-origin redirects retain any
-existing client policy; the inference client itself is not reconfigured.
+Credential-settings and inference redirects stay within the configured origin
+(scheme/host/port); credentials and prompt/image bodies are not forwarded to a
+foreign origin, a changed scheme, or a redirect URL containing user information.
+All inference dialects reuse the canonical `httpboundary.OriginBoundClient` copy,
+not a second validator or a mutation of the shared client. Same-origin redirects
+retain existing caller policy, transport/timeout, and the default ten-request bound.
+This redirect guard does not validate the initial configured endpoint or change
+MiniMax endpoint derivation; those remain separate from redirect confinement.
 
 AI upstream HTTP/application failure responses expose a provider label and numeric
 code, never the upstream application message. Retry classification is carried
