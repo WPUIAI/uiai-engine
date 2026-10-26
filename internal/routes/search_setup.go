@@ -1,0 +1,89 @@
+package routes
+
+import "github.com/WPUIAI/uiai-engine/internal/config"
+
+// searchProviderSetup is guidance, not permission, a credential value, or a
+// configuration writer. It derives only from the canonical inventory decision.
+type searchProviderSetup struct {
+	NextAction              string   `json:"next_action"`
+	Message                 string   `json:"message"`
+	ConfigurationFields     []string `json:"configuration_fields,omitempty"`
+	ConventionalEnvFallback string   `json:"conventional_env_fallback,omitempty"`
+	RetryAfterSeconds       int      `json:"retry_after_seconds,omitempty"`
+}
+
+func buildSearchProviderSetup(id, reason string, retry int) searchProviderSetup {
+	s := searchProviderSetup{}
+	switch reason {
+	case "disabled":
+		s.NextAction = "keep_disabled"
+		s.Message = "Explicitly disabled; do not enable or replace configuration without the user's direction."
+	case "unsupported_provider":
+		s.NextAction = "choose_supported_provider"
+		s.Message = "No installed adapter; adding a key or endpoint cannot install one."
+	case "credential_unreadable":
+		s.NextAction = "repair_existing_credential_reference"
+		s.Message = "Repair the existing credential reference or its access; do not silently select another key or create an account."
+	case "missing_key":
+		s.NextAction = "connect_existing_credential_reference"
+		s.Message = "Use the name of an existing approved secret environment variable or an approved credential-file reference, never a key value in chat. Account creation is a separate user-approved action."
+		prefix := "search.providers." + id + "."
+		s.ConfigurationFields = []string{prefix + "api_key_env", prefix + "api_key_file"}
+		s.ConventionalEnvFallback = config.BuiltinSearchProviderEnv[id]
+	case "missing_endpoint", "invalid_endpoint":
+		s.NextAction = "connect_existing_endpoint"
+		if reason == "invalid_endpoint" {
+			s.NextAction = "repair_existing_endpoint"
+		}
+		s.Message = "Use an approved JSON-enabled SearxNG search endpoint: HTTPS (HTTP only for loopback development), no userinfo, query, or fragment. Do not pick a public instance or provision a service automatically."
+		s.ConfigurationFields = []string{"search.providers.searxng.api_url"}
+	case "circuit_open":
+		s.NextAction = "wait_then_retry"
+		s.Message = "Respect the reported delay; do not replace credentials or run background probes."
+		s.RetryAfterSeconds = retry
+	default:
+		s.NextAction = "use_selected_provider"
+		s.Message = "Configured and admitted, not proof of external availability or remaining quota. Run only the user's requested search, not an automatic setup probe."
+	}
+	return s
+}
+
+// searchSetupGuide is the single read-only setup projection shared by provider
+// discovery and the agent card. No browser, provider, account, or config mutation
+// occurs here; future human surfaces can consume the same contract.
+func searchSetupGuide(inventory searchProviderInventory, observed bool) map[string]any {
+	byCapability := map[string][]string{"web_search": {}, "encyclopedia_search": {}}
+	steps := make(map[string]any, len(inventory.providers))
+	for _, p := range inventory.providers {
+		id := p["id"].(string)
+		steps[id] = p["setup"]
+		if p["status"] == "ready" {
+			for _, capability := range p["capabilities"].([]string) {
+				if _, known := byCapability[capability]; known {
+					byCapability[capability] = append(byCapability[capability], id)
+				}
+			}
+		}
+	}
+	basis := "configuration_only"
+	if observed {
+		basis = "observed_circuits"
+	}
+	return map[string]any{
+		"schema":                        "uiai.search_setup.v1",
+		"discovery_endpoint":            "/api/search/providers",
+		"default_provider":              inventory.defaultProvider,
+		"default_capabilities":          searchProviderMeta(inventory.defaultProvider).capabilities,
+		"ready_providers_by_capability": byCapability,
+		"general_web_search_ready":      len(byCapability["web_search"]) > 0,
+		"provider_setup":                steps,
+		"readiness_basis":               basis,
+		"remaining_quota_status":        "unknown",
+		"requires_gui":                  false,
+		"configuration_write_supported": false,
+		"upstream_probes_performed":     false,
+		"configuration_activation":      "Use the existing deployment configuration and supported restart/reload mechanism; discovery neither writes nor activates configuration.",
+		"credential_precedence":         "Explicit provider configuration wins, even when empty. Conventional environment fallback applies only to undeclared providers.",
+		"safety_rules":                  []string{"Never reveal credential values; prefer existing approved secret references.", "Account creation, spending, provider disclosure changes, and service provisioning require their own authorization; discovery grants none."},
+	}
+}

@@ -457,7 +457,7 @@ func (e *Engine) mountRoutes() {
 	// GET /api/tools/openai → OpenAI function calling format
 	// GET /api/tools/mcp → MCP tool definitions
 	r.Route("/api/tools", func(r chi.Router) {
-		routes.MountToolsDiscovery(r, e.cfg)
+		routes.MountToolsDiscovery(r, e.cfg, searchRuntime)
 	})
 
 	// Pipeline operations (cloud-capable build steps)

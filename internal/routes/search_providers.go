@@ -158,6 +158,7 @@ func buildSearchProviderInventory(cfg *config.Config, breakers *SearchRuntime) s
 			"configured":        configured,
 			"status":            status,
 			"degraded_reason":   degradedReason,
+			"setup":             buildSearchProviderSetup(id, degradedReason, circuit.RetryAfterSeconds),
 			"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
 			"capabilities":      meta.capabilities,
 			"circuit":           circuit,
@@ -168,7 +169,7 @@ func buildSearchProviderInventory(cfg *config.Config, breakers *SearchRuntime) s
 }
 func handleSearchProviders(w http.ResponseWriter, cfg *config.Config, states ...*SearchRuntime) {
 	inventory := buildSearchProviderInventory(cfg, firstSearchRuntime(states...))
-	writeJSON(w, 200, map[string]any{"schema": "uiai.search_providers.v1", "default_provider": inventory.defaultProvider, "available_providers": inventory.ids, "ready_providers": inventory.ready, "providers": inventory.providers})
+	writeJSON(w, 200, map[string]any{"schema": "uiai.search_providers.v1", "default_provider": inventory.defaultProvider, "available_providers": inventory.ids, "ready_providers": inventory.ready, "providers": inventory.providers, "setup": searchSetupGuide(inventory, firstSearchRuntime(states...) != nil)})
 }
 
 // searchProviderPlan permits query disclosure only to explicitly configured

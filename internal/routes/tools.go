@@ -20,7 +20,7 @@ import (
 //
 // Design: tools are NEVER auto-loaded into LLM context.
 // Agents discover via search, then call tools by name.
-func MountToolsDiscovery(r chi.Router, _ *config.Config) {
+func MountToolsDiscovery(r chi.Router, cfg *config.Config, states ...*SearchRuntime) {
 
 	// Full tool list — OpenAI function calling format (default)
 	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
@@ -41,7 +41,10 @@ func MountToolsDiscovery(r chi.Router, _ *config.Config) {
 	})
 
 	r.Get("/agent-card", func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(w, 200, agentBootstrapCard())
+		card := agentBootstrapCard()
+		state := firstSearchRuntime(states...)
+		card["setup"] = searchSetupGuide(buildSearchProviderInventory(cfg, state), state != nil)
+		writeJSON(w, 200, card)
 	})
 
 	r.Get("/graph", func(w http.ResponseWriter, req *http.Request) {
@@ -102,22 +105,27 @@ func agentBootstrapCard() map[string]any {
 			"Hand off redacted research/diagnostics/proof packets to Focusa and Pi workflows.",
 		},
 		"discovery": map[string]string{
-			"agent_card": "/api/tools/agent-card",
-			"search":     "/api/tools/search?q=<keyword>",
-			"openai":     "/api/tools/openai",
-			"mcp":        "/api/tools/mcp",
-			"graph":      "/api/tools/graph",
-			"docs":       "/api/tools/docs",
-			"focusa":     "pass focusa_scope to browser_open; compose packets with /api/agent/research-packet; ingest diagnostics with focusa_browser_diagnostics_intake",
-			"health":     "/api/health/browser",
-			"metrics":    "/api/metrics/browser",
-			"packet":     "/api/agent/research-packet",
-			"markdown":   "/api/markdown",
+			"agent_card":   "/api/tools/agent-card",
+			"search":       "/api/tools/search?q=<keyword>",
+			"openai":       "/api/tools/openai",
+			"mcp":          "/api/tools/mcp",
+			"graph":        "/api/tools/graph",
+			"docs":         "/api/tools/docs",
+			"focusa":       "pass focusa_scope to browser_open; compose packets with /api/agent/research-packet; ingest diagnostics with focusa_browser_diagnostics_intake",
+			"health":       "/api/health/browser",
+			"metrics":      "/api/metrics/browser",
+			"packet":       "/api/agent/research-packet",
+			"markdown":     "/api/markdown",
+			"search_setup": "/api/search/providers",
 		},
 		"recommended_workflows": []map[string]any{
 			{
 				"name":  "source_to_markdown",
 				"steps": []string{"source_to_markdown url=<public-url>", "capture focusa evidence if needed", "use browser_open/browser_read only for follow-up interactions"},
+			},
+			{
+				"name":  "agent_first_search_setup",
+				"steps": []string{"inspect this card's setup or GET /api/search/providers", "select the required capability: web_search is not encyclopedia_search", "follow provider_setup next_action using existing approved access; ask only for consequential missing input or consent", "apply configuration only through the supported deployment mechanism; discovery is read-only", "use browser_search for the user's requested query; do not run unsolicited paid probes"},
 			},
 			{
 				"name":  "search_then_browse",
@@ -416,7 +424,7 @@ func openAITools() []map[string]any {
 	tools := []map[string]any{
 		{
 			"name":        "uiai_agent_card",
-			"description": "Return a compact UIAI Engine agent card/bootstrap card for local/remote agents: discovery endpoints, health/metrics links, recommended browser workflows, diagnostics rules, and search hints. Prefer this before loading full tool schemas.",
+			"description": "Return a compact UIAI Engine agent card/bootstrap card for local/remote agents: discovery endpoints, health/metrics links, recommended browser workflows, diagnostics rules, and read-only search setup with readiness and exact next actions. Prefer this before loading full tool schemas.",
 			"parameters": map[string]any{
 				"type":       "object",
 				"properties": map[string]any{},

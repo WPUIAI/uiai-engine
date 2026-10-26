@@ -578,3 +578,39 @@ list, forwarding it unchanged through the existing scope/HTTP boundary. Fresh
 module/import and installer-fixture tests prove source behavior; editing the
 source or reloading an unrelated MCP process does not reload a running Pi native
 extension. Do not claim current native activation without that separate proof.
+
+
+### Agent-first search setup (no Cockpit prerequisite)
+
+Start with the existing agent card (`pi_uiai_agent_card` / MCP
+`uiai_agent_card`, HTTP `GET /api/tools/agent-card`). Its `setup` object is the
+same `uiai.search_setup.v1` projection returned by `GET /api/search/providers`;
+searching existing tool discovery for `setup` finds the card. No new client tool
+registration or native schema reload is needed for this additive response.
+
+- Inspect `ready_providers_by_capability`: `encyclopedia_search` (Wikipedia) is
+  not `web_search`. A fresh installation with no credentials/endpoints honestly
+  reports no general-web provider, while still permitting encyclopedia search.
+- Follow `provider_setup.<id>.next_action`: use selected provider, connect an
+  existing credential reference or approved endpoint, repair that existing
+  reference/endpoint, respect an explicit disable, choose a supported adapter,
+  or wait for the shared circuit's retry delay. Never replace credentials just
+  because a circuit is cooling or a credential file is unreadable.
+- Credential fields name existing secret environment variables or credential
+  files, not values to paste into chat. Explicit provider configuration wins
+  even when empty; conventional environment fallback applies only when that
+  provider has no explicit configuration entry. Actual private references,
+  endpoint URLs and values are not returned by discovery.
+- Discovery is read-only: `configuration_write_supported:false`,
+  `upstream_probes_performed:false`, `requires_gui:false`. It does not sign up,
+  acquire keys, select public SearxNG instances, provision services, activate
+  configuration, send test queries or assert a remaining balance. Apply approved
+  configuration through the installation's supported deployment/reload path.
+  Account creation, spending and changed query disclosure remain separate grants.
+- Configured/admitted readiness is not external availability, account entitlement
+  or a successful paid query. The card labels legacy standalone mounts
+  `configuration_only`; engine mounts share the actual search circuit runtime.
+
+This is the discover/detect/guide slice, not a claim of a complete automatic
+configuration writer, account-acquisition workflow, general-web zero-setup
+service, or Cockpit UI. Search issue #90 and key-acquisition issue #91 remain open.
