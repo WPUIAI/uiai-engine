@@ -18,10 +18,14 @@ env:
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
   CARGO_INCREMENTAL: '0'
 
+concurrency:
+  group: cockpit-release
+  cancel-in-progress: false
+
 jobs:
   open-issue-release-gate:
     name: Open release-gate issue check
-    if: ${{ startsWith(github.ref, 'refs/tags/cockpit-v') && !contains(github.ref, '-dev') }}
+    if: ${{ startsWith(inputs.tag || github.ref_name, 'cockpit-v') }}
     runs-on: ubuntu-latest
     steps:
       - name: Require every release-gating issue closed
@@ -30,23 +34,25 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [[ "$RELEASE_TAG" == *-dev* ]]; then echo 'dev tag — issue gate advisory'; exit 0; fi
           open="$(gh api --paginate -H 'Accept: application/vnd.github+json' "/repos/${REPOSITORY}/issues?state=open&per_page=100" | jq -s '[.[][] | select(has("pull_request") | not) | select(any(.labels[]?; .name | startswith("release-gate:"))) | {number, title, labels: [.labels[].name]}]')"
           if [ "$(jq 'length' <<<"$open")" -ne 0 ]; then echo "::error::Release blocked by open release-gate issues: $open"; exit 1; fi
           echo "open_issue_release_gate=passed"
 
   pull-request-release-gate:
     name: Pull request inclusion gate
-    if: ${{ startsWith(github.ref, 'refs/tags/cockpit-v') }}
+    if: ${{ startsWith(inputs.tag || github.ref_name, 'cockpit-v') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
       - name: Require release-scoped PR queue and tag inclusion
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           blocking_prs=$(gh pr list --repo "$REPOSITORY" --state open --limit 500 --json number,title,url,labels | jq '[.[] | select(any(.labels[]?; (.name | startswith("release-gate:")) or .name == "release-candidate")) | {number,title,url,labels:[.labels[].name]}]')
@@ -61,30 +67,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Wait for successful CI on stamped candidate SHA
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 120); do runs=$(gh api --method GET "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" -f head_sha="$GITHUB_SHA" -f per_page=10 --jq '[.workflow_runs[] | {status,conclusion,url:.html_url,headSha:.head_sha}]' 2>/dev/null || echo '[]'); run=$(jq -c --arg sha "$GITHUB_SHA" 'map(select(.headSha == $sha)) | .[0] // {}' <<<"$runs"); status=$(jq -r '.status // "missing"' <<<"$run"); conclusion=$(jq -r '.conclusion // ""' <<<"$run"); if [ "$status" = completed ] && [ "$conclusion" = success ]; then echo "tag_ci_proof=${run}"; exit 0; fi; if [ "$status" = completed ] && [ "$conclusion" != success ]; then echo "::error::Stamped candidate CI failed: ${run}"; exit 1; fi; if (( attempt % 6 == 0 )); then echo "tag_ci_wait attempt=${attempt} status=${status} receipt=${run}"; fi; sleep 10; done; echo "::error::Timed out waiting for stamped candidate CI ${GITHUB_SHA}"; exit 1
+          CANDIDATE_SHA="$(git rev-parse HEAD)"
+          for attempt in $(seq 1 120); do runs=$(gh api --method GET "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" -f head_sha="$CANDIDATE_SHA" -f per_page=10 --jq '[.workflow_runs[] | {status,conclusion,url:.html_url,headSha:.head_sha}]'); run=$(jq -c --arg sha "$CANDIDATE_SHA" 'map(select(.headSha == $sha)) | .[0] // {}' <<<"$runs"); status=$(jq -r '.status // "missing"' <<<"$run"); conclusion=$(jq -r '.conclusion // ""' <<<"$run"); if [ "$status" = completed ] && [ "$conclusion" = success ]; then echo "tag_ci_proof=${run}"; exit 0; fi; if [ "$status" = completed ] && [ "$conclusion" != success ]; then echo "::error::Stamped candidate CI failed: ${run}"; exit 1; fi; if (( attempt % 6 == 0 )); then echo "tag_ci_wait attempt=${attempt} status=${status} receipt=${run}"; fi; sleep 10; done; echo "::error::Timed out waiting for stamped candidate CI ${CANDIDATE_SHA}"; exit 1
 
   version-policy:
     name: Release version policy
-    if: ${{ startsWith(github.ref, 'refs/tags/cockpit-v') }}
+    if: ${{ startsWith(inputs.tag || github.ref_name, 'cockpit-v') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-      - name: Validate tag against docs/release-strategy.md
+      - name: Validate tag against canonical version surfaces
         run: |
           set -euo pipefail
-          echo "Checking ${GITHUB_REF_NAME} against release strategy..."
-          python3 scripts/next-version.py --repo "$PWD" --tag "$GITHUB_REF_NAME" --json 2>/dev/null || echo "version-policy: no next-version.py — tag shape checks passed (cockpit-v*)"
+          python3 scripts/verify-uiai-version-surfaces.py "$RELEASE_TAG"
 
   checks:
     name: Strict release checks
-    runs-on: self-hosted
+    needs: [open-issue-release-gate, pull-request-release-gate, version-policy, tag-ci-proof]
+    runs-on: [self-hosted, ovh, uiai-engine]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -114,10 +125,12 @@ jobs:
         run: |
           npm ci --prefer-offline
           npm run check
+          npm test
           npm run build
 
   signed-macos-build:
     name: Build signed macOS OTA (x86_64)
+    needs: checks
     runs-on: macos-15-intel
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
@@ -175,6 +188,7 @@ jobs:
 
   signed-macos-build-arm64:
     name: Build signed macOS OTA (aarch64)
+    needs: checks
     runs-on: macos-14
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
@@ -231,8 +245,8 @@ jobs:
           compression-level: 0
 
   create-release:
-    name: Create immutable release
-    needs: [open-issue-release-gate, pull-request-release-gate, version-policy, tag-ci-proof, checks]
+    name: Stage immutable draft release
+    needs: [checks, signed-macos-build, signed-macos-build-arm64]
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
@@ -247,16 +261,26 @@ jobs:
           # DETERMINISTIC — script-owned, never agent. Detailed: type/area/files/features.
           python3 scripts/generate-release-notes.py --tag "$TAG" --output /tmp/release-notes.md
           echo "release_notes_generated $(wc -l < /tmp/release-notes.md) lines for $TAG"
+      - name: Refuse replacement of a published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          state="$(gh release list --limit 1000 --json tagName,isDraft | jq -r --arg tag "$RELEASE_TAG" '.[] | select(.tagName == $tag) | .isDraft')"
+          case "$state" in
+            true|'') ;;
+            *) echo 'Published or ambiguous release is immutable' >&2; exit 2 ;;
+          esac
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: UIAI Engine Cockpit ${{ env.RELEASE_TAG }}
           body_path: /tmp/release-notes.md
-          draft: false
+          draft: true
           prerelease: true
 
   publish-macos-ota:
-    name: Publish signed macOS OTA
+    name: Stage signed macOS OTA
     needs: [checks, signed-macos-build, signed-macos-build-arm64, create-release]
     runs-on: ubuntu-latest
     steps:
@@ -270,25 +294,29 @@ jobs:
           path: /tmp/cockpit-ota-arm64
       - name: Merge updater latest.json (x86_64 + aarch64)
         run: |
-          jq -s '.[0] * {platforms: (.[0].platforms + .[1].platforms)}' /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json /tmp/cockpit-ota-arm64/release-proof/cockpit/updater/latest.json > /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json.merged
+          set -euo pipefail
+          jq -e -s 'if length != 2 or .[0].version != .[1].version then error("OTA platform versions differ") else .[0] * {platforms: (.[0].platforms + .[1].platforms)} end' /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json /tmp/cockpit-ota-arm64/release-proof/cockpit/updater/latest.json > /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json.merged
           mv /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json.merged /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json
-          cp /tmp/cockpit-ota-arm64/release-proof/cockpit/updater/*.app.tar.gz /tmp/cockpit-ota-x86/release-proof/cockpit/updater/ 2>/dev/null || true
-          cp /tmp/cockpit-ota-arm64/release-proof/cockpit/updater/*.app.tar.gz.sig /tmp/cockpit-ota-x86/release-proof/cockpit/updater/ 2>/dev/null || true
+          cp /tmp/cockpit-ota-arm64/release-proof/cockpit/updater/*.app.tar.gz /tmp/cockpit-ota-x86/release-proof/cockpit/updater/
+          cp /tmp/cockpit-ota-arm64/release-proof/cockpit/updater/*.app.tar.gz.sig /tmp/cockpit-ota-x86/release-proof/cockpit/updater/
           jq -e '(.platforms["darwin-x86_64"].signature | length > 0) and (.platforms["darwin-aarch64"].signature | length > 0)' /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json
           echo "merged latest.json platforms: $(jq -c .platforms /tmp/cockpit-ota-x86/release-proof/cockpit/updater/latest.json)"
-      - name: Publish immutable proof and mutable dev channel
+      - name: Stage immutable proof (channel unchanged)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ env.RELEASE_TAG }}
         run: |
+          set -euo pipefail
           find /tmp/cockpit-ota-x86/release-proof/cockpit -maxdepth 1 -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
           find /tmp/cockpit-ota-x86/release-proof/cockpit/updater -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
           find /tmp/cockpit-ota-x86/src-tauri -name '*.dmg' -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
-          find /tmp/cockpit-ota-arm64/src-tauri -name '*.dmg' -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber 2>/dev/null || true
-          if ! gh release view cockpit-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create cockpit-latest --repo "$GITHUB_REPOSITORY" --target "$TAG" --title 'UIAI Engine Cockpit Dev OTA' --notes 'Mutable signed development channel.' --prerelease
-          fi
-          gh release upload cockpit-latest /tmp/cockpit-ota/release-proof/cockpit/updater/* --repo "$GITHUB_REPOSITORY" --clobber
+          find /tmp/cockpit-ota-arm64/src-tauri -name '*.dmg' -type f -print0 | xargs -0 gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-ota-merged-${{ env.RELEASE_TAG }}
+          path: /tmp/cockpit-ota-x86/release-proof/cockpit/updater
+          if-no-files-found: error
+          retention-days: 1
 
   linux-binary:
     name: Build Linux binary
@@ -326,4 +354,39 @@ jobs:
           test -x "$BIN"
           cp "$BIN" "/tmp/uaiengine-cockpit-${TAG}-Linux_x86_64.bin"
           shasum -a 256 "/tmp/uaiengine-cockpit-${TAG}-Linux_x86_64.bin" > "/tmp/uaiengine-cockpit-${TAG}-Linux_x86_64.bin.sha256"
-          gh release upload "$TAG" /tmp/uaiengine-cockpit-* --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$TAG" "/tmp/uaiengine-cockpit-${TAG}-Linux_x86_64.bin" "/tmp/uaiengine-cockpit-${TAG}-Linux_x86_64.bin.sha256" --repo "$GITHUB_REPOSITORY" --clobber
+
+  promote-release:
+    name: Publish verified assets and advance OTA feed last
+    needs: [create-release, publish-macos-ota, linux-binary]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cockpit-ota-merged-${{ env.RELEASE_TAG }}
+          path: /tmp/cockpit-ota-verified
+      - name: Promote immutable release and mutable channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          set -euo pipefail
+          updater=/tmp/cockpit-ota-verified
+          state="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')"
+          [[ "$state" == true ]] || { echo 'Only a draft may be promoted' >&2; exit 2; }
+          actual="$(mktemp -d)"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.app.tar.gz' --pattern '*.app.tar.gz.sig' --dir "$actual"
+          for file in "$updater"/*.app.tar.gz "$updater"/*.app.tar.gz.sig; do
+            cmp -- "$file" "$actual/$(basename "$file")"
+          done
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease
+          channel="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName,isDraft | jq -r '.[] | select(.tagName == "cockpit-latest") | .isDraft')"
+          case "$channel" in
+            false) ;;
+            '') gh release create cockpit-latest --repo "$GITHUB_REPOSITORY" --target "$TAG" --title 'UIAI Engine Cockpit Dev OTA' --notes 'Mutable signed development channel.' --prerelease ;;
+            *) echo 'Unexpected draft or ambiguous OTA channel' >&2; exit 2 ;;
+          esac
+          # The feed must remain unchanged if any bundle/signature upload fails.
+          gh release upload cockpit-latest "$updater"/*.app.tar.gz "$updater"/*.app.tar.gz.sig --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload cockpit-latest "$updater/latest.json" --repo "$GITHUB_REPOSITORY" --clobber

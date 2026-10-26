@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing/new engine release tag, e.g. engine-v2.0.1
+        description: Existing immutable engine release tag, e.g. engine-v2.0.24
         required: true
         type: string
       deploy_to_ovh:
@@ -27,11 +27,16 @@ permissions:
 
 env:
   ENGINE_ASSET_NAME: uiai-engine-linux-amd64
+  RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+
+concurrency:
+  group: engine-release-${{ inputs.release_tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   open-issue-release-gate:
     name: Open release-gate issue check
-    if: ${{ startsWith(github.ref, 'refs/tags/engine-v') || startsWith(github.ref, 'refs/tags/uiai-engine-v') }}
+    if: ${{ startsWith(inputs.release_tag || github.ref_name, 'engine-v') || startsWith(inputs.release_tag || github.ref_name, 'uiai-engine-v') }}
     runs-on: ubuntu-latest
     steps:
       - name: Require every release-gating issue closed
@@ -40,24 +45,25 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF_NAME}" == *"-dev"* ]]; then echo "dev tag — gate advisory"; exit 0; fi
+          if [[ "${RELEASE_TAG}" == *"-dev"* ]]; then echo "dev tag — gate advisory"; exit 0; fi
           open="$(gh api --paginate -H 'Accept: application/vnd.github+json' "/repos/${REPOSITORY}/issues?state=open&per_page=100" | jq -s '[.[][] | select(has("pull_request") | not) | select(any(.labels[]?; .name | startswith("release-gate:"))) | {number, title, labels: [.labels[].name]}]')"
           if [ "$(jq 'length' <<<"$open")" -ne 0 ]; then echo "::error::Release blocked by open release-gate issues: $open"; exit 1; fi
           echo "open_issue_release_gate=passed"
 
   pull-request-release-gate:
     name: Pull request inclusion gate
-    if: ${{ startsWith(github.ref, 'refs/tags/engine-v') || startsWith(github.ref, 'refs/tags/uiai-engine-v') }}
+    if: ${{ startsWith(inputs.release_tag || github.ref_name, 'engine-v') || startsWith(inputs.release_tag || github.ref_name, 'uiai-engine-v') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
       - name: Require tag inclusion
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
           set -euo pipefail
           blocking_prs=$(gh pr list --repo "$REPOSITORY" --state open --limit 500 --json number,title,url,labels | jq '[.[] | select(any(.labels[]?; (.name | startswith("release-gate:")) or .name == "release-candidate")) | {number,title,url,labels:[.labels[].name]}]')
@@ -72,31 +78,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - name: Wait for successful CI on stamped candidate SHA
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 120); do runs=$(gh api --method GET "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" -f head_sha="$GITHUB_SHA" -f per_page=10 --jq '[.workflow_runs[] | {status,conclusion,url:.html_url,headSha:.head_sha}]' 2>/dev/null || echo '[]'); run=$(jq -c --arg sha "$GITHUB_SHA" 'map(select(.headSha == $sha)) | .[0] // {}' <<<"$runs"); status=$(jq -r '.status // "missing"' <<<"$run"); conclusion=$(jq -r '.conclusion // ""' <<<"$run"); if [ "$status" = completed ] && [ "$conclusion" = success ]; then echo "tag_ci_proof=${run}"; exit 0; fi; if [ "$status" = completed ] && [ "$conclusion" != success ]; then echo "::error::Stamped candidate CI failed: ${run}"; exit 1; fi; if (( attempt % 6 == 0 )); then echo "tag_ci_wait attempt=${attempt} status=${status} receipt=${run}"; fi; sleep 10; done; echo "::error::Timed out waiting for stamped candidate CI ${GITHUB_SHA}"; exit 1
+          CANDIDATE_SHA="$(git rev-parse HEAD)"
+          for attempt in $(seq 1 120); do runs=$(gh api --method GET "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" -f head_sha="$CANDIDATE_SHA" -f per_page=10 --jq '[.workflow_runs[] | {status,conclusion,url:.html_url,headSha:.head_sha}]'); run=$(jq -c --arg sha "$CANDIDATE_SHA" 'map(select(.headSha == $sha)) | .[0] // {}' <<<"$runs"); status=$(jq -r '.status // "missing"' <<<"$run"); conclusion=$(jq -r '.conclusion // ""' <<<"$run"); if [ "$status" = completed ] && [ "$conclusion" = success ]; then echo "tag_ci_proof=${run}"; exit 0; fi; if [ "$status" = completed ] && [ "$conclusion" != success ]; then echo "::error::Stamped candidate CI failed: ${run}"; exit 1; fi; if (( attempt % 6 == 0 )); then echo "tag_ci_wait attempt=${attempt} status=${status} receipt=${run}"; fi; sleep 10; done; echo "::error::Timed out waiting for stamped candidate CI ${CANDIDATE_SHA}"; exit 1
 
   version-policy:
     name: Release version policy
-    if: ${{ startsWith(github.ref, 'refs/tags/engine-v') || startsWith(github.ref, 'refs/tags/uiai-engine-v') }}
+    if: ${{ startsWith(inputs.release_tag || github.ref_name, 'engine-v') || startsWith(inputs.release_tag || github.ref_name, 'uiai-engine-v') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-      - name: Validate tag against docs/release-strategy.md
+      - name: Validate tag against canonical version surfaces
         run: |
           set -euo pipefail
-          echo "Checking ${GITHUB_REF_NAME} against release strategy..."
-          python3 scripts/next-version.py --repo "$PWD" --tag "$GITHUB_REF_NAME" --json 2>/dev/null || echo "version-policy: tag shape cockpit/engine-v* passed"
+          python3 scripts/verify-uiai-version-surfaces.py "$RELEASE_TAG"
 
   build-release:
     name: Build parent UIAI Engine release
     needs: [open-issue-release-gate, pull-request-release-gate, version-policy, tag-ci-proof]
-    runs-on: self-hosted
+    runs-on: [self-hosted, ovh, uiai-engine]
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       asset_name: ${{ env.ENGINE_ASSET_NAME }}
@@ -104,6 +114,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
 
       - uses: actions/setup-go@v6
@@ -115,11 +126,7 @@ jobs:
         id: meta
         shell: bash
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            tag="${{ inputs.release_tag }}"
-          else
-            tag="${GITHUB_REF_NAME}"
-          fi
+          tag="$RELEASE_TAG"
           case "$tag" in
             engine-v*|uiai-engine-v*) ;;
             *) echo "release tag must start with engine-v or uiai-engine-v: $tag" >&2; exit 2 ;;
@@ -166,27 +173,36 @@ jobs:
             echo ""
             echo "---"
             echo "### Artifact provenance"
-            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Commit: \`$(git rev-parse HEAD)\`"
             echo "- Artifact: \`${ENGINE_ASSET_NAME}\`"
             echo "- SHA256: \`${{ steps.hash.outputs.sha256 }}\`"
             echo "- Deploy target: OVH worker (via deploy job; public domains unchanged)"
           } >> "$notes"
           echo "release_notes_generated $(wc -l < "$notes") lines for $RELEASE_TAG"
 
-      - name: Create or update GitHub release
+      - name: Stage draft candidate (never publish before verification)
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
         shell: bash
         run: |
+          set -euo pipefail
           notes="dist/release-notes.md"
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" --clobber
-          else
-            gh release create "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" \
-              --title "UIAI Engine ${RELEASE_TAG}" \
-              --notes-file "$notes"
-          fi
+          # A failed metadata read must not masquerade as a missing release.
+          state="$(gh release list --limit 1000 --json tagName,isDraft | jq -r --arg tag "$RELEASE_TAG" '.[] | select(.tagName == $tag) | .isDraft')"
+          case "$state" in
+            true)
+              gh release upload "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" --clobber
+              gh release edit "$RELEASE_TAG" --notes-file "$notes"
+              ;;
+            false) echo 'Published releases are immutable; refusing replacement' >&2; exit 2 ;;
+            '')
+              gh release create "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" \
+                --verify-tag --draft --title "UIAI Engine ${RELEASE_TAG}" --notes-file "$notes"
+              ;;
+            *) echo 'Ambiguous release metadata; refusing mutation' >&2; exit 2 ;;
+          esac
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
@@ -199,7 +215,7 @@ jobs:
   deploy-ovh:
     name: Deploy parent UIAI Engine to OVH worker
     needs: build-release
-    runs-on: self-hosted
+    runs-on: [self-hosted, ovh, uiai-engine]
     if: ${{ github.event_name == 'push' || inputs.deploy_to_ovh }}
     environment: production
     concurrency:
@@ -207,6 +223,8 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Download release artifact
         uses: actions/download-artifact@v4
@@ -263,3 +281,30 @@ jobs:
           export REMOTE_SMOKE_BASE_URLS="${REMOTE_SMOKE_BASE_URLS:-http://127.0.0.1:7460}"
           if [[ "${WORKFLOW_DRY_RUN:-false}" == "true" ]]; then export DRY_RUN=1; else export DRY_RUN=0; fi
           scripts/deploy-engine-ovh.sh
+
+  publish-release:
+    name: Publish only the verified deployed candidate
+    needs: [build-release, deploy-ovh]
+    if: ${{ needs.deploy-ovh.result == 'success' && (github.event_name == 'push' || (inputs.deploy_to_ovh && !inputs.dry_run)) }}
+    runs-on: [self-hosted, ovh, uiai-engine]
+    environment: production
+    steps:
+      - name: Verify draft bytes and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build-release.outputs.release_tag }}
+          EXPECTED_SHA256: ${{ needs.build-release.outputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')"
+          [[ "$state" == true ]] || { echo 'Only an unmodified draft may be promoted' >&2; exit 2; }
+          [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]] || { echo 'Missing tested artifact digest' >&2; exit 2; }
+          candidate="$(mktemp -d)"
+          gh release download "$RELEASE_TAG" --pattern "$ENGINE_ASSET_NAME" --dir "$candidate"
+          actual="$(sha256sum "$candidate/$ENGINE_ASSET_NAME" | awk '{print $1}')"
+          [[ "$actual" == "$EXPECTED_SHA256" ]] || { echo 'Draft differs from tested deployed artifact' >&2; exit 2; }
+          case "$RELEASE_TAG" in
+            *-dev*) gh release edit "$RELEASE_TAG" --draft=false --prerelease ;;
+            *) gh release edit "$RELEASE_TAG" --draft=false --latest ;;
+          esac

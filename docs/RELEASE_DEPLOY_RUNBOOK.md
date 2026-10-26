@@ -95,40 +95,32 @@ Commit guidance:
 - Do not add ignored `.beads/` unless the repository intentionally tracks a bead export.
 - Run `bd update <id> --notes "..."` and `bd close <id> --reason "..."` before or after the commit when work is complete.
 
-## 5. Rebuild binary
+## 5. Build and stage the immutable candidate
 
-Create a timestamped backup, then rebuild the live binary:
+Build/test/package on the approved OVH runner, not the production control host.
+`.github/workflows/engine-release.yml` resolves the exact immutable release tag,
+checks its version surfaces through `scripts/verify-uiai-version-surfaces.py`,
+and waits for CI on that checked-out source SHA. Record the binary SHA-256.
 
-```bash
-as-user wpuiai 'cd /home/wpuiai/uiai-engine && cp ./uiai-engine ./uiai-engine.bak.$(date +%Y%m%d-%H%M%S)'
-as-user wpuiai 'cd /home/wpuiai/uiai-engine && go build -o ./uiai-engine ./cmd/uiai-engine'
-as-user wpuiai 'cd /home/wpuiai/uiai-engine && ./uiai-engine --version'
-```
+The workflow creates or resumes a **draft**, never an already-published release.
+A metadata-read failure is not a missing release. Dry-run dispatch does not upload
+a release, and build-only dispatch leaves its candidate unpublished.
 
-If the binary path changes, update `deploy/uiai-engine.service` and the live systemd unit together.
+## 6. Deploy, verify, then publish
 
-## 6. Restart live service
+Use `scripts/deploy-engine-ovh.sh` with the exact approved artifact and named OVH
+workers. Its idle checks, backups, rollback, health, and running-executable digest
+checks replace direct rebuild/restart commands. Do not rebuild between hashing,
+deploying and verifying; do not change services or public routing by implication.
 
-```bash
-systemctl status uiai-engine.service --no-pager -l | sed -n '1,100p'
-systemctl restart uiai-engine.service
-for i in $(seq 1 30); do
-  if curl -fsS http://127.0.0.1:7456/health >/tmp/uiai-health.json; then
-    cat /tmp/uiai-health.json | jq .
-    break
-  fi
-  sleep 1
-done
-systemctl status uiai-engine.service --no-pager -l | sed -n '1,100p'
-```
+A release requires its mandatory scoped browser/evidence smoke to pass.
+`RUN_BROWSER_SMOKE=0` may describe an explicitly authorized diagnostic candidate,
+not successful release acceptance. On failure retain the draft and diagnose;
+never publish simply because the build or ordinary health check succeeded.
 
-If health fails:
-
-```bash
-journalctl -u uiai-engine.service -n 120 --no-pager
-```
-
-Fix the source/config/unit issue, rebuild, restart, and repeat health verification.
+Only a successful non-dry-run deployment admits the publication job. It downloads
+the draft binary and requires an exact match to the tested/deployed digest before
+promotion. Published releases are not overwritten; stable promotion sets Latest.
 
 ## 7. Live service proof
 
@@ -264,6 +256,13 @@ Missing Chrome fails explicitly without installing packages. Per-run output path
 and required artifact uploads prevent stale or absent JSON from becoming proof.
 
 ## Cockpit over-the-air release gate
+
+The Cockpit workflow stages both signed Mac architectures and Linux artifacts in
+a draft before promotion. Platform versions must match; missing bundles or
+signatures fail closed. The mutable channel uploads bundles/signatures first and
+`latest.json` last, so a failed upload cannot advertise unavailable artifacts.
+Release-shell regression checks execute the real workflow commands against an
+isolated GitHub/filesystem fixture; they are not actual publication or native OTA.
 
 Engine releases and signed Cockpit desktop updates are separate delivery lanes.
 Before claiming an existing-user Cockpit rollout is ready:

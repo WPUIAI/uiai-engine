@@ -21,6 +21,8 @@ jobs:
       - run: go test ./...
       - name: Release-note publication bounds
         run: python3 scripts/test-generate-release-notes.py
+      - name: Release publication and OTA regression checks
+        run: python3 -m unittest tests.test_release_publication_workflow -v
 
   cockpit:
     name: Cockpit (Node 22 + Tauri)
@@ -50,6 +52,6 @@ jobs:
           APP=$(find apps/cockpit/src-tauri/target/release/bundle/macos -name "*.app" | head -1)
           test -n "$APP" && /usr/bin/plutil -lint "$APP/Contents/Info.plist" && echo "plutil PASS $APP"
       - working-directory: apps/cockpit
-        run: npm run test || true
+        run: npm run test
       - working-directory: apps/cockpit
-        run: npm run cockpit:smoke -- --mode local-only --mock-external || true
+        run: npm run cockpit:smoke -- --mode local-only --mock-external
