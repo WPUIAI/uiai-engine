@@ -22,6 +22,9 @@ func newProviderRequest(ctx context.Context, provider, endpoint string, body []b
 // doProviderRequest shares origin confinement and value-free transport failures
 // across inference dialects without changing the caller's client or policies.
 func (p *Provider) doProviderRequest(provider string, request *http.Request) (*http.Response, error) {
+	if err := request.Context().Err(); err != nil {
+		return nil, providerTransportFailure(provider, err)
+	}
 	client := httpboundary.OriginBoundClient(p.client)
 	response, err := client.Do(request)
 	if err != nil {
