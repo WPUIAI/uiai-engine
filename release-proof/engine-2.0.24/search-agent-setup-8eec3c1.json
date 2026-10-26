@@ -24,7 +24,8 @@
     "Windowsamd64/Darwinarm64 cross-builds pass, not native OS runs",
     "canonical idle-safe rollback-preserving rollout; both active healthy running executable hashes verified",
     "both installed worker card/provider setup parity and setup tool discovery verified; owned browser/read/snapshot/eval/error/screenshot artifact/redaction/diagnostics/cleanup regression probes pass",
-    "Canonical CLI wrapper executed on OVH against BOTH installed workers: --json tools agent-card returns setup and --json tools search setup discovers agent card; credential env blank, no external search query"
+    "Canonical CLI wrapper executed on OVH against BOTH installed workers: --json tools agent-card returns setup and --json tools search setup discovers agent card; credential env blank, no external search query",
+    "Agent-style synthetic walkthrough: initial missing key -> discover canonical api_key_env field -> edit owned fixture configuration with existing synthetic environment reference -> re-read through config.Load -> readiness changes -> one requested local Tavily fixture search with expected header, no secret value in config/output and zero unsolicited setup queries; focused race5x/fullGo rerun pass"
   ],
   "limits": [
     "Only discover/detect/guide, not complete configuration application, key acquisition, quota ledger, Cockpit or zero-setup general-web acceptance",
@@ -33,7 +34,8 @@
     "No new search provider queries, credentials, accounts, endpoint/default/fallback changes or service provisioning; no public Release",
     "No native research provider-array activation claim; this is existing card response data, not new native parameter schema",
     "Screenshot artifacts in ordinary consumer probes unsealed/no scope, delivery blocked; no scoped EPWA or pixel-inspection claim",
-    "Issues90/91 remain OPEN; original unrelated working tree changes preserved"
+    "Issues90/91 remain OPEN; original unrelated working tree changes preserved",
+    "Walkthrough is a mounted HTTP/config-loader synthetic fixture, not independent-model usability evaluation, actual deployment reconfiguration, autonomous signup, real provider account or paid-query proof; initial test incorrectly expected200 rather than successful unsealed202, corrected without changing production code"
   ],
   "probe_ref": "OVH/tmp/uiai-live-8eec3c1.json",
   "cli_entrypoints": [

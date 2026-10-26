@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -147,5 +149,77 @@ func TestSearchSetupExplicitEmptyCredentialDoesNotFallBack(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("setup not discoverable through existing tool search")
+	}
+}
+
+// The agent-style walkthrough uses existing file/config mechanisms, not a new
+// privileged configuration API. Everything is an owned fixture, including key
+// and upstream; this is not proof of autonomous signup or a real paid query.
+func TestSearchSetupExistingReferenceThroughConfigLoader(t *testing.T) {
+	clearSearchSetupCredentials(t)
+	const envName = "UIAI_SYNTHETIC_CUSTOM_SEARCH_REFERENCE"
+	const secret = "UIAI_SYNTHETIC_SEARCH_SETUP_KEY_0123456789"
+	t.Setenv(envName, secret)
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.Header.Get("Authorization") != "Bearer "+secret {
+			t.Error("existing reference was not resolved into header")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"results":[{"title":"Owned fixture","url":"https://example.com/setup-fixture","content":"Synthetic setup success"}]}`))
+	}))
+	defer upstream.Close()
+	path := filepath.Join(t.TempDir(), "owned-engine-config.yaml")
+	writeConfig := func(reference string) {
+		t.Helper()
+		body := "search:\n  default_provider: tavily\n  providers:\n    tavily:\n      api_url: " + upstream.URL + "/search\n"
+		if reference != "" {
+			body += "      api_key_env: " + reference + "\n"
+		}
+		if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	load := func() *config.Config {
+		t.Helper()
+		cfg, err := config.Load(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+	writeConfig("")
+	initial := setupRouter(load(), NewSearchRuntime())
+	guide, _ := readSetup(t, initial, "/api/tools/agent-card")
+	if setupAction(t, guide, "tavily") != "connect_existing_credential_reference" {
+		t.Fatal("initial setup not actionable")
+	}
+	fields := guide["provider_setup"].(map[string]any)["tavily"].(map[string]any)["configuration_fields"].([]any)
+	if fields[0] != "search.providers.tavily.api_key_env" {
+		t.Fatal("guide does not identify canonical configuration field")
+	}
+	// A separately authorized agent can edit its own deployment's configuration
+	// using ordinary tools, then the existing configuration loader re-reads it.
+	writeConfig(envName)
+	configured := setupRouter(load(), NewSearchRuntime())
+	guide, raw := readSetup(t, configured, "/api/tools/agent-card")
+	if setupAction(t, guide, "tavily") != "use_selected_provider" || guide["general_web_search_ready"] != true {
+		t.Fatal("reference configuration did not become usable")
+	}
+	if calls.Load() != 0 {
+		t.Fatal("setup discovery sent an unsolicited query")
+	}
+	out := httptest.NewRecorder()
+	configured.ServeHTTP(out, httptest.NewRequest(http.MethodPost, "/api/search/", strings.NewReader(`{"query":"synthetic setup fixture `+upstream.URL+`","provider":"tavily","limit":1}`)))
+	if (out.Code != 200 && out.Code != 202) || calls.Load() != 1 || !strings.Contains(out.Body.String(), "Synthetic setup success") {
+		t.Fatalf("fixture search status=%d upstream_calls=%d content_present=%v", out.Code, calls.Load(), strings.Contains(out.Body.String(), "Synthetic setup success"))
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(raw, secret) || strings.Contains(out.Body.String(), secret) || strings.Contains(string(data), secret) {
+		t.Fatal("credential value escaped into configuration or output")
 	}
 }

@@ -616,3 +616,10 @@ The existing CLI consumes it too: `scripts/uiai --json tools agent-card`;
 This is the discover/detect/guide slice, not a claim of a complete automatic
 configuration writer, account-acquisition workflow, general-web zero-setup
 service, or Cockpit UI. Search issue #90 and key-acquisition issue #91 remain open.
+
+An agent-style regression walkthrough covers connecting an existing environment
+reference through the normal configuration loader and then requesting one local
+synthetic provider search. It verifies that discovery sends no queries and that
+neither configuration nor responses contain the credential value. It is not an
+independent-model usability test or an actual account/paid-provider proof; no new
+privileged configuration-writing API is needed for that existing-file workflow.
