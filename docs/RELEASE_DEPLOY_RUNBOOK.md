@@ -265,6 +265,17 @@ Release-shell regression checks execute the real workflow commands against an
 isolated GitHub/filesystem fixture; they are not actual publication or native OTA.
 
 Engine releases and signed Cockpit desktop updates are separate delivery lanes.
+Native qualification can use the existing public-repository hosted macOS runners:
+manual `Cockpit CI` dispatch with `qualify_ota=true` runs Intel and Apple Silicon
+canaries, without tags or publication. It builds the actual signed candidate with
+production configuration, then a declared prior-source/version baseline in the
+same worktree. Only that baseline uses a private loopback feed; the existing trust
+key is unchanged and a corrupted-signature control must fail before a valid
+automatic upgrade/relaunch and preservation/owned-fixture-rollback checks pass.
+Receipts identify source revisions, versions and actual candidate bytes. This is
+not a claim about an unidentified historical public binary or notarization;
+qualification artifacts are not automatically published or silently rebuilt.
+
 Before claiming an existing-user Cockpit rollout is ready:
 
 - Inspect the actual updater feed and assets for every advertised platform; an

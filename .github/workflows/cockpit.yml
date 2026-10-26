@@ -7,10 +7,29 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      qualify_ota:
+        description: Run private native OTA qualification (no publication)
+        type: boolean
+        default: false
+      candidate_version:
+        description: Intended candidate app version
+        type: string
+        default: '0.3.1'
+      baseline_version:
+        description: Declared old-version native canary (not a historical-binary claim)
+        type: string
+        default: '0.3.0'
+      baseline_ref:
+        description: Immutable previously verified UIAI source for the baseline canary
+        type: string
+        default: 'c9b94a1dd77c052b4b6df9e07573d1237cad652f'
 
 jobs:
   cockpit:
     name: Cockpit
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.qualify_ota }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -184,3 +203,130 @@ jobs:
       - name: Backend smoke (mock external)
         working-directory: apps/cockpit
         run: npm run cockpit:smoke -- --mode local-only --mock-external
+
+  native-ota-qualification:
+    name: Native OTA qualification (${{ matrix.platform }})
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.qualify_ota }}
+    permissions:
+      contents: read
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            platform: darwin-x86_64
+            arch: x86_64
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            platform: darwin-aarch64
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    env:
+      TARGET_TRIPLE: ${{ matrix.target }}
+      CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+      BASELINE_VERSION: ${{ inputs.baseline_version }}
+      BASELINE_REF: ${{ inputs.baseline_ref }}
+      CANDIDATE_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/cockpit/src-tauri
+          shared-key: cockpit-native-ota-${{ matrix.target }}
+      - name: Build actual signed candidate with production configuration
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          UPDATER_ASSET_BASE_URL: https://github.com/${{ github.repository }}/releases/download/cockpit-latest
+          COCKPIT_RELEASE_FAST_PATH: '1'
+          UPDATER_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,re
+          for name in ('CANDIDATE_VERSION','BASELINE_VERSION'):
+              assert re.fullmatch(r'\d+\.\d+\.\d+',os.environ[name]), 'Expected a bounded stable version'
+          assert tuple(map(int,os.environ['CANDIDATE_VERSION'].split('.'))) > tuple(map(int,os.environ['BASELINE_VERSION'].split('.'))), 'Candidate must be newer'
+          PY
+          test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo 'Existing approved updater signing reference is unavailable' >&2; exit 1; }
+          mkdir -p "$RUNNER_TEMP/ota-candidate"
+          cp apps/cockpit/scripts/qualify-native-ota.py "$RUNNER_TEMP/qualify-native-ota.py"
+          mkdir -p "$RUNNER_TEMP/ota-build-adapter"
+          cp scripts/stamp-uiai-version.py "$RUNNER_TEMP/ota-build-adapter/stamp.py"
+          cp apps/cockpit/scripts/cockpit-release.sh "$RUNNER_TEMP/ota-build-adapter/release.sh"
+          cp apps/cockpit/scripts/stamp-cockpit-version/stamp-cockpit-version "$RUNNER_TEMP/ota-build-adapter/stamp-adapter.sh"
+          jq -r '.plugins.updater.pubkey' apps/cockpit/src-tauri/tauri.conf.json > "$RUNNER_TEMP/ota-candidate/public-key.txt"
+          jq -r '.identifier' apps/cockpit/src-tauri/tauri.conf.json > "$RUNNER_TEMP/ota-candidate/identifier.txt"
+          ./apps/cockpit/scripts/generate-icons.sh
+          TAG="cockpit-v${CANDIDATE_VERSION}" ./apps/cockpit/scripts/cockpit-release.sh
+          cp "apps/cockpit/release-proof/cockpit/updater/uaiengine-cockpit_${CANDIDATE_VERSION}_${UPDATER_ARCH}.app.tar.gz" "$RUNNER_TEMP/ota-candidate/candidate.app.tar.gz"
+          cp "apps/cockpit/release-proof/cockpit/updater/uaiengine-cockpit_${CANDIDATE_VERSION}_${UPDATER_ARCH}.app.tar.gz.sig" "$RUNNER_TEMP/ota-candidate/candidate.app.tar.gz.sig"
+      # One worktree, sequential checkouts; no duplicate UIAI checkout is created.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.baseline_ref }}
+          clean: false
+      - name: Build declared baseline canary with private feed and unchanged trust key
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          COCKPIT_RELEASE_FAST_PATH: '1'
+        run: |
+          set -euo pipefail
+          echo "BASELINE_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          # Current canonical build adapters, prior app source; no duplicate source tree.
+          cp "$RUNNER_TEMP/ota-build-adapter/stamp.py" scripts/stamp-uiai-version.py
+          cp "$RUNNER_TEMP/ota-build-adapter/release.sh" apps/cockpit/scripts/cockpit-release.sh
+          cp "$RUNNER_TEMP/ota-build-adapter/stamp-adapter.sh" apps/cockpit/scripts/stamp-cockpit-version/stamp-cockpit-version
+          python3 - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path('apps/cockpit/src-tauri/tauri.conf.json');d=json.loads(p.read_text())
+          expected=(pathlib.Path(os.environ['RUNNER_TEMP'])/'ota-candidate/public-key.txt').read_text().strip()
+          assert d['plugins']['updater']['pubkey']==expected, 'Existing updater trust key changed'
+          d['plugins']['updater']['endpoints']=['http://127.0.0.1:48763/latest.json']
+          d['plugins']['updater']['dangerousInsecureTransportProtocol']=True
+          p.write_text(json.dumps(d,indent=2)+'\n')
+          PY
+          TAG="cockpit-v${BASELINE_VERSION}" ./apps/cockpit/scripts/cockpit-release.sh
+          mkdir -p "$RUNNER_TEMP/native-ota/install"
+          app="$(find "apps/cockpit/src-tauri/target/${TARGET_TRIPLE}/release/bundle/macos" -maxdepth 1 -name '*.app' -type d)"
+          test -n "$app"
+          ditto "$app" "$RUNNER_TEMP/native-ota/install/UIAI Engine Cockpit.app"
+      - name: Real native invalid-signature, upgrade, relaunch and preservation checks
+        env:
+          NATIVE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          # Signing credentials are deliberately NOT in the consumer process environment.
+          test -z "${TAURI_SIGNING_PRIVATE_KEY:-}"
+          python3 "$RUNNER_TEMP/qualify-native-ota.py" \
+            --app "$RUNNER_TEMP/native-ota/install/UIAI Engine Cockpit.app" \
+            --candidate "$RUNNER_TEMP/ota-candidate/candidate.app.tar.gz" \
+            --signature "$RUNNER_TEMP/ota-candidate/candidate.app.tar.gz.sig" \
+            --baseline-version "$BASELINE_VERSION" --candidate-version "$CANDIDATE_VERSION" \
+            --platform "$NATIVE_PLATFORM" \
+            --identifier "$(cat "$RUNNER_TEMP/ota-candidate/identifier.txt")" \
+            --output "$RUNNER_TEMP/native-ota-proof/receipt.json"
+      - name: Preserve native evidence and actual candidate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-native-ota-${{ matrix.platform }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-ota-proof
+            ${{ runner.temp }}/ota-candidate
+          if-no-files-found: error
+          retention-days: 7

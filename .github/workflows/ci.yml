@@ -22,7 +22,7 @@ jobs:
       - name: Release-note publication bounds
         run: python3 scripts/test-generate-release-notes.py
       - name: Release publication and OTA regression checks
-        run: python3 -m unittest tests.test_release_publication_workflow -v
+        run: python3 -m unittest tests.test_release_publication_workflow tests.test_native_ota_qualification -v
 
   cockpit:
     name: Cockpit (Node 22 + Tauri)
