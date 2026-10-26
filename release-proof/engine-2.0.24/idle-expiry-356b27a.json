@@ -1,0 +1,26 @@
+{
+  "schema": "uiai.idle_expiry_proof.v1",
+  "issue": 270,
+  "parent_issue": 82,
+  "implementation_revision": "356b27a",
+  "version": "2.0.24",
+  "build": "2026-10-26T10:07:35Z+356b27a",
+  "running_sha256": "b976812c34f84fa9bccd3038d68a70105df9eebfef0397d7ee7847cbb6224658",
+  "verified": [
+    "Three deterministic REDs: already-dispatched idle callback reaped pending-auth, recently touched, or newly resolved session despite Stop/Reset; extracted callback owner retained original unconditional Close behavior for RED",
+    "GREEN expiry rechecks pending-auth and last activity atomically under session lock before map detach; resolve updates LastUsed with existing timer reset; truly idle still expires",
+    "One shared close/cleanup owner, public explicit close/cancel remains unconditional and missing-session sentinel unchanged; 32 concurrent callbacks/explicit closes exactly one close winner",
+    "20 focused race runs; actual Chromium login wall, duplicate event, simulated old-callback/pending page usability and freshly resolved lease race3 passed; explicit browser gate now fails rather than silently skips unavailable browser",
+    "One full vision race suite/fullGo/vet/17native-shared-MCPtests/Windowsamd64+Darwinarm64 crossbuild passed",
+    "One canonical both-worker idle-safe rollback-preserving deployment: active/healthy/running executable hashes verified; broad ordinary source/browser/security/search/cleanup probe and real focused a/Enter keydown bothworkers passed; own probe sessions closed"
+  ],
+  "live_probe_ref": "OVH/tmp/uiai-live-356b27a.json",
+  "live_probe_observed_at": "2026-10-26T10:08:15Z",
+  "limits": [
+    "Stale callback and expired-age simulation, not actual ten-minute elapsed human-FPV/broker acceptance; parent82 remains open",
+    "Session housekeeping only: no actuator control-lease, entitlement, holder/fencing, FPV takeover, grant, or cross-system authority policy changes",
+    "No paid-provider/OTP/login probe, newprovider/account/key/config/dependency/default/service/monitor changes; Brave retained/Jina absent",
+    "No scoped EPWA/pixel/nativeOS/publicRelease/new native research-array activation claim; artifact deliveryblocked",
+    "Original dirt preserved; no duplicatecheckout/Focusa repair/greenadmission/acceptedbackgroundjob claim; existing scoped UIAI-only continuation receipt remains applicable"
+  ]
+}
