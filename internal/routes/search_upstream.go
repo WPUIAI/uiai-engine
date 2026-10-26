@@ -133,9 +133,10 @@ func stringsFromJSONArray(value any) []string {
 // can return honest semantics (#64): 429 stays 429 (retryable, with
 // Retry-After), never a blanket unrecoverable 503.
 type upstreamSearchError struct {
-	status     int
-	retryAfter string
-	message    string
+	setupReason string
+	status      int
+	retryAfter  string
+	message     string
 }
 
 func (e *upstreamSearchError) Error() string { return e.message }

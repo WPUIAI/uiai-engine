@@ -103,8 +103,8 @@ type braveWebResponse struct {
 }
 
 // MountSearchRoutes exposes provider-neutral web discovery for browser agents.
-// Brave is the default provider, but the public contract stays provider-neutral
-// so other providers can be added without changing browser/session semantics.
+// Explicit defaults preserve intent; otherwise configured providers precede
+// public keyless defaults, without changing browser/session semantics.
 func MountSearchRoutes(r chi.Router, cfg *config.Config, states ...*SearchRuntime) {
 	breakers := firstSearchRuntime(states...)
 	if breakers == nil {
@@ -183,6 +183,16 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 			break
 		}
 	}
+	var spacing *searchRequestSpacingError
+	if errors.As(err, &spacing) {
+		failure := researchSearchFailure(cfg, provider, err)
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Retry-After", failure.RetryAfter)
+		body := map[string]any{"error": failure.Code, "provider": provider, "message": spacing.Error(), "retryable": true, "local": true}
+		addSearchSetupRecovery(body, *failure.Setup)
+		writeJSON(w, http.StatusTooManyRequests, body)
+		return
+	}
 	var circuit *searchCircuitOpenError
 	if errors.As(err, &circuit) {
 		w.Header().Set("Cache-Control", "no-store")
@@ -204,10 +214,14 @@ func runSearch(w http.ResponseWriter, httpReq *http.Request, cfg *config.Config,
 			code = http.StatusTooManyRequests
 			errCode = "search_provider_limited"
 		}
-		writeJSON(w, code, map[string]any{
+		body := map[string]any{
 			"error": errCode, "provider": provider, "message": use.message,
 			"upstream_status": use.status, "retryable": retryableSearchStatus(use.status),
-		})
+		}
+		if use.setupReason != "" {
+			addSearchSetupRecovery(body, buildSearchProviderSetup(provider, use.setupReason, 0))
+		}
+		writeJSON(w, code, body)
 		return
 	}
 	if err != nil {

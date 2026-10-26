@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -28,6 +29,7 @@ var builtinSearchProviders []builtinSearchProvider
 
 func init() {
 	builtinSearchProviders = []builtinSearchProvider{
+		{id: "ddg", name: "DuckDuckGo HTML", keyless: true, defaultAPIURL: "https://html.duckduckgo.com/html/", apiHosts: []string{"html.duckduckgo.com"}, configAPIURL: true, search: searchDDG, capabilities: []string{"web_search", "source_urls", "snippets", "keyless_public"}},
 		{id: "searxng", name: "SearxNG", keyless: true, configured: searxSearchConfigured, search: searchSearxNG, capabilities: []string{"web_search", "source_urls", "snippets", "keyless_configured_endpoint"}},
 		{id: "exa", defaultAPIURL: "https://api.exa.ai/search", apiHosts: []string{"api.exa.ai"}, configAPIURL: true, name: "Exa Search", search: searchExa, capabilities: []string{"web_search", "source_urls", "snippets"}},
 		{id: "tavily", defaultAPIURL: "https://api.tavily.com/search", apiHosts: []string{"api.tavily.com"}, configAPIURL: true, name: "Tavily Search", search: searchTavily, capabilities: []string{"web_search", "source_urls", "snippets"}},
@@ -118,12 +120,23 @@ func searchProviderConfigured(cfg *config.Config, id string) (bool, string) {
 // names none: an explicit default is query-disclosure intent, not permission to
 // silently choose another configured provider when it is broken. Only the
 // approved fallback plan can move its queries. Without an explicit default,
-// preserve the existing first-ready built-in selection; empty means none ready.
+// prefer established configured providers, then public keyless defaults; empty means none ready.
 func resolveDefaultSearchProvider(cfg *config.Config) string {
 	ids := searchProviderIDs(cfg)
 	if cfg != nil {
 		if wanted := strings.ToLower(strings.TrimSpace(cfg.Search.DefaultProvider)); wanted != "" {
 			return wanted
+		}
+	}
+	// Preserve established configured-provider selection before introducing a
+	// new implicit public fallback. DDG must not silently displace an existing
+	// Exa/Tavily credential or explicitly configured SearxNG endpoint.
+	for _, id := range ids {
+		if slices.Contains(searchProviderMeta(id).capabilities, "keyless_public") {
+			continue
+		}
+		if configured, _ := searchProviderConfigured(cfg, id); configured {
+			return id
 		}
 	}
 	for _, id := range ids {
@@ -156,7 +169,20 @@ func buildSearchProviderInventory(cfg *config.Config, breakers *SearchRuntime) s
 		} else if circuit.RetryAfterSeconds > 0 {
 			status = "degraded"
 			degradedReason = "circuit_open"
-		} else {
+		}
+		pacingDelay := 0
+		if id == "ddg" {
+			pacingDelay = breakers.ddgRequestDelay()
+		}
+		if configured && circuit.RetryAfterSeconds == 0 && pacingDelay > 0 {
+			status = "degraded"
+			degradedReason = "local_rate_limit"
+		}
+		retryDelay := circuit.RetryAfterSeconds
+		if degradedReason == "local_rate_limit" {
+			retryDelay = pacingDelay
+		}
+		if status == "ready" {
 			ready = append(ready, id)
 		}
 		providers = append(providers, map[string]any{
@@ -165,7 +191,7 @@ func buildSearchProviderInventory(cfg *config.Config, breakers *SearchRuntime) s
 			"configured":        configured,
 			"status":            status,
 			"degraded_reason":   degradedReason,
-			"setup":             buildSearchProviderSetup(id, degradedReason, circuit.RetryAfterSeconds),
+			"setup":             buildSearchProviderSetup(id, degradedReason, retryDelay),
 			"cache_ttl_seconds": int(searchCacheTTL() / time.Second),
 			"capabilities":      meta.capabilities,
 			"circuit":           circuit,

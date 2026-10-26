@@ -20,6 +20,14 @@ type searchProviderSetup struct {
 func buildSearchProviderSetup(id, reason string, retry int) searchProviderSetup {
 	s := searchProviderSetup{}
 	switch reason {
+	case "provider_challenge":
+		s.NextAction = "respect_provider_challenge"
+		s.Message = "The provider requested verification. Do not solve or bypass its challenge or retry automatically; use only another already approved provider or ask the user for a supported route."
+	case "local_rate_limit":
+		s.NextAction = "wait_then_retry"
+		s.Message = "Local per-engine DuckDuckGo request spacing is active; no provider request was sent. Respect the delay. Cached reads do not consume a request slot."
+		s.RetryAfterSeconds = retry
+
 	case "conflicting_search_providers":
 		s.NextAction = "choose_search_mode"
 		s.Message = "Send either provider for a pinned single-provider search or providers for explicitly approved research, not both; do not silently choose between them."

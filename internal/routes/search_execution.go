@@ -27,6 +27,11 @@ func executeSearchProvider(req *http.Request, cfg *config.Config, provider, quer
 		}
 	}
 	runtime := searchBreakersFor(req)
+	if provider == "ddg" {
+		if err := runtime.admitDDGRequest(); err != nil {
+			return nil, false, err
+		}
+	}
 	attempt, wait := runtime.acquire(provider)
 	if wait > 0 {
 		return nil, false, &searchCircuitOpenError{retryAfter: wait}

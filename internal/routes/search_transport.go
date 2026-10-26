@@ -16,29 +16,38 @@ const maxSearchResponseBytes = 2 << 20
 // searchJSON is the shared bounded, origin-confined transport. Provider bodies,
 // credential-bearing URLs and header errors never become diagnostic messages.
 func searchJSON(req *http.Request, out any) error {
-	client := httpboundary.OriginBoundClient(&http.Client{Timeout: 12 * time.Second})
-	resp, err := client.Do(req)
+	body, _, err := searchBody(req)
 	if err != nil {
-		if req.Context().Err() != nil {
-			return req.Context().Err()
-		}
-		return fmt.Errorf("search provider transport failed")
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return upstreamErr(resp)
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSearchResponseBytes+1))
-	if err != nil {
-		return fmt.Errorf("search provider response read failed")
-	}
-	if len(body) > maxSearchResponseBytes {
-		return fmt.Errorf("search provider response exceeds size limit")
+		return err
 	}
 	if err := json.Unmarshal(body, out); err != nil {
 		return fmt.Errorf("search provider returned invalid JSON")
 	}
 	return nil
+}
+
+// searchBody is the bounded, origin-confined transport owner for JSON and HTML.
+func searchBody(req *http.Request) ([]byte, int, error) {
+	client := httpboundary.OriginBoundClient(&http.Client{Timeout: 12 * time.Second})
+	resp, err := client.Do(req)
+	if err != nil {
+		if req.Context().Err() != nil {
+			return nil, 0, req.Context().Err()
+		}
+		return nil, 0, fmt.Errorf("search provider transport failed")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, resp.StatusCode, upstreamErr(resp)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSearchResponseBytes+1))
+	if err != nil {
+		return nil, 0, fmt.Errorf("search provider response read failed")
+	}
+	if len(body) > maxSearchResponseBytes {
+		return nil, 0, fmt.Errorf("search provider response exceeds size limit")
+	}
+	return body, resp.StatusCode, nil
 }
 
 // searchCredential gives explicit operator configuration precedence even when

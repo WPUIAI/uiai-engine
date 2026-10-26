@@ -90,11 +90,22 @@ func researchSearchFailure(cfg *config.Config, provider string, err error) searc
 	var setup *searchProviderSetup
 	var upstream *upstreamSearchError
 	var circuit *searchCircuitOpenError
-	if errors.As(err, &upstream) {
+	var spacing *searchRequestSpacingError
+	if errors.As(err, &spacing) {
+		failure.Code = "search_request_spacing"
+		failure.Retryable = true
+		failure.RetryAfter = strconv.Itoa(spacing.retryAfter)
+		step := buildSearchProviderSetup(provider, "local_rate_limit", spacing.retryAfter)
+		setup = &step
+	} else if errors.As(err, &upstream) {
 		failure.Code = "search_provider_error"
 		failure.UpstreamStatus = upstream.status
 		failure.Retryable = retryableSearchStatus(upstream.status)
 		failure.RetryAfter = upstream.retryAfter
+		if upstream.setupReason != "" {
+			step := buildSearchProviderSetup(provider, upstream.setupReason, 0)
+			setup = &step
+		}
 	} else if errors.As(err, &circuit) {
 		failure.Code = "search_provider_circuit_open"
 		failure.Retryable = true

@@ -108,7 +108,7 @@ func TestSearchRecoveryDoesNotMisdiagnoseUpstreamResponseAsSetup(t *testing.T) {
 	if out.Code != 503 || calls.Load() != 1 || body["setup"] != nil {
 		t.Fatal("provider response failure incorrectly asks to change setup")
 	}
-	cfg.Search.Providers = map[string]config.SearchProviderConfig{"wikipedia": {Disabled: true}}
+	cfg.Search.Providers = map[string]config.SearchProviderConfig{"wikipedia": {Disabled: true}, "ddg": {Disabled: true}}
 	out = httptest.NewRecorder()
 	setupRouter(cfg, NewSearchRuntime()).ServeHTTP(out, httptest.NewRequest(http.MethodGet, "/api/search/?q=synthetic-no-providers", nil))
 	if out.Code != 503 || !strings.Contains(out.Body.String(), "suggested_next_action") || !strings.Contains(out.Body.String(), "/api/search/providers") {

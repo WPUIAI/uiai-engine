@@ -202,7 +202,7 @@ func TestSearchProvidersReportsMissingKeyDegraded(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		t.Fatalf("decode providers: %v", err)
 	}
-	if len(body.Providers) != 5 || body.Providers[0].ID != "brave" || body.Providers[1].ID != "exa" || body.Providers[2].ID != "searxng" || body.Providers[3].ID != "tavily" || body.Providers[4].ID != "wikipedia" {
+	if len(body.Providers) != 6 || body.Providers[0].ID != "brave" || body.Providers[1].ID != "ddg" || body.Providers[2].ID != "exa" || body.Providers[3].ID != "searxng" || body.Providers[4].ID != "tavily" || body.Providers[5].ID != "wikipedia" {
 		t.Fatalf("unexpected providers: %+v", body.Providers)
 	}
 	brave := body.Providers[0]
@@ -385,11 +385,11 @@ func TestSearchProvidersReportsConfigOnlyProvider(t *testing.T) {
 	if status["brave"] != "degraded" {
 		t.Fatalf("brave status = %q, want degraded", status["brave"])
 	}
-	if body.DefaultProvider != "wikipedia" {
+	if body.DefaultProvider != "ddg" {
 		t.Fatalf("default_provider = %q, want the implemented keyless provider", body.DefaultProvider)
 	}
-	if len(body.ReadyProviders) != 1 { // only implemented keyless wikipedia
-		t.Fatalf("ready_providers = %v, want only wikipedia", body.ReadyProviders)
+	if len(body.ReadyProviders) != 2 { // keyless web DDG and encyclopedia Wikipedia
+		t.Fatalf("ready_providers = %v, want DDG and Wikipedia", body.ReadyProviders)
 	}
 }
 
@@ -403,14 +403,14 @@ func TestSearchPressureSummaryDoesNotClaimReadyProviders(t *testing.T) {
 
 	summary := searchPressureSummary(cfg)
 	ready, _ := summary["ready_providers"].([]string)
-	if len(ready) != 1 || ready[0] != "wikipedia" {
+	if len(ready) != 2 || ready[0] != "ddg" || ready[1] != "wikipedia" {
 		t.Fatalf("ready_providers = %v, want only the keyless provider", ready)
 	}
 	if summary["pressure"] != "normal" {
 		t.Fatalf("pressure = %v, want normal while a keyless provider can serve", summary["pressure"])
 	}
 
-	cfg.Search.Providers = map[string]config.SearchProviderConfig{"wikipedia": {Disabled: true}}
+	cfg.Search.Providers = map[string]config.SearchProviderConfig{"wikipedia": {Disabled: true}, "ddg": {Disabled: true}}
 	summary = searchPressureSummary(cfg)
 	if summary["pressure"] != "degraded" {
 		t.Fatalf("pressure = %v, want degraded when no provider can serve", summary["pressure"])
@@ -447,10 +447,10 @@ func TestZeroKeyBoxServesKeylessDefault(t *testing.T) {
 	t.Setenv("TAVILY_API_KEY", "")
 	t.Setenv("EXA_API_KEY", "")
 
-	if got := resolveDefaultSearchProvider(nil); got != "wikipedia" {
+	if got := resolveDefaultSearchProvider(nil); got != "ddg" {
 		t.Fatalf("default = %q, want the keyless provider", got)
 	}
-	if got := resolveDefaultSearchProvider(&config.Config{}); got != "wikipedia" {
+	if got := resolveDefaultSearchProvider(&config.Config{}); got != "ddg" {
 		t.Fatalf("default = %q, want the keyless provider", got)
 	}
 }

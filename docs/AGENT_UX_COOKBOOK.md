@@ -420,9 +420,43 @@ If every attempt fails, the final provider's HTTP status and Retry-After survive
 Caller cancellation/deadlines reach upstream requests; redirects cannot expand the
 configured origin. Retiring a provider prevents serving its old cached results.
 
-Installed adapters are Brave, Exa, Tavily, SearxNG and Wikipedia. Other adapters, circuit
-breakers, fusion and quota accounting for issue90 remain incomplete.
-No production fallback list is enabled by this code deployment alone.
+Use `GET /api/search/providers` for installed adapters and current admission.
+Issue90's remaining adapters, quota accounting and complete acceptance stay open;
+the following sections describe implemented slices and their limits.
+No production fallback list is enabled by a code deployment alone.
+
+### Keyless DuckDuckGo HTML search
+
+`provider: "ddg"` uses `https://html.duckduckgo.com/html/` without credentials,
+browser sessions, result-link fetching, pagination or challenge solving. Existing
+configured providers retain implicit selection priority; only otherwise
+unconfigured installations gain the public keyless web default. Explicit defaults,
+disables, pinned requests and approved fallback/research disclosure remain controlling.
+Wikipedia remains encyclopedia search, not a general-web substitute.
+
+The adapter uses the Go HTML parser (`golang.org/x/net/html`, x/net v0.58.0,
+compatible with the existing Go1.25 baseline), sharing the bounded2MiB/12s,
+origin-confined transport, normalization, citations, cache and circuit owner.
+Tracking links are decoded locally, not followed; ads and unsafe citation URLs
+are omitted. A provider challenge (including HTTP202) is a non-retryable failure
+with `respect_provider_challenge` guidance, never a false empty result. Unknown
+markup fails closed; only an explicit no-results marker permits an empty success.
+
+Each engine runtime admits at most one uncached DDG request every15s. Concurrent
+callers receive local429 with Retry-After and safe `wait_then_retry` guidance;
+no upstream status or upstream failure count is fabricated. No queue, background
+probe or automatic retry exists. Cache hits do not consume a request slot.
+Discovery reports this local admission delay but never performs a provider probe
+or claims known quota/availability. A ready configuration does not guarantee that
+DDG will serve a given network; challenge failures cannot establish clean-install
+usability. Neither additional query disclosure nor private infrastructure is enabled.
+
+Protocol sources: DuckDuckGo's official non-JavaScript help and
+`https://html.duckduckgo.com/robots.txt` (Allow:/ reviewed2026-10-26); this is not a
+provider SLA. Module v0.59+ needs a Go-baseline upgrade outside this dependency
+addition. The v0.58 parser differs from v0.61 only by an equivalent min() refactor;
+five OSV advisories at v0.58 affect the unimported x/net/http2 package, not html/atom.
+This package/reachability check is not a whole-project vulnerability-clean claim.
 
 Tavily uses its documented `POST https://api.tavily.com/search` contract and
 header-only bearer authentication. Supply an operator-owned credential reference
@@ -630,7 +664,7 @@ privileged configuration-writing API is needed for that existing-file workflow.
 
 ### Local endpoint validation and explicit-default intent
 
-Readiness now applies the same endpoint resolver used by Brave, Exa, Tavily and
+Readiness now applies the same endpoint resolver used by DDG, Brave, Exa, Tavily and
 Wikipedia before advertising them as configured/ready. Defaults, allowed hosts,
 override source and precedence live in the existing provider registry, not a
 second setup-only table. No DNS lookup, account check or search query is sent.

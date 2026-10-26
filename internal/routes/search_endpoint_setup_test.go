@@ -17,16 +17,16 @@ func TestSearchSetupRejectsInvalidEndpointBeforeQuery(t *testing.T) {
 	clearSearchSetupCredentials(t)
 	cfg := &config.Config{Search: config.SearchConfig{DefaultProvider: "brave", Providers: map[string]config.SearchProviderConfig{"brave": {APIKey: "synthetic-key", APIURL: "http://outside.example/search"}}}}
 	guide, _ := readSetup(t, setupRouter(cfg, NewSearchRuntime()), "/api/tools/agent-card")
-	if setupAction(t, guide, "brave") != "repair_existing_endpoint" || guide["general_web_search_ready"] != false {
+	if setupAction(t, guide, "brave") != "repair_existing_endpoint" || guide["default_provider"] != "brave" {
 		t.Fatal("invalid configured endpoint falsely advertised as ready")
 	}
 }
 
 func TestSearchEndpointSetupAndExecutionUseSameLocalPolicy(t *testing.T) {
 	clearSearchSetupCredentials(t)
-	for _, id := range []string{"brave", "exa", "tavily", "wikipedia"} {
+	for _, id := range []string{"brave", "ddg", "exa", "tavily", "wikipedia"} {
 		t.Run(id, func(t *testing.T) {
-			host := map[string]string{"brave": "api.search.brave.com", "exa": "api.exa.ai", "tavily": "api.tavily.com", "wikipedia": "en.wikipedia.org"}[id]
+			host := map[string]string{"brave": "api.search.brave.com", "ddg": "html.duckduckgo.com", "exa": "api.exa.ai", "tavily": "api.tavily.com", "wikipedia": "en.wikipedia.org"}[id]
 			for _, raw := range []string{"http://outside.example/search", "https://outside.example/search", "https://user:synthetic-endpoint-canary@" + host + "/search", "https://" + host + "/search?api_key=synthetic-endpoint-canary", "https://" + host + "/search#synthetic-endpoint-canary", "http://127.0.0.1:99999/search", "https://" + host + "/search?", "https://" + host + "/search#"} {
 				cfg := &config.Config{Search: config.SearchConfig{Providers: map[string]config.SearchProviderConfig{id: {APIKey: "synthetic-key", APIURL: raw}}}}
 				// Wikipedia's existing endpoint override is environment-only.
@@ -60,7 +60,7 @@ func TestSearchEndpointDiscoveryDoesNotContactConfiguredUpstream(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.WriteHeader(500) }))
 	defer server.Close()
-	for _, id := range []string{"brave", "exa", "tavily", "wikipedia"} {
+	for _, id := range []string{"brave", "ddg", "exa", "tavily", "wikipedia"} {
 		t.Run(id, func(t *testing.T) {
 			cfg := &config.Config{Search: config.SearchConfig{Providers: map[string]config.SearchProviderConfig{id: {APIKey: "synthetic-key", APIURL: server.URL + "/search"}}}}
 			if id == "wikipedia" {

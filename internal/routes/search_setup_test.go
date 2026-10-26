@@ -48,9 +48,9 @@ func clearSearchSetupCredentials(t *testing.T) {
 		t.Setenv(env, "")
 	}
 }
-func TestSearchSetupCleanInstallHasNoGeneralWebClaim(t *testing.T) {
+func TestSearchSetupWikipediaOnlyHasNoGeneralWebClaim(t *testing.T) {
 	clearSearchSetupCredentials(t)
-	r := setupRouter(&config.Config{}, NewSearchRuntime())
+	r := setupRouter(&config.Config{Search: config.SearchConfig{Providers: map[string]config.SearchProviderConfig{"ddg": {Disabled: true}}}}, NewSearchRuntime())
 	guide, _ := readSetup(t, r, "/api/tools/agent-card")
 	same, _ := readSetup(t, r, "/api/search/providers")
 	if !reflect.DeepEqual(guide, same) {
@@ -104,7 +104,7 @@ func TestSearchSetupDoesNotProbeProviderAndSharesCircuitState(t *testing.T) {
 	var calls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.WriteHeader(500) }))
 	defer upstream.Close()
-	cfg := &config.Config{Search: config.SearchConfig{Providers: map[string]config.SearchProviderConfig{"searxng": {APIURL: upstream.URL + "/search"}}}}
+	cfg := &config.Config{Search: config.SearchConfig{Providers: map[string]config.SearchProviderConfig{"searxng": {APIURL: upstream.URL + "/search"}, "ddg": {Disabled: true}}}}
 	state, _ := testSearchBreakers()
 	r := setupRouter(cfg, state)
 	guide, _ := readSetup(t, r, "/api/tools/agent-card")
