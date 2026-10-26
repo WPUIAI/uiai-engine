@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
+	"golang.org/x/net/html"
 	"io"
 	"os"
 	"path/filepath"
@@ -322,4 +324,154 @@ func deepCopy[T any](in T) T {
 	var out T
 	_ = json.Unmarshal(body, &out)
 	return out
+}
+
+func TestT08ADecodedUnsafeRelativeRefsFailClosed(t *testing.T) {
+	for _, ref := range []string{"%2fetc/passwd", ".%2f%2e%2e/private", "asset%00.png", "asset%5cprivate.png", "asset%0a.png"} {
+		p := validProjection()
+		p.Assets[0].Ref = ref
+		if ValidateProjection(p) == nil {
+			t.Fatalf("unsafe encoded asset ref accepted: %q", ref)
+		}
+	}
+	for _, ref := range []string{"./assets/safe%20name.png", "#overview", "./next?cursor=opaque"} {
+		if !relativeRef(ref) {
+			t.Fatalf("safe portable ref rejected: %q", ref)
+		}
+	}
+}
+
+func TestT08ADeclaredReceiptsAreValidTimelineEvidence(t *testing.T) {
+	p := validProjection()
+	p.Timeline[0].Refs = []string{p.ReceiptRefs[0], p.CustodyRefs[0], p.InspectionRefs[0]}
+	p.Warnings[0].EvidenceRefs = []string{p.TrustRefs[0]}
+	if err := ValidateProjection(p); err != nil {
+		t.Fatalf("declared immutable evidence refs rejected: %v", err)
+	}
+	p.Timeline[0].Refs = []string{"receipt:not-declared"}
+	if !errors.Is(ValidateProjection(p), ErrProjectionReferenceDangling) {
+		t.Fatal("undeclared receipt accepted")
+	}
+}
+
+func TestT08APaginationAndReadOnlyPostureCannotContradictData(t *testing.T) {
+	p := validProjection()
+	second := p.Claims[0]
+	second.ClaimID = "claim:second"
+	p.Claims = append(p.Claims, second)
+	p.Page.TotalCount = 2
+	if !errors.Is(ValidateProjection(p), ErrProjectionInvalid) {
+		t.Fatal("page contains more claims than its declared size")
+	}
+	p = validProjection()
+	p.Access = AccessPrivate
+	p.HandoffRef = "./focusa/handoff"
+	if !errors.Is(ValidateProjection(p), ErrAccessPostureInvalid) {
+		t.Fatal("read-only projection advertises handoff")
+	}
+	p.Interaction = InteractionAuthenticatedHandoff
+	if err := ValidateProjection(p); err != nil {
+		t.Fatalf("explicit private authenticated handoff rejected: %v", err)
+	}
+}
+
+func TestT08AImmutableProjectionGoldenRoundTrips(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("testdata", "projection.golden.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p Projection
+	if err = json.Unmarshal(raw, &p); err != nil {
+		t.Fatal(err)
+	}
+	if err = ValidateProjection(p); err != nil {
+		t.Fatal(err)
+	}
+	next, err := json.MarshalIndent(p, "", "  ")
+	if err != nil || !bytes.Equal(append(next, '\n'), raw) {
+		t.Fatal("projection golden roundtrip drift")
+	}
+}
+
+func TestT08APrivatePathTokensAndNestedBounds(t *testing.T) {
+	for _, ref := range []string{"/tmp/private", "/etc/private", "/private/client", "C:/private/client", `Z:\\private\\client`} {
+		p := validProjection()
+		p.Artifact.Scope.WorkItemRef = ref
+		if !errors.Is(ValidateProjection(p), ErrRelativeRefInvalid) {
+			t.Fatal("private source path token accepted")
+		}
+	}
+	p := validProjection()
+	p.ReceiptRefs = nil
+	for i := 0; i < MaxRefs; i++ {
+		p.ReceiptRefs = append(p.ReceiptRefs, fmt.Sprintf("receipt:%d", i))
+	}
+	p.Timeline[0].Refs = append([]string{p.Artifact.ArtifactRef}, p.ReceiptRefs...)
+	if ValidateProjection(p) == nil {
+		t.Fatal("unbounded timeline refs accepted")
+	}
+	p = validProjection()
+	p.Page.NextCursor, p.Page.Cursor = "same", "same"
+	if ValidateProjection(p) == nil {
+		t.Fatal("cursor loop accepted")
+	}
+}
+
+func TestT08AHTML5SemanticStructureHasNoExecutableOrNetworkDependencies(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "web", "evidence", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := html.Parse(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	ids := map[string]bool{}
+	var skip, lang bool
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode {
+			counts[n.Data]++
+			attrs := map[string]string{}
+			for _, a := range n.Attr {
+				attrs[a.Key] = a.Val
+				if strings.HasPrefix(a.Key, "on") {
+					t.Fatal("inline event handler")
+				}
+				if a.Key == "src" || a.Key == "href" {
+					if !relativeRef(a.Val) {
+						t.Fatal("nonportable dependency")
+					}
+				}
+			}
+			if n.Data == "html" {
+				lang = attrs["lang"] != ""
+			}
+			if attrs["id"] != "" {
+				if ids[attrs["id"]] {
+					t.Fatal("duplicate HTML identity")
+				}
+				ids[attrs["id"]] = true
+			}
+			if n.Data == "a" && attrs["href"] == "#evidence-artifact" {
+				skip = true
+			}
+			if n.Data == "button" || n.Data == "input" || n.Data == "form" || n.Data == "script" || n.Data == "iframe" || n.Data == "link" {
+				t.Fatal("static shell gained executable/mutation dependency")
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(doc)
+	for _, tag := range []string{"html", "head", "title", "body", "header", "nav", "main", "article", "footer", "noscript"} {
+		if counts[tag] != 1 {
+			t.Fatalf("landmark %s count %d", tag, counts[tag])
+		}
+	}
+	if !lang || !skip {
+		t.Fatal("missing language/skip link")
+	}
 }

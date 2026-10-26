@@ -63,11 +63,8 @@ func ValidateProjection(projection Projection) error {
 	if err := validateSections(projection.Sections); err != nil {
 		return err
 	}
-	known, err := validateEvidence(projection)
+	_, err = validateEvidence(projection)
 	if err != nil {
-		return err
-	}
-	if err := validateRefs(projection, known); err != nil {
 		return err
 	}
 	if err := validateRedaction(projection); err != nil {
@@ -93,6 +90,11 @@ func validateArtifact(binding ArtifactBinding) error {
 		blank(binding.Scope.WorkItemRef) {
 		return ErrProjectionBindingMismatch
 	}
+	for _, ref := range []string{binding.ArtifactRef, binding.Scope.ProjectRef, binding.Scope.WorkstreamRef, binding.Scope.WorksetRef, binding.Scope.CallGraphRef, binding.Scope.WorkpointRef, binding.Scope.WorkItemRef} {
+		if hasPrivatePath(ref) {
+			return ErrRelativeRefInvalid
+		}
+	}
 	return nil
 }
 
@@ -116,6 +118,10 @@ func validateEvidence(projection Projection) (map[string]struct{}, error) {
 		return nil, ErrProjectionTooLarge
 	}
 	known := map[string]struct{}{projection.Artifact.ArtifactRef: {}}
+	// Register declared immutable external refs before validating timeline/warning edges.
+	if err := validateRefs(projection, known); err != nil {
+		return nil, err
+	}
 	assets := make(map[string]Asset, len(projection.Assets))
 	for _, asset := range projection.Assets {
 		if blank(asset.AssetID) || !relativeRef(asset.Ref) || !validSHA256(asset.SHA256) ||
@@ -144,12 +150,12 @@ func validateEvidence(projection Projection) (map[string]struct{}, error) {
 	}
 	for _, entry := range projection.Timeline {
 		if blank(entry.EntryID) || entry.OccurredAt.IsZero() || blank(entry.EventType) ||
-			hasBlankOrDuplicate(entry.Refs) || !allExist(entry.Refs, known) || !addUnique(known, entry.EntryID) {
+			len(entry.Refs) > MaxRefs || hasBlankOrDuplicate(entry.Refs) || !allExist(entry.Refs, known) || !addUnique(known, entry.EntryID) {
 			return nil, ErrProjectionReferenceDangling
 		}
 	}
 	for _, warning := range projection.Warnings {
-		if blank(warning.Code) || blank(warning.Message) || hasBlankOrDuplicate(warning.EvidenceRefs) ||
+		if blank(warning.Code) || blank(warning.Message) || len(warning.EvidenceRefs) > MaxRefs || hasBlankOrDuplicate(warning.EvidenceRefs) ||
 			!allExist(warning.EvidenceRefs, known) {
 			return nil, ErrProjectionReferenceDangling
 		}
@@ -168,6 +174,9 @@ func validateRefs(projection Projection, known map[string]struct{}) error {
 			return ErrProjectionInvalid
 		}
 		for _, ref := range group {
+			if hasPrivatePath(ref) {
+				return ErrRelativeRefInvalid
+			}
 			known[ref] = struct{}{}
 		}
 	}
@@ -195,6 +204,9 @@ func validateRedaction(projection Projection) error {
 	if projection.Access == AccessOfflineSnapshot && (projection.Interaction != InteractionReadOnly || !blank(projection.HandoffRef)) {
 		return ErrAccessPostureInvalid
 	}
+	if projection.Interaction == InteractionReadOnly && !blank(projection.HandoffRef) {
+		return ErrAccessPostureInvalid
+	}
 	if projection.Interaction == InteractionAuthenticatedHandoff && blank(projection.HandoffRef) {
 		return ErrAccessPostureInvalid
 	}
@@ -206,7 +218,7 @@ func validateRedaction(projection Projection) error {
 
 func validatePage(projection Projection) error {
 	if projection.Page.PageSize == 0 || projection.Page.PageSize > MaxPageSize ||
-		projection.Page.TotalCount < uint64(len(projection.Claims)) ||
+		projection.Page.TotalCount < uint64(len(projection.Claims)) || len(projection.Claims) > int(projection.Page.PageSize) ||
 		(!blank(projection.Page.NextCursor) && projection.Page.NextCursor == projection.Page.Cursor) {
 		return ErrProjectionInvalid
 	}
@@ -242,6 +254,9 @@ func relativeRef(value string) bool {
 	if strings.HasPrefix(value, "#") {
 		return len(value) > 1
 	}
+	if strings.HasPrefix(parsed.Path, "/") || strings.ContainsAny(parsed.Path, "\\\r\n\x00") {
+		return false
+	}
 	cleaned := path.Clean(parsed.Path)
 	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
 		return false
@@ -255,8 +270,12 @@ func relativeRef(value string) bool {
 }
 
 func hasPrivatePath(value string) bool {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "/") || strings.HasPrefix(value, `\\`) || (len(value) > 2 && value[1] == ':' && (value[2] == '/' || value[2] == '\\')) {
+		return true
+	}
 	lower := strings.ToLower(value)
-	for _, marker := range []string{"/home/", "/root/", "file://", `c:\\users\\`, "authorization: bearer", "cookie:"} {
+	for _, marker := range []string{"/home/", "/root/", "/tmp/", "/etc/", "/private/", "file://", `c:\\users\\`, "authorization: bearer", "cookie:"} {
 		if strings.Contains(lower, marker) {
 			return true
 		}
