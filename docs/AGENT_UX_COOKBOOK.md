@@ -587,6 +587,8 @@ Start with the existing agent card (`pi_uiai_agent_card` / MCP
 same `uiai.search_setup.v1` projection returned by `GET /api/search/providers`;
 searching existing tool discovery for `setup` finds the card. No new client tool
 registration or native schema reload is needed for this additive response.
+The existing CLI consumes it too: `scripts/uiai --json tools agent-card`;
+`scripts/uiai --json tools search setup` discovers the same entry point.
 
 - Inspect `ready_providers_by_capability`: `encyclopedia_search` (Wikipedia) is
   not `web_search`. A fresh installation with no credentials/endpoints honestly
