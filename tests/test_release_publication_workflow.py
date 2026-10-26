@@ -144,6 +144,16 @@ class ReleasePublicationTests(unittest.TestCase):
         self.assertNotIn('scripts/next-version.py',source)
         self.assertIn('python3 scripts/verify-uiai-version-surfaces.py "$RELEASE_TAG"',source)
 
+    def test_deploy_caller_supplies_an_explicit_idle_target_for_each_named_worker(self):
+        scripts=self.root/'scripts';scripts.mkdir()
+        stub=scripts/'deploy-engine-ovh.sh'
+        stub.write_text('#!/bin/bash\nprintf \"%s\\n\" \"$REMOTE_IDLE_BASE_URLS\"\n')
+        stub.chmod(0o755)
+        env={key:'' for key in ('REMOTE_INSTALL_ROOT','REMOTE_SERVICE_NAME','REMOTE_HEALTH_URL','REMOTE_EXTRA_SERVICES','REMOTE_SMOKE_BASE_URLS','REMOTE_IDLE_BASE_URLS')}
+        result=self.run_step(command(ENGINE,'Deploy to OVH worker'),**env)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.strip().split(),['http://127.0.0.1:7456','http://127.0.0.1:7460'])
+
     def ota_tree(self, arm_version='0.3.1'):
         for arch,version in [('x86','0.3.1'),('arm64',arm_version)]:
             base=self.root/('cockpit-ota-'+arch)
