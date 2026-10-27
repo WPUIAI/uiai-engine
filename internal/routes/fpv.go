@@ -102,6 +102,21 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "session not found"})
 			return
 		}
+		// Public observation must not expose a session awaiting authentication;
+		// inspect fresh metadata as well as the latched challenge before capture.
+		challenge := sess.CurrentAuthChallenge()
+		if challenge == nil {
+			detected, err := sess.DetectAuthChallengeContext(req.Context())
+			if err != nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "session privacy could not be verified", "error_class": "fpv_privacy_check_failed"})
+				return
+			}
+			challenge = detected
+		}
+		if challenge != nil || sess.CurrentAuthChallenge() != nil {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "authentication sessions cannot create public views", "error_class": "fpv_private_session"})
+			return
+		}
 		snap, err := sess.Screenshot("jpeg", 80)
 		if err != nil {
 			writeEPWAPublishError(w, http.StatusServiceUnavailable, "fpv_snapshot_failed", err, "", "", "reconcile:fpv-session-snapshot")

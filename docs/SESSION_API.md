@@ -421,6 +421,12 @@ supply an operator grant. A separate canonical control-approval resolver remains
 required before that stronger capability can be exposed. This does not claim the
 remaining origin/consent/revocation work complete or weaken evidence publication.
 
+Before public-view capture or capability creation, the endpoint rejects a latched
+or freshly detected authentication challenge with `fpv_private_session`. Removing
+page markers does not clear a pending challenge or authorize public sharing. A
+failed metadata privacy check returns `fpv_privacy_check_failed` without creating
+a share. This guard does not establish complete origin classification, provider
+authentication approval, or a private operator-handoff capability.
 
 FPV CDP streaming uses one session-owned Chrome pump with latest-frame fanout;
 disconnecting one viewer cannot stop capture for another. `stream.cdp.mjpg?fps=8`
