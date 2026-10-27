@@ -364,6 +364,13 @@ Errors expose a bounded `cause_class` (such as `javascript_exception`,
 exception values or protocol parameters. The internal wrapped cause remains
 available for typed classification. Both legacy Go methods remain supported.
 
+Non-string JavaScript results retain JSON structure inside the existing result
+string, rather than Go `map[...]` formatting. Credential-labelled arrays, objects
+and scalar values are classified with their aliases by the shared redactor before
+the result preview is truncated. A sensitive field beyond the preview budget must
+still protect an earlier alias. Ordinary typed JSON data remains intact; this is
+not a broker binding or a guarantee against arbitrary secret transformations.
+
 ### Open response recovery
 
 Open responses include `X-UIAI-Created-Session-ID`, identifying only the newly

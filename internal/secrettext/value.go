@@ -1,6 +1,7 @@
 package secrettext
 
 import (
+	"encoding/json"
 	"sort"
 	"strings"
 )
@@ -10,6 +11,26 @@ import (
 func Value(input any) any {
 	var fragments []string
 	classified := map[string]bool{}
+	// Credential-labelled containers classify every scalar leaf, including aliases
+	// elsewhere in this projection; the transient set never becomes a secret cache.
+	var classify func(any)
+	classify = func(value any) {
+		switch value := value.(type) {
+		case []any:
+			for _, child := range value {
+				classify(child)
+			}
+		case map[string]any:
+			for _, child := range value {
+				classify(child)
+			}
+		default:
+			if text := secretScalar(value); text != "" {
+				classified[text] = true
+				fragments = append(fragments, "API key "+text)
+			}
+		}
+	}
 	var collect func(any)
 	collect = func(value any) {
 		switch value := value.(type) {
@@ -37,9 +58,8 @@ func Value(input any) any {
 			for _, key := range keys {
 				child := value[key]
 				collect(child)
-				if text, ok := child.(string); ok && text != "" && (SensitiveField(key) || (control && sensitive && (key == "value" || key == "text"))) {
-					classified[text] = true
-					fragments = append(fragments, "API key "+text)
+				if SensitiveField(key) || (control && sensitive && (key == "value" || key == "text")) {
+					classify(child)
 				}
 			}
 		}
@@ -81,14 +101,30 @@ func Value(input any) any {
 			out := make(map[string]any, len(value))
 			for key, child := range value {
 				out[key] = clone(child)
-				if text, ok := child.(string); ok && text != "" && SensitiveField(key) {
+				if SensitiveField(key) && child != nil && secretScalar(child) != "" {
 					out[key] = Marker
 				}
 			}
 			return out
 		default:
+			if text := secretScalar(value); text != "" && classified[text] {
+				return Marker
+			}
 			return value
 		}
 	}
 	return clone(input)
+}
+
+// Match scalar aliases without coercing ordinary structured output to strings.
+func secretScalar(value any) string {
+	switch value := value.(type) {
+	case string:
+		return value
+	case json.Number, float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, bool:
+		if encoded, err := json.Marshal(value); err == nil {
+			return string(encoded)
+		}
+	}
+	return ""
 }

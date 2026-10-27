@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/go-rod/rod/lib/proto"
 )
 
 // Eval runs JavaScript through the shared bounded evaluation boundary.
@@ -61,15 +63,17 @@ func (s *Session) evaluateContext(caller context.Context, operation, script stri
 	}
 	value := ""
 	if result != nil {
-		value = result.Value.Str()
-		if value == "" {
+		// Str formats objects as Go map[...] text, erasing JSON field roles.
+		// Keep their JSON structure available to the shared privacy projection.
+		if result.Type == proto.RuntimeRemoteObjectTypeString {
+			value = result.Value.Str()
+		} else {
 			raw, encodeErr := result.Value.MarshalJSON()
 			if encodeErr != nil {
 				return "", nil, failure("result", encodeErr, true)
 			}
 			value = string(raw)
 		}
-		value = sanitizeDiagnosticText(value)
 	}
 	settle := time.NewTimer(100 * time.Millisecond)
 	defer settle.Stop()
@@ -80,7 +84,9 @@ func (s *Session) evaluateContext(caller context.Context, operation, script stri
 	}
 	s.URL = safeEvalStr(page, `() => window.location.href`)
 	title, values := safePageProjection(page, value)
-	s.Title, value = title, values[0]
+	// Structured credential labels and aliases must be classified before the
+	// diagnostic budget can cut JSON in half and erase its sensitive fields.
+	s.Title, value = title, sanitizeDiagnosticText(values[0])
 	if err := ctx.Err(); err != nil {
 		return "", nil, failure("observe", err, true)
 	}
