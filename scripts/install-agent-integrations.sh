@@ -20,9 +20,13 @@ MCP_FILES=(mcp/browser-session-mcp.mjs mcp/epwa-contract.mjs integrations/pi/uia
 say(){ printf "%s\n" "$*"; }
 run(){ if [[ "$DRY_RUN" == "1" ]]; then printf "DRY_RUN "; printf "%q " "$@"; printf "\n"; else "$@"; fi; }
 
+if [[ -z "${UIAI_ENGINE_URL:-}" && -f "$MCP_CONFIG_DEST" ]] && command -v jq >/dev/null 2>&1; then
+  ENGINE_URL="$(jq -r --arg name "$MCP_SERVER_NAME" --arg fallback "$ENGINE_URL" '.mcpServers[$name].env.UIAI_ENGINE_URL // $fallback' "$MCP_CONFIG_DEST")"
+fi
+
 say "UIAI agent integration installer"
 say "root=$ROOT_DIR"
-say "engine_url=$ENGINE_URL"
+say "engine_url=explicit environment, preserved configuration, or localhost default (value not logged)"
 if [[ -n "${UIAI_API_KEY:-}" || -n "${UIAI_BEARER_TOKEN:-}" ]]; then
   say "auth_env=client credentials will be passed to MCP config (values redacted)"
 fi
@@ -64,16 +68,21 @@ if [[ "$DRY_RUN" == "1" ]]; then
   say "DRY_RUN would update MCP config: $MCP_CONFIG_DEST"
 elif command -v jq >/dev/null 2>&1; then
   tmp="$(mktemp)"
+  # Same-directory private output keeps credentials private and replacement atomic.
+  output="$(mktemp "${MCP_CONFIG_DEST}.XXXXXX")"
+  trap 'rm -f "$tmp" "$output"' EXIT
   if [[ -f "$MCP_CONFIG_DEST" ]]; then
     cp "$MCP_CONFIG_DEST" "$tmp"
   else
     printf '{"mcpServers":{}}' > "$tmp"
   fi
-  jq --arg name "$MCP_SERVER_NAME" --arg script "$MCP_SCRIPT" --arg url "$ENGINE_URL" --arg api_key "${UIAI_API_KEY:-}" --arg bearer "${UIAI_BEARER_TOKEN:-}" \
-    '.mcpServers[$name] = {"command":"node","args":[$script],"env":({"UIAI_ENGINE_URL":$url} + (if $api_key != "" then {"UIAI_API_KEY":$api_key} else {} end) + (if $bearer != "" then {"UIAI_BEARER_TOKEN":$bearer} else {} end)),"lifecycle":"lazy","idleTimeout":60,"description":"UIAI Engine browser/session/search tools with Focusa-aware graph metadata"}' \
-    "$tmp" > "$tmp.out"
-  mv "$tmp.out" "$MCP_CONFIG_DEST"
+  UIAI_INSTALL_ENGINE_URL="$ENGINE_URL" jq --arg name "$MCP_SERVER_NAME" --arg script "$MCP_SCRIPT" \
+    '(env.UIAI_API_KEY // "") as $api_key | (env.UIAI_BEARER_TOKEN // "") as $bearer |
+    .mcpServers[$name] = ((.mcpServers[$name] // {}) + {"command":"node","args":[$script],"env":((.mcpServers[$name].env // {}) + {"UIAI_ENGINE_URL":env.UIAI_INSTALL_ENGINE_URL} + (if $api_key != "" then {"UIAI_API_KEY":$api_key} else {} end) + (if $bearer != "" then {"UIAI_BEARER_TOKEN":$bearer} else {} end)),"lifecycle":"lazy","idleTimeout":60,"description":"UIAI Engine browser/session/search tools with Focusa-aware graph metadata"})' \
+    "$tmp" > "$output"
+  mv "$output" "$MCP_CONFIG_DEST"
   rm -f "$tmp"
+  trap - EXIT
   say "MCP config updated: $MCP_CONFIG_DEST server=$MCP_SERVER_NAME"
 else
   say "jq not found; writing standalone MCP config to $MCP_CONFIG_DEST.uiai-example"

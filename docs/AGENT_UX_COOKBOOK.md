@@ -397,6 +397,11 @@ and shared response decoder together. `UIAI_INSTALL_PI=0` limits that delivery t
 MCP assets/configuration without adding or replacing any Pi extension. Back up the
 existing installation first; reconnect MCP and verify the actual discovered schema
 and consumer response. A staged configuration is not an activated configuration.
+Upgrades preserve the saved engine endpoint, authentication and other environment
+settings unless nonempty replacements are explicitly supplied. Credentials are
+not logged or passed as command-line arguments. Configuration replacement uses
+an owner-only (`0600`) temporary file in the destination directory and an atomic
+rename; unrelated MCP servers remain unchanged.
 
 Tool discovery treats an exact qualified identifier such as `browser_screenshot`
 as a single-tool lookup (case-insensitive, surrounding whitespace ignored). Broad
