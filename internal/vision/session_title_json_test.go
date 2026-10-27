@@ -4,7 +4,20 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 )
+
+func TestEscapedStructuredTitleIsWithheldAcrossMetadataFields(t *testing.T) {
+	title := `{"password":"UIAI\u005fSYNTHETIC\u005fESCAPED\u005fTITLE","echo":"UIAI_SYNTHETIC_ESCAPED_TITLE"}`
+	clean := redactPageFields(map[string]any{"title": title, "fields": []any{title, "ordinary field"}})
+	if clean["title"] != secrettext.Marker || clean["fields"].([]any)[0] != secrettext.Marker {
+		t.Fatal("encoded structured credential survived title or identical metadata alias")
+	}
+	if clean["fields"].([]any)[1] != "ordinary field" {
+		t.Fatal("ordinary unrelated metadata changed")
+	}
+}
 
 func TestPageTitleJSONCredentialsRedactedBeforeMetadata(t *testing.T) {
 	const canary = "UIAI_SYNTHETIC_TITLE_0123456789"

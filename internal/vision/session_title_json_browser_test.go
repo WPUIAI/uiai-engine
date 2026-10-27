@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 )
 
 func TestStructuredTitleCredentialRedactionBrowser(t *testing.T) {
@@ -17,6 +19,7 @@ func TestStructuredTitleCredentialRedactionBrowser(t *testing.T) {
 	}
 	const canary = "UIAI_SYNTHETIC_TITLE_0123456789"
 	titles := []string{
+		`{"password":"UIAI\u005fSYNTHETIC\u005fTITLE\u005f0123456789","echo":"UIAI_SYNTHETIC_TITLE_0123456789"}`,
 		`{"password":"` + canary + `","echo":"` + canary + `"}`,
 		`Status {"password":["` + canary + `"],"echo":"` + canary + `"} suffix`,
 		`{"echo":"` + canary + `","padding":"` + strings.Repeat("x", 1400) + `","password":"` + canary + `"}`,
@@ -47,6 +50,12 @@ func TestStructuredTitleCredentialRedactionBrowser(t *testing.T) {
 				}
 				if strings.Contains(string(encoded), canary) {
 					t.Fatal("synthetic credential escaped page-title metadata")
+				}
+			}
+			if strings.Contains(title, `\u005f`) && initial.Title != secrettext.Marker {
+				var decoded map[string]any
+				if err := json.Unmarshal([]byte(initial.Title), &decoded); err != nil || decoded["password"] != secrettext.Marker {
+					t.Fatal("JSON escape spelling retained a decoded credential in initial title")
 				}
 			}
 			assertClean(initial)

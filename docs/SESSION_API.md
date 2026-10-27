@@ -404,8 +404,11 @@ and arbitrary encodings/transformed secret text remain outside this guarantee
 without an explicit binding.
 JSON credential roles in page titles also supply transient privacy context for
 action/evaluation metadata, read fields, snapshot metadata and wrapped-page
-initialization. Their aliases are classified before title previews; ordinary read
-formatting is preserved. This context is not a persistent binding/secret cache.
+initialization. A title containing classified data is withheld as a whole, along
+with identical metadata aliases, so JSON escape spellings cannot survive partial
+replacement. Exact classified string aliases are withheld before inner-fragment
+rewrites. Ordinary titles/read formatting remain intact; this context is not a
+persistent binding/secret cache.
 Byte-bounded diagnostic/title previews stop at a complete UTF-8 code point before
 adding the existing ellipsis; their byte limits do not become character limits.
 This preserves valid text, not necessarily an entire combining/grapheme cluster.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"github.com/go-rod/rod"
+	"reflect"
 )
 
 // safePageProjection classifies labels/controls and aliases before exposing
@@ -48,11 +49,21 @@ func redactPageProjection(raw string, values ...string) (string, []string) {
 // Structured title roles remain transient classification context; never expose
 // this derived projection as a response field or retain a secret-value cache.
 func redactPageFields(fields map[string]any) map[string]any {
+	var titleProjection []any
 	if title, ok := fields["title"].(string); ok {
 		prefix, value, suffix := secrettext.DecodeFramedProjection(title)
-		fields["title_projection"] = []any{prefix, value, suffix}
+		titleProjection = []any{prefix, value, suffix}
+		fields["title_projection"] = titleProjection
 	}
-	return secrettext.Value(fields).(map[string]any)
+	clean := secrettext.Value(fields).(map[string]any)
+	if titleProjection != nil && !reflect.DeepEqual(titleProjection, clean["title_projection"]) {
+		// A title containing classified data is private as a whole: replacing
+		// decoded scalar aliases alone cannot remove every JSON escape spelling.
+		// Reuse Value for the raw container and its identical metadata aliases.
+		fields["sensitive_title"] = map[string]any{"secret": fields["title"]}
+		clean = secrettext.Value(fields).(map[string]any)
+	}
+	return clean
 }
 
 func safePageTitle(page *rod.Page) string { title, _ := safePageProjection(page); return title }

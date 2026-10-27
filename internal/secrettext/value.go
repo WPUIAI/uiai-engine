@@ -117,6 +117,9 @@ func Value(input any) any {
 	clone = func(value any) any {
 		switch value := value.(type) {
 		case string:
+			if classified[value] {
+				return Marker
+			}
 			if out, ok := translations[value]; ok {
 				return out
 			}
