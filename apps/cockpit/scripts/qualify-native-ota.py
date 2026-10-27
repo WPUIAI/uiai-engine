@@ -216,6 +216,11 @@ def main():
             upgraded_pids = pids(executable)
             window_captures['candidate'] = capture_owned_window(executable,
                 args.output.parent/'candidate-window.png', root)
+            # Keep the early frame, then observe again after bounded startup
+            # settlement; neither elapsed time nor a PNG alone proves readiness.
+            time.sleep(2)
+            window_captures['candidate_settled'] = capture_owned_window(executable,
+                args.output.parent/'candidate-settled-window.png', root)
             state['phase'] = 'no_update'
             stop(executable)
             # Restore only this exact, freshly-created test installation.

@@ -116,6 +116,17 @@ class NativeQualificationBoundaryTests(unittest.TestCase):
 
 
 class NativeWindowCaptureBoundaryTests(unittest.TestCase):
+    def test_early_and_settled_candidate_frames_precede_owned_stop(self):
+        source = SCRIPT.read_text()
+        early = source.index("window_captures['candidate'] =")
+        settled = source.index("window_captures['candidate_settled'] =")
+        stopped = source.index('stop(executable)', settled)
+        self.assertLess(early, settled)
+        self.assertLess(settled, stopped)
+        self.assertIn("args.output.parent/'candidate-window.png'", source[early:settled])
+        self.assertIn("args.output.parent/'candidate-settled-window.png'", source[settled:stopped])
+        self.assertIn('not claimed until PNG pixels are inspected', source)
+
     def fixture(self, root):
         executable = root/'native-ota/install/UIAI Engine Cockpit.app/Contents/MacOS/fixture'
         executable.parent.mkdir(parents=True)

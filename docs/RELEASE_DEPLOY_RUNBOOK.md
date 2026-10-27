@@ -279,7 +279,9 @@ manual qualification artifacts are not automatically published.
 The same hosted fixture may capture its exact app window before upgrade, after
 candidate activation and after owned rollback. The receipt binds each PNG to a
 currently running fixture PID/window and digest; no full-desktop fallback or OS
-permission change is allowed. An unavailable capture stays explicitly unproven
+permission change is allowed. Preserve both the early candidate frame and a later
+bounded-settlement frame; an early blank view is not silently discarded or called
+ready. An unavailable capture stays explicitly unproven
 and does not manufacture visual acceptance or erase a separately valid native
 updater receipt. Inspect the PNG pixels before claiming a version/toast is visible;
 a captured file or matched hash alone is not that verification.
