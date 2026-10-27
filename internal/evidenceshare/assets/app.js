@@ -468,6 +468,13 @@ function restoreRegistrySnapshot() {
   } catch { return false; }
 }
 
+function invalidateRegistryRequest() {
+  registryState.abortController?.abort();
+  registryState.abortController = null;
+  registryState.requestID += 1;
+  byId("registry").setAttribute("aria-busy", "false");
+}
+
 async function loadRegistry({ append = false, previous = false } = {}) {
   const status = byId("status");
   if (!registryState.project) return;
@@ -480,9 +487,9 @@ async function loadRegistry({ append = false, previous = false } = {}) {
   const nextHistory = direction === "reset" ? [] : (direction === "previous"
     ? registryState.cursorHistory.slice(0, -1)
     : [...registryState.cursorHistory, { artifact: registryState.artifactPageCursor, workItem: registryState.workItemPageCursor }].slice(-registryHistoryLimit));
-  registryState.abortController?.abort();
+  invalidateRegistryRequest();
   const controller = new AbortController();
-  const requestID = ++registryState.requestID;
+  const requestID = registryState.requestID;
   registryState.abortController = controller;
   byId("registry").setAttribute("aria-busy", "true");
   setStatus(status, "loading", tr("syncing_registry"));
@@ -517,6 +524,10 @@ async function loadRegistry({ append = false, previous = false } = {}) {
     else setStatus(status, "degraded", tr("registry_degraded", { state: syncStatus.freshness || "degraded" }));
     saveRegistrySnapshot();
     updateRegistryURL();
+  } catch (error) {
+    // Superseded failures belong to the old view, not its replacement.
+    if (requestID !== registryState.requestID || controller.signal.aborted) return;
+    throw error;
   } finally {
     if (requestID === registryState.requestID) {
       registryState.abortController = null;
@@ -626,11 +637,18 @@ async function renderRegistry() {
 
 function wireRegistryControls() {
   let debounce = 0;
+  const changeFilter = (field, delayed = false) => (event) => {
+    invalidateRegistryRequest();
+    clearTimeout(debounce);
+    registryState[field] = field === "query" ? event.target.value.trim() : event.target.value;
+    if (delayed) debounce = setTimeout(() => loadRegistry().catch(showRegistryUnavailable), 250);
+    else loadRegistry().catch(showRegistryUnavailable);
+  };
   byId("registry-controls").addEventListener("submit", (event) => event.preventDefault());
-  byId("registry-project").addEventListener("change", (event) => { registryState.project = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
-  byId("registry-query").addEventListener("input", (event) => { registryState.query = event.target.value.trim(); clearTimeout(debounce); debounce = setTimeout(() => loadRegistry().catch(showRegistryUnavailable), 250); });
-  byId("registry-status").addEventListener("change", (event) => { registryState.status = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
-  byId("registry-type").addEventListener("change", (event) => { registryState.type = event.target.value; loadRegistry().catch(showRegistryUnavailable); });
+  byId("registry-project").addEventListener("change", changeFilter("project"));
+  byId("registry-query").addEventListener("input", changeFilter("query", true));
+  byId("registry-status").addEventListener("change", changeFilter("status"));
+  byId("registry-type").addEventListener("change", changeFilter("type"));
   byId("registry-previous").addEventListener("click", () => loadRegistry({ previous: true }).catch(showRegistryUnavailable));
   byId("registry-more").addEventListener("click", () => loadRegistry({ append: true }).catch(showRegistryUnavailable));
   const tableWrap = registryTableWrap();
@@ -663,7 +681,7 @@ function wireRegistryControls() {
   document.addEventListener("visibilitychange", () => {
     if (byId("registry").hidden) return;
     if (document.hidden) {
-      registryState.abortController?.abort();
+      invalidateRegistryRequest();
       disconnectRegistryEvents("paused_hidden");
     } else if (navigator.onLine !== false) {
       loadRegistry().then(connectRegistryEvents).catch(showRegistryUnavailable);
@@ -671,7 +689,7 @@ function wireRegistryControls() {
   });
   addEventListener("offline", () => {
     if (byId("registry").hidden) return;
-    registryState.abortController?.abort();
+    invalidateRegistryRequest();
     disconnectRegistryEvents("paused_offline");
     const error = new Error(tr("registry_unavailable"));
     error.offline = true;
@@ -682,7 +700,7 @@ function wireRegistryControls() {
     loadRegistry().then(connectRegistryEvents).catch(showRegistryUnavailable);
   });
   addEventListener("beforeunload", () => {
-    registryState.abortController?.abort();
+    invalidateRegistryRequest();
     disconnectRegistryEvents("closed");
     if (!byId("registry").hidden) sessionStorage.setItem(registryScrollKey(), String(registryTableWrap().scrollTop));
   });

@@ -76,7 +76,7 @@ jobs:
       - name: MCP and CLI EPWA contract checks
         if: matrix.lane == 'browser'
         run: |
-          node --test mcp/epwa-contract.test.mjs internal/evidenceshare/generic_record_locale.test.mjs internal/evidenceshare/review_snapshot.test.mjs
+          node --test mcp/epwa-contract.test.mjs internal/evidenceshare/generic_record_locale.test.mjs internal/evidenceshare/review_snapshot.test.mjs internal/evidenceshare/registry_cancellation.test.mjs
           scripts/test-uiai-open-result-contract.sh
       - name: Focusa packet endpoint smoke
         if: matrix.lane == 'browser'

@@ -121,7 +121,9 @@ func (s *Store) IntegrityCheck(ctx context.Context) error {
 	return nil
 }
 
-func (s *Store) Status(ctx context.Context) (IndexStatus, error) {
+// indexMetadata reads page freshness without enumerating inventory that a page
+// explicitly omits; Status remains the owner of full inventory counts.
+func (s *Store) indexMetadata(ctx context.Context) (IndexStatus, error) {
 	if s == nil || s.db == nil {
 		return IndexStatus{}, ErrIndexUnavailable
 	}
@@ -137,6 +139,14 @@ func (s *Store) Status(ctx context.Context) (IndexStatus, error) {
 	status.State = IndexState(state)
 	if integrityAt > 0 {
 		status.LastIntegrityAt = time.Unix(0, integrityAt).UTC()
+	}
+	return status, nil
+}
+
+func (s *Store) Status(ctx context.Context) (IndexStatus, error) {
+	status, err := s.indexMetadata(ctx)
+	if err != nil {
+		return IndexStatus{}, err
 	}
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM artifact WHERE project_ref = ?`, s.projectRef).Scan(&status.ArtifactCount); err != nil {
 		return IndexStatus{}, fmt.Errorf("%w: count artifacts: %v", ErrIndexUnavailable, err)

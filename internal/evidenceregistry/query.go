@@ -103,7 +103,7 @@ func (s *Store) List(ctx context.Context, query Query) (Page, error) {
 		return Page{}, fmt.Errorf("%w: iterate artifacts: %v", ErrIndexUnavailable, err)
 	}
 	page := Page{Schema: PageSchemaV1, ProjectRef: s.projectRef, Rows: items, PageSize: query.PageSize, TotalPosture: "omitted", ResourceProfile: profile, MediaPosture: mediaPosture, ObservedAt: s.now().UTC()}
-	status, err := s.Status(ctx)
+	status, err := s.indexMetadata(ctx)
 	if err != nil {
 		return Page{}, err
 	}

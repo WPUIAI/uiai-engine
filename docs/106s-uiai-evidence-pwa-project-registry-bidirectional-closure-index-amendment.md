@@ -116,6 +116,7 @@ Budgets must be reported with fixture size, hardware class, cold/warm state, ind
 ### 5.2 Rendering and resource policy
 
 - Virtualized rows, bounded overscan, cursor paging, lazy thumbnails, intersection-based media loading, and cancellation are mandatory for large sets.
+- Registry controls invalidate request identity immediately, including during search debounce or project clearing. Superseded responses/errors cannot populate the new view or its offline snapshot; current failures remain visible. Page freshness reads omit full-inventory counting, while the status endpoint retains its real counts.
 - Thumbnail/poster derivatives are browser-native, digest-bound, metadata-stripped, and optional; list usability never depends on full media decode.
 - LowMem mode disables nonessential thumbnails/background work, reduces page size/overscan, preserves semantic rows, and reports omitted media.
 - Offline mode serves the last verified bounded index snapshot with snapshot time/cursor and explicit staleness; it queues no acceptance/closure mutation.
