@@ -176,10 +176,7 @@ func NewSessionManagerWithPools(pool PoolSource) *SessionManager {
 // Used by the captcha solver's proxy module to wrap ephemeral browser pages.
 func WrapPage(page *rod.Page, url string, width, height int) *Session {
 	now := time.Now()
-	title := ""
-	if el, err := page.Eval(`() => document.title`); err == nil {
-		title = el.Value.Str()
-	}
+	title := safePageTitle(page)
 	sess := &Session{
 		ID:          generateID(),
 		URL:         url,
@@ -1254,8 +1251,13 @@ func (s *Session) ReadPageContext(caller context.Context, opts ReadOptions) (*Pa
 	for i := 0; i < originalCount; i++ {
 		fields = append(fields, sanitizeBrowserContent(fields[i]))
 	}
-	fragments := secrettext.Fragments(fields)[originalCount:]
-	raw.Text, raw.Title, raw.Description, raw.SiteName = fragments[0], fragments[1], fragments[2], fragments[3]
+	projection := make([]any, len(fields))
+	for i, field := range fields {
+		projection[i] = field
+	}
+	clean := redactPageFields(map[string]any{"title": raw.Title, "fields": projection})
+	fragments := clean["fields"].([]any)[originalCount:]
+	raw.Text, raw.Title, raw.Description, raw.SiteName = fragments[0].(string), fragments[1].(string), fragments[2].(string), fragments[3].(string)
 	raw.Text = sanitizeBrowserContent(raw.Text)
 	raw.URL = focusapacket.SanitizeURL(raw.URL)
 	raw.Title = sanitizeBrowserContent(raw.Title)

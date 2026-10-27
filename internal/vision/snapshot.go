@@ -3,7 +3,6 @@ package vision
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/WPUIAI/uiai-engine/internal/secrettext"
 	"strings"
 
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
@@ -352,7 +351,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 		names[i] = element.Name
 		controls[i] = map[string]any{"tag": element.Tag, "selector": element.Selector, "text": element.Name}
 	}
-	projection := secrettext.Value(map[string]any{"names": names, "controls": controls, "title": s.Title}).(map[string]any)
+	projection := redactPageFields(map[string]any{"names": names, "controls": controls, "title": s.Title})
 	for i, name := range projection["names"].([]any) {
 		elements[i].Name = name.(string)
 	}

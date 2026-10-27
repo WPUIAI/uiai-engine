@@ -10,6 +10,12 @@ import (
 // action metadata or evaluation data; raw context never leaves this boundary.
 func safePageProjection(page *rod.Page, values ...string) (string, []string) {
 	raw := safeEvalStr(page, `() => JSON.stringify({title:document.title || '',body:document.body?.innerText || '',controls:Array.from(document.querySelectorAll('input,textarea,select')).map(e=>({tag:e.tagName.toLowerCase(),type:e.type||'',name:e.name||'',id:e.id||'',aria_label:e.getAttribute('aria-label')||'',value:e.value||''}))})`)
+	return redactPageProjection(raw, values...)
+}
+
+// Keep page privacy classification pure so the same production boundary can be
+// exercised without Chrome, including unavailable-context failures.
+func redactPageProjection(raw string, values ...string) (string, []string) {
 	var fields map[string]any
 	outputs := make([]any, len(values))
 	for i, value := range values {
@@ -23,7 +29,7 @@ func safePageProjection(page *rod.Page, values ...string) (string, []string) {
 		return secrettext.Marker, out
 	}
 	fields["outputs"] = outputs
-	clean := secrettext.Value(fields).(map[string]any)
+	clean := redactPageFields(fields)
 	title, _ := clean["title"].(string)
 	out := make([]string, len(values))
 	for i, value := range clean["outputs"].([]any) {
@@ -38,4 +44,15 @@ func safePageProjection(page *rod.Page, values ...string) (string, []string) {
 	}
 	return sanitizeDiagnosticText(title), out
 }
+
+// Structured title roles remain transient classification context; never expose
+// this derived projection as a response field or retain a secret-value cache.
+func redactPageFields(fields map[string]any) map[string]any {
+	if title, ok := fields["title"].(string); ok {
+		prefix, value, suffix := secrettext.DecodeFramedProjection(title)
+		fields["title_projection"] = []any{prefix, value, suffix}
+	}
+	return secrettext.Value(fields).(map[string]any)
+}
+
 func safePageTitle(page *rod.Page) string { title, _ := safePageProjection(page); return title }

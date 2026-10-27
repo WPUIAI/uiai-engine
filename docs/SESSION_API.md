@@ -402,6 +402,10 @@ roles even inside diagnostic prose, such as Chrome's `Uncaught ` prefix and a
 trailing stack; ordinary text stays text. Malformed or additional embedded JSON
 and arbitrary encodings/transformed secret text remain outside this guarantee
 without an explicit binding.
+JSON credential roles in page titles also supply transient privacy context for
+action/evaluation metadata, read fields, snapshot metadata and wrapped-page
+initialization. Their aliases are classified before title previews; ordinary read
+formatting is preserved. This context is not a persistent binding/secret cache.
 Explicitly labelled recovery-material sections are withheld as a unit, never
 parsed or enumerated; this grants no recovery-code automation authority.
 
