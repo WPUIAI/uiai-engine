@@ -565,6 +565,13 @@ async function toolsCall(name, args) {
       validate: data => assertEvidenceDelivery(data, name === "screenshot" || name === "browser_screenshot"),
     }));
   } catch (err) {
+    if (err.code === "epwa_delivery_unavailable" && err.delivery_error) {
+      return {
+        content: [{ type: "text", text: JSON.stringify(err.delivery_error) }],
+        structuredContent: err.delivery_error,
+        isError: true,
+      };
+    }
     return {
       content: [{ type: "text", text: `UIAI request failed: ${err.message}` }],
       isError: true,

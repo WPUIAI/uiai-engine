@@ -173,6 +173,14 @@ not the retired raw-image error. This metadata-only response contains no private
 payload, scope, viewer or download links. Only a fully verified public package
 returns ready links; unknown or corrupted artifacts remain unavailable.
 
+Screenshot consumers still reject raw payloads and unverified publication.
+These failures preserve a typed `uiai.epwa_delivery_error.v1` envelope containing
+`code: epwa_delivery_unavailable`, `delivery_state: blocked`, and only bounded
+artifact/session/job/reconciliation handles. Native Pi throws its JSON encoding;
+MCP returns the same object in `structuredContent` and JSON text with `isError: true`.
+Neither path returns private payloads, scope, titles or publication URLs, and a
+structured failure never becomes a successful evidence-delivery claim.
+
 ## Packet parity status
 
 The browser research and diagnostics handoff is represented by `uiai.focusa_research_diagnostics_packet.v1`. The `POST /api/agent/research-packet` route and the Pi/extension `uiai_focusa_packet_build`/`uiai_focusa_packet_compose` surfaces preserve bounded evidence, redacted diagnostics, Focusa scope, and an exact next action. Packet intake remains advisory: it never grants UIAI entitlement or replaces Focusa Workpoint authority. This is proposal-only evidence handoff.

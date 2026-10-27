@@ -32,8 +32,13 @@ export async function readEngineResponse(response, { opening = false, closeSessi
   } catch (cause) {
     const cleanupState = await cleanup();
     const evidenceFailure = cause?.code === "epwa_delivery_unavailable";
-    const error = new Error((evidenceFailure ? cause.message : "UIAI invalid response: expected a typed JSON/session envelope") +
+    const deliveryError = evidenceFailure && cause.delivery_error
+      ? { ...cause.delivery_error, ...(opening ? { session_cleanup: cleanupState } : {}) }
+      : undefined;
+    const error = new Error(deliveryError ? JSON.stringify(deliveryError) :
+      (evidenceFailure ? cause.message : "UIAI invalid response: expected a typed JSON/session envelope") +
       (opening ? `; session_cleanup=${cleanupState}` : ""));
+    if (deliveryError) error.delivery_error = deliveryError;
     error.code = evidenceFailure ? cause.code : "invalid_engine_response";
     error.status = response.status;
     error.cleanup_state = cleanupState;

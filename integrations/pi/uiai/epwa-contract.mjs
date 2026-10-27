@@ -85,13 +85,17 @@ export function findNonReadyArtifactDelivery(value, path = "$") {
 }
 
 // Preserve handles for committed effects without exposing raw evidence payloads.
-export function evidenceRecoveryHint(value) {
-  return Object.entries({
+function evidenceRecoveryDetails(value) {
+  return Object.fromEntries(Object.entries({
     artifact_ref: value?.artifact_ref || value?.artifact?.artifact_ref || value?.epwa_delivery?.artifact?.artifact_ref,
     job_id: value?.job_id,
     recovery_ref: value?.recovery_ref || value?.epwa_delivery?.recovery_ref,
     session_id: value?.session_id || value?.session?.id,
-  }).filter(([, ref]) => typeof ref === "string" && ref.length > 0 && ref.length <= 512)
+  }).filter(([, ref]) => typeof ref === "string" && ref.length > 0 && ref.length <= 512));
+}
+
+export function evidenceRecoveryHint(value) {
+  return Object.entries(evidenceRecoveryDetails(value))
     .map(([key, ref]) => `${key}=${JSON.stringify(ref)}`).join("; ");
 }
 
@@ -107,6 +111,14 @@ export function assertEvidenceDelivery(value, required = false) {
   const fail = (reason) => {
     const error = new Error(`EPWA delivery unavailable: ${reason}${recovery ? `; ${recovery}` : ""}`);
     error.code = "epwa_delivery_unavailable";
+    // Explicit allowlist: never copy the rejected payload, title, scope or links.
+    error.delivery_error = Object.freeze({
+      schema: "uiai.epwa_delivery_error.v1",
+      code: error.code,
+      delivery_state: "blocked",
+      message: "EPWA delivery unavailable: delivery was not verified; no raw artifact bytes were returned.",
+      ...evidenceRecoveryDetails(value),
+    });
     throw error;
   };
   if (problem) fail(problem);

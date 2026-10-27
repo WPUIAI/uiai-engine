@@ -22,6 +22,33 @@ const extension=(await import("../uiai-engine.ts")).default;
 const tools=new Map();
 extension({on(){},registerCommand(){},registerTool(tool){tools.set(tool.name,tool)}});
 
+test("actual native screenshot tools throw typed degraded errors without exposing rejected payloads",async()=>{
+ const artifact="uiai-artifact:sha256:"+"b".repeat(64);
+ let raw=false;
+ const server=createServer((req,res)=>{res.setHeader("Content-Type","application/json");res.end(JSON.stringify({delivery_state:"blocked",artifact_ref:artifact,epwa_delivery:{schema:"uiai.epwa_delivery.v1",state:"blocked",recovery_ref:"reconcile:epwa-scope-required"},private_title:"synthetic-private-title",...(raw?{screenshot:"synthetic-private-bytes"}:{})}));});
+ await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
+ const prior=process.env.UIAI_ENGINE_URL;process.env.UIAI_ENGINE_URL=`http://127.0.0.1:${server.address().port}`;
+ try{
+  for(const name of ["uiai_browser_screenshot","uiai_screenshot"]){
+   for(raw of [false,true]){
+    await assert.rejects(tools.get(name).execute("owned-fixture",name==="uiai_screenshot"?{url:"https://example.test"}:{session_id:"owned-fixture"}),error=>{
+     assert.equal(error.code,"epwa_delivery_unavailable");
+     const envelope=JSON.parse(error.message);
+     assert.equal(envelope.schema,"uiai.epwa_delivery_error.v1");
+     assert.equal(envelope.delivery_state,"blocked");
+     assert.equal(envelope.artifact_ref,artifact);
+     assert.equal(envelope.recovery_ref,"reconcile:epwa-scope-required");
+     for(const privateValue of ["synthetic-private-title","synthetic-private-bytes","artifact_url","portable_url"])assert.ok(!error.message.includes(privateValue));
+     return true;
+    });
+   }
+  }
+ }finally{
+  if(prior===undefined)delete process.env.UIAI_ENGINE_URL;else process.env.UIAI_ENGINE_URL=prior;
+  await new Promise(resolve=>server.close(resolve));
+ }
+});
+
 test("native Pi open decodes gzip and cleans its session on malformed bytes",async()=>{
  let mode="gzip",closed=0;
  const server=createServer((req,res)=>{
