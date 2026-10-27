@@ -9,14 +9,31 @@ import (
 // DecodeProjection retains object/array roles in JSON text for Value to classify
 // together with the other fields/arguments in the same privacy boundary.
 func DecodeProjection(raw string) any {
-	var decoded any
-	if json.Unmarshal([]byte(raw), &decoded) == nil {
-		switch decoded.(type) {
-		case map[string]any, []any:
-			return decoded
-		}
+	prefix, decoded, suffix := DecodeFramedProjection(raw)
+	if strings.TrimSpace(prefix) == "" && strings.TrimSpace(suffix) == "" {
+		return decoded
 	}
 	return raw
+}
+
+// DecodeFramedProjection retains a leading JSON object/array inside diagnostic
+// prose (for example Chrome's "Uncaught " prefix and trailing stack). Decoding
+// grants no privacy: callers classify all three parts together through Value.
+// Only the first structural candidate is decoded; malformed text stays text.
+func DecodeFramedProjection(raw string) (string, any, string) {
+	start := strings.IndexAny(raw, "{[")
+	if start < 0 {
+		return "", raw, ""
+	}
+	decoder := json.NewDecoder(strings.NewReader(raw[start:]))
+	var decoded any
+	if decoder.Decode(&decoded) == nil {
+		switch decoded.(type) {
+		case map[string]any, []any:
+			return raw[:start], decoded, raw[start+int(decoder.InputOffset()):]
+		}
+	}
+	return "", raw, ""
 }
 
 // Value redacts copied structured projections, including aliases of values from

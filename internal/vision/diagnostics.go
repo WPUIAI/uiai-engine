@@ -1,7 +1,6 @@
 package vision
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -274,24 +273,11 @@ func (s *Session) recordConsole(e *proto.RuntimeConsoleAPICalled) {
 	if s.diagnostics == nil || e == nil {
 		return
 	}
-	projections := make([]any, 0, len(e.Args))
+	raw := make([]string, 0, len(e.Args))
 	for _, arg := range e.Args {
-		projections = append(projections, secrettext.DecodeProjection(fullRemoteObjectPreview(arg)))
+		raw = append(raw, fullRemoteObjectPreview(arg))
 	}
-	// Classify complete arguments together, including JSON roles and aliases,
-	// before a preview budget can erase their credential labels.
-	clean := secrettext.Value(projections).([]any)
-	args := make([]string, len(clean))
-	for i, value := range clean {
-		if text, ok := value.(string); ok {
-			args[i] = text
-		} else if encoded, err := json.Marshal(value); err == nil {
-			args[i] = string(encoded)
-		} else {
-			args[i] = secrettext.Marker
-		}
-		args[i] = truncateDiag(sanitizeDiagnosticText(args[i]), 500)
-	}
+	args := redactedDiagnosticPreviews(raw, 500)
 	url, line, col := stackTop(e.StackTrace)
 	s.diagnostics.mu.Lock()
 	defer s.diagnostics.mu.Unlock()
@@ -314,22 +300,27 @@ func (s *Session) recordException(e *proto.RuntimeExceptionThrown) {
 	}
 	d := e.ExceptionDetails
 	text := d.Text
+	textLimit := 1000
 	if d.Exception != nil {
-		if p := remoteObjectPreview(d.Exception); p != "" {
+		if p := fullRemoteObjectPreview(d.Exception); p != "" {
 			text = p
+			textLimit = 500
 		}
 	}
+	// Labels may occur beyond the preview budget, while their aliases appear
+	// earlier in the message or stack; classify the complete event first.
+	clean := redactedDiagnosticPreviews([]string{text, stackPreview(d.StackTrace)}, 1000)
 	s.diagnostics.mu.Lock()
 	defer s.diagnostics.mu.Unlock()
 	s.diagnostics.seq++
 	s.diagnostics.exceptions = appendBounded(s.diagnostics.exceptions, ExceptionEvent{
 		Seq:          s.diagnostics.seq,
 		TS:           time.Now().UTC().Format(time.RFC3339),
-		Text:         sanitizeDiagnosticText(text),
+		Text:         truncateDiag(clean[0], textLimit),
 		URL:          redactURL(d.URL),
 		Line:         d.LineNumber,
 		Column:       d.ColumnNumber,
-		StackPreview: sanitizeDiagnosticText(stackPreview(d.StackTrace)),
+		StackPreview: clean[1],
 	}, maxExceptionEvents)
 }
 
@@ -501,10 +492,6 @@ func summarizeDiagnostics(console []ConsoleEvent, exceptions []ExceptionEvent, n
 	return s
 }
 
-func remoteObjectPreview(obj *proto.RuntimeRemoteObject) string {
-	return truncateDiag(fullRemoteObjectPreview(obj), 500)
-}
-
 func fullRemoteObjectPreview(obj *proto.RuntimeRemoteObject) string {
 	if obj == nil {
 		return ""
@@ -546,7 +533,7 @@ func stackPreview(st *proto.RuntimeStackTrace) string {
 		}
 		parts = append(parts, fmt.Sprintf("%s %s:%d:%d", f.FunctionName, f.URL, f.LineNumber, f.ColumnNumber))
 	}
-	return truncateDiag(strings.Join(parts, "\n"), 1000)
+	return strings.Join(parts, "\n")
 }
 
 func redactURL(raw string) string {

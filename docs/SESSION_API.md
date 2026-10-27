@@ -395,8 +395,13 @@ labels, credential-labelled controls and aliases, and PEM private-key blocks.
 Valid JSON console arguments retain their field roles and are classified together
 with the other arguments before the 500-byte argument previews are persisted.
 A credential field beyond that preview must still protect earlier and separate
-argument aliases. This does not promise recognition of arbitrary encodings or
-prefixed/transformed secret text without an explicit binding.
+argument aliases. Exception messages and their first five stack frames use the
+same joint classification before the existing 500-byte remote-object message
+and 1000-byte stack previews are stored. A leading valid JSON object/array retains its credential
+roles even inside diagnostic prose, such as Chrome's `Uncaught ` prefix and a
+trailing stack; ordinary text stays text. Malformed or additional embedded JSON
+and arbitrary encodings/transformed secret text remain outside this guarantee
+without an explicit binding.
 Explicitly labelled recovery-material sections are withheld as a unit, never
 parsed or enumerated; this grants no recovery-code automation authority.
 
