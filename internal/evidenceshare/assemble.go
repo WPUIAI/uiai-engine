@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -41,13 +40,10 @@ func Assemble(root string, input Input) (Result, error) {
 	}
 	screenshotDigest := sha256.Sum256(input.Screenshot)
 	screenshotSHA := hex.EncodeToString(screenshotDigest[:])
-	scopeBody, err := json.Marshal(input.Scope)
+	id, err := screenshotPackageID(screenshotSHA, input)
 	if err != nil {
 		return Result{}, err
 	}
-	idInput := fmt.Sprintf("%s\n%d\n%d\n%s\n%s\n%s\n%s", screenshotSHA, input.Width, input.Height, sanitizeURL(input.SourceURL), input.CapturedAt.UTC().Format(time.RFC3339Nano), embeddedAssetsSHA256(), scopeBody)
-	idDigest := sha256.Sum256([]byte(idInput))
-	id := hex.EncodeToString(idDigest[:])
 	artifactRef := "uiai-evidence-share:sha256:" + id
 	_, inspectionBody, inspectionErr := inspectScreenshot(input.Screenshot, mime, screenshotSHA)
 	availability := "blocked"

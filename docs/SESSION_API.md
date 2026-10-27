@@ -167,8 +167,11 @@ Preferred stable handles:
 Focusa ingestion must preserve exact project/Workpoint scope and independently verify the UIAI product/child token. A Focusa Evidence link cannot retroactively authorize an unlicensed UIAI action.
 
 Artifact inspection (`GET /api/screenshot/artifact/{ref}`) accepts a typed
-`uiai-artifact:sha256:` reference or its bare digest. An intact unsealed browser
-artifact returns HTTP202 with `delivery_state: blocked` and a reconciliation hint,
+`uiai-artifact:sha256:` reference or its bare digest. Screenshot packet refs
+(`uiai-evidence-share:sha256:`) are also accepted; packet-id inspection at
+`GET /api/screenshot/share/{id}` recognizes current-producer unsealed screenshots.
+The native inspector accepts either typed reference without caller-side prefix
+rewriting. An intact unsealed browser artifact or screenshot returns HTTP202 with `delivery_state: blocked` and a reconciliation hint,
 not the retired raw-image error. This metadata-only response contains no private
 payload, scope, viewer or download links. Only a fully verified public package
 returns ready links; unknown or corrupted artifacts remain unavailable.

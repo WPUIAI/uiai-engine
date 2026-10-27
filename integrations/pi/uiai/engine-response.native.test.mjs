@@ -49,6 +49,28 @@ test("actual native screenshot tools throw typed degraded errors without exposin
  }
 });
 
+test("native inspector accepts issued typed screenshot refs and returns only blocked metadata",async()=>{
+ const id="c".repeat(64), ref="uiai-evidence-share:sha256:"+id;
+ const requested=[];
+ const server=createServer((req,res)=>{requested.push(req.url);res.writeHead(202,{"Content-Type":"application/json"});res.end(JSON.stringify({schema:"uiai.evidence_artifact_resolve.v1",artifact_ref:ref,delivery_state:"blocked",code:"artifact_not_published",posture:"metadata_only_no_delivery_claim"}));});
+ await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
+ const prior=process.env.UIAI_ENGINE_URL;process.env.UIAI_ENGINE_URL=`http://127.0.0.1:${server.address().port}`;
+ try{
+  const tool=tools.get("uiai_evidence_share_inspect");
+  assert.match(ref,new RegExp(tool.parameters.properties.packet_id.pattern));
+  for(const packet_id of [ref,id]){
+   const response=await tool.execute("owned-inspect-fixture",{packet_id});
+   const body=JSON.parse(response.content[0].text);
+   assert.equal(body.artifact_ref,ref);assert.equal(body.delivery_state,"blocked");
+   assert.ok(!body.artifact_url);assert.ok(!body.screenshot);
+  }
+  assert.deepEqual(requested,[`/api/screenshot/share/${id}`,`/api/screenshot/share/${id}`]);
+ }finally{
+  if(prior===undefined)delete process.env.UIAI_ENGINE_URL;else process.env.UIAI_ENGINE_URL=prior;
+  await new Promise(resolve=>server.close(resolve));
+ }
+});
+
 test("native Pi open decodes gzip and cleans its session on malformed bytes",async()=>{
  let mode="gzip",closed=0;
  const server=createServer((req,res)=>{

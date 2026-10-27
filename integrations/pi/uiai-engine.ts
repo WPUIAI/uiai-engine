@@ -1034,12 +1034,12 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "uiai_evidence_share_inspect",
 		label: "UIAI Evidence Share Inspect",
-		description: "Inspect a published Evidence Share Packet by exact id, or resolve a published artifact reference to verified EPWA linkage.",
+		description: "Inspect an Evidence Share Packet or artifact reference. Published records resolve to verified linkage; intact unsealed records return blocked metadata only.",
 		parameters: Type.Object({
-			packet_id: Type.String({ description: "Exact packet id, artifact digest, or uiai-artifact:sha256 reference", pattern: "^(?:uiai-artifact:sha256:)?[a-f0-9]{64}$" }),
+			packet_id: Type.String({ description: "Exact packet id, artifact digest, or typed uiai-artifact/uiai-evidence-share reference", pattern: "^(?:uiai-(?:artifact|evidence-share):sha256:)?[a-f0-9]{64}$" }),
 		}),
 		async execute(_toolCallId, params) {
-			const ref = String(params.packet_id || "");
+			const ref = String(params.packet_id || "").replace(/^uiai-evidence-share:sha256:/, "");
 			if (!ref.startsWith("uiai-artifact:sha256:")) {
 				try {
 					return textResult(await callEngine(`/api/screenshot/share/${encodeURIComponent(ref)}`), { endpoint: "/api/screenshot/share/{id}" });

@@ -287,12 +287,7 @@ func mountScreenshotArtifact(r chi.Router, cfg *config.Config) {
 		if !published && packet != nil {
 			// Recognize intact unsealed browser artifacts without publishing
 			// private content or pretending that their scope is complete.
-			writeJSON(w, http.StatusAccepted, map[string]any{
-				"schema":       "uiai.evidence_artifact_resolve.v1",
-				"artifact_ref": requested, "delivery_state": "blocked",
-				"code": "artifact_not_published", "recovery_ref": "reconcile:epwa-scope-required",
-				"posture": "metadata_only_no_delivery_claim",
-			})
+			writeUnpublishedArtifactMetadata(w, requested)
 			return
 		}
 		if published {
@@ -311,6 +306,14 @@ func mountScreenshotArtifact(r chi.Router, cfg *config.Config) {
 			"artifact_ref": chi.URLParam(req, "sha"),
 			"message":      "raw screenshots are available only through an EPWA viewer and portable package",
 		})
+	})
+}
+
+func writeUnpublishedArtifactMetadata(w http.ResponseWriter, ref string) {
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"schema": "uiai.evidence_artifact_resolve.v1", "artifact_ref": ref,
+		"delivery_state": "blocked", "code": "artifact_not_published",
+		"recovery_ref": "reconcile:epwa-scope-required", "posture": "metadata_only_no_delivery_claim",
 	})
 }
 
@@ -371,6 +374,12 @@ func findPublishedArtifactPacket(cfg *config.Config, req *http.Request, artifact
 		}
 		if ref == "" || ref != artifactRef {
 			continue
+		}
+		if descriptor.Schema == evidenceshare.Schema {
+			if manifest, err := evidenceshare.VerifyScreenshotArtifactBytes(directory, entry.Name()); err == nil && manifest.Availability == "blocked" && !manifest.Scope.Complete() {
+				knownUnsealed = true
+				continue
+			}
 		}
 		if descriptor.Schema == evidenceshare.GenericArtifactSchema {
 			if manifest, err := evidenceshare.VerifyGenericArtifactBytes(directory, entry.Name()); err == nil && manifest.Availability == "blocked" && !manifest.Scope.Complete() {
@@ -663,6 +672,10 @@ func mountEvidenceShare(r chi.Router, cfg *config.Config) {
 func serveShareRecord(w http.ResponseWriter, req *http.Request, cfg *config.Config, id string) {
 	directory := filepath.Join(evidenceShareDir(cfg), id)
 	if _, err := loadPublicPackage(directory, id); err != nil {
+		if manifest, verifyErr := evidenceshare.VerifyScreenshotArtifactBytes(directory, id); verifyErr == nil && manifest.Availability == "blocked" && !manifest.Scope.Complete() {
+			writeUnpublishedArtifactMetadata(w, manifest.ArtifactRef)
+			return
+		}
 		http.NotFound(w, req)
 		return
 	}
