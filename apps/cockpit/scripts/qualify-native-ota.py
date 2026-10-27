@@ -85,7 +85,7 @@ def capture_owned_window(executable, output, root):
     script = '''ObjC.import('CoreGraphics');
 function run(argv) {
   const owned = JSON.parse(argv[0]);
-  const rows = ObjC.deepUnwrap($.CGWindowListCopyWindowInfo(1, 0));
+  const rows = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(1, 0)));
   return JSON.stringify(rows.filter(w => owned.includes(w.kCGWindowOwnerPID) &&
     w.kCGWindowLayer === 0 && w.kCGWindowBounds.Width >= 100 && w.kCGWindowBounds.Height >= 100)
     .map(w => ({id:w.kCGWindowNumber,pid:w.kCGWindowOwnerPID})));

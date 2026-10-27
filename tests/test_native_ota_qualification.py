@@ -140,10 +140,16 @@ class NativeWindowCaptureBoundaryTests(unittest.TestCase):
     def test_owned_capture_binds_pid_window_and_digest_without_claiming_pixels(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); executable, output = self.fixture(root)
+            def fake_query(command, **_):
+                # CoreGraphics returns CFArrayRef, not an already-unwrapped JS
+                # array; the native bridge conversion is required before filter.
+                self.assertIn('ObjC.castRefToObject($.CGWindowListCopyWindowInfo', command[4])
+                self.assertEqual(json.loads(command[5]), [42])
+                return '[{"id":11,"pid":42}]'
             def fake_capture(command, **_):
                 self.assertEqual(command[:5], ['/usr/sbin/screencapture', '-x', '-o', '-l', '11'])
                 Path(command[-1]).write_bytes(b'\x89PNG\r\n\x1a\nsynthetic header fixture')
-            with patch.object(module, 'pids', return_value=[42]), patch.object(module.time, 'sleep'), patch.object(module.subprocess, 'check_output', return_value='[{"id":11,"pid":42}]'), patch.object(module.subprocess, 'run', side_effect=fake_capture):
+            with patch.object(module, 'pids', return_value=[42]), patch.object(module.time, 'sleep'), patch.object(module.subprocess, 'check_output', side_effect=fake_query), patch.object(module.subprocess, 'run', side_effect=fake_capture):
                 result = module.capture_owned_window(executable, output, root)
             self.assertEqual(result['status'], 'captured'); self.assertEqual(result['owner_pid'], 42)
             self.assertEqual(result['sha256'], module.sha(output))
