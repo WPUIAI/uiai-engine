@@ -296,6 +296,10 @@ Before claiming an existing-user Cockpit rollout is ready:
   Cockpit queries native `getVersion()` before announcing activation, preserves
   pending receipts when the old process is still running or verification fails,
   and never removes a newer receipt during an overlapping check.
+  A manifest check does not verify the downloaded artifact signature, and the
+  updater's `Finished` download event is not installation or activation proof.
+  Download/install/relaunch progress stays informational; only a matching native
+  running-version confirmation produces the successful activation notification.
 - Mocked updater tests, frontend builds and cross-compilation are not native OTA
   receipts. Public evidence-delivery failures remain separate release blockers.
 - Use the actual authorized release channel, not probe releases or paid CI used

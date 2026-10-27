@@ -45,7 +45,7 @@ function report(reporter: CockpitUpdateReporter | undefined, result: CockpitUpda
     } else if (result.phase === 'downloading') {
       pushToast({ id: 'cockpit-ota', level: 'info', title: `Downloading Cockpit ${result.version ?? ''}`, message: result.message, progress: result.totalBytes ? result.downloadedBytes! / result.totalBytes : undefined, durationMs: 0 });
     } else if (result.phase === 'installing') {
-      pushToast({ id: 'cockpit-ota', level: 'success', title: `Cockpit ${result.version ?? ''} installed`, message: result.message, progress: 1, durationMs: 0 });
+      pushToast({ id: 'cockpit-ota', level: 'info', title: `Installing Cockpit ${result.version ?? ''}`, message: result.message, progress: 1, durationMs: 0 });
     } else if (result.phase === 'error') {
       pushToast({ id: 'cockpit-ota', level: 'error', title: 'Cockpit update failed safely', message: result.message });
     }
@@ -92,7 +92,7 @@ export async function runCockpitUpdate(options: {
     if (!install) {
       return report(reporter, {
         phase: 'available',
-        message: `Cockpit ${update.version} is signed and ready.`,
+        message: `Cockpit ${update.version} is available; its signature will be verified before installation.`,
         version: update.version,
       });
     }
@@ -101,7 +101,7 @@ export async function runCockpitUpdate(options: {
     let totalBytes: number | undefined;
     report(reporter, {
       phase: 'available',
-      message: `Cockpit ${update.version} is signed; installing in the background…`,
+      message: `Cockpit ${update.version} is available; downloading and verifying before installation…`,
       version: update.version,
     });
     await update.downloadAndInstall((event) => {
