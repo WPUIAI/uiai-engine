@@ -406,6 +406,9 @@ JSON credential roles in page titles also supply transient privacy context for
 action/evaluation metadata, read fields, snapshot metadata and wrapped-page
 initialization. Their aliases are classified before title previews; ordinary read
 formatting is preserved. This context is not a persistent binding/secret cache.
+Byte-bounded diagnostic/title previews stop at a complete UTF-8 code point before
+adding the existing ellipsis; their byte limits do not become character limits.
+This preserves valid text, not necessarily an entire combining/grapheme cluster.
 Explicitly labelled recovery-material sections are withheld as a unit, never
 parsed or enumerated; this grants no recovery-code automation authority.
 

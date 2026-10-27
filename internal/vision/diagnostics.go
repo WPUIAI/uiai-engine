@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/secrettext"
@@ -600,7 +601,11 @@ func truncateDiag(s string, max int) string {
 	if len(s) <= max {
 		return s
 	}
-	return s[:max] + "…"
+	end := max
+	for end > 0 && !utf8.RuneStart(s[end]) {
+		end--
+	}
+	return s[:end] + "…"
 }
 
 func reverseConsole(items []ConsoleEvent) {
