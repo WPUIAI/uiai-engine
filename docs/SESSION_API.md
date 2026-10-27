@@ -392,6 +392,11 @@ titles, evaluation projections, research capture summaries, and persisted error
 text share `internal/secrettext` before output/persistence and before truncation.
 It covers bearer/credential assignments, opaque values next to API-key/token
 labels, credential-labelled controls and aliases, and PEM private-key blocks.
+Valid JSON console arguments retain their field roles and are classified together
+with the other arguments before the 500-byte argument previews are persisted.
+A credential field beyond that preview must still protect earlier and separate
+argument aliases. This does not promise recognition of arbitrary encodings or
+prefixed/transformed secret text without an explicit binding.
 Explicitly labelled recovery-material sections are withheld as a unit, never
 parsed or enumerated; this grants no recovery-code automation authority.
 

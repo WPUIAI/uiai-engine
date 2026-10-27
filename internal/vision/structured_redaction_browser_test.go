@@ -60,6 +60,32 @@ func TestStructuredCredentialRedactionBeforeEvalTruncationBrowser(t *testing.T) 
 			}
 		}
 	}
+	_, _, err = sess.Eval(`console.error(JSON.stringify({echo:"` + canary + `",padding:"x".repeat(1500),password:["` + canary + `"]}), "` + canary + `"); return true`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics := sess.Diagnostics(50, "all", false)
+	if len(diagnostics.Console) == 0 {
+		t.Fatal("real console event was not observed")
+	}
+	encoded, err := json.Marshal(diagnostics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), canary) {
+		t.Fatal("synthetic JSON credential escaped actual browser diagnostics")
+	}
+	func() {
+		sess.diagnostics.mu.Lock()
+		defer sess.diagnostics.mu.Unlock()
+		stored, err := json.Marshal(sess.diagnostics.console)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(stored), canary) {
+			t.Fatal("synthetic JSON credential was persisted in recorder")
+		}
+	}()
 	value, _, err := sess.Eval(`return {answer:42,items:["ordinary",true,null]}`)
 	if err != nil {
 		t.Fatal(err)

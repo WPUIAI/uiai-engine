@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -273,13 +274,23 @@ func (s *Session) recordConsole(e *proto.RuntimeConsoleAPICalled) {
 	if s.diagnostics == nil || e == nil {
 		return
 	}
-	args := make([]string, 0, len(e.Args))
+	projections := make([]any, 0, len(e.Args))
 	for _, arg := range e.Args {
-		args = append(args, remoteObjectPreview(arg))
+		projections = append(projections, secrettext.DecodeProjection(fullRemoteObjectPreview(arg)))
 	}
-	args = secrettext.Fragments(args)
-	for i := range args {
-		args[i] = sanitizeDiagnosticText(args[i])
+	// Classify complete arguments together, including JSON roles and aliases,
+	// before a preview budget can erase their credential labels.
+	clean := secrettext.Value(projections).([]any)
+	args := make([]string, len(clean))
+	for i, value := range clean {
+		if text, ok := value.(string); ok {
+			args[i] = text
+		} else if encoded, err := json.Marshal(value); err == nil {
+			args[i] = string(encoded)
+		} else {
+			args[i] = secrettext.Marker
+		}
+		args[i] = truncateDiag(sanitizeDiagnosticText(args[i]), 500)
 	}
 	url, line, col := stackTop(e.StackTrace)
 	s.diagnostics.mu.Lock()
@@ -491,14 +502,24 @@ func summarizeDiagnostics(console []ConsoleEvent, exceptions []ExceptionEvent, n
 }
 
 func remoteObjectPreview(obj *proto.RuntimeRemoteObject) string {
+	return truncateDiag(fullRemoteObjectPreview(obj), 500)
+}
+
+func fullRemoteObjectPreview(obj *proto.RuntimeRemoteObject) string {
 	if obj == nil {
 		return ""
 	}
-	if obj.Description != "" {
-		return truncateDiag(obj.Description, 500)
-	}
 	if obj.Value.Raw() != nil {
-		return truncateDiag(obj.Value.String(), 500)
+		if obj.Type == proto.RuntimeRemoteObjectTypeString {
+			return obj.Value.Str()
+		}
+		if encoded, err := obj.Value.MarshalJSON(); err == nil {
+			return string(encoded)
+		}
+		return secrettext.Marker
+	}
+	if obj.Description != "" {
+		return obj.Description
 	}
 	if obj.UnserializableValue != "" {
 		return string(obj.UnserializableValue)

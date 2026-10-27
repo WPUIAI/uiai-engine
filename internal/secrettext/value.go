@@ -6,6 +6,19 @@ import (
 	"strings"
 )
 
+// DecodeProjection retains object/array roles in JSON text for Value to classify
+// together with the other fields/arguments in the same privacy boundary.
+func DecodeProjection(raw string) any {
+	var decoded any
+	if json.Unmarshal([]byte(raw), &decoded) == nil {
+		switch decoded.(type) {
+		case map[string]any, []any:
+			return decoded
+		}
+	}
+	return raw
+}
+
 // Value redacts copied structured projections, including aliases of values from
 // credential-labelled controls; it does not mutate browser state or cache data.
 func Value(input any) any {

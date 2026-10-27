@@ -13,16 +13,7 @@ func safePageProjection(page *rod.Page, values ...string) (string, []string) {
 	var fields map[string]any
 	outputs := make([]any, len(values))
 	for i, value := range values {
-		var decoded any
-		if json.Unmarshal([]byte(value), &decoded) == nil {
-			switch decoded.(type) {
-			case map[string]any, []any:
-				if encoded, err := json.Marshal(secrettext.Value(decoded)); err == nil {
-					value = string(encoded)
-				}
-			}
-		}
-		outputs[i] = value
+		outputs[i] = secrettext.DecodeProjection(value)
 	}
 	if json.Unmarshal([]byte(raw), &fields) != nil || fields == nil {
 		out := make([]string, len(values))
@@ -36,7 +27,13 @@ func safePageProjection(page *rod.Page, values ...string) (string, []string) {
 	title, _ := clean["title"].(string)
 	out := make([]string, len(values))
 	for i, value := range clean["outputs"].([]any) {
-		out[i], _ = value.(string)
+		if text, ok := value.(string); ok {
+			out[i] = text
+		} else if encoded, err := json.Marshal(value); err == nil {
+			out[i] = string(encoded)
+		} else {
+			out[i] = secrettext.Marker
+		}
 		out[i] = sanitizeBrowserContent(out[i])
 	}
 	return sanitizeDiagnosticText(title), out
