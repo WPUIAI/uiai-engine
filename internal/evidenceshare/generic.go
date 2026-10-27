@@ -194,28 +194,39 @@ func AssembleGeneric(root string, input GenericInput) (Result, error) {
 	return result(packageSHA), nil
 }
 
-func ValidateGenericPackage(directory, packageID string) (GenericManifest, GenericProjection, error) {
+// VerifyGenericArtifactBytes checks immutable identity and bytes, NOT public
+// delivery readiness or execution authority. It never exposes the payload.
+func VerifyGenericArtifactBytes(directory, packageID string) (GenericManifest, error) {
 	var manifest GenericManifest
 	body, err := os.ReadFile(filepath.Join(directory, "artifact.json"))
 	if err != nil || json.Unmarshal(body, &manifest) != nil || manifest.Schema != GenericArtifactSchema {
-		return GenericManifest{}, GenericProjection{}, ErrInvalidInput
+		return GenericManifest{}, ErrInvalidInput
 	}
-	if manifest.Availability != "ready" || !manifest.Scope.Complete() || manifest.AssetRef == "" || !safePackagePath(strings.TrimPrefix(manifest.AssetRef, "./")) {
-		return GenericManifest{}, GenericProjection{}, ErrInvalidInput
+	if (manifest.Availability != "ready" && manifest.Availability != "blocked") ||
+		manifest.Bytes <= 0 || manifest.Bytes > maxGenericBytes || manifest.AssetRef == "" || !safePackagePath(strings.TrimPrefix(manifest.AssetRef, "./")) {
+		return GenericManifest{}, ErrInvalidInput
 	}
 	payload, err := os.ReadFile(filepath.Join(directory, strings.TrimPrefix(manifest.AssetRef, "./")))
 	if err != nil || len(payload) != manifest.Bytes || digestBytes(payload) != manifest.AssetSHA256 {
-		return GenericManifest{}, GenericProjection{}, ErrInvalidInput
-	}
-	var projection GenericProjection
-	projectionBody, err := os.ReadFile(filepath.Join(directory, "projection.json"))
-	if err != nil || json.Unmarshal(projectionBody, &projection) != nil || projection.Schema != GenericProjectionSchema || projection.ArtifactRef != manifest.ArtifactRef || projection.ArtifactSHA256 != manifest.AssetSHA256 || !reflect.DeepEqual(projection.Scope, manifest.Scope) || projection.Availability != "ready" {
-		return GenericManifest{}, GenericProjection{}, ErrInvalidInput
+		return GenericManifest{}, ErrInvalidInput
 	}
 	manifestBody, _ := json.MarshalIndent(manifest, "", "  ")
 	manifestBody = append(manifestBody, '\n')
 	identity := sha256.Sum256([]byte(digestBytes(manifestBody) + "\n" + embeddedAssetsSHA256()))
 	if hex.EncodeToString(identity[:]) != packageID {
+		return GenericManifest{}, ErrInvalidInput
+	}
+	return manifest, nil
+}
+
+func ValidateGenericPackage(directory, packageID string) (GenericManifest, GenericProjection, error) {
+	manifest, err := VerifyGenericArtifactBytes(directory, packageID)
+	if err != nil || manifest.Availability != "ready" || !manifest.Scope.Complete() {
+		return GenericManifest{}, GenericProjection{}, ErrInvalidInput
+	}
+	var projection GenericProjection
+	projectionBody, err := os.ReadFile(filepath.Join(directory, "projection.json"))
+	if err != nil || json.Unmarshal(projectionBody, &projection) != nil || projection.Schema != GenericProjectionSchema || projection.ArtifactRef != manifest.ArtifactRef || projection.ArtifactSHA256 != manifest.AssetSHA256 || !reflect.DeepEqual(projection.Scope, manifest.Scope) || projection.Availability != "ready" {
 		return GenericManifest{}, GenericProjection{}, ErrInvalidInput
 	}
 	return manifest, projection, nil

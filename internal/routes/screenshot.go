@@ -267,8 +267,8 @@ func screenshotStoreDir() string {
 // mountScreenshotArtifact resolves artifacts the engine issued without ever
 // serving raw bytes: the legacy raw-artifact route stays a fail-closed
 // tombstone for unknown digests, but any digest the engine already published
-// as an EPWA package resolves to its typed EPWA linkage (record/portable
-// URLs) so callers can inspect what they hold (issue #224 acceptance).
+// as a verified EPWA package resolves to its typed linkage; intact unsealed
+// artifacts resolve only to blocked metadata, never payloads or public links.
 func mountScreenshotArtifact(r chi.Router, cfg *config.Config) {
 	r.Get("/artifact/{sha}", func(w http.ResponseWriter, req *http.Request) {
 		// Chi may select RawPath for escaped segments. Decode exactly once,
@@ -283,7 +283,19 @@ func mountScreenshotArtifact(r chi.Router, cfg *config.Config) {
 			}
 		}
 		requested := normalizeArtifactRef(ref)
-		if packet, ok := findPublishedArtifactPacket(cfg, req, requested); ok {
+		packet, published := findPublishedArtifactPacket(cfg, req, requested)
+		if !published && packet != nil {
+			// Recognize intact unsealed browser artifacts without publishing
+			// private content or pretending that their scope is complete.
+			writeJSON(w, http.StatusAccepted, map[string]any{
+				"schema":       "uiai.evidence_artifact_resolve.v1",
+				"artifact_ref": requested, "delivery_state": "blocked",
+				"code": "artifact_not_published", "recovery_ref": "reconcile:epwa-scope-required",
+				"posture": "metadata_only_no_delivery_claim",
+			})
+			return
+		}
+		if published {
 			writeJSON(w, http.StatusOK, map[string]any{
 				"schema":         "uiai.evidence_artifact_resolve.v1",
 				"artifact_ref":   requested,
@@ -312,7 +324,8 @@ func normalizeArtifactRef(ref string) string {
 }
 
 // findPublishedArtifactPacket scans the share store for a package whose
-// artifact_ref matches, reusing the bounded listing walk (max 100 packets).
+// artifact_ref matches. A non-nil packet with false readiness denotes an intact
+// unsealed generic artifact; a later verified public package still takes priority.
 func findPublishedArtifactPacket(cfg *config.Config, req *http.Request, artifactRef string) (map[string]any, bool) {
 	if artifactRef == "" {
 		return nil, false
@@ -322,6 +335,7 @@ func findPublishedArtifactPacket(cfg *config.Config, req *http.Request, artifact
 		return nil, false
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() > entries[j].Name() })
+	knownUnsealed := false
 	for _, entry := range entries {
 		if !entry.IsDir() || !validShareID(entry.Name()) {
 			continue
@@ -358,6 +372,12 @@ func findPublishedArtifactPacket(cfg *config.Config, req *http.Request, artifact
 		if ref == "" || ref != artifactRef {
 			continue
 		}
+		if descriptor.Schema == evidenceshare.GenericArtifactSchema {
+			if manifest, err := evidenceshare.VerifyGenericArtifactBytes(directory, entry.Name()); err == nil && manifest.Availability == "blocked" && !manifest.Scope.Complete() {
+				knownUnsealed = true
+				continue
+			}
+		}
 		if issues := verifySharePackage(cfg, entry.Name()); len(issues) != 0 {
 			continue
 		}
@@ -384,6 +404,9 @@ func findPublishedArtifactPacket(cfg *config.Config, req *http.Request, artifact
 			"record_url":   recordURL,
 			"portable_url": portableURL,
 		}, true
+	}
+	if knownUnsealed {
+		return map[string]any{"delivery_state": "blocked"}, false
 	}
 	return nil, false
 }

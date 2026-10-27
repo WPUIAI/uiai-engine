@@ -166,6 +166,13 @@ Preferred stable handles:
 
 Focusa ingestion must preserve exact project/Workpoint scope and independently verify the UIAI product/child token. A Focusa Evidence link cannot retroactively authorize an unlicensed UIAI action.
 
+Artifact inspection (`GET /api/screenshot/artifact/{ref}`) accepts a typed
+`uiai-artifact:sha256:` reference or its bare digest. An intact unsealed browser
+artifact returns HTTP202 with `delivery_state: blocked` and a reconciliation hint,
+not the retired raw-image error. This metadata-only response contains no private
+payload, scope, viewer or download links. Only a fully verified public package
+returns ready links; unknown or corrupted artifacts remain unavailable.
+
 ## Packet parity status
 
 The browser research and diagnostics handoff is represented by `uiai.focusa_research_diagnostics_packet.v1`. The `POST /api/agent/research-packet` route and the Pi/extension `uiai_focusa_packet_build`/`uiai_focusa_packet_compose` surfaces preserve bounded evidence, redacted diagnostics, Focusa scope, and an exact next action. Packet intake remains advisory: it never grants UIAI entitlement or replaces Focusa Workpoint authority. This is proposal-only evidence handoff.
