@@ -16,13 +16,13 @@ func TestFPVStreamFirstFrameFailureIsTypedAndBounded(t *testing.T) {
 	frames := make(chan []byte)
 	response := httptest.NewRecorder()
 	start := time.Now()
-	fpvWriteStream(response, httptest.NewRequest("GET", "/stream", nil), frames, 8)
+	fpvWriteStream(response, httptest.NewRequest("GET", "/stream", nil), frames, 8, func() bool { return true })
 	if response.Code != http.StatusGatewayTimeout || !strings.Contains(response.Body.String(), "fpv_stream_stalled") || time.Since(start) > 4*time.Second {
 		t.Fatal("initial silence became hanging or false-success stream")
 	}
 	close(frames)
 	response = httptest.NewRecorder()
-	fpvWriteStream(response, httptest.NewRequest("GET", "/stream", nil), frames, 8)
+	fpvWriteStream(response, httptest.NewRequest("GET", "/stream", nil), frames, 8, func() bool { return true })
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatal("closed pump reported success")
 	}
@@ -52,7 +52,7 @@ func TestFPVStreamDeadReaderCannotHoldWriter(t *testing.T) {
 	frames <- []byte("owned-synthetic-jpeg-transport-fixture")
 	writer := &stalledFPVWriter{header: make(http.Header)}
 	start := time.Now()
-	fpvWriteStream(writer, httptest.NewRequest("GET", "/", nil), frames, 8)
+	fpvWriteStream(writer, httptest.NewRequest("GET", "/", nil), frames, 8, func() bool { return true })
 	if time.Since(start) > 3*time.Second {
 		t.Fatal("dead reader retained stream writer")
 	}
@@ -69,7 +69,10 @@ func TestFPVStreamFPSAndDisconnect(t *testing.T) {
 	frames := make(chan []byte, 1)
 	frames <- []byte("synthetic-transport-only")
 	done := make(chan struct{})
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { defer close(done); fpvWriteStream(w, r, frames, 8) }))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(done)
+		fpvWriteStream(w, r, frames, 8, func() bool { return true })
+	}))
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

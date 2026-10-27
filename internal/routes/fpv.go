@@ -427,7 +427,14 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			return
 		}
 		defer stop()
-		fpvWriteStream(w, req, frames, fps)
+		fpvWriteStream(w, req, frames, fps, func() bool {
+			current, valid := fpvEntry(entry.Token)
+			if !valid || current.SessionID != entry.SessionID {
+				return false
+			}
+			active, exists := sm.Get(entry.SessionID)
+			return exists && active == sess
+		})
 	})
 
 	r.Get("/{token}/stream.mjpg", func(w http.ResponseWriter, req *http.Request) {

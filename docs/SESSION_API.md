@@ -436,6 +436,13 @@ successful empty stream. Static pages need not repaint continuously. Native
 multipart `<img>` load events do not measure per-frame FPS or glass-to-glass delay;
 the viewer reports Live/Not measured instead of invented numbers. Local conformance
 measures mutation-to-received-decoded-JPEG separately from public-network latency.
+An open CDP stream revalidates its existing share and exact session before the
+first frame and every subsequent write. Revocation, expiry or session loss stops
+that consumer and releases its viewer/subscription without stopping other valid
+viewers. Losing admission while awaiting the first frame returns HTTP 410
+`fpv_stream_lease_ended`. Already-authorized bytes in flight may drain, and an
+ongoing write retains the existing two-second bound; this is not a promise to
+recall bytes already sent or complete origin/navigation privacy binding.
 The same binary embeds the canonical FPV template and generated asset bundle;
 `bash scripts/build-fpv-assets.sh` is its sole generated-asset writer.
 
