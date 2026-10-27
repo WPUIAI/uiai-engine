@@ -17,6 +17,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/evidenceshare"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-rod/rod/lib/launcher"
 )
 
 // Opt-in browser proof uses real package assembly and serving, not a mocked API.
@@ -26,9 +27,9 @@ func TestEPWALocalizedBrowser(t *testing.T) {
 	if output == "" {
 		t.Skip("set UIAI_EPWA_BROWSER_PROOF_DIR for real Chromium proof")
 	}
-	chrome, err := exec.LookPath("chromium-browser")
-	if err != nil {
-		t.Fatal(err)
+	chrome, found := launcher.LookPath()
+	if !found {
+		t.Fatal("installed Chromium executable unavailable; browser proof never downloads a replacement")
 	}
 	if err := os.MkdirAll(output, 0700); err != nil {
 		t.Fatal(err)
