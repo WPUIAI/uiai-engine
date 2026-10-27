@@ -276,6 +276,14 @@ Receipts identify source revisions, versions and actual candidate bytes. This is
 not a claim about an unidentified historical public binary or notarization;
 manual qualification artifacts are not automatically published.
 
+The same hosted fixture may capture its exact app window before upgrade, after
+candidate activation and after owned rollback. The receipt binds each PNG to a
+currently running fixture PID/window and digest; no full-desktop fallback or OS
+permission change is allowed. An unavailable capture stays explicitly unproven
+and does not manufacture visual acceptance or erase a separately valid native
+updater receipt. Inspect the PNG pixels before claiming a version/toast is visible;
+a captured file or matched hash alone is not that verification.
+
 The release workflow calls that same native qualification workflow with the exact
 candidate SHA and version. It never rebuilds separate Mac packages for publication.
 Candidate metadata, DMG, updater bundle and signature are frozen before the baseline

@@ -115,4 +115,61 @@ class NativeQualificationBoundaryTests(unittest.TestCase):
 
 
 
+class NativeWindowCaptureBoundaryTests(unittest.TestCase):
+    def fixture(self, root):
+        executable = root/'native-ota/install/UIAI Engine Cockpit.app/Contents/MacOS/fixture'
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b'owned fixture, not an executable')
+        output = root/'candidate-window.png'
+        return executable, output
+
+    def test_wrong_scope_never_queries_or_captures_a_desktop(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(module.subprocess, 'check_output') as query, patch.object(module.subprocess, 'run') as capture:
+            result = module.capture_owned_window(Path('/Applications/Unrelated.app/Contents/MacOS/app'), Path(tmp)/'out.png', Path(tmp))
+            self.assertEqual(result['status'], 'blocked')
+            query.assert_not_called(); capture.assert_not_called()
+
+    def test_foreign_window_never_becomes_a_fallback_capture(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); executable, output = self.fixture(root)
+            with patch.object(module, 'pids', return_value=[42]), patch.object(module.time, 'sleep'), patch.object(module.subprocess, 'check_output', return_value='[{"id":11,"pid":43}]'), patch.object(module.subprocess, 'run') as capture:
+                result = module.capture_owned_window(executable, output, root)
+            self.assertEqual(result['status'], 'unavailable'); capture.assert_not_called()
+            self.assertFalse(output.exists())
+
+    def test_owned_capture_binds_pid_window_and_digest_without_claiming_pixels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); executable, output = self.fixture(root)
+            def fake_capture(command, **_):
+                self.assertEqual(command[:5], ['/usr/sbin/screencapture', '-x', '-o', '-l', '11'])
+                Path(command[-1]).write_bytes(b'\x89PNG\r\n\x1a\nsynthetic header fixture')
+            with patch.object(module, 'pids', return_value=[42]), patch.object(module.time, 'sleep'), patch.object(module.subprocess, 'check_output', return_value='[{"id":11,"pid":42}]'), patch.object(module.subprocess, 'run', side_effect=fake_capture):
+                result = module.capture_owned_window(executable, output, root)
+            self.assertEqual(result['status'], 'captured'); self.assertEqual(result['owner_pid'], 42)
+            self.assertEqual(result['sha256'], module.sha(output))
+            self.assertEqual(result['visual_verification'], 'pending_pixel_inspection')
+
+    def test_exited_fixture_and_existing_output_are_not_reused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); executable, output = self.fixture(root)
+            with patch.object(module, 'pids', side_effect=[[42], []]), patch.object(module.time, 'sleep'), patch.object(module.subprocess, 'check_output', return_value='[{"id":11,"pid":42}]'), patch.object(module.subprocess, 'run') as capture:
+                result = module.capture_owned_window(executable, output, root)
+            self.assertEqual(result['status'], 'unavailable'); capture.assert_not_called()
+            output.write_bytes(b'prior artifact')
+            with patch.object(module, 'pids') as lookup:
+                result = module.capture_owned_window(executable, output, root)
+            self.assertEqual(result['status'], 'blocked'); lookup.assert_not_called()
+            self.assertEqual(output.read_bytes(), b'prior artifact')
+
+    def test_os_capture_failure_is_recorded_without_changing_permissions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); executable, output = self.fixture(root)
+            error = subprocess.CalledProcessError(1, ['screencapture'], stderr=b'fixture permission unavailable')
+            with patch.object(module, 'pids', return_value=[42]), patch.object(module.time, 'sleep'), patch.object(module.subprocess, 'check_output', return_value='[{"id":11,"pid":42}]'), patch.object(module.subprocess, 'run', side_effect=error):
+                result = module.capture_owned_window(executable, output, root)
+            self.assertEqual(result['status'], 'unavailable')
+            self.assertIn('fixture permission unavailable', (root/result['diagnostics']).read_text())
+            self.assertNotIn('sha256', result)
+
+
 if __name__=='__main__': unittest.main()

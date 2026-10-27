@@ -70,6 +70,52 @@ def wait(predicate, label, timeout=90):
     raise RuntimeError('Timed out: ' + label)
 
 
+def capture_owned_window(executable, output, root):
+    """Optional pixels from only the exact hosted fixture; never grant OS access."""
+    executable, output, root = Path(executable), Path(output), Path(root).resolve()
+    expected = root/'native-ota/install/UIAI Engine Cockpit.app/Contents/MacOS'
+    if executable.resolve().parent != expected or root not in output.resolve().parents:
+        return {'status': 'blocked', 'reason': 'outside_owned_fixture'}
+    log = output.with_suffix('.capture.log')
+    if output.exists() or output.is_symlink() or log.exists() or log.is_symlink():
+        return {'status': 'blocked', 'reason': 'prior_capture_exists'}
+    owned = pids(executable)
+    if not owned:
+        return {'status': 'unavailable', 'reason': 'owned_fixture_not_running'}
+    script = '''ObjC.import('CoreGraphics');
+function run(argv) {
+  const owned = JSON.parse(argv[0]);
+  const rows = ObjC.deepUnwrap($.CGWindowListCopyWindowInfo(1, 0));
+  return JSON.stringify(rows.filter(w => owned.includes(w.kCGWindowOwnerPID) &&
+    w.kCGWindowLayer === 0 && w.kCGWindowBounds.Width >= 100 && w.kCGWindowBounds.Height >= 100)
+    .map(w => ({id:w.kCGWindowNumber,pid:w.kCGWindowOwnerPID})));
+}'''
+    try:
+        time.sleep(1)
+        rows = json.loads(subprocess.check_output(['/usr/bin/osascript', '-l', 'JavaScript',
+            '-e', script, json.dumps(owned)], text=True, stderr=subprocess.PIPE, timeout=10))
+        if not isinstance(rows, list):
+            return {'status': 'unavailable', 'reason': 'invalid_window_metadata'}
+        selected = next((row for row in rows if isinstance(row, dict) and type(row.get('id')) is int and
+            row['id'] > 0 and row.get('pid') in owned), None)
+        if selected is None or selected['pid'] not in pids(executable):
+            return {'status': 'unavailable', 'reason': 'no_current_owned_window'}
+        subprocess.run(['/usr/sbin/screencapture', '-x', '-o', '-l', str(selected['id']),
+            str(output)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+        if output.is_symlink() or not output.is_file() or output.read_bytes()[:8] != b'\x89PNG\r\n\x1a\n':
+            return {'status': 'unavailable', 'reason': 'capture_is_not_png'}
+        return {'status': 'captured', 'file': output.name, 'sha256': sha(output),
+            'owner_pid': selected['pid'], 'window_id': selected['id'],
+            'visual_verification': 'pending_pixel_inspection'}
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
+        detail = getattr(error, 'stderr', b'') or b''
+        if isinstance(detail, str):
+            detail = detail.encode()
+        with log.open('xb') as stream:
+            stream.write((type(error).__name__ + '\n').encode() + detail[:2000])
+        return {'status': 'unavailable', 'reason': type(error).__name__, 'diagnostics': log.name}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--app', type=Path, required=True)
@@ -160,12 +206,16 @@ def main():
             time.sleep(3)
             if baseline.poll() is not None or sha(executable) != baseline_sha:
                 raise RuntimeError('Invalid signature changed the baseline')
+            window_captures = {'baseline': capture_owned_window(executable,
+                args.output.parent/'baseline-window.png', root)}
             state['phase'] = 'valid'
             wait(lambda: baseline.poll() is not None, 'baseline process exits for native relaunch')
             wait(lambda: pids(executable) and baseline.pid not in pids(executable), 'new native process starts')
             if version(app) != args.candidate_version or sha(executable) != expected or sha(marker) != marker_sha:
                 raise RuntimeError('Running candidate identity/data preservation mismatch')
             upgraded_pids = pids(executable)
+            window_captures['candidate'] = capture_owned_window(executable,
+                args.output.parent/'candidate-window.png', root)
             state['phase'] = 'no_update'
             stop(executable)
             # Restore only this exact, freshly-created test installation.
@@ -176,6 +226,8 @@ def main():
             time.sleep(2)
             if version(app) != args.baseline_version or sha(executable) != baseline_sha or sha(marker) != marker_sha:
                 raise RuntimeError('Owned-fixture rollback/data preservation mismatch')
+            window_captures['rollback'] = capture_owned_window(executable,
+                args.output.parent/'rollback-window.png', root)
             result = {'schema': 'uiai.cockpit_native_ota_qualification.v1', 'status': 'passed',
                 'platform': actual_platform, 'baseline_version': args.baseline_version,
                 'candidate_version': args.candidate_version,
@@ -189,7 +241,10 @@ def main():
                 'preservation_marker_unchanged': True, 'owned_fixture_rollback': True,
                 'running_version_evidence': 'new process plus native bundle version and exact candidate executable hash',
                 'baseline_private_feed_override': True, 'candidate_production_config_preserved': True,
-                'historical_public_binary_upgrade': 'not claimed', 'public_channel_changed': False}
+                'historical_public_binary_upgrade': 'not claimed', 'public_channel_changed': False,
+                'native_window_captures': window_captures,
+                'window_capture_scope': 'exact owned fixture only; no OS permission changes',
+                'window_visual_verification': 'not claimed until PNG pixels are inspected'}
             args.output.write_text(json.dumps(result, indent=2)+'\n')
             print(json.dumps(result))
         finally:
