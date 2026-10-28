@@ -44,7 +44,7 @@ try {
   await call('Page.enable');
   await call('Page.addScriptToEvaluateOnNewDocument', { source: "window.__proofErrors=[];addEventListener('error',e=>__proofErrors.push(e.message));addEventListener('unhandledrejection',e=>__proofErrors.push(String(e.reason)));" });
   const metrics = [];
-  for (const [width, height] of [[1280, 900], [390, 844]]) {
+  for (const [width, height] of [[1440, 900], [1280, 900], [1024, 900], [768, 1024], [390, 844], [375, 812]]) {
     await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
     await call('Page.navigate', { url: address });
     let ready = false;
@@ -54,10 +54,38 @@ try {
     }
     assert(ready, 'Record did not reach ready state');
     await evaluate('document.fonts.ready');
+    if (name.startsWith('screenshot-')) {
+      const custody = await evaluate(`(async () => {
+        const projection = await (await fetch('./projection.json')).json();
+        const summary = document.getElementById('facts');
+        const asset = projection.assets.find(item => item.modality === 'screenshot');
+        const digests = [projection.artifact.manifest_sha256, projection.artifact.bundle_sha256, asset.sha256];
+        return { hashes: digests.every(value => value && summary.textContent.includes(value)),
+          beforeMedia: Boolean(summary.compareDocumentPosition(document.getElementById('evidence')) & Node.DOCUMENT_POSITION_FOLLOWING),
+          validityLayers: document.querySelectorAll('[data-validity-layer]').length };
+      })()`);
+      assert.equal(custody.hashes, true, 'digest-bound custody summary must precede media');
+      assert.equal(custody.beforeMedia, true);
+      assert.equal(custody.validityLayers, 8);
+    }
     const measured = await evaluate('({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,lang:document.documentElement.lang,dir:document.documentElement.dir,errors:window.__proofErrors})');
     const screenshot = await call('Page.captureScreenshot', { format: 'png' });
     await writeFile(join(output, `${name}-${width}.png`), Buffer.from(screenshot.data, 'base64'));
     await writeFile(join(output, `${name}-${width}.html`), await evaluate('document.documentElement.outerHTML'));
+    if (name.startsWith('screenshot-')) {
+      const inView = await evaluate(`(async () => {
+        const summary = document.getElementById('facts');
+        summary.scrollIntoView({block:'start',behavior:'instant'});
+        const headerHeight = document.querySelector('header')?.getBoundingClientRect().height || 0;
+        scrollBy({top: -headerHeight - 16, behavior:'instant'});
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const bounds = summary.getBoundingClientRect();
+        return bounds.top >= headerHeight && bounds.top < innerHeight && bounds.bottom > 0;
+      })()`);
+      assert.equal(inView, true, 'custody frame must actually show its summary');
+      const custodyFrame = await call('Page.captureScreenshot', { format: 'png' });
+      await writeFile(join(output, `${name}-${width}-custody.png`), Buffer.from(custodyFrame.data, 'base64'));
+    }
     assert.equal(measured.width, width);
     assert(measured.scrollWidth <= width + 1, `Horizontal overflow: ${JSON.stringify(measured)}`);
     assert.equal(measured.lang, url.searchParams.get('lang'));

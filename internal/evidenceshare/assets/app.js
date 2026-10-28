@@ -813,7 +813,13 @@ async function renderRecord() {
     setValidity("settlement", tr("not_asserted"), "not_determined");
     setValidity("legal", tr("not_determined"), "not_determined");
 
+    const integrityFields = [
+      ["Manifest SHA-256", projection.artifact.manifest_sha256],
+      ["Bundle SHA-256", projection.artifact.bundle_sha256],
+      ["Screenshot SHA-256", asset.sha256],
+    ];
     byId("facts").replaceChildren(
+      ...integrityFields.map(([label, value]) => fact(label, value)),
       fact(tr("captured"), formatTime(manifest.captured_at)),
       fact(tr("freshness_observed"), formatTime(projection.freshness_observed_at)),
       fact(tr("target"), manifest.source_url || tr("source_not_disclosed")),
@@ -831,9 +837,7 @@ async function renderRecord() {
     byId("inspect-grid").replaceChildren(
       datum(tr("artifact"), projection.artifact.artifact_ref),
       datum(tr("revision"), projection.artifact.revision),
-      datum("Manifest SHA-256", projection.artifact.manifest_sha256),
-      datum("Bundle SHA-256", projection.artifact.bundle_sha256),
-      datum("Screenshot SHA-256", asset.sha256),
+      ...integrityFields.map(([label, value]) => datum(label, value)),
       datum("Inspection", manifest.inspection_ref),
       datum(tr("project_label"), scope.project_ref),
       datum(tr("workstream"), scope.workstream_ref),
