@@ -128,6 +128,7 @@ class ReleasePublicationTests(unittest.TestCase):
         edits=[x for x in self.calls() if '--draft=false' in x]
         self.assertEqual(len(edits),1)
         self.assertIn('--latest',edits[0])
+        self.assertIn('--prerelease=false',edits[0])
 
     def test_missing_digest_cannot_promote(self):
         result=self.run_step(command(ENGINE,'Verify draft bytes and publish'),EXPECTED_SHA256='')
@@ -199,6 +200,32 @@ class ReleasePublicationTests(unittest.TestCase):
         self.assertIn('needs: [create-release, publish-macos-ota, linux-binary]',promote)
         stage=command(COCKPIT,'Stage immutable proof (channel unchanged)')
         self.assertNotIn('cockpit-latest',stage)
+
+    def test_stable_cockpit_publication_is_not_a_prerelease(self):
+        self.ota_tree()
+        result=self.run_step(self.ota_command('Merge updater latest.json (x86_64 + aarch64)'))
+        self.assertEqual(result.returncode,0,result.stderr)
+        updater=self.root/'cockpit-ota-x86/release-proof/cockpit/updater'
+        shutil.copytree(updater,self.root/'cockpit-ota-verified')
+        result=self.run_step(self.ota_command('Promote immutable release and mutable channel'),OTA_CANDIDATE_DIR=str(updater))
+        self.assertEqual(result.returncode,0,result.stderr)
+        edits=[x for x in self.calls() if x[:3]==['release','edit','cockpit-v0.3.1']]
+        self.assertEqual(len(edits),1)
+        self.assertIn('--prerelease=false',edits[0])
+        self.assertIn('--latest=false',edits[0], 'Cockpit must not displace the parent Engine installer Latest')
+
+    def test_dev_cockpit_publication_remains_a_prerelease(self):
+        self.ota_tree()
+        result=self.run_step(self.ota_command('Merge updater latest.json (x86_64 + aarch64)'))
+        self.assertEqual(result.returncode,0,result.stderr)
+        updater=self.root/'cockpit-ota-x86/release-proof/cockpit/updater'
+        shutil.copytree(updater,self.root/'cockpit-ota-verified')
+        result=self.run_step(self.ota_command('Promote immutable release and mutable channel'),OTA_CANDIDATE_DIR=str(updater),TAG='cockpit-v0.3.1-dev')
+        self.assertEqual(result.returncode,0,result.stderr)
+        edits=[x for x in self.calls() if x[:3]==['release','edit','cockpit-v0.3.1-dev']]
+        self.assertEqual(len(edits),1)
+        self.assertIn('--prerelease',edits[0])
+        self.assertIn('--latest=false',edits[0])
 
     def test_failed_bundle_upload_does_not_advance_feed(self):
         self.ota_tree()

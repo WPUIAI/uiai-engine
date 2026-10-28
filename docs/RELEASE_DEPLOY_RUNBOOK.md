@@ -282,6 +282,10 @@ Release-shell regression checks execute the real workflow commands against an
 isolated GitHub/filesystem fixture; they are not actual publication or native OTA.
 
 Engine releases and signed Cockpit desktop updates are separate delivery lanes.
+Stable tags publish as non-prereleases; `-dev` tags remain prereleases. Parent
+Engine stable releases advance the repository's GitHub Latest. Cockpit keeps its
+own `cockpit-latest` updater feed and must not displace the parent Engine Latest;
+its immutable stable release is still explicitly non-prerelease.
 Native qualification can use the existing public-repository hosted macOS runners:
 manual `Cockpit CI` dispatch with `qualify_ota=true` runs Intel and Apple Silicon
 canaries, without tags or publication. It builds the actual signed candidate with

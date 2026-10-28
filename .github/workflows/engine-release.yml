@@ -307,6 +307,6 @@ jobs:
           actual="$(sha256sum "$candidate/$ENGINE_ASSET_NAME" | awk '{print $1}')"
           [[ "$actual" == "$EXPECTED_SHA256" ]] || { echo 'Draft differs from tested deployed artifact' >&2; exit 2; }
           case "$RELEASE_TAG" in
-            *-dev*) gh release edit "$RELEASE_TAG" --draft=false --prerelease ;;
-            *) gh release edit "$RELEASE_TAG" --draft=false --latest ;;
+            *-dev*) gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false ;;
+            *) gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest ;;
           esac

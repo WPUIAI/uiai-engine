@@ -1,9 +1,9 @@
 {
   "name": "uaiengine-cockpit",
-  "version": "0.1.0-dev",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
-  "description": "UIAI Engine Cockpit — Svelte/Tauri developer/operator desktop client (Slice 0).",
+  "description": "UIAI Engine Cockpit \u2014 Svelte/Tauri developer/operator desktop client (Slice 0).",
   "engines": {
     "node": ">=20"
   },

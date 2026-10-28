@@ -303,11 +303,14 @@ jobs:
           for file in "$updater"/*.app.tar.gz "$updater"/*.app.tar.gz.sig; do
             cmp -- "$file" "$actual/$(basename "$file")"
           done
-          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease
+          case "$TAG" in
+            *-dev*) gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false ;;
+            *) gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest=false ;;
+          esac
           channel="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName,isDraft | jq -r '.[] | select(.tagName == "cockpit-latest") | .isDraft')"
           case "$channel" in
             false) ;;
-            '') gh release create cockpit-latest --repo "$GITHUB_REPOSITORY" --target "$TAG" --title 'UIAI Engine Cockpit Dev OTA' --notes 'Mutable signed development channel.' --prerelease ;;
+            '') gh release create cockpit-latest --repo "$GITHUB_REPOSITORY" --target "$TAG" --title 'UIAI Engine Cockpit OTA' --notes 'Mutable signed Cockpit update channel.' --prerelease --latest=false ;;
             *) echo 'Unexpected draft or ambiguous OTA channel' >&2; exit 2 ;;
           esac
           # The feed must remain unchanged if any bundle/signature upload fails.
