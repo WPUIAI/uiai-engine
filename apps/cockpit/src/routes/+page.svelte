@@ -134,7 +134,7 @@
         {#each sessions.slice(0, 4) as session}
           <div class="data-row">
             <span class="session-orb">◉</span>
-            <div class="data-row-copy"><strong>{session.title || "Untitled browser session"}</strong><span>{session.url || "No URL"} · {session.width || "?"}×{session.height || "?"}</span></div>
+            <div class="data-row-main"><strong>{session.title || "Untitled browser session"}</strong><span>{session.url || "No URL"} · {session.width || "?"}×{session.height || "?"}</span></div>
             <span class="badge">Live</span><a class="data-row-action" href="/runs">Open →</a>
           </div>
         {/each}

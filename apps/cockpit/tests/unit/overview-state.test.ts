@@ -185,5 +185,7 @@ describe("Overview live-state lifecycle", () => {
     expect(overview).toContain("Background job status is not provided here.");
     expect(overview).not.toContain("All clear");
     expect(overview).not.toContain("browserHealth?.active_pages ?? 0");
+    expect(overview).toContain('class="data-row-main"');
+    expect(overview).not.toContain('class="data-row-copy"');
   });
 });
