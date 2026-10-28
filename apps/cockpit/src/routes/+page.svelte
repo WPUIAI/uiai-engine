@@ -202,5 +202,10 @@
   .suggestion-list a:focus-visible, .posture-card a:focus-visible { outline: 3px solid var(--focus-ring, #4f46e5); outline-offset: 2px; }
   .session-orb { color: var(--success, #12b76a); }
   @media (max-width: 900px) { .posture-grid { grid-template-columns: repeat(2, 1fr); } .suggestion-list { grid-template-columns: 1fr; } }
-  @media (max-width: 640px) { .continue-card, .recovery-card { align-items: flex-start; flex-wrap: wrap; } .posture-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    .continue-card, .recovery-card { align-items: flex-start; flex-wrap: wrap; }
+    .continue-copy { flex: 1 1 calc(100% - 56px); }
+    .continue-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
+    .posture-grid { grid-template-columns: 1fr; }
+  }
 </style>

@@ -11,11 +11,12 @@ const proof = { schema: "uiai.cockpit_consumer_proof.v1", commit_sha: process.en
 const storage = (page) => page.evaluate((names) => Object.fromEntries(names.map((key) => [key, localStorage.getItem(key)])), keys);
 
 async function capture(page, name, width) {
-  const metrics = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth }));
+  const metrics = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth, continue_copy_width: document.querySelector(".continue-copy")?.getBoundingClientRect().width ?? null }));
   await page.screenshot({ path: join(output, name), fullPage: true });
   proof.captures.push({ file: name, viewport_width: width, metrics, sha256: createHash("sha256").update(readFileSync(join(output, name))).digest("hex") });
   assert.equal(metrics.viewport, width, "the CSS viewport must match the requested width");
   assert.ok(metrics.scroll <= width + 1, `horizontal overflow: ${metrics.scroll}px in ${width}px viewport`);
+  if (metrics.continue_copy_width !== null) assert.ok(metrics.continue_copy_width >= 120, "Continue text must not collapse into a narrow column beside its action");
 }
 
 async function run(browser, width) {
