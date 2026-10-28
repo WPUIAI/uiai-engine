@@ -75,9 +75,11 @@ as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/smoke-focusa-packet.sh'
 as-user wpuiai 'cd /home/wpuiai/uiai-engine && scripts/uiai smoke packet'
 ```
 
-Cockpit dependency changes additionally require `npm audit --audit-level=high`,
-`npm run check`, unit tests, the mocked backend smoke and `npm run build:frontend`
-on OVH. Critical/high findings block readiness; disclose remaining moderate/low
+Cockpit dependency changes require a successful clean `npm ci` on OVH before
+`npm audit --audit-level=high`, `npm run check`, unit tests, the mocked backend
+smoke and `npm run build:frontend`. An updated existing `node_modules` tree is not
+proof that the committed lockfile supports a clean install; validate the lockfile
+before committing even when typecheck, tests and build already passed. Critical/high findings block readiness; disclose remaining moderate/low
 findings rather than describing a nonzero audit as clean. The committed same-major
 Zod override retains the patched 4.6.6 floor for Remotion transitive dependencies;
 never use forced audit downgrades or silence peer conflicts to obtain green gates.
