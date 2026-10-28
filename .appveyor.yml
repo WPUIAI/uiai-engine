@@ -9,13 +9,16 @@ environment:
   GO111MODULE: on
   GOTOOLCHAIN: local
   GOROOT: c:\uiai-go\go
-  GO_VERSION: 1.25.5
-  GO_SHA256: ae756cce1cb80c819b4fe01b0353807178f532211b47f72d7fa77949de054ebb
+  GO_SHA256: 7ecd2d7260e82c59bcbd7f1077a07cee2dea607295b858df67195a1e4e09629b
   PATH: c:\uiai-go\go\bin;c:\gopath\bin;%PATH%
 install:
   - ps: |
-      $archive = Join-Path $env:TEMP "go$env:GO_VERSION.windows-amd64.zip"
-      Invoke-WebRequest "https://go.dev/dl/go$env:GO_VERSION.windows-amd64.zip" -OutFile $archive
+      $goMod = Get-Content -Raw (Join-Path $env:APPVEYOR_BUILD_FOLDER 'go.mod')
+      $match = [regex]::Match($goMod, '(?m)^go\s+(\d+\.\d+\.\d+)\s*$')
+      if (-not $match.Success) { throw "Go toolchain version missing from go.mod" }
+      $version = $match.Groups[1].Value
+      $archive = Join-Path $env:TEMP "go$version.windows-amd64.zip"
+      Invoke-WebRequest "https://go.dev/dl/go$version.windows-amd64.zip" -OutFile $archive
       $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
       if ($actual -ne $env:GO_SHA256) { throw "Go toolchain checksum mismatch: $actual" }
       if (Test-Path "c:\uiai-go") { Remove-Item -Recurse -Force "c:\uiai-go" }

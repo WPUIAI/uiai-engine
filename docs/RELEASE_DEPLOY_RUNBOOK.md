@@ -82,6 +82,21 @@ findings rather than describing a nonzero audit as clean. The committed same-maj
 Zod override retains the patched 4.6.6 floor for Remotion transitive dependencies;
 never use forced audit downgrades or silence peer conflicts to obtain green gates.
 
+### Go toolchain and vulnerability gate
+
+`go.mod` owns the Go baseline (1.26.10); GitHub builds and the Windows installer
+derive that version rather than maintaining a separate version pin. Windows still
+verifies the archive against its independently published SHA-256. OVH verification
+uses the approved side-by-side Go-managed toolchain (`GOTOOLCHAIN=go1.26.10`),
+retaining `/opt/go1.26.7` for rollback without changing global service configuration.
+
+Build `govulncheck` with that same compiler; an older scanner's source loader may
+reject newer Go syntax. CI runs the pinned `golang.org/x/vuln/cmd/govulncheck@v1.3.0`
+in ordinary text mode so findings fail the job. Audit both source and the exact
+candidate executable; a JSON-mode exit0 alone does not mean there are no findings.
+Module-only or binary-symbol findings are not proof of exploitability or a source
+call graph. Failed package loading is an incomplete audit, never a clean result.
+
 ## 4. Commit small batches
 
 ```bash
