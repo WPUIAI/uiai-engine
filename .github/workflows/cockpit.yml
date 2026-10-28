@@ -146,6 +146,12 @@ jobs:
           grep -q 'data-cursor="0"' visual-proof/cockpit-focusa-idle.dom.html
           grep -q 'data-activity-count="0"' visual-proof/cockpit-focusa-idle.dom.html
           grep -q 'data-evidence-ready="false"' visual-proof/cockpit-focusa-idle.dom.html
+          grep -Fq 'Browser activity unavailable' visual-proof/cockpit-focusa-idle.dom.html
+          grep -Fq 'Live state incomplete.' visual-proof/cockpit-focusa-idle.dom.html
+          if grep -Eq 'All clear|No live browser sessions' visual-proof/cockpit-focusa-idle.dom.html; then
+            echo "Overview must not report successful empty activity when the Engine is unavailable" >&2
+            exit 1
+          fi
 
           "$BROWSER" --headless --disable-gpu --no-sandbox --virtual-time-budget=1500 \
             --dump-dom "http://127.0.0.1:4173/?evidence=focusa-live" > visual-proof/cockpit-focusa-live.dom.html
@@ -168,6 +174,13 @@ jobs:
           "$BROWSER" --headless --disable-gpu --no-sandbox --hide-scrollbars \
             --force-device-scale-factor=1 --window-size=1440,1200 --virtual-time-budget=1500 \
             --screenshot="$LIVE_PATH" "http://127.0.0.1:4173/?evidence=focusa-live"
+
+          "$BROWSER" --headless --disable-gpu --no-sandbox --hide-scrollbars \
+            --force-device-scale-factor=1 --window-size=375,1200 --virtual-time-budget=1500 \
+            --screenshot="$(pwd)/visual-proof/cockpit-overview-unavailable-mobile.png" "http://127.0.0.1:4173/"
+          MOBILE_SHA=$(shasum -a 256 visual-proof/cockpit-overview-unavailable-mobile.png | awk '{print $1}')
+          MOBILE_SIZE=$(sips -g pixelWidth -g pixelHeight visual-proof/cockpit-overview-unavailable-mobile.png | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w"x"h}')
+          test "$MOBILE_SIZE" = "375x1200"
 
           test -s visual-proof/cockpit-focusa-idle.png
           test -s visual-proof/cockpit-focusa-live-after-events.png
@@ -204,7 +217,8 @@ jobs:
                 "sha256": "${IDLE_SHA}",
                 "dom_sha256": "${IDLE_DOM_SHA}",
                 "asserted_live_state": "idle",
-                "asserted_activity_count": 0
+                "asserted_activity_count": 0,
+                "asserted_browser_activity": "unavailable_not_empty"
               },
               {
                 "file": "cockpit-focusa-live-after-events.png",
@@ -215,6 +229,12 @@ jobs:
                 "expected_activity_count": 3,
                 "sha256": "${LIVE_SHA}",
                 "dom_sha256": "${LIVE_DOM_SHA}"
+              },
+              {
+                "file": "cockpit-overview-unavailable-mobile.png",
+                "state": "engine_unavailable_not_empty",
+                "viewport": "${MOBILE_SIZE}",
+                "sha256": "${MOBILE_SHA}"
               }
             ]
           }

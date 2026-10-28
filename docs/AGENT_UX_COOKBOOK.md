@@ -139,6 +139,12 @@ Rules:
 - Preserve bounded diagnostic summaries and evidence refs, not raw full logs.
 - Clear diagnostics only after evidence is captured or when starting a clean repro.
 
+### Cockpit Overview: unknown is not empty
+
+Overview reads Engine health, browser health and sessions independently. A failed read is unavailable, not an empty successful result; other successful reads remain visible. A confirmed empty session response says **No live browser sessions** and makes no claim about background jobs. Refresh clears previous live results, coalesces overlapping polls for the same endpoint, and discards late responses after a connection change or view teardown. Unknown browser page counts display `?`, not zero.
+
+Regression coverage lives in `apps/cockpit/tests/unit/overview-state.test.ts`. The existing Cockpit CI browser proof checks that an unavailable Engine never produces **All clear** or a confirmed-empty session result, and captures desktop/mobile Overview states. A passed source check or captured fixture is not proof of a connected customer workflow or a deployed update.
+
 ## Recipe 4: Proof packet capture
 
 Render packet/diagnostics artifacts for human reports:

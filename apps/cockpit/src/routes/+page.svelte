@@ -2,17 +2,20 @@
   import { onMount } from "svelte";
   import "$lib/ui/screen.css";
   import { openInFocusa } from "$lib/controllers/desktop-handoff-controller";
-  import { engineClient, engineUrl, type BrowserHealth, type BrowserSession, type EngineHealth } from "$lib/engine-client";
+  import { engineClient, engineUrl } from "$lib/engine-client";
+  import { createOverviewController, initialOverviewState } from "$lib/controllers/overview-state";
   import { parseCockpitWorkpointResume, workpointResumeFromHost, type CockpitWorkpointResume } from "$lib/contracts/workpoint-resume";
   import BrowserProfileSettings from "$lib/components/BrowserProfileSettings.svelte";
   import FocusaLiveSurfaces from "$lib/components/FocusaLiveSurfaces.svelte";
 
-  let health: EngineHealth | null = null;
-  let browserHealth: BrowserHealth | null = null;
-  let sessions: BrowserSession[] = [];
+  let state = initialOverviewState();
+  $: health = state.health;
+  $: browserHealth = state.browserHealth;
+  $: sessions = state.sessions ?? [];
+  $: sessionsKnown = state.sessions !== null;
+  $: loading = state.loading;
+  $: error = state.error;
   let resumeState: CockpitWorkpointResume | null = null;
-  let loading = true;
-  let error = "";
   let handoffMessage = "";
 
   async function handoffWorkpoint() {
@@ -21,20 +24,8 @@
     handoffMessage = receipt.status === "opened" || receipt.status === "focused" ? "Opened in Focusa." : "Focusa Menubar is unavailable; Cockpit retained the read-only Workpoint context.";
   }
 
-  async function refresh() {
-    error = "";
-    try {
-      [health, browserHealth, sessions] = await Promise.all([
-        engineClient.health(),
-        engineClient.browserHealth(),
-        engineClient.sessions(),
-      ]);
-    } catch (cause) {
-      error = cause instanceof Error ? cause.message : "The engine could not be reached.";
-    } finally {
-      loading = false;
-    }
-  }
+  const overview = createOverviewController(engineClient, engineUrl, (next) => { state = next; });
+  const refresh = overview.refresh;
 
   onMount(() => {
     resumeState = workpointResumeFromHost();
@@ -51,6 +42,7 @@
     return () => {
       window.removeEventListener("uiai:workpoint-resume", onResumeContract);
       window.clearInterval(timer);
+      overview.dispose();
     };
   });
 
@@ -58,16 +50,18 @@
   $: blockedResume = resumeState?.status === "blocked" ? resumeState : null;
   $: continueTitle = resumable
     ? resumable.label
-    : sessions.length
-      ? "Continue live browser work"
-      : "No Workpoint is connected";
+    : loading ? "Checking browser activity"
+    : !sessionsKnown ? "Browser activity unavailable"
+    : sessions.length ? "Continue live browser work" : "No Workpoint is connected";
   $: continueText = resumable
     ? "Canonical Focusa resume state is available for this Workpoint."
+    : loading ? "Reading the current session response from the Engine."
+    : !sessionsKnown ? "The Engine did not return current session data. Browser work may still be running."
     : sessions.length
       ? `${sessions.length} live session${sessions.length === 1 ? " is" : "s are"} returned by the engine.`
       : "A canonical Workpoint or live session will appear here when its owning adapter supplies real state.";
-  $: continueHref = resumable?.target.href || (sessions.length ? "/runs" : "/settings?section=scope");
-  $: continueAction = resumable ? "Resume Workpoint" : sessions.length ? "Open Live runs" : "Connect scope";
+  $: continueHref = resumable?.target.href || (!sessionsKnown || sessions.length ? "/runs" : "/settings?section=scope");
+  $: continueAction = resumable ? "Resume Workpoint" : !sessionsKnown || sessions.length ? "Open Live runs" : "Connect scope";
 </script>
 
 <svelte:head><title>Overview · UIAI Engine Cockpit</title></svelte:head>
@@ -80,14 +74,14 @@
       <p class="screen-lede">Continue current work, inspect live activity, and recover from truthful system state.</p>
     </div>
     <div class="screen-actions">
-      <span class:success={health?.status === "healthy"} class="badge">{health ? health.status : "Checking engine"}</span>
+      <span class:success={!loading && health?.status === "healthy"} class="badge">{loading ? "Checking engine" : health?.status || "Engine unavailable"}</span>
       <button class="screen-button" type="button" onclick={refresh} disabled={loading}>↻ Refresh</button>
     </div>
   </div>
 
   {#if error}
     <div class="error-banner" role="alert">
-      <strong>Engine unavailable.</strong>
+      <strong>Live state incomplete.</strong>
       <span>{error}</span>
       <button class="data-row-action" type="button" onclick={refresh}>Retry</button>
     </div>
@@ -132,8 +126,10 @@
     <div class="data-list">
       {#if loading}
         <div class="empty-state compact"><span>◌</span><div><strong>Reading live state</strong><p>Connecting to {engineUrl()}.</p></div></div>
+      {:else if !sessionsKnown}
+        <div class="empty-state compact"><span>?</span><div><strong>Browser activity unavailable</strong><p>The current session list could not be read. This does not mean that no browser work is running.</p></div></div>
       {:else if sessions.length === 0}
-        <div class="empty-state compact"><span>◉</span><div><strong>All clear</strong><p>No browser sessions or running jobs are currently returned by the engine.</p></div></div>
+        <div class="empty-state compact"><span>◉</span><div><strong>No live browser sessions</strong><p>The current session response is empty. Background job status is not provided here.</p></div></div>
       {:else}
         {#each sessions.slice(0, 4) as session}
           <div class="data-row">
@@ -148,7 +144,7 @@
 
   <section class="screen-section" aria-labelledby="recent-work-heading">
     <div class="section-heading"><div><p class="screen-kicker">Recent work</p><h2 id="recent-work-heading">Durable history</h2></div></div>
-    <div class="empty-state compact"><span>↺</span><div><strong>No recent work in scope</strong><p>The engine does not expose durable Workpoint history here, so Overview leaves this surface empty instead of inventing records.</p></div></div>
+    <div class="empty-state compact"><span>↺</span><div><strong>No recent-work history connected</strong><p>The engine does not expose durable Workpoint history here, so Overview leaves this surface empty instead of inventing records.</p></div></div>
   </section>
 
   <section class="screen-section" aria-labelledby="system-posture-heading">
@@ -158,7 +154,7 @@
     </div>
     <div class="posture-grid">
       <article class="posture-card"><span>Engine</span><strong>{health?.status || "unknown"}</strong><small>{health?.service || "UIAI Engine"}</small></article>
-      <article class="posture-card"><span>Browser</span><strong>{browserHealth?.browser_state || browserHealth?.status || "unknown"}</strong><small>{browserHealth?.active_pages ?? 0} / {browserHealth?.max_pages ?? "?"} pages</small></article>
+      <article class="posture-card"><span>Browser</span><strong>{browserHealth?.browser_state || browserHealth?.status || "unknown"}</strong><small>{browserHealth?.active_pages ?? "?"} / {browserHealth?.max_pages ?? "?"} pages</small></article>
       <article class="posture-card"><span>Scope</span><strong>{resumable ? "Workpoint ready" : blockedResume ? "Recovery required" : "Not connected"}</strong><small>{resumable ? resumable.target.workspace_id : "No inferred mission data"}</small></article>
       <article class="posture-card"><span>Contracts</span><strong>Manifest-backed</strong><small><a href="/capabilities">Inspect registered capabilities</a></small></article>
     </div>
