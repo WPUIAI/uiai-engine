@@ -191,6 +191,14 @@ class ReleasePublicationTests(unittest.TestCase):
         self.assertTrue(all(not x.endswith('latest.json') for x in uploads[0]))
         self.assertTrue(any(x.endswith('latest.json') for x in uploads[-1]))
 
+    def test_preflight_and_publisher_share_the_strict_rust_gate(self):
+        invocation='bash scripts/check-cockpit-rust.sh'
+        self.assertIn(invocation, (ROOT/'scripts/local-uiai-preflight.sh').read_text())
+        self.assertIn(invocation, command(COCKPIT,'Rust checks'))
+        shared=(ROOT/'scripts/check-cockpit-rust.sh').read_text()
+        self.assertIn('cargo test',shared)
+        self.assertIn('cargo clippy -- -D warnings',shared)
+
     def test_cockpit_stays_draft_until_all_assets_and_checks_complete(self):
         source=COCKPIT.read_text()
         create=source.split('  create-release:\n',1)[1].split('  publish-macos-ota:\n',1)[0]

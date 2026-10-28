@@ -42,23 +42,25 @@ pub fn verify_profile<T: VerificationTransport, S: CredentialStore>(
     transport: &T,
     store: &S,
     daemon_url: &str,
-    expected_daemon: &str,
-    expected_device: &str,
-    expected_scopes: &[String],
+    expected: &VerifiedIdentity,
     profile_id: &str,
     handle: CredentialHandle,
 ) -> Result<(VerifiedProfile, PairingReceipt), String> {
-    if ![expected_daemon, expected_device, profile_id]
-        .iter()
-        .all(|v| opaque(v))
+    if ![
+        expected.daemon_id.as_str(),
+        expected.device_id.as_str(),
+        profile_id,
+    ]
+    .iter()
+    .all(|v| opaque(v))
     {
         return Err("profile references invalid".into());
     }
     let secret = store.read(&handle).map_err(|e| e.to_string())?;
     let identity = transport.authenticated_identity(daemon_url, secret.expose_native())?;
-    if identity.daemon_id != expected_daemon
-        || identity.device_id != expected_device
-        || identity.scopes != expected_scopes
+    if identity.daemon_id != expected.daemon_id
+        || identity.device_id != expected.device_id
+        || identity.scopes != expected.scopes
     {
         return Err("authenticated profile identity mismatch".into());
     }
@@ -122,9 +124,11 @@ mod tests {
             &Transport { mismatch: false },
             &Store,
             "https://focusa.example",
-            "daemon_1",
-            "device_1",
-            &["read".into()],
+            &VerifiedIdentity {
+                daemon_id: "daemon_1".into(),
+                device_id: "device_1".into(),
+                scopes: vec!["read".into()],
+            },
             "profile_1",
             CredentialHandle::parse("profile:1").unwrap(),
         )
@@ -135,14 +139,40 @@ mod tests {
         assert!(!serialized.contains("native-token"));
     }
     #[test]
+    fn device_and_scope_mismatch_never_activate() {
+        for (device, scopes) in [
+            ("device_2", vec!["read".into()]),
+            ("device_1", vec!["write".into()]),
+        ] {
+            let result = verify_profile(
+                &Transport { mismatch: false },
+                &Store,
+                "https://focusa.example",
+                &VerifiedIdentity {
+                    daemon_id: "daemon_1".into(),
+                    device_id: device.into(),
+                    scopes,
+                },
+                "profile_1",
+                CredentialHandle::parse("profile:1").unwrap(),
+            );
+            assert_eq!(
+                result.unwrap_err(),
+                "authenticated profile identity mismatch"
+            );
+        }
+    }
+    #[test]
     fn identity_mismatch_never_activates() {
         assert!(verify_profile(
             &Transport { mismatch: true },
             &Store,
             "https://focusa.example",
-            "daemon_1",
-            "device_1",
-            &["read".into()],
+            &VerifiedIdentity {
+                daemon_id: "daemon_1".into(),
+                device_id: "device_1".into(),
+                scopes: vec!["read".into()],
+            },
             "profile_1",
             CredentialHandle::parse("profile:1").unwrap()
         )

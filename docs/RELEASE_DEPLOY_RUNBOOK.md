@@ -122,6 +122,9 @@ waits for that exact source's CI before creating immutable tags. Run its executi
 phase on the authorized build host, not the production control host. Repeated
 `--tag` arguments push coordinated parent/child tags in one atomic transaction.
 The helper neither resets existing edits nor suppresses commit/push failures.
+Strict preflight and the Cockpit publisher share `scripts/check-cockpit-rust.sh`
+for the same Rust tests and warning-denying Clippy check; these failures must be
+caught before tag creation, not first discovered by the publisher.
 Prepared CI checkouts fetch the missing parent when shallow. Manifest freshness
 compares resolved commit identities, not display abbreviations; a different Git
 abbreviation length cannot make the same parent appear stale. Strict still

@@ -80,11 +80,7 @@ pub fn fetch(endpoint: &str) -> Result<FocusaSiblingManifest, String> {
         .ok_or("sibling manifest response is malformed")?;
     let headers = std::str::from_utf8(&response[..separator])
         .map_err(|_| "sibling manifest headers are invalid")?;
-    if !headers
-        .lines()
-        .next()
-        .is_some_and(|line| line == "HTTP/1.1 200 OK")
-    {
+    if headers.lines().next() != Some("HTTP/1.1 200 OK") {
         return Err("sibling manifest response was not successful".into());
     }
     let manifest: FocusaSiblingManifest = serde_json::from_slice(&response[separator + 4..])

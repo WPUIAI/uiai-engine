@@ -119,10 +119,8 @@ jobs:
           workspaces: apps/cockpit/src-tauri
           shared-key: cockpit-checks-linux
       - name: Rust checks
-        working-directory: apps/cockpit/src-tauri
         run: |
-          cargo test
-          cargo clippy -- -D warnings
+          bash scripts/check-cockpit-rust.sh
       - uses: actions/setup-node@v6
         with:
           node-version: '22'

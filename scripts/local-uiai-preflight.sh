@@ -75,6 +75,8 @@ if [[ $? -ne 0 ]]; then echo "FAIL manifest freshness"; exit 1; fi
 echo "manifest: FRESH"
 
 if [[ "$STRICT" -eq 1 ]]; then
+  echo "=== UIAI preflight: Cockpit Rust release gate ==="
+  bash scripts/check-cockpit-rust.sh
   echo "=== UIAI preflight: go tests ==="
   go test ./... || { echo "FAIL go test"; exit 1; }
   echo "go tests: PASS"

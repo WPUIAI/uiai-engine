@@ -18,7 +18,7 @@ fn browser_json_from_root(root: &YamlValue) -> Result<JsonValue, String> {
         .as_mapping()
         .ok_or_else(|| "engine config root must be a YAML mapping".to_string())?;
     let browser = mapping
-        .get(&browser_key())
+        .get(browser_key())
         .cloned()
         .unwrap_or_else(|| serde_yaml::to_value(default_browser_profiles()).unwrap_or(YamlValue::Null));
     serde_json::to_value(browser).map_err(|error| format!("convert browser config to JSON: {error}"))
