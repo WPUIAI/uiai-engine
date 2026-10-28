@@ -49,17 +49,19 @@ if manifest_cockpit_v != cockpit_v:
     print(f"FAIL cockpit_version {manifest_cockpit_v} != {cockpit_v}", file=sys.stderr); sys.exit(1)
 import os
 source_commit = m.get("source_commit","")
-head_parent = subprocess.check_output(["git","rev-parse","--short","HEAD~1"], stderr=subprocess.DEVNULL).decode().strip() if subprocess.call(["git","rev-parse","--verify","HEAD~1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)==0 else head_short
-manifest_touched = "distribution-manifest.json" in subprocess.check_output(["git","diff","--name-only","HEAD~1","HEAD"], stderr=subprocess.DEVNULL).decode() if head_parent != head_short else False
+def commit_identity(ref):
+    result = subprocess.run(["git", "rev-parse", "--verify", "--end-of-options", ref + "^{commit}"],
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    return result.stdout.strip() if result.returncode == 0 else None
+head_parent = commit_identity("HEAD~1")
 fast_mode = "PREFLIGHT_FAST" in os.environ
-if source_commit and source_commit not in (head_short, head_full, head_full[:7], head_parent):
-    if manifest_touched and source_commit == head_parent:
-        pass
-    elif fast_mode:
-        if subprocess.call(["git","merge-base","--is-ancestor", source_commit, "HEAD"]) != 0:
-            print(f"FAIL stale source_commit {source_commit} not ancestor of HEAD {head_short} (touched={manifest_touched})", file=sys.stderr); sys.exit(1)
-    else:
-        print(f"FAIL stale source_commit {source_commit} != HEAD {head_short} nor parent {head_parent} (touched={manifest_touched}) — STRICT requires HEAD/parent", file=sys.stderr); sys.exit(1)
+if source_commit:
+    source_identity = commit_identity(source_commit)
+    if source_identity is None:
+        print(f"FAIL source_commit {source_commit} cannot be resolved; complete the checkout history before verification", file=sys.stderr); sys.exit(1)
+    if source_identity not in (head_full, head_parent):
+        if not fast_mode or subprocess.call(["git", "merge-base", "--is-ancestor", source_identity, head_full]) != 0:
+            print(f"FAIL stale source_commit {source_commit} — STRICT requires actual HEAD/parent identity, FAST requires verified ancestry", file=sys.stderr); sys.exit(1)
 try:
     gen = datetime.datetime.fromisoformat(m.get("generated_at","").replace("Z","+00:00"))
     age = datetime.datetime.now(datetime.timezone.utc) - gen

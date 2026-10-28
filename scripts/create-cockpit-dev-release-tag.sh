@@ -63,6 +63,9 @@ if [[ "$TAG_ONLY" == 0 ]]; then
   if [[ "$PREPARE_ONLY" == 1 ]]; then echo 'Source prepared; no tags created.'; exit 0; fi
 fi
 for tag in "${TAGS[@]}"; do python3 scripts/verify-uiai-version-surfaces.py "$tag"; done
+if [[ $(git rev-parse --is-shallow-repository) == true ]]; then
+  git -c 'credential.helper=!gh auth git-credential' fetch --deepen=1 origin main
+fi
 head=$(git rev-parse HEAD)
 # Run on the authorized execution host, never the production control host.
 unset PREFLIGHT_FAST

@@ -122,6 +122,10 @@ waits for that exact source's CI before creating immutable tags. Run its executi
 phase on the authorized build host, not the production control host. Repeated
 `--tag` arguments push coordinated parent/child tags in one atomic transaction.
 The helper neither resets existing edits nor suppresses commit/push failures.
+Prepared CI checkouts fetch the missing parent when shallow. Manifest freshness
+compares resolved commit identities, not display abbreviations; a different Git
+abbreviation length cannot make the same parent appear stale. Strict still
+requires HEAD/parent, while fast mode still requires verified ancestry.
 
 Build/test/package on the approved OVH runner, not the production control host.
 `.github/workflows/engine-release.yml` resolves the exact immutable release tag,
