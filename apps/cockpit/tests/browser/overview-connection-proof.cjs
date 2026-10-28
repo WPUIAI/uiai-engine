@@ -11,7 +11,12 @@ const proof = { schema: "uiai.cockpit_consumer_proof.v1", commit_sha: process.en
 const storage = (page) => page.evaluate((names) => Object.fromEntries(names.map((key) => [key, localStorage.getItem(key)])), keys);
 
 async function capture(page, name, width) {
-  const metrics = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth, continue_copy_width: document.querySelector(".continue-copy")?.getBoundingClientRect().width ?? null }));
+  const metrics = await page.evaluate(() => ({
+    viewport: innerWidth,
+    scroll: document.documentElement.scrollWidth,
+    continue_copy_width: document.querySelector(".continue-copy")?.getBoundingClientRect().width ?? null,
+    overflow_elements: Array.from(document.querySelectorAll(".overview-screen, .overview-screen *")).filter((element) => element.getBoundingClientRect().right > innerWidth + 1).slice(0, 12).map((element) => ({ tag: element.tagName, class: element.className, right: element.getBoundingClientRect().right, min_width: getComputedStyle(element).minWidth, grid_columns: getComputedStyle(element).gridTemplateColumns })),
+  }));
   await page.screenshot({ path: join(output, name), fullPage: true });
   proof.captures.push({ file: name, viewport_width: width, metrics, sha256: createHash("sha256").update(readFileSync(join(output, name))).digest("hex") });
   assert.equal(metrics.viewport, width, "the CSS viewport must match the requested width");

@@ -179,7 +179,8 @@
 <BrowserProfileSettings />
 
 <style>
-  .overview-screen { display: grid; gap: 24px; }
+  .overview-screen { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .data-list { min-width: 0; grid-template-columns: minmax(0, 1fr); }
   .continue-card, .recovery-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
   .continue-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 11px; background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface-elevated)); color: var(--color-accent); font-size: 1.2rem; }
   .continue-copy { flex: 1; min-width: 0; }
