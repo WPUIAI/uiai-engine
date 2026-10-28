@@ -3,17 +3,17 @@ import { DEFAULT_ENGINE_URL } from "$lib/engine-client";
 export const ENGINE_HINTS_KEY = "uiai.cockpit.engine_hints.v1";
 export interface EngineConnection { baseUrl: string; status: "connected" | "unavailable"; latencyMs?: number; service?: string; browserless?: boolean; source: "loopback" | "saved" | "environment"; }
 
-function normalize(value: string): string | undefined {
-  try { const url = new URL(value.trim()); if (!/^https?:$/.test(url.protocol)) return; url.pathname = ""; url.search = ""; url.hash = ""; return url.toString().replace(/\/$/, ""); } catch { return; }
+function normalize(value: string, preservePath = false): string | undefined {
+  try { const url = new URL(value.trim()); if (!/^https?:$/.test(url.protocol)) return; if (!preservePath) url.pathname = ""; url.search = ""; url.hash = ""; return url.toString().replace(/\/$/, ""); } catch { return; }
 }
 
 export function readEngineHints(): string[] {
   if (typeof window === "undefined") return [];
-  try { const values = JSON.parse(localStorage.getItem(ENGINE_HINTS_KEY) || "[]"); return Array.isArray(values) ? values.map(String).map(normalize).filter((v): v is string => Boolean(v)).slice(0, 12) : []; } catch { return []; }
+  try { const values = JSON.parse(localStorage.getItem(ENGINE_HINTS_KEY) || "[]"); return Array.isArray(values) ? values.map(String).map((value) => normalize(value)).filter((v): v is string => Boolean(v)).slice(0, 12) : []; } catch { return []; }
 }
 
 export function saveEngineHints(values: string[]): string[] {
-  const normalized = [...new Set(values.map(normalize).filter((v): v is string => Boolean(v)))].slice(0, 12);
+  const normalized = [...new Set(values.map((value) => normalize(value)).filter((v): v is string => Boolean(v)))].slice(0, 12);
   if (typeof window !== "undefined") localStorage.setItem(ENGINE_HINTS_KEY, JSON.stringify(normalized));
   return normalized;
 }
@@ -26,6 +26,13 @@ async function probe(baseUrl: string, source: EngineConnection["source"]): Promi
     if (!response.ok || body.service !== "uiai-engine" || body.status !== "healthy") throw new Error("not UIAI Engine");
     return { baseUrl, source, status: "connected", latencyMs: Math.round(performance.now() - started), service: String(body.service), browserless: body.browserless === true };
   } catch { return { baseUrl, source, status: "unavailable" }; } finally { window.clearTimeout(timer); }
+}
+
+/** Probe a draft API base URL without selecting it or changing saved hints. */
+export async function probeEngineConnection(candidate: string): Promise<EngineConnection> {
+  const baseUrl = normalize(candidate, true);
+  if (!baseUrl) throw new Error("Enter an HTTP or HTTPS Engine URL.");
+  return probe(baseUrl, "saved");
 }
 
 export async function discoverEngines(): Promise<EngineConnection[]> {

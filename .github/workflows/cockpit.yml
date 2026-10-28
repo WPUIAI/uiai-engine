@@ -175,12 +175,20 @@ jobs:
             --force-device-scale-factor=1 --window-size=1440,1200 --virtual-time-budget=1500 \
             --screenshot="$LIVE_PATH" "http://127.0.0.1:4173/?evidence=focusa-live"
 
-          "$BROWSER" --headless --disable-gpu --no-sandbox --hide-scrollbars \
-            --force-device-scale-factor=1 --window-size=375,1200 --virtual-time-budget=1500 \
-            --screenshot="$(pwd)/visual-proof/cockpit-overview-unavailable-mobile.png" "http://127.0.0.1:4173/"
+          # Use the already-cached Playwright CLI for exact CSS viewports; native
+          # Chrome window sizing can crop a 500px layout into a 375px bitmap.
+          npm exec --offline --yes --package=playwright@1.54.2 -- playwright screenshot \
+            --viewport-size="375,1200" --wait-for-timeout=1500 --full-page \
+            "http://127.0.0.1:4173/" visual-proof/cockpit-overview-unavailable-mobile.png
+          npm exec --offline --yes --package=playwright@1.54.2 -- playwright screenshot \
+            --viewport-size="1440,1200" --wait-for-timeout=1500 --full-page \
+            "http://127.0.0.1:4173/" visual-proof/cockpit-overview-unavailable-desktop.png
           MOBILE_SHA=$(shasum -a 256 visual-proof/cockpit-overview-unavailable-mobile.png | awk '{print $1}')
           MOBILE_SIZE=$(sips -g pixelWidth -g pixelHeight visual-proof/cockpit-overview-unavailable-mobile.png | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w"x"h}')
-          test "$MOBILE_SIZE" = "375x1200"
+          test "${MOBILE_SIZE%%x*}" = "375"
+          OVERVIEW_DESKTOP_SHA=$(shasum -a 256 visual-proof/cockpit-overview-unavailable-desktop.png | awk '{print $1}')
+          OVERVIEW_DESKTOP_SIZE=$(sips -g pixelWidth -g pixelHeight visual-proof/cockpit-overview-unavailable-desktop.png | awk '/pixelWidth/{w=$2}/pixelHeight/{h=$2}END{print w"x"h}')
+          test "${OVERVIEW_DESKTOP_SIZE%%x*}" = "1440"
 
           test -s visual-proof/cockpit-focusa-idle.png
           test -s visual-proof/cockpit-focusa-live-after-events.png
@@ -233,8 +241,16 @@ jobs:
               {
                 "file": "cockpit-overview-unavailable-mobile.png",
                 "state": "engine_unavailable_not_empty",
-                "viewport": "${MOBILE_SIZE}",
+                "viewport": "375x1200",
+                "image_size": "${MOBILE_SIZE}",
                 "sha256": "${MOBILE_SHA}"
+              },
+              {
+                "file": "cockpit-overview-unavailable-desktop.png",
+                "state": "engine_unavailable_not_empty",
+                "viewport": "1440x1200",
+                "image_size": "${OVERVIEW_DESKTOP_SIZE}",
+                "sha256": "${OVERVIEW_DESKTOP_SHA}"
               }
             ]
           }

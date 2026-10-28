@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { discoverEngines, selectBestEngine } from "../../src/lib/engine-discovery";
+import { discoverEngines, readEngineHints, saveEngineHints, selectBestEngine } from "../../src/lib/engine-discovery";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("UIAI Engine discovery", () => {
+  it("still normalizes every saved discovery hint to its origin", () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", { localStorage: { getItem: (key: string) => storage.get(key) || null, setItem: (key: string, value: string) => storage.set(key, value) } });
+    vi.stubGlobal("localStorage", window.localStorage);
+    expect(saveEngineHints(["https://one.example/path", "https://two.example/another"])).toEqual(["https://one.example", "https://two.example"]);
+    expect(readEngineHints()).toEqual(["https://one.example", "https://two.example"]);
+  });
   it("auto-connects only health-verified UIAI Engine candidates", async () => {
     const storage = new Map<string, string>();
     vi.stubGlobal("window", { setTimeout, clearTimeout, localStorage: { getItem: (key: string) => storage.get(key) || null, setItem: (key: string, value: string) => storage.set(key, value) } });

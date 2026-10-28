@@ -2,11 +2,13 @@
   import { onMount } from "svelte";
   import "$lib/ui/screen.css";
   import { DEFAULT_ENGINE_URL, engineClient } from "$lib/engine-client";
-  import { discoverFocusaDaemons, focusaDaemonSummary, readSavedFocusaDaemonHints, saveFocusaDaemonHints } from "$lib/focusa-daemon-discovery";
+  import { readSavedFocusaDaemonHints, saveFocusaDaemonHints } from "$lib/focusa-daemon-discovery";
+  import { testConnectionDraft } from "$lib/controllers/connection-test";
 
   let saved = false;
   let testing = false;
   let connectionResult = "";
+  let connectionSuccess = false;
   let engineUrl = DEFAULT_ENGINE_URL;
   let focusaDaemonHints = "";
   let projectRoot = "";
@@ -73,15 +75,29 @@
     window.localStorage.setItem("uiai.confirm-mutations", String(confirmMutations));
     window.localStorage.setItem("uiai.reduced-motion", String(reducedMotion));
     saved = true;
+    connectionResult = "";
     void loadEvidenceSettings();
     window.setTimeout(() => (saved = false), 2200);
   }
 
   async function testConnection() {
-    saveSettings();
+    const candidate = engineUrl.trim() || DEFAULT_ENGINE_URL;
     testing = true;
     connectionResult = "";
-    try { const [result, daemons] = await Promise.all([engineClient.health(), discoverFocusaDaemons()]); connectionResult = `${result.status} · ${result.service || "UIAI Engine"} · ${focusaDaemonSummary(daemons)}`; } catch (cause) { connectionResult = cause instanceof Error ? cause.message : "Connection failed"; } finally { testing = false; }
+    connectionSuccess = false;
+    try {
+      const result = await testConnectionDraft(candidate);
+      if (candidate !== (engineUrl.trim() || DEFAULT_ENGINE_URL)) {
+        connectionResult = "Engine URL changed. Test the new draft before saving.";
+      } else {
+        connectionSuccess = result.success;
+        connectionResult = result.message;
+      }
+    } catch (cause) {
+      connectionResult = cause instanceof Error ? cause.message : "Connection test failed. Saved settings are unchanged.";
+    } finally {
+      testing = false;
+    }
   }
 
   onMount(() => {
@@ -101,7 +117,13 @@
 
 <svelte:head><title>Settings · UIAI Engine Cockpit</title></svelte:head>
 <div class="screen">
-  <div class="screen-header"><div><p class="screen-kicker">Configure</p><h1>Settings</h1><p class="screen-lede">Tune the connected engine and the amount of context this Cockpit keeps visible.</p></div><div class="screen-actions"><button class="screen-button" type="button" onclick={testConnection} disabled={testing}>{testing ? "Testing…" : "Test connection"}</button><button class="screen-button primary" type="button" onclick={saveSettings}>Save changes</button></div></div>
-  {#if saved || connectionResult}<div class="selection-banner" style="margin: -14px 0 18px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--color-success) 25%, var(--color-border)); border-radius: 9px; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 7%, transparent); font-size: 12px">{saved ? "Settings saved locally." : "Connection result:"} {connectionResult}</div>{/if}
+  <div class="screen-header"><div><p class="screen-kicker">Configure</p><h1>Settings</h1><p class="screen-lede">Tune the connected engine and the amount of context this Cockpit keeps visible.</p></div><div class="screen-actions"><button class="screen-button" type="button" onclick={testConnection} disabled={testing}>{testing ? "Testing…" : "Test connection"}</button><button class="screen-button primary" type="button" onclick={saveSettings} disabled={testing}>Save changes</button></div></div>
+  {#if saved}<div class="connection-result" role="status">Settings saved locally.</div>{/if}
+  {#if connectionResult}<div class="connection-result" class:error={!connectionSuccess} role="status">{connectionResult}</div>{/if}
   <section class="screen-card evidence-settings-card"><div class="form-section"><h2>Evidence sharing</h2><p>Connected to canonical UIAI Evidence Share Settings. Existing packets remain immutable; changes apply to future captures.</p>{#if evidenceSettingsError && evidenceSettingsState !== "unavailable"}<div class="settings-warning" role="alert">{evidenceSettingsError}</div>{/if}{#if evidenceSettingsState === "loading"}<p class="scope-note">Loading effective settings…</p>{:else if evidenceSettingsState === "unavailable"}<div class="settings-warning" role="alert">{evidenceSettingsError}<button class="screen-button" type="button" onclick={loadEvidenceSettings}>Retry</button></div>{:else if evidenceSettings}<p class="scope-note">Source: {evidenceSettings.sources.join(" → ")} · Revision {evidenceSettings.revision}</p><label class="form-field">All Evidence settings domains (JSON)<textarea rows="18" spellcheck="false" bind:value={evidenceSettingsJSON}></textarea></label><p>The engine validates supported fields and revision conflicts. Refresh to discard the draft and load current values.</p><button class="screen-button" type="button" onclick={resetEvidenceSettings} disabled={evidenceSettingsState !== "ready"}>Reset scoped overrides</button><div class="screen-actions"><button class="screen-button" type="button" onclick={loadEvidenceSettings}>Refresh</button><button class="screen-button primary" type="button" onclick={saveEvidenceSettings} disabled={evidenceSettingsState === "saving"}>{evidenceSettingsState === "saving" ? "Saving…" : "Save evidence settings"}</button></div>{/if}</div><div class="form-section"><h2>Engine connection</h2><p>The local engine remains the execution boundary for browser work.</p><label class="form-field">Engine URL<input bind:value={engineUrl} /></label><label class="form-field">Remote Focusa daemon hints<textarea bind:value={focusaDaemonHints} rows="3" placeholder="http://focusa-vps.tailnet.ts.net:8787"></textarea><span>Optional saved VPS/Tailscale URLs. Cockpit always probes loopback and Bonjour too; discovery never grants authority.</span></label><p class="scope-note">Scope is required for governed Workpoint continuity. Leave fields empty only for an explicitly local, unscoped session.</p><label class="form-field">Project root<input bind:value={projectRoot} placeholder="/path/to/project" /></label><label class="form-field">Workstream reference<input bind:value={workstreamRef} placeholder="Explicit Focusa Workstream reference" /></label><label class="form-field">Continuity ID<input bind:value={continuityId} placeholder="Focusa continuity id" /></label><label class="form-field">Workpoint ID<input bind:value={workpointId} placeholder="Focusa Workpoint id" /></label><label class="form-field" style="margin-top: 16px">Response profile<select bind:value={responseProfile}><option value="agent_compact">Agent compact</option><option value="agent_standard">Agent standard</option><option value="evidence_grade">Evidence grade</option></select></label></div><div class="form-section"><h2>Workspace behavior</h2><div class="toggle-row"><div><strong>Live updates</strong><span>Keep run and engine status moving without manual refresh.</span></div><input type="checkbox" bind:checked={liveUpdates} aria-label="Live updates" /></div><div class="toggle-row"><div><strong>Confirm consequential actions</strong><span>Require an explicit confirmation before browser mutations.</span></div><input type="checkbox" bind:checked={confirmMutations} aria-label="Confirm consequential actions" /></div><div class="toggle-row"><div><strong>Reduce motion</strong><span>Respect a calmer presentation for longer work sessions.</span></div><input type="checkbox" bind:checked={reducedMotion} aria-label="Reduce motion" /></div></div></section>
 </div>
+
+<style>
+  .connection-result { margin: -14px 0 18px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--color-success) 25%, var(--color-border)); border-radius: 9px; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 7%, transparent); font-size: 12px; overflow-wrap: anywhere; }
+  .connection-result.error { color: var(--color-error); border-color: color-mix(in srgb, var(--color-error) 25%, var(--color-border)); background: color-mix(in srgb, var(--color-error) 7%, transparent); }
+</style>
