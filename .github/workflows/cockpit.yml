@@ -255,6 +255,8 @@ jobs:
             ]
           }
           JSON
+          npm exec --offline --yes --package=playwright@1.54.2 -- sh -c \
+            'NODE_PATH="$(dirname "$(dirname "$(command -v playwright)")")" node tests/browser/overview-connection-proof.cjs'
       - name: Upload functional UI evidence
         if: always()
         uses: actions/upload-artifact@v4
