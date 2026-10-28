@@ -114,6 +114,15 @@ Commit guidance:
 
 ## 5. Build and stage the immutable candidate
 
+The existing `scripts/create-cockpit-dev-release-tag.sh` is the script-owned tag
+creator; its legacy filename also accepts explicit Engine tags. `--dry-run` is
+read-only. `--prepare-only --push` stamps and pushes version surfaces without tags;
+`--tag-only --push` verifies an already prepared source, runs strict preflight and
+waits for that exact source's CI before creating immutable tags. Run its execution
+phase on the authorized build host, not the production control host. Repeated
+`--tag` arguments push coordinated parent/child tags in one atomic transaction.
+The helper neither resets existing edits nor suppresses commit/push failures.
+
 Build/test/package on the approved OVH runner, not the production control host.
 `.github/workflows/engine-release.yml` resolves the exact immutable release tag,
 checks its version surfaces through `scripts/verify-uiai-version-surfaces.py`,
