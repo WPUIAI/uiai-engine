@@ -179,6 +179,7 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 
 func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 	fpvLoadRegistry()
+	r = r.With(fpvPublicPrivacyGuard(sm))
 	r.Get("/assets/{file}", func(w http.ResponseWriter, req *http.Request) {
 		file := filepath.Base(chi.URLParam(req, "file"))
 		data, ok := fpvassets.Asset(file)
@@ -428,12 +429,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 		}
 		defer stop()
 		fpvWriteStream(w, req, frames, fps, func() bool {
-			current, valid := fpvEntry(entry.Token)
-			if !valid || current.SessionID != entry.SessionID {
-				return false
-			}
-			active, exists := sm.Get(entry.SessionID)
-			return exists && active == sess
+			return fpvPublicSessionAllowed(sm, entry, sess)
 		})
 	})
 
@@ -468,11 +464,11 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			case <-req.Context().Done():
 				return
 			case <-ticker.C:
-				if _, alive := fpvEntry(entry.Token); !alive {
+				if !fpvPublicSessionAllowed(sm, entry, sess) {
 					return
 				}
 				data, err := fpvScreenshotJPEG(sess)
-				if err != nil {
+				if err != nil || !fpvPublicSessionAllowed(sm, entry, sess) {
 					return
 				}
 				_, _ = fmt.Fprintf(w, "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))

@@ -35,7 +35,7 @@ func TestOpenFPVCDPStreamStopsAfterRevocationOrExpiryBrowser(t *testing.T) {
 	router.Route("/m", func(r chi.Router) { MountFPVPublicRoutes(r, manager) })
 	server := httptest.NewServer(router)
 	defer server.Close()
-	for _, cause := range []string{"revoked", "expired", "closed"} {
+	for _, cause := range []string{"revoked", "expired", "closed", "authentication"} {
 		t.Run(cause, func(t *testing.T) {
 			session, _, err := manager.Open(site.URL, 640, 480)
 			if err != nil {
@@ -68,7 +68,7 @@ func TestOpenFPVCDPStreamStopsAfterRevocationOrExpiryBrowser(t *testing.T) {
 			// the first share is revoked or expires.
 			var otherBody io.ReadCloser
 			var otherReader *multipart.Reader
-			if cause != "closed" {
+			if cause != "closed" && cause != "authentication" {
 				otherToken := token + "-other"
 				fpvShares.Store(otherToken, &fpvShare{Token: otherToken, SessionID: session.ID, ExpiresAt: time.Now().Add(time.Minute)})
 				defer fpvShares.Delete(otherToken)
@@ -95,11 +95,24 @@ func TestOpenFPVCDPStreamStopsAfterRevocationOrExpiryBrowser(t *testing.T) {
 				_, _ = fpvUpdateShare(token, func(entry *fpvShare) bool { entry.ExpiresAt = time.Now().Add(-time.Second); return true })
 			case "closed":
 				manager.Close(session.ID)
+			case "authentication":
+				if _, _, err := session.Eval(`document.body.innerHTML='<input type="password">'; return true;`); err != nil {
+					t.Fatal(err)
+				}
+				if challenge, err := session.DetectAuthChallenge(); err != nil || challenge == nil {
+					t.Fatal("owned authentication transition was not recognized")
+				}
 			}
 			start := time.Now()
 			_, copyErr := io.Copy(io.Discard, response.Body)
 			if copyErr != nil || time.Since(start) > time.Second {
 				t.Fatal("open CDP stream retained output after its share/session became invalid")
+			}
+			if cause == "authentication" {
+				stored, ok := fpvShares.Load(token)
+				if !ok || !stored.(*fpvShare).Revoked {
+					t.Fatal("authentication did not revoke the streaming capability")
+				}
 			}
 			if otherReader != nil {
 				nextPart, readErr := otherReader.NextPart()

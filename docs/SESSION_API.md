@@ -440,8 +440,13 @@ Before public-view capture or capability creation, the endpoint rejects a latche
 or freshly detected authentication challenge with `fpv_private_session`. Removing
 page markers does not clear a pending challenge or authorize public sharing. A
 failed metadata privacy check returns `fpv_privacy_check_failed` without creating
-a share. This guard does not establish complete origin classification, provider
-authentication approval, or a private operator-handoff capability.
+a share. Existing public viewer pages, status, event, screenshot and stream
+admission use that same fresh challenge check. A recognized challenge permanently
+revokes the existing share; resolving or removing the challenge cannot restore
+it. Already-open CDP and MJPEG streams also fence output against the latched
+challenge and revoke their share when it is observed. This does not continuously
+classify every DOM mutation, establish complete origin/navigation privacy binding,
+provider authentication approval, or a private operator-handoff capability.
 
 FPV CDP streaming uses one session-owned Chrome pump with latest-frame fanout;
 disconnecting one viewer cannot stop capture for another. `stream.cdp.mjpg?fps=8`

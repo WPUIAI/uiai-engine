@@ -64,6 +64,13 @@ jobs:
           UIAI_AUTH_TESTS: "1"
           UIAI_TEST_BLOCK_DEFAULT_EVIDENCE_STORE: "1"
         run: go test -race -p 2 ./internal/vision -run 'TestStructuredExceptionCredentialRedactionBrowser|TestStructuredCredentialRedactionBeforeEvalTruncationBrowser|TestStructuredTitleCredentialRedactionBrowser|TestUnicodeDiagnosticPreviewBoundariesBrowser' -count=1
+      - name: Public viewer privacy and stream lease transitions in actual Chromium
+        if: matrix.lane == 'browser'
+        env:
+          GOMAXPROCS: "2"
+          UIAI_AUTH_TESTS: "1"
+          UIAI_TEST_BLOCK_DEFAULT_EVIDENCE_STORE: "1"
+        run: go test -race -p 2 ./internal/routes -run 'TestFPVExistingShareRejectsAuthenticationTransitionBrowser|TestPublicFPVShareRejectsAuthenticationSessionsBrowser|TestOpenFPVCDPStreamStopsAfterRevocationOrExpiryBrowser' -count=1
       - name: Focusa packet drift check
         if: matrix.lane == 'browser'
         run: scripts/check-focusa-packet-drift.sh
