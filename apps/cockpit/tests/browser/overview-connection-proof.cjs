@@ -58,7 +58,7 @@ async function run(browser, width) {
     const before = await storage(page);
     await page.getByLabel("Engine URL", { exact: true }).fill("http://unavailable.invalid:7456");
     await page.getByLabel("Project root", { exact: true }).fill("/fixture/draft");
-    await page.getByLabel("Response profile", { exact: true }).selectOption("evidence_grade");
+    await page.getByRole("combobox", { name: /Response profile/ }).selectOption("evidence_grade");
     await page.getByRole("button", { name: "Test connection", exact: true }).click();
     await page.locator(".connection-result.error").filter({ hasText: "Engine unavailable" }).waitFor();
     assert.deepEqual(await storage(page), before, "a failed test must preserve the saved connection and unrelated drafts");
