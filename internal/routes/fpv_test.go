@@ -93,15 +93,22 @@ func TestFPVLiveFocusaContextUsesDaemon(t *testing.T) {
 }
 
 func TestFPVCreateSharePayloadIncludesPublicURLAndControls(t *testing.T) {
-	share, err := fpvCreateShare("sid-auto", 5, true, false, 0)
+	t.Chdir(t.TempDir())
+	share, err := fpvCreateShare("sid-auto", "https://example.test", 5, true, false, 0)
 	if err != nil {
 		t.Fatalf("fpvCreateShare returned error: %v", err)
 	}
 	if share["controls"] != true || share["mode"] != "control" || share["public_url"] == "" {
 		t.Fatalf("unexpected share payload: %#v", share)
 	}
-	if _, ok := fpvEntry(share["token"].(string)); !ok {
-		t.Fatalf("expected share token to resolve: %#v", share)
+	if entry, ok := fpvEntry(share["token"].(string)); !ok || entry.Origin != "https://example.test" {
+		t.Fatal("share did not preserve its origin binding")
+	}
+}
+
+func TestFPVCreateShareRequiresBoundOrigin(t *testing.T) {
+	if _, err := fpvCreateShare("owned-fixture", "", 5, false, false, 0); err == nil {
+		t.Fatal("unbound public share creation succeeded")
 	}
 }
 

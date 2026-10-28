@@ -43,7 +43,7 @@ func TestFPVStreamTwoConsumersAndPaintLatency(t *testing.T) {
 	}
 	token := fmt.Sprintf("synthetic-stream-%d", time.Now().UnixNano())
 	fpvLoadRegistry()
-	fpvShares.Store(token, &fpvShare{Token: token, SessionID: session.ID, ExpiresAt: time.Now().Add(time.Minute)})
+	fpvShares.Store(token, &fpvShare{Token: token, SessionID: session.ID, Origin: site.URL, ExpiresAt: time.Now().Add(time.Minute)})
 	defer fpvShares.Delete(token)
 	router := chi.NewRouter()
 	router.Route("/m", func(r chi.Router) { MountFPVPublicRoutes(r, manager) })

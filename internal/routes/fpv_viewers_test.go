@@ -174,7 +174,7 @@ func TestFPVViewerHTTPConsumerAndClosedSession(t *testing.T) {
 	token := fmt.Sprintf("synthetic-http-viewer-%d", time.Now().UnixNano())
 	fpvLoadRegistry()
 	fpvViewerFixture(t, token, 0)
-	fpvShares.Store(token, &fpvShare{Token: token, SessionID: session.ID, ExpiresAt: time.Now().Add(time.Minute)})
+	fpvShares.Store(token, &fpvShare{Token: token, SessionID: session.ID, Origin: site.URL, ExpiresAt: time.Now().Add(time.Minute)})
 	router := chi.NewRouter()
 	router.Route("/m", func(r chi.Router) { MountFPVPublicRoutes(r, manager) })
 	router.Get("/api/fpv/events", fpvAuditEventsHandler)

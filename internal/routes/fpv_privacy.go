@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/WPUIAI/uiai-engine/internal/vision"
@@ -17,7 +18,7 @@ func fpvRevokePrivateShare(token string) {
 
 // Reuse the existing session challenge authority; streaming must not outlive a
 // recognized transition simply because its HTTP request was admitted earlier.
-func fpvPublicSessionAllowed(sm *vision.SessionManager, entry *fpvShare, sess *vision.Session) bool {
+func fpvPublicSessionAllowed(ctx context.Context, sm *vision.SessionManager, entry *fpvShare, sess *vision.Session) bool {
 	if sm == nil || sess == nil || entry == nil {
 		return false
 	}
@@ -29,7 +30,16 @@ func fpvPublicSessionAllowed(sm *vision.SessionManager, entry *fpvShare, sess *v
 	if !exists || active != sess {
 		return false
 	}
-	if sess.CurrentAuthChallenge() != nil {
+	// Unbound legacy shares cannot inherit permission for the current page.
+	if current.Origin == "" {
+		fpvRevokePrivateShare(entry.Token)
+		return false
+	}
+	origin, err := sess.CurrentOriginContext(ctx)
+	if err != nil {
+		return false
+	}
+	if origin != current.Origin || sess.CurrentAuthChallenge() != nil {
 		fpvRevokePrivateShare(entry.Token)
 		return false
 	}
@@ -64,7 +74,7 @@ func fpvPublicPrivacyGuard(sm *vision.SessionManager) func(http.Handler) http.Ha
 					return
 				}
 			}
-			if !fpvPublicSessionAllowed(sm, entry, sess) {
+			if !fpvPublicSessionAllowed(req.Context(), sm, entry, sess) {
 				writeJSON(w, http.StatusForbidden, map[string]string{"error": "public view is no longer authorized", "error_class": "fpv_private_session"})
 				return
 			}

@@ -40,7 +40,7 @@ func TestFPVExistingShareRejectsAuthenticationTransitionBrowser(t *testing.T) {
 			}
 			defer manager.Close(session.ID)
 			token := fmt.Sprintf("synthetic-auth-transition-%d", time.Now().UnixNano())
-			fpvShares.Store(token, &fpvShare{Token: token, SessionID: session.ID, ExpiresAt: time.Now().Add(time.Minute)})
+			fpvShares.Store(token, &fpvShare{Token: token, SessionID: session.ID, Origin: site.URL, ExpiresAt: time.Now().Add(time.Minute)})
 			defer fpvShares.Delete(token)
 			before := httptest.NewRecorder()
 			router.ServeHTTP(before, httptest.NewRequest("GET", "/m/"+token+"/status", nil))

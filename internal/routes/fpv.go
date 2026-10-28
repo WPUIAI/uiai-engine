@@ -27,6 +27,7 @@ import (
 type fpvShare struct {
 	Token        string        `json:"token"`
 	SessionID    string        `json:"session_id"`
+	Origin       string        `json:"origin"`
 	CreatedAt    time.Time     `json:"created_at"`
 	ExpiresAt    time.Time     `json:"expires_at"`
 	Views        int           `json:"views"`
@@ -117,9 +118,19 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "authentication sessions cannot create public views", "error_class": "fpv_private_session"})
 			return
 		}
+		origin, err := sess.CurrentOriginContext(req.Context())
+		if err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "session origin could not be verified", "error_class": "fpv_privacy_check_failed"})
+			return
+		}
 		snap, err := sess.Screenshot("jpeg", 80)
 		if err != nil {
 			writeEPWAPublishError(w, http.StatusServiceUnavailable, "fpv_snapshot_failed", err, "", "", "reconcile:fpv-session-snapshot")
+			return
+		}
+		capturedOrigin, originErr := sess.CurrentOriginContext(req.Context())
+		if originErr != nil || capturedOrigin != origin || sess.CurrentAuthChallenge() != nil {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "public snapshot is no longer authorized", "error_class": "fpv_private_session"})
 			return
 		}
 		delivery, err := publishSessionSnapshotEPWA(req, cfg, sess, snap, epwadelivery.ProducerFPV)
@@ -127,7 +138,7 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 			writeEPWAPublishError(w, http.StatusServiceUnavailable, "epwa_publication_failed", err, "", "", "reconcile:fpv-epwa-publication")
 			return
 		}
-		share, err := fpvCreateShare(body.SessionID, body.ExpiresMinutes, body.Controls, body.OneTime, body.MaxViews)
+		share, err := fpvCreateShare(body.SessionID, origin, body.ExpiresMinutes, body.Controls, body.OneTime, body.MaxViews)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
@@ -392,6 +403,10 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			writeSessionError(w, http.StatusInternalServerError, classifySessionError(err), err, sess)
 			return
 		}
+		if !fpvPublicSessionAllowed(req.Context(), sm, entry, sess) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "public snapshot is no longer authorized", "error_class": "fpv_private_session"})
+			return
+		}
 		markFPVOperationalMirror(w)
 		w.Header().Set("Content-Type", "image/jpeg")
 		_, _ = w.Write(data)
@@ -429,7 +444,7 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 		}
 		defer stop()
 		fpvWriteStream(w, req, frames, fps, func() bool {
-			return fpvPublicSessionAllowed(sm, entry, sess)
+			return fpvPublicSessionAllowed(req.Context(), sm, entry, sess)
 		})
 	})
 
@@ -464,11 +479,11 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 			case <-req.Context().Done():
 				return
 			case <-ticker.C:
-				if !fpvPublicSessionAllowed(sm, entry, sess) {
+				if !fpvPublicSessionAllowed(req.Context(), sm, entry, sess) {
 					return
 				}
 				data, err := fpvScreenshotJPEG(sess)
-				if err != nil || !fpvPublicSessionAllowed(sm, entry, sess) {
+				if err != nil || !fpvPublicSessionAllowed(req.Context(), sm, entry, sess) {
 					return
 				}
 				_, _ = fmt.Fprintf(w, "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", len(data))
@@ -480,7 +495,10 @@ func MountFPVPublicRoutes(r chi.Router, sm *vision.SessionManager) {
 	})
 }
 
-func fpvCreateShare(sessionID string, expiresMinutes int, controls, oneTime bool, maxViews int) (map[string]any, error) {
+func fpvCreateShare(sessionID, origin string, expiresMinutes int, controls, oneTime bool, maxViews int) (map[string]any, error) {
+	if origin == "" {
+		return nil, fmt.Errorf("public share origin required")
+	}
 	minutes := expiresMinutes
 	if minutes <= 0 || minutes > 240 {
 		minutes = 60
@@ -489,7 +507,7 @@ func fpvCreateShare(sessionID string, expiresMinutes int, controls, oneTime bool
 	if err != nil {
 		return nil, err
 	}
-	entry := &fpvShare{Token: token, SessionID: sessionID, CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Duration(minutes) * time.Minute), Controls: controls, OneTime: oneTime, MaxViews: maxViews}
+	entry := &fpvShare{Token: token, SessionID: sessionID, Origin: origin, CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Duration(minutes) * time.Minute), Controls: controls, OneTime: oneTime, MaxViews: maxViews}
 	fpvShares.Store(token, entry)
 	fpvSaveRegistry()
 	return fpvSharePayload(entry), nil

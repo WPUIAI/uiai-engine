@@ -70,7 +70,7 @@ jobs:
           GOMAXPROCS: "2"
           UIAI_AUTH_TESTS: "1"
           UIAI_TEST_BLOCK_DEFAULT_EVIDENCE_STORE: "1"
-        run: go test -race -p 2 ./internal/routes -run 'TestFPVExistingShareRejectsAuthenticationTransitionBrowser|TestPublicFPVShareRejectsAuthenticationSessionsBrowser|TestOpenFPVCDPStreamStopsAfterRevocationOrExpiryBrowser' -count=1
+        run: go test -race -p 2 ./internal/routes -run 'TestFPVExistingShareRejects(AuthenticationTransition|CrossOriginNavigation)Browser|TestPublicFPVShareRejectsAuthenticationSessionsBrowser|TestOpenFPVCDPStreamStopsAfterRevocationOrExpiryBrowser' -count=1
       - name: Focusa packet drift check
         if: matrix.lane == 'browser'
         run: scripts/check-focusa-packet-drift.sh

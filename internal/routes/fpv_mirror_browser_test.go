@@ -37,7 +37,7 @@ func TestFPVMirrorScreenshotAfterResizeAndScroll20Cycles(t *testing.T) {
 		t.Fatal(err)
 	}
 	token := "synthetic-mirror-regression"
-	fpvShares.Store(token, &fpvShare{Token: token, SessionID: session.ID, ExpiresAt: time.Now().Add(5 * time.Minute)})
+	fpvShares.Store(token, &fpvShare{Token: token, SessionID: session.ID, Origin: site.URL, ExpiresAt: time.Now().Add(5 * time.Minute)})
 	defer fpvShares.Delete(token)
 	router := chi.NewRouter()
 	router.Route("/m", func(r chi.Router) { MountFPVPublicRoutes(r, manager) })

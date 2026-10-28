@@ -448,6 +448,16 @@ challenge and revoke their share when it is observed. This does not continuously
 classify every DOM mutation, establish complete origin/navigation privacy binding,
 provider authentication approval, or a private operator-handoff capability.
 
+New public shares persist their initial HTTP(S) origin, derived from browser-managed
+target metadata using the same origin normalizer as authentication storage. Public
+admission and open-stream delivery recheck that origin, not the cached session URL.
+An observed origin change permanently revokes the share; returning to the original
+origin cannot restore it. Same-origin navigation remains permitted. Unbound legacy
+shares fail closed and are revoked on access rather than inheriting permission for
+the current page. These checks do not provide atomic document/frame identity across
+navigation races or complete sensitive-origin classification; those privacy gates
+remain open.
+
 FPV CDP streaming uses one session-owned Chrome pump with latest-frame fanout;
 disconnecting one viewer cannot stop capture for another. `stream.cdp.mjpg?fps=8`
 accepts1–30FPS, rejects malformed/out-of-range values, and bounds writes to2seconds.
