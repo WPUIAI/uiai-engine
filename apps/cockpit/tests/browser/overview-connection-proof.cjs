@@ -73,7 +73,10 @@ async function run(browser, width) {
     assert.equal(saved["uiai.engine.url"], "http://healthy.invalid:7456");
     assert.equal(saved["uiai.scope.project_root"], "/fixture/draft");
     assert.equal(saved["uiai.response.profile"], "evidence_grade");
-    proof.checks.push({ width, check: "failed_and_successful_tests_read_only_explicit_save_activates", passed: true });
+    // Cover the real shell's 15s automatic discovery cycle, not just immediate storage.
+    await page.waitForTimeout(16_000);
+    assert.equal((await storage(page))["uiai.engine.url"], "http://healthy.invalid:7456", "automatic discovery must retain a verified explicit selection");
+    proof.checks.push({ width, check: "failed_and_successful_tests_read_only_explicit_save_stays_selected", passed: true });
 
     await page.goto(base);
     await page.getByText("No live browser sessions", { exact: true }).waitFor();

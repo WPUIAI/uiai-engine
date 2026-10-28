@@ -149,6 +149,8 @@ Regression coverage lives in `apps/cockpit/tests/unit/overview-state.test.ts`. T
 
 **Test connection** probes the draft Engine URL through the same bounded health probe used by discovery; it does not save the Engine, project scope, preferences or Evidence settings. A failed independent Focusa discovery does not turn a healthy Engine result into an Engine failure. **Save changes** remains the explicit activation action. An edited URL invalidates an in-flight test result; probe errors use an error state rather than a success banner. Explicit reverse-proxy API base paths are retained by the candidate probe.
 
+Discovery includes the configured Engine itself and retains that selection while its health is verified, even when loopback has lower latency. An unavailable selection can still use the existing verified fallback; late discovery results cannot overwrite a more recent selection. The browser fixture checks persistence across the normal 15-second discovery cycle.
+
 `apps/cockpit/tests/unit/connection-test.test.ts` covers read-only testing, failure isolation and the bounded probe. `apps/cockpit/tests/browser/overview-connection-proof.cjs` exercises the actual Settings buttons and Overview failure/recovery states at 1440px and 375px with read-only network fixtures; its manifest explicitly identifies fixtures, records CSS viewport/overflow metrics and hashes the full-page screenshots. It never opens or controls real worker sessions and is not live connected-project acceptance. Browser captures use the already-installed Playwright CLI with explicit CSS viewports and full-page images; PNG dimensions alone do not prove the CSS viewport or rule out a cropped native-window capture.
 
 ## Recipe 4: Proof packet capture

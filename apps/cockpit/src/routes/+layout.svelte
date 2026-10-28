@@ -4,7 +4,7 @@
   import "../lib/ui/sidebar-primitives.css";
   import { installCockpitDeepLinkRouting } from "$lib/desktop-deep-link";
   import { discoverEngines, selectBestEngine } from "$lib/engine-discovery";
-  import { engineClient, savedScope, selectEngineUrl } from "$lib/engine-client";
+  import { engineClient, engineUrl, savedScope, selectEngineUrl } from "$lib/engine-client";
   import { discoverFocusaDaemons, focusaDaemonSummary, readSavedFocusaDaemonHints, saveFocusaDaemonHints, type FocusaDaemonConnection } from "$lib/focusa-daemon-discovery";
   import { projectBindingRequiresReconciliation, readFocusaProjectBindings, rememberFocusaProjectBinding, selectFocusaProjectBinding, verifyFocusaProject, type FocusaProjectBinding } from "$lib/focusa-projects";
   import { phase0Cards } from "$lib/cards/phase0-card-manifest";
@@ -114,7 +114,15 @@
     const completionToastTimer = window.setTimeout(reportCompletedCockpitUpdate, 250);
     const stop = startAutomaticCockpitUpdate((result) => (update = result));
     const refreshEngineStatus = () => void engineClient.health().then((result) => (engineStatus = result.status)).catch(() => (engineStatus = "unavailable"));
-    const refreshEngineDiscovery = () => void discoverEngines().then((connections) => { const selected = selectBestEngine(connections); if (selected) { selectEngineUrl(selected.baseUrl); engineStatus = "healthy"; } else engineStatus = "unavailable"; });
+    const refreshEngineDiscovery = () => {
+      const preferred = engineUrl();
+      void discoverEngines().then((connections) => {
+        if (engineUrl() !== preferred) return;
+        const selected = selectBestEngine(connections, preferred);
+        if (selected) { selectEngineUrl(selected.baseUrl); engineStatus = "healthy"; }
+        else engineStatus = "unavailable";
+      }).catch(() => { engineStatus = "unavailable"; });
+    };
     refreshEngineDiscovery();
     const engineTimer = window.setInterval(refreshEngineStatus, 5000);
     const engineDiscoveryTimer = window.setInterval(refreshEngineDiscovery, 15_000);

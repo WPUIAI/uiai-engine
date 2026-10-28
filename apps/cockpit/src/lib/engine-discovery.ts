@@ -1,4 +1,4 @@
-import { DEFAULT_ENGINE_URL } from "$lib/engine-client";
+import { DEFAULT_ENGINE_URL, engineUrl } from "$lib/engine-client";
 
 export const ENGINE_HINTS_KEY = "uiai.cockpit.engine_hints.v1";
 export interface EngineConnection { baseUrl: string; status: "connected" | "unavailable"; latencyMs?: number; service?: string; browserless?: boolean; source: "loopback" | "saved" | "environment"; }
@@ -40,12 +40,16 @@ export async function discoverEngines(): Promise<EngineConnection[]> {
   const candidates = new Map<string, EngineConnection["source"]>();
   candidates.set(DEFAULT_ENGINE_URL, "loopback"); candidates.set("http://localhost:7456", "loopback");
   for (const value of readEngineHints()) candidates.set(value, "saved");
+  const configured = normalize(engineUrl(), true);
+  if (configured && !candidates.has(configured)) candidates.set(configured, "saved");
   const environment = normalize(String((window as unknown as Record<string, unknown>).__UIAI_ENGINE_URL__ || ""));
   if (environment) candidates.set(environment, "environment");
   const results = await Promise.all([...candidates].map(([url, source]) => probe(url, source)));
-  return results.sort((a, b) => Number(b.status === "connected") - Number(a.status === "connected") || (a.latencyMs || 9999) - (b.latencyMs || 9999));
+  return results.sort((a, b) => Number(b.status === "connected") - Number(a.status === "connected") || (a.latencyMs ?? 9999) - (b.latencyMs ?? 9999));
 }
 
-export function selectBestEngine(connections: EngineConnection[]): EngineConnection | undefined {
-  return connections.filter((item) => item.status === "connected").sort((a, b) => (a.latencyMs || 9999) - (b.latencyMs || 9999))[0];
+export function selectBestEngine(connections: EngineConnection[], preferredBaseUrl?: string): EngineConnection | undefined {
+  const preferred = preferredBaseUrl ? normalize(preferredBaseUrl, true) : undefined;
+  return connections.find((item) => item.status === "connected" && item.baseUrl === preferred)
+    ?? connections.filter((item) => item.status === "connected").sort((a, b) => (a.latencyMs ?? 9999) - (b.latencyMs ?? 9999))[0];
 }
