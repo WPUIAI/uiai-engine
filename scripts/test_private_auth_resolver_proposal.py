@@ -61,7 +61,7 @@ class ProposalConsistency(unittest.TestCase):
         self.assertLess(gates.index('capture_quarantine_before_retrieval'),
                         gates.index('fresh_authenticated_account_observation'))
         self.assertLess(gates.index('fresh_authenticated_account_observation'),
-                        gates.index('atomic_recheck_receipt_and_resume'))
+                        gates.index('external_durable_receipt_then_local_fenced_resume'))
         self.assertIn('secret_cleanup_before_capture_release', gates)
         self.assertIn('Ordinary agent fill/eval/click remain denied', self.doc)
         self.assertIn('no broker socket is added by this PR', self.doc)
@@ -73,6 +73,119 @@ class ProposalConsistency(unittest.TestCase):
         self.assertEqual(d['closes_issues'], [])
         self.assertEqual(d['website_acceptance'], 'separate_pending')
         self.assertIn('exact_owner_approved', d['implementation_gate'])
+
+    def test_decision_packet_requires_bounded_choices_and_admission_fields(self):
+        packet = self.data['decision_packet']
+        self.assertEqual(packet['status'], 'advisory_external')
+        self.assertEqual(packet['runtime_label'], 'NO auth runtime')
+        self.assertFalse(packet['implementation_admission'])
+        self.assertFalse(packet['root_promotion'])
+        self.assertFalse(packet['distributed_atomicity_claim'])
+        self.assertEqual(packet['lineage'], ['WPUIAI/uiai-engine#291',
+            'WPUIAI/uiai-engine#145', 'Startempire-Wire/focusa#299',
+            'Startempire-Wire/focusa#294'])
+        required = {'rooted_decision_provenance','scope_forbidden_effects',
+            'human_component_owners','pinned_repos_revisions_files_symbols',
+            'api_schemas_errors_states','issuer_trust_peer_mapping',
+            'request_account_origin_context_bindings','time_revocation_crash_rules',
+            'capture_egress_owner_acknowledgments','golden_executable_fixtures',
+            'capacity_retention_cleanup_rollback_reconcile',
+            'dependency_graph_and_IR5_receipts'}
+        self.assertEqual(set(packet['required_IR5_fields']), required)
+        self.assertEqual(len(packet['unknown_mandatory']), 6)
+        for row, choice in zip(self.data['decisions'], ['A','A','B']):
+            self.assertEqual([a['id'] for a in row['alternatives']], ['A','B','C'])
+            self.assertEqual(row['recommended_alternative'], choice)
+            self.assertEqual(row['promotion_owner'], 'Sir V3')
+            self.assertIsNone(row['promotion_evidence'])
+            self.assertTrue(row['source_seams'])
+            self.assertGreater(len(row['security_tradeoffs']), 40)
+            self.assertGreater(len(row['admission_prerequisites']), 40)
+        self.assertIn('NOT distributed', self.doc)
+        self.assertNotIn('authorized result atomically with challenge resume', self.doc)
+
+    def test_ipc_candidate_explicit_limits_and_negative_case_inventory(self):
+        ipc = self.data['ipc_candidate']
+        self.assertEqual(ipc['status'], 'proposed_not_admitted')
+        self.assertEqual((ipc['frame_max_bytes'], ipc['ref_max_bytes'],
+                          ipc['outstanding_per_peer'], ipc['active_per_context'],
+                          ipc['read_deadline_seconds'], ipc['dispatch_deadline_seconds']),
+                         (16384, 256, 4, 1, 5, 30))
+        self.assertEqual(ipc['status_cancel_body'], ['resolution_ref','lease_generation'])
+        self.assertEqual(set(ipc['reject_cases']), {'unknown_field','duplicate_key',
+            'invalid_utf8','trailing_data','unsupported_version','oversize_frame',
+            'malformed_ref','unknown_principal','shared_uid_ambiguous','pid_reuse',
+            'stale_launch_generation','foreign_status_cancel','resource_exhaustion'})
+        self.assertEqual(ipc['timeout_after_possible_use'], 'reconcile_never_release_budget')
+        self.assertIn('UID alone', self.doc)
+        self.assertIn('not existing service limits', self.doc)
+
+    def test_distributed_crash_windows_are_enumerated_not_executed(self):
+        windows = self.data['distributed_windows']
+        self.assertEqual([w['id'] for w in windows], ['W%d'%i for i in range(1,8)])
+        self.assertEqual([w['window'] for w in windows], [
+            'external_reserve_reply_or_local_intent_lost','intent_durable_delivery_unknown',
+            'delivery_input_submit_or_response_lost','account_observed_consume_pending_ack_lost',
+            'consume_durable_resume_not_durable','resume_durable_reply_event_lost',
+            'revoke_expire_cancel_close_restart'])
+        self.assertTrue(all(w['status'] == 'required_not_executed' for w in windows))
+        self.assertEqual(windows[2]['required_recovery'], 'quarantine_possible_use_no_resubmit')
+        self.assertEqual(windows[4]['required_recovery'],
+                         'no_new_input_revalidate_then_local_compare_transition')
+        for phrase in ['linearization point', 'max clock skew', 'propagation budget',
+                       'no distributed atomicity claim', 'possible_use']:
+            self.assertIn(phrase, self.doc)
+
+    def test_capture_egress_owners_remain_unresolved_and_source_backed(self):
+        rows = self.data['capture_egress_inventory']
+        self.assertEqual([r['id'] for r in rows],
+                         ['C1','C2','C3','C4','C5','C6','E1','E2','E3'])
+        for row in rows:
+            self.assertIsNone(row['human_owner'])
+            self.assertFalse(row['fence_verified'])
+            self.assertIn('| '+row['id']+' |', self.doc)
+            for path in row['source_path'].split(';'):
+                if path not in ('not_implemented','not_selected'):
+                    self.assertTrue((ROOT/path).is_file(), path)
+        by_id = {r['id']: r for r in rows}
+        self.assertEqual(by_id['C2']['unresolved_contract'], 'producer_subscriber_buffer_drain')
+        self.assertEqual(by_id['C3']['unresolved_contract'], 'async_recorder_stop_drain_late_callback')
+        self.assertEqual(by_id['E2']['unresolved_contract'],
+                         'hostile_same_origin_input_listeners_and_allowed_destination_exfiltration')
+        for phrase in ['same-origin malicious script','fetch/XHR/beacon/WebSocket',
+                       'service-worker','complete audit','UNKNOWN']:
+            self.assertIn(phrase, self.doc)
+
+    def test_public_resolve_race_enumeration_requires_all_interleavings(self):
+        rows = self.data['public_resolve_cases']
+        self.assertEqual([r['id'] for r in rows], ['R%d'%i for i in range(1,9)])
+        self.assertEqual([r['interleaving'] for r in rows], [
+            'resolve_before_reservation','resolve_between_reserve_and_quarantine',
+            'resolve_during_retrieval_input_submit','resolve_after_observation_consume_pending',
+            'duplicate_resolve_after_private_resume_nil_challenge',
+            'resolve_vs_cancel_close_expiry_navigation_replacement_restart',
+            'resolve_vs_inflight_GET_read_stream_share_queued_action',
+            'foreign_principal_legacy_token_or_private_ref'])
+        self.assertTrue(all(r['status'] == 'required_not_executed' for r in rows))
+        for row in rows:
+            self.assertIn('- '+row['id']+':', self.doc)
+        self.assertEqual(rows[2]['required_assertion'],
+                         'no_ordinary_mutation_capture_release_or_second_consumer')
+        self.assertEqual(rows[6]['required_assertion'],
+                         'no_buffered_late_capture_or_guard_TOCTOU_escape')
+        self.assertIn('authChallenge != nil', self.doc)
+        self.assertIn('R1-R8', self.data['runtime_cases'][8]['required_assertion'])
+
+    def test_distribution_metadata_scope_is_not_release_claim(self):
+        scope = self.data['scope']
+        self.assertEqual(scope['manifest_allowed_fields'], ['source_commit','generated_at'])
+        self.assertEqual(scope['manifest_tool'], 'scripts/stamp-uiai-version.py')
+        self.assertFalse(scope['release_artifact_version_change'])
+        self.assertEqual(set(scope['allowed_changed_files']), {
+            str(DOC.relative_to(ROOT)), str(CONTRACT.relative_to(ROOT)),
+            'scripts/test_private_auth_resolver_proposal.py','docs/distribution-manifest.json'})
+        self.assertIn('supported distribution manifest stamp metadata', self.doc)
+        self.assertIn('NOT installed compatibility or deployment proof', self.doc)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
