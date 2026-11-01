@@ -1,0 +1,193 @@
+{
+  "schema": "uiai.private_auth_resolver_admission_proposal.v1",
+  "status": "proposed",
+  "authority_class": "advisory_external",
+  "implementation_implied": false,
+  "runtime_implemented": false,
+  "base_revision": "1c0a2d3a5a2724fcad7dde7981c2a0be053316c9",
+  "existing_issues": [
+    "WPUIAI/uiai-engine#82",
+    "WPUIAI/uiai-engine#81",
+    "WPUIAI/uiai-engine#145",
+    "Startempire-Wire/focusa#299",
+    "Startempire-Wire/focusa#294"
+  ],
+  "authority": {
+    "issuer_owner": "Focusa",
+    "consumer_owner": "UIAI Engine",
+    "self_issue": false,
+    "raw_secret_in_model": false,
+    "recovery_material": "unconditionally_forbidden",
+    "unknown_renewability": "reject_before_provider_access"
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "status": "owner_decision_required",
+      "subject": "authenticated private IPC consumer; operation-name conflict review"
+    },
+    {
+      "id": "D2",
+      "status": "owner_decision_required",
+      "subject": "exact Focusa authority verifier/reserve/consume/reconcile operations, trust and IR5 admission"
+    },
+    {
+      "id": "D3",
+      "status": "owner_decision_required",
+      "subject": "private context allocation and provider-specific fresh account verifier"
+    }
+  ],
+  "interface": {
+    "deployment_status": "not_deployed",
+    "transport": "proposed_authenticated_node_local_ipc",
+    "operations": [
+      "PrivateAuth.Begin",
+      "PrivateAuth.Status",
+      "PrivateAuth.Cancel"
+    ],
+    "begin_required": [
+      "grant_ref",
+      "secret_binding_ref",
+      "private_session_ref",
+      "challenge_ref",
+      "work_surface_binding_ref",
+      "frame_attempt_ref",
+      "operation_ref",
+      "account_assertion_ref",
+      "pre_observation_ref",
+      "lease_generation",
+      "idempotency_key"
+    ],
+    "begin_forbidden": [
+      "password",
+      "otp",
+      "cookie",
+      "js",
+      "selector",
+      "url",
+      "actor",
+      "resume_token",
+      "authenticated",
+      "grant_document"
+    ],
+    "unknown_fields": "reject",
+    "actor_source": "authenticated_peer_and_owning_records",
+    "expected_account_source": "trusted_authority_binding",
+    "observed_account_source": "fresh_provider_account_verifier",
+    "resume": "server_private_after_verified_identity_and_current_authority"
+  },
+  "gates": [
+    "current_external_authority",
+    "private_context_not_pooled",
+    "exact_actor_scope_frame_attempt",
+    "origin_form_frame_document_binding",
+    "expected_account_assertion",
+    "renewable_provider_class",
+    "expiry_revocation_use_budget",
+    "generation_fencing",
+    "atomic_idempotent_reservation",
+    "capture_quarantine_before_retrieval",
+    "fresh_authenticated_account_observation",
+    "atomic_recheck_receipt_and_resume",
+    "secret_cleanup_before_capture_release"
+  ],
+  "runtime_cases": [
+    {
+      "id": "PA01",
+      "category": "positive_real_browser",
+      "status": "required_not_executed",
+      "required_assertion": "Admitted private dispatcher authenticates synthetic fixture; fresh account endpoint matches trusted expected account; challenge resumes once; ordinary ops remain denied until authorized resume."
+    },
+    {
+      "id": "PA02",
+      "category": "stale_replay",
+      "status": "required_not_executed",
+      "required_assertion": "Expired grant, old revision, old context/challenge/frame generation and consumed idempotency key cannot cause another retrieval/submit."
+    },
+    {
+      "id": "PA03",
+      "category": "origin_change",
+      "status": "required_not_executed",
+      "required_assertion": "Wrong origin, hostile form.action, cross-origin frame, redirect or navigation race denies before next secret use; no exfiltration."
+    },
+    {
+      "id": "PA04",
+      "category": "account_mismatch",
+      "status": "required_not_executed",
+      "required_assertion": "Expected account from trusted binding differs from fresh authenticated account; no resume even after HTTP200/submit success."
+    },
+    {
+      "id": "PA05",
+      "category": "grant_rejection",
+      "status": "required_not_executed",
+      "required_assertion": "Absent/untrusted/malformed/revoked/wrong-actor/scope/operation/consumer/effect/use-limit grants reject before custodian call; revocation during execution prevents resume."
+    },
+    {
+      "id": "PA06",
+      "category": "no_secret_leak",
+      "status": "required_not_executed",
+      "required_assertion": "Synthetic secret and encoded/decoded aliases absent from all model outputs, responses, logs, events, diagnostics, receipts, argv and persisted artifacts; no screenshot/stream/recorder capture while quarantined."
+    },
+    {
+      "id": "PA07",
+      "category": "ordinary_guard",
+      "status": "required_not_executed",
+      "required_assertion": "Ordinary fill/eval/eval_async/click and public FPV control remain denied; no resume through caller-supplied boolean/token/JS."
+    },
+    {
+      "id": "PA08",
+      "category": "private_context_isolation",
+      "status": "required_not_executed",
+      "required_assertion": "Private/private and pooled/private cookie/storage separation; pooled session refuses provider use before retrieval; separate private capacity accounting."
+    },
+    {
+      "id": "PA09",
+      "category": "fence_concurrency",
+      "status": "required_not_executed",
+      "required_assertion": "Parallel request/resume/cancel/close/navigation races have one winner; exact current challenge/account/context verified atomically at resume."
+    },
+    {
+      "id": "PA10",
+      "category": "ambiguous_side_effect",
+      "status": "required_not_executed",
+      "required_assertion": "Lost response or timeout after submit reconciles same immutable idempotency binding without a second retrieval or submit; uncertain use is never reported unused."
+    },
+    {
+      "id": "PA11",
+      "category": "renewability",
+      "status": "required_not_executed",
+      "required_assertion": "Recovery/break-glass/unknown-renewability and unsupported challenge classes stop before provider access; trusted-clock TOTP window constraints tested."
+    },
+    {
+      "id": "PA12",
+      "category": "cleanup_crash",
+      "status": "required_not_executed",
+      "required_assertion": "Close/expiry/crash cancel owned context only; resource-specific cleanup receipts are idempotent; unverified residue keeps quarantine/incident."
+    },
+    {
+      "id": "PA13",
+      "category": "capture_quarantine_race",
+      "status": "required_not_executed",
+      "required_assertion": "Existing GET/read/snapshot/stream/share/export/recorder consumers cannot capture between admission, injection, identity verification and cleanup; failure never reopens captures."
+    },
+    {
+      "id": "PA14",
+      "category": "authority_interoperability",
+      "status": "required_not_executed",
+      "required_assertion": "Pinned Focusa authority adapter performs actual current grant verification plus atomic reserve/consume/reconcile/revocation; test-only issuer impossible in release wiring."
+    },
+    {
+      "id": "PA15",
+      "category": "compatibility_installed",
+      "status": "required_not_executed",
+      "required_assertion": "Preserve ordinary formatting/lifecycle/privacy regressions; exact candidate binary and installed workers tested separately before real operator-site acceptance."
+    }
+  ],
+  "release": {
+    "implementation_gate": "exact_owner_approved_call_stack_design_and_dependency_ordered_IR5",
+    "parent_independent_review_required": true,
+    "production_deploy_authorized": false,
+    "website_acceptance": "separate_pending",
+    "closes_issues": []
+  }
+}
