@@ -1,0 +1,514 @@
+{
+  "schema": "uiai.private_auth_resolver_admission_proposal.v1",
+  "status": "proposed",
+  "authority_class": "advisory_external",
+  "implementation_implied": false,
+  "runtime_implemented": false,
+  "base_revision": "1c0a2d3a5a2724fcad7dde7981c2a0be053316c9",
+  "existing_issues": [
+    "WPUIAI/uiai-engine#82",
+    "WPUIAI/uiai-engine#81",
+    "WPUIAI/uiai-engine#145",
+    "Startempire-Wire/focusa#299",
+    "Startempire-Wire/focusa#294"
+  ],
+  "authority": {
+    "issuer_owner": "Focusa",
+    "consumer_owner": "UIAI Engine",
+    "self_issue": false,
+    "raw_secret_in_model": false,
+    "recovery_material": "unconditionally_forbidden",
+    "unknown_renewability": "reject_before_provider_access"
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "status": "owner_decision_required",
+      "subject": "authenticated private IPC consumer; operation-name conflict review",
+      "alternatives": [
+        {
+          "id": "A",
+          "choice": "Linux registered-peer Unix-domain IPC"
+        },
+        {
+          "id": "B",
+          "choice": "supervisor inherited socketpair/FD"
+        },
+        {
+          "id": "C",
+          "choice": "loopback bearer HTTP"
+        }
+      ],
+      "recommended_alternative": "A",
+      "source_seams": [
+        "S1",
+        "S7"
+      ],
+      "security_tradeoffs": "Linux-only bounded boundary; no UID-only actor mapping; explicit registration and restart fencing burden",
+      "admission_prerequisites": "exact dispatcher/schema/enums/registration owner and malformed/resource/peer fixtures",
+      "promotion_owner": "Sir V3",
+      "promotion_evidence": null
+    },
+    {
+      "id": "D2",
+      "status": "owner_decision_required",
+      "subject": "exact Focusa authority verifier/reserve/consume/reconcile operations, trust and IR5 admission",
+      "alternatives": [
+        {
+          "id": "A",
+          "choice": "external durable ledger plus local recovery journal"
+        },
+        {
+          "id": "B",
+          "choice": "distributed two-phase commit"
+        },
+        {
+          "id": "C",
+          "choice": "local mutex and best-effort receipt"
+        }
+      ],
+      "recommended_alternative": "A",
+      "source_seams": [
+        "S1",
+        "S7"
+      ],
+      "security_tradeoffs": "no distributed atomicity or exactly-once login; conservative possible_use and lower availability",
+      "admission_prerequisites": "pinned Focusa operations/trust/schema, revocation linearization/window, crash fixtures and reaper",
+      "promotion_owner": "Sir V3",
+      "promotion_evidence": null
+    },
+    {
+      "id": "D3",
+      "status": "owner_decision_required",
+      "subject": "private context allocation and provider-specific fresh account verifier",
+      "alternatives": [
+        {
+          "id": "A",
+          "choice": "dedicated private Incognito context"
+        },
+        {
+          "id": "B",
+          "choice": "dedicated ephemeral profile/process"
+        },
+        {
+          "id": "C",
+          "choice": "reuse operator profile or pooled page"
+        }
+      ],
+      "recommended_alternative": "B",
+      "source_seams": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6"
+      ],
+      "security_tradeoffs": "more process memory/startup cost; process isolation alone does not prove capture or egress safety",
+      "admission_prerequisites": "exact lifecycle/capacity/cleanup, documented trusted provider account endpoint and tenant/freshness contract",
+      "promotion_owner": "Sir V3",
+      "promotion_evidence": null
+    }
+  ],
+  "interface": {
+    "deployment_status": "not_deployed",
+    "transport": "proposed_authenticated_node_local_ipc",
+    "operations": [
+      "PrivateAuth.Begin",
+      "PrivateAuth.Status",
+      "PrivateAuth.Cancel"
+    ],
+    "begin_required": [
+      "grant_ref",
+      "secret_binding_ref",
+      "private_session_ref",
+      "challenge_ref",
+      "work_surface_binding_ref",
+      "frame_attempt_ref",
+      "operation_ref",
+      "account_assertion_ref",
+      "pre_observation_ref",
+      "lease_generation",
+      "idempotency_key"
+    ],
+    "begin_forbidden": [
+      "password",
+      "otp",
+      "cookie",
+      "js",
+      "selector",
+      "url",
+      "actor",
+      "resume_token",
+      "authenticated",
+      "grant_document"
+    ],
+    "unknown_fields": "reject",
+    "actor_source": "authenticated_peer_and_owning_records",
+    "expected_account_source": "trusted_authority_binding",
+    "observed_account_source": "fresh_provider_account_verifier",
+    "resume": "server_private_after_verified_identity_and_current_authority"
+  },
+  "gates": [
+    "current_external_authority",
+    "private_context_not_pooled",
+    "exact_actor_scope_frame_attempt",
+    "origin_form_frame_document_binding",
+    "expected_account_assertion",
+    "renewable_provider_class",
+    "expiry_revocation_use_budget",
+    "generation_fencing",
+    "atomic_idempotent_reservation",
+    "capture_quarantine_before_retrieval",
+    "fresh_authenticated_account_observation",
+    "external_durable_receipt_then_local_fenced_resume",
+    "secret_cleanup_before_capture_release"
+  ],
+  "runtime_cases": [
+    {
+      "id": "PA01",
+      "category": "positive_real_browser",
+      "status": "required_not_executed",
+      "required_assertion": "Admitted private dispatcher authenticates synthetic fixture; fresh account endpoint matches trusted expected account; challenge resumes once; ordinary ops remain denied until authorized resume."
+    },
+    {
+      "id": "PA02",
+      "category": "stale_replay",
+      "status": "required_not_executed",
+      "required_assertion": "Expired grant, old revision, old context/challenge/frame generation and consumed idempotency key cannot cause another retrieval/submit."
+    },
+    {
+      "id": "PA03",
+      "category": "origin_change",
+      "status": "required_not_executed",
+      "required_assertion": "Wrong origin, hostile form.action, cross-origin frame, redirect or navigation race denies before next secret use; no exfiltration."
+    },
+    {
+      "id": "PA04",
+      "category": "account_mismatch",
+      "status": "required_not_executed",
+      "required_assertion": "Expected account from trusted binding differs from fresh authenticated account; no resume even after HTTP200/submit success."
+    },
+    {
+      "id": "PA05",
+      "category": "grant_rejection",
+      "status": "required_not_executed",
+      "required_assertion": "Absent/untrusted/malformed/revoked/wrong-actor/scope/operation/consumer/effect/use-limit grants reject before custodian call; revocation during execution prevents resume."
+    },
+    {
+      "id": "PA06",
+      "category": "no_secret_leak",
+      "status": "required_not_executed",
+      "required_assertion": "Synthetic secret and encoded/decoded aliases absent from all model outputs, responses, logs, events, diagnostics, receipts, argv and persisted artifacts; no screenshot/stream/recorder capture while quarantined."
+    },
+    {
+      "id": "PA07",
+      "category": "ordinary_guard",
+      "status": "required_not_executed",
+      "required_assertion": "Ordinary fill/eval/eval_async/click and public FPV control remain denied; no resume through caller-supplied boolean/token/JS."
+    },
+    {
+      "id": "PA08",
+      "category": "private_context_isolation",
+      "status": "required_not_executed",
+      "required_assertion": "Private/private and pooled/private cookie/storage separation; pooled session refuses provider use before retrieval; separate private capacity accounting."
+    },
+    {
+      "id": "PA09",
+      "category": "fence_concurrency",
+      "status": "required_not_executed",
+      "required_assertion": "Parallel request/resume/cancel/close/navigation races have one winner; exact current challenge/account/context verified atomically at resume. Enumerate public-resolve interleavings R1-R8 against actual legacy route and private fence."
+    },
+    {
+      "id": "PA10",
+      "category": "ambiguous_side_effect",
+      "status": "required_not_executed",
+      "required_assertion": "Lost response or timeout after submit reconciles same immutable idempotency binding without a second retrieval or submit; uncertain use is never reported unused. Enumerate distributed windows W1-W7; no distributed atomicity claim."
+    },
+    {
+      "id": "PA11",
+      "category": "renewability",
+      "status": "required_not_executed",
+      "required_assertion": "Recovery/break-glass/unknown-renewability and unsupported challenge classes stop before provider access; trusted-clock TOTP window constraints tested."
+    },
+    {
+      "id": "PA12",
+      "category": "cleanup_crash",
+      "status": "required_not_executed",
+      "required_assertion": "Close/expiry/crash cancel owned context only; resource-specific cleanup receipts are idempotent; unverified residue keeps quarantine/incident."
+    },
+    {
+      "id": "PA13",
+      "category": "capture_quarantine_race",
+      "status": "required_not_executed",
+      "required_assertion": "Existing GET/read/snapshot/stream/share/export/recorder consumers cannot capture between admission, injection, identity verification and cleanup; failure never reopens captures. Cover inventory C1-C6/E1-E3, drain existing buffers/callbacks and hostile same-origin network exfiltration."
+    },
+    {
+      "id": "PA14",
+      "category": "authority_interoperability",
+      "status": "required_not_executed",
+      "required_assertion": "Pinned Focusa authority adapter performs actual current grant verification plus atomic reserve/consume/reconcile/revocation; test-only issuer impossible in release wiring."
+    },
+    {
+      "id": "PA15",
+      "category": "compatibility_installed",
+      "status": "required_not_executed",
+      "required_assertion": "Preserve ordinary formatting/lifecycle/privacy regressions; exact candidate binary and installed workers tested separately before real operator-site acceptance."
+    }
+  ],
+  "release": {
+    "implementation_gate": "exact_owner_approved_call_stack_design_and_dependency_ordered_IR5",
+    "parent_independent_review_required": true,
+    "production_deploy_authorized": false,
+    "website_acceptance": "separate_pending",
+    "closes_issues": []
+  },
+  "decision_packet": {
+    "status": "advisory_external",
+    "runtime_label": "NO auth runtime",
+    "lineage": [
+      "WPUIAI/uiai-engine#291",
+      "WPUIAI/uiai-engine#145",
+      "Startempire-Wire/focusa#299",
+      "Startempire-Wire/focusa#294"
+    ],
+    "protected_writer": "uiai-engine-zsjm / #82",
+    "implementation_admission": false,
+    "root_promotion": false,
+    "required_IR5_fields": [
+      "rooted_decision_provenance",
+      "scope_forbidden_effects",
+      "human_component_owners",
+      "pinned_repos_revisions_files_symbols",
+      "api_schemas_errors_states",
+      "issuer_trust_peer_mapping",
+      "request_account_origin_context_bindings",
+      "time_revocation_crash_rules",
+      "capture_egress_owner_acknowledgments",
+      "golden_executable_fixtures",
+      "capacity_retention_cleanup_rollback_reconcile",
+      "dependency_graph_and_IR5_receipts"
+    ],
+    "unknown_mandatory": [
+      "Focusa operations/signatures/schema/trust roots",
+      "human implementation assignees",
+      "revocation window/clock/propagation contract",
+      "provider endpoint/identity/tenant/freshness contract",
+      "private egress enforcement primitive",
+      "capture owner fence acknowledgments"
+    ],
+    "distributed_atomicity_claim": false
+  },
+  "ipc_candidate": {
+    "status": "proposed_not_admitted",
+    "frame_max_bytes": 16384,
+    "ref_max_bytes": 256,
+    "ref_pattern": "[A-Za-z0-9][A-Za-z0-9._:-]*",
+    "outstanding_per_peer": 4,
+    "active_per_context": 1,
+    "read_deadline_seconds": 5,
+    "dispatch_deadline_seconds": 30,
+    "status_cancel_body": [
+      "resolution_ref",
+      "lease_generation"
+    ],
+    "reject_cases": [
+      "unknown_field",
+      "duplicate_key",
+      "invalid_utf8",
+      "trailing_data",
+      "unsupported_version",
+      "oversize_frame",
+      "malformed_ref",
+      "unknown_principal",
+      "shared_uid_ambiguous",
+      "pid_reuse",
+      "stale_launch_generation",
+      "foreign_status_cancel",
+      "resource_exhaustion"
+    ],
+    "peer_mapping": "OS_peer_plus_protected_service_registration_then_owning_actor_records",
+    "timeout_after_possible_use": "reconcile_never_release_budget"
+  },
+  "distributed_windows": [
+    {
+      "id": "W1",
+      "window": "external_reserve_reply_or_local_intent_lost",
+      "required_recovery": "same_key_authoritative_reconcile_no_new_use",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "W2",
+      "window": "intent_durable_delivery_unknown",
+      "required_recovery": "prove_no_use_or_possible_use",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "W3",
+      "window": "delivery_input_submit_or_response_lost",
+      "required_recovery": "quarantine_possible_use_no_resubmit",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "W4",
+      "window": "account_observed_consume_pending_ack_lost",
+      "required_recovery": "reconcile_receipt_authority_fence_observation_freshness",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "W5",
+      "window": "consume_durable_resume_not_durable",
+      "required_recovery": "no_new_input_revalidate_then_local_compare_transition",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "W6",
+      "window": "resume_durable_reply_event_lost",
+      "required_recovery": "same_authorized_receipt_no_repeat_login",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "W7",
+      "window": "revoke_expire_cancel_close_restart",
+      "required_recovery": "fence_generation_reconcile_owned_cleanup",
+      "status": "required_not_executed"
+    }
+  ],
+  "capture_egress_inventory": [
+    {
+      "id": "C1",
+      "source_path": "internal/vision/session.go",
+      "source_symbols": "Screenshot/ScreenshotFull/ReadPageContext/DOMInfo",
+      "unresolved_contract": "direct_and_action_returned_capture",
+      "human_owner": null,
+      "fence_verified": false
+    },
+    {
+      "id": "C2",
+      "source_path": "internal/vision/session_screencast.go;internal/routes/fpv_stream.go;internal/routes/fpv.go",
+      "source_symbols": "CDPScreencast/screencastHub/fpvWriteStream/fpvScreenshotJPEG",
+      "unresolved_contract": "producer_subscriber_buffer_drain",
+      "human_owner": null,
+      "fence_verified": false
+    },
+    {
+      "id": "C3",
+      "source_path": "internal/vision/diagnostics.go",
+      "source_symbols": "initDiagnostics/recordConsole/recordException/recordRequest/recordResponse",
+      "unresolved_contract": "async_recorder_stop_drain_late_callback",
+      "human_owner": null,
+      "fence_verified": false
+    },
+    {
+      "id": "C4",
+      "source_path": "internal/routes/epwa_delivery.go;internal/routes/vision_interactive.go;internal/evidenceartifact/store.go",
+      "source_symbols": "writeSessionSnapshot/publishSessionSnapshotEPWA/storeCapture/Store.OpenAsset",
+      "unresolved_contract": "publication_export_share_queued_writes_prior_artifacts",
+      "human_owner": null,
+      "fence_verified": false
+    },
+    {
+      "id": "C5",
+      "source_path": "internal/browserprofile/session_access.go;internal/vision/session_eval.go;internal/vision/pool.go",
+      "source_symbols": "Manager.SessionPage/Session.Eval/Pool.Screenshot",
+      "unresolved_contract": "raw_page_CDP_alternate_consumers",
+      "human_owner": null,
+      "fence_verified": false
+    },
+    {
+      "id": "C6",
+      "source_path": "internal/vision/auth_challenge.go;internal/routes/session.go;internal/observability/errors.go",
+      "source_symbols": "events/sessionInfoPayload/writeSessionError/ErrorStore.Record",
+      "unresolved_contract": "value_free_events_errors_logs_no_private_resume_token",
+      "human_owner": null,
+      "fence_verified": false
+    },
+    {
+      "id": "E1",
+      "source_path": "internal/vision/pool.go;internal/browserprofile/launcher.go",
+      "source_symbols": "ValidateNavigationURL/BuildChromiumLauncher",
+      "unresolved_contract": "pre_input_full_request_egress_primitive_not_selected",
+      "human_owner": null,
+      "fence_verified": false
+    },
+    {
+      "id": "E2",
+      "source_path": "not_implemented",
+      "source_symbols": "private_target_frame_document/provider_form_adapter",
+      "unresolved_contract": "hostile_same_origin_input_listeners_and_allowed_destination_exfiltration",
+      "human_owner": null,
+      "fence_verified": false
+    },
+    {
+      "id": "E3",
+      "source_path": "not_selected",
+      "source_symbols": "trusted_provider_account_adapter",
+      "unresolved_contract": "endpoint_provenance_cache_service_worker_tenant_freshness",
+      "human_owner": null,
+      "fence_verified": false
+    }
+  ],
+  "public_resolve_cases": [
+    {
+      "id": "R1",
+      "interleaving": "resolve_before_reservation",
+      "required_assertion": "stale_challenge_no_retrieval",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "R2",
+      "interleaving": "resolve_between_reserve_and_quarantine",
+      "required_assertion": "all_owner_fences_before_retrieval",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "R3",
+      "interleaving": "resolve_during_retrieval_input_submit",
+      "required_assertion": "no_ordinary_mutation_capture_release_or_second_consumer",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "R4",
+      "interleaving": "resolve_after_observation_consume_pending",
+      "required_assertion": "no_resume_without_durable_receipt_current_authority",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "R5",
+      "interleaving": "duplicate_resolve_after_private_resume_nil_challenge",
+      "required_assertion": "no_double_release_or_account_proof",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "R6",
+      "interleaving": "resolve_vs_cancel_close_expiry_navigation_replacement_restart",
+      "required_assertion": "no_old_token_or_timer_affects_new_generation",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "R7",
+      "interleaving": "resolve_vs_inflight_GET_read_stream_share_queued_action",
+      "required_assertion": "no_buffered_late_capture_or_guard_TOCTOU_escape",
+      "status": "required_not_executed"
+    },
+    {
+      "id": "R8",
+      "interleaving": "foreign_principal_legacy_token_or_private_ref",
+      "required_assertion": "no_private_status_cancel_use_or_account_proof",
+      "status": "required_not_executed"
+    }
+  ],
+  "scope": {
+    "allowed_changed_files": [
+      "docs/proposals/PRIVATE_AUTH_RESOLVER_ADMISSION_PROPOSAL_v1.md",
+      "docs/contracts/PRIVATE_AUTH_RESOLVER_ACCEPTANCE_v1.json",
+      "scripts/test_private_auth_resolver_proposal.py",
+      "docs/distribution-manifest.json"
+    ],
+    "manifest_allowed_fields": [
+      "source_commit",
+      "generated_at"
+    ],
+    "manifest_tool": "scripts/stamp-uiai-version.py",
+    "release_artifact_version_change": false
+  }
+}
