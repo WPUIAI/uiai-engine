@@ -456,10 +456,24 @@ func evidenceScopeFromFocusa(scope *vision.FocusaScope) evidenceshare.Scope {
 	if scope == nil {
 		return evidenceshare.Scope{}
 	}
+	// The session scope carries the workpoint and continuity under two spellings:
+	// `workpoint_id`/`continuity_id` and the Focusa-native `workpoint_ref`/
+	// `continuity_ref`. Callers legitimately send either, and the session echoes
+	// back whichever it received, so reading only the *_id spelling silently
+	// produced an empty binding and blocked every delivery with
+	// `reconcile:epwa-scope-required`. Prefer the id and fall back to the ref,
+	// mirroring DerivedWorkstreamKey's continuity fallback.
+	workpointRef, continuityRef := scope.WorkpointID, scope.ContinuityID
+	if workpointRef == "" {
+		workpointRef = scope.WorkpointRef
+	}
+	if continuityRef == "" {
+		continuityRef = scope.ContinuityRef
+	}
 	return evidenceshare.Scope{
 		ProjectRef: scope.ProjectRef, WorkstreamRef: scope.WorkstreamRef, WorksetRef: scope.WorksetRef,
-		CallGraphRef: scope.CallGraphRef, WorkpointRef: scope.WorkpointID, WorkItemRef: scope.WorkItemRef,
-		WorkItems: scope.WorkItems, ContinuityRef: scope.ContinuityID,
+		CallGraphRef: scope.CallGraphRef, WorkpointRef: workpointRef, WorkItemRef: scope.WorkItemRef,
+		WorkItems: scope.WorkItems, ContinuityRef: continuityRef,
 	}
 }
 
