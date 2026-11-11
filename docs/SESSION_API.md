@@ -436,6 +436,13 @@ supply an operator grant. A separate canonical control-approval resolver remains
 required before that stronger capability can be exposed. This does not claim the
 remaining origin/consent/revocation work complete or weaken evidence publication.
 
+Fresh credential and CAPTCHA marker detection checks every selector match using
+native rendered visibility, including hidden or transparent ancestors; DOM presence
+alone is insufficient. Rendered markers outside the viewport still qualify.
+Passkey/payment text and OIDC URL checks retain their existing gates. Visibility
+changes never clear a latched challenge, replace its bound resume token, or grant
+action/public-sharing authority.
+
 Before public-view capture or capability creation, the endpoint rejects a latched
 or freshly detected authentication challenge with `fpv_private_session`. Removing
 page markers does not clear a pending challenge or authorize public sharing. A

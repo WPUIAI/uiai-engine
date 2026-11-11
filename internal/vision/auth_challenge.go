@@ -68,7 +68,10 @@ func (s *Session) DetectAuthChallengeContext(caller context.Context) (*AuthChall
 	result, err := page.Context(ctx).Eval(`() => {
 		const url = location.href || '';
 		const text = (document.body?.innerText || '').toLowerCase();
-		const has = selector => Boolean(document.querySelector(selector));
+		// Native rendered-visibility checks cover hidden/transparent ancestors and all matches.
+		// Unsupported visibility inspection throws, preserving fail-closed action admission.
+		const has = selector => Array.from(document.querySelectorAll(selector)).some(el =>
+			el.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}));
 		let cls = '';
 		if (has('input[type="password"], form[action*="login" i]')) cls = 'credential_form';
 		else if (has('[data-sitekey], [name*="captcha" i], [id*="captcha" i], [id*="turnstile" i], iframe[src*="recaptcha" i]')) cls = 'captcha';
