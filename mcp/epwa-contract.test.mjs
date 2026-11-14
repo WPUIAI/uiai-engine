@@ -132,7 +132,7 @@ test("missing project evidence scope returns actionable but non-authorizing guid
     focusa_scope:{project_ref:"sensitive-private-name"},
   };
   const guidance=evidenceScopeRecoveryAdvice(pending);
-  assert.equal(guidance.code,"epwa_project_scope_required");
+  assert.equal(guidance.reason_code,"epwa_project_scope_required");
   assert.deepEqual(guidance.required_fields,[
     "project_ref","workstream_ref","workset_ref","callgraph_ref",
     "workpoint_ref","work_item_ref","continuity_ref","work_items",
@@ -141,7 +141,8 @@ test("missing project evidence scope returns actionable but non-authorizing guid
   assert.match(guidance.suggested_next_action,/ad hoc screenshots/);
   assert.doesNotMatch(JSON.stringify(guidance),/sensitive-private-name/);
   assert.throws(()=>assertEvidenceDelivery(pending,true),error=>{
-    assert.equal(error.delivery_error.code,"epwa_project_scope_required");
+    assert.equal(error.delivery_error.code,"epwa_delivery_unavailable");
+    assert.equal(error.delivery_error.reason_code,"epwa_project_scope_required");
     assert.equal(error.delivery_error.delivery_state,"blocked");
     assert.equal(error.delivery_error.required_fields.length,8);
     assert.ok(!JSON.stringify(error.delivery_error).includes("sensitive-private-name"));

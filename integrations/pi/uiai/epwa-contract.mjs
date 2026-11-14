@@ -106,7 +106,7 @@ export function evidenceScopeRecoveryAdvice(value) {
   const recovery = value?.recovery_ref || value?.epwa_delivery?.recovery_ref;
   if (recovery !== "reconcile:epwa-scope-required") return null;
   return Object.freeze({
-    code: "epwa_project_scope_required",
+    reason_code: "epwa_project_scope_required",
     required_fields: EVIDENCE_SCOPE_FIELDS,
     suggested_next_action: "Formal project evidence: obtain the exact authorized Focusa scope (project, workstream, workset, CallGraph, Workpoint, work item, continuity and matching work_items), then retry. Do not invent references or switch an existing project to ad hoc. Ordinary ad hoc screenshots must use a separately authorized unsealed visual path; this legacy EPWA-only screenshot result does not provide one.",
   });
