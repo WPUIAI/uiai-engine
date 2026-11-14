@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#182025">
-  <title>Evidence Record · UIAI × Focusa</title>
+  <title>Evidence Progressive Web App · UIAI × Focusa</title>
   <link rel="icon" href="./icon.svg?v=__UIAI_ASSET_VERSION__" type="image/svg+xml">
   <link rel="manifest" href="./manifest.webmanifest?v=__UIAI_ASSET_VERSION__">
   <link rel="stylesheet" href="./styles.css?v=__UIAI_ASSET_VERSION__">
@@ -27,7 +27,7 @@
   <main id="artifact">
     <section id="registry" class="registry" aria-labelledby="registry-title" data-registry-state="loading" aria-busy="true">
       <div class="registry-head">
-        <div><p class="eyebrow" data-i18n="project_scoped">Project-scoped evidence</p><h1 id="registry-title" tabindex="-1" data-i18n="registry_title">Evidence registry</h1><p id="registry-truth" class="lede" data-i18n="registry_loading">Loading public-safe project, artifact, and Work Item projections.</p></div>
+        <div><p class="eyebrow" data-i18n="project_scoped">Project-scoped evidence</p><h1 id="registry-title" tabindex="-1" data-i18n="reader_registry_title">Explore the evidence</h1><p id="registry-truth" class="lede" data-i18n="registry_loading">Loading public-safe project, artifact, and Work Item projections.</p></div>
         <dl class="registry-freshness"><div><dt data-i18n="freshness">Freshness</dt><dd id="registry-freshness" data-i18n="loading">Loading</dd></div><div><dt data-i18n="index_revision">Index revision</dt><dd id="registry-revision">—</dd></div></dl>
       </div>
       <form id="registry-controls" class="registry-controls" role="search">
@@ -50,16 +50,21 @@
       <section id="overview" class="overview" data-epwa-section="overview" aria-labelledby="title">
         <div class="record-heading">
           <div>
-            <p class="eyebrow" data-i18n="immutable_record">Immutable evidence record</p>
+            <p class="eyebrow" data-i18n="reader_eyebrow">What was captured</p>
             <h1 id="title" tabindex="-1" dir="auto" data-i18n="evidence_record">Evidence record</h1>
             <p id="truth" class="lede" dir="auto" data-i18n="loading_projection">Loading the bounded evidentiary projection.</p>
           </div>
+        </div>
+        <p class="reader-intro" data-i18n="reader_intro">Start with what was captured. You can inspect the checks and technical details whenever you need them.</p>
+        <a class="reader-primary-link" href="#evidence" data-i18n="reader_view_evidence">View the evidence ↓</a>
+        <details class="technical-details" id="technical-checks">
+          <summary data-i18n="reader_check_details">How this evidence was checked</summary>
+          <div class="technical-details-content">
           <dl class="record-identity">
             <div><dt data-i18n="artifact">Artifact</dt><dd><code id="record-id" dir="ltr" data-i18n="loading">Loading</code></dd></div>
             <div><dt data-i18n="revision">Revision</dt><dd id="record-revision">—</dd></div>
             <div><dt data-i18n="record_posture">Record posture</dt><dd data-i18n="read_only_projection">Read-only projection</dd></div>
           </dl>
-        </div>
 
         <div class="authority-pair" aria-label="Authority separation">
           <section aria-labelledby="uiai-authority"><p class="authority-label" data-i18n="evidence_authority">Evidence authority</p><h2 id="uiai-authority">UIAI Engine</h2><p data-i18n="uiai_authority_copy">Capture, immutable bytes, digest binding, inspection, custody inputs, and rendering.</p></section>
@@ -84,7 +89,11 @@
             <div data-validity-layer="legal"><dt data-i18n="legal">Legal admissibility</dt><dd id="validity-legal" data-i18n="loading">Loading</dd></div>
           </dl>
         </section>
-
+          </div>
+        </details>
+        <details class="technical-details" id="technical-review">
+          <summary data-i18n="reader_review_details">Review decisions and record facts</summary>
+          <div class="technical-details-content">
         <section id="review-panel" class="review-panel" aria-labelledby="review-title" data-review-gated="true">
           <div class="subhead-row"><h2 id="review-title" data-i18n="review_title">Operator review and closure</h2><p data-i18n="review_gate">Proof-gated</p></div>
           <p id="review-truth" class="lede" data-i18n="review_loading">Loading the canonical review case and completion gate.</p>
@@ -106,6 +115,8 @@
         </section>
 
         <dl id="facts" class="facts" aria-label="Record facts"></dl>
+          </div>
+        </details>
 
         <aside class="limitations" aria-labelledby="limitations-title">
           <div><p class="subhead" id="limitations-title" data-i18n="limitations_title">Limitations and challenge posture</p><p id="limitations-copy" data-i18n="limitations_loading">This technical record is loading. Technical records are not automatically legally admissible and their existence does not establish review, completion, or settlement.</p></div>
