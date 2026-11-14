@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const root = new URL('../', import.meta.url);
+const read = name => fs.readFileSync(new URL(name, root), 'utf8');
+test('EPWA is a Progressive Web App with a customer-first evidence view', () => {
+  const html = read('internal/evidenceshare/assets/index.html');
+  assert.match(html, /Evidence Progressive Web App/);
+  assert.match(html, /id="technical-checks"/);
+  assert.match(html, /id="technical-review"/);
+  assert.match(html, /reader_view_evidence/);
+  assert.ok(html.indexOf('reader-intro') < html.indexOf('id="technical-checks"'));
+  for (const id of ['record-id','lineage-list','validity-grid','review-panel','review-decision-form','facts','primary-evidence-frame','events','inspect-grid','developer']) assert.ok(html.includes('id="' + id + '"'), id);
+  assert.equal((html.match(/<details\b/g) || []).length, (html.match(/<\/details>/g) || []).length);
+  assert.equal((html.match(/<summary\b/g) || []).length, (html.match(/<\/summary>/g) || []).length);
+  const i18n = read('internal/evidenceshare/assets/locale.js');
+  for (const key of ['reader_registry_title','reader_intro','reader_view_evidence','reader_check_details','reader_review_details']) assert.equal((i18n.match(new RegExp(key + ':', 'g')) || []).length, 3, key);
+  assert.match(read('internal/evidenceshare/assets/app.js'), /if \(eligible\) byId\("technical-review"\)\?\.setAttribute\("open", ""\)/);
+  assert.match(read('docs/106r-uiai-evidence-pwa-epwa-delivery-agent-first-contract.md'), /EPWA = Evidence Progressive Web App/);
+});
