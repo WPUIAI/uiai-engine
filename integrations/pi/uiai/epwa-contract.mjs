@@ -94,6 +94,24 @@ function evidenceRecoveryDetails(value) {
   }).filter(([, ref]) => typeof ref === "string" && ref.length > 0 && ref.length <= 512));
 }
 
+
+const EVIDENCE_SCOPE_FIELDS = Object.freeze([
+  "project_ref", "workstream_ref", "workset_ref", "callgraph_ref",
+  "workpoint_ref", "work_item_ref", "continuity_ref", "work_items",
+]);
+
+// A recovery hint is not a grant. UIAI must never invent canonical Focusa
+// identities or downgrade project-bound work to ad hoc to get screenshot pixels.
+export function evidenceScopeRecoveryAdvice(value) {
+  const recovery = value?.recovery_ref || value?.epwa_delivery?.recovery_ref;
+  if (recovery !== "reconcile:epwa-scope-required") return null;
+  return Object.freeze({
+    code: "epwa_project_scope_required",
+    required_fields: EVIDENCE_SCOPE_FIELDS,
+    suggested_next_action: "Formal project evidence: obtain the exact authorized Focusa scope (project, workstream, workset, CallGraph, Workpoint, work item, continuity and matching work_items), then retry. Do not invent references or switch an existing project to ad hoc. Ordinary ad hoc screenshots must use a separately authorized unsealed visual path; this legacy EPWA-only screenshot result does not provide one.",
+  });
+}
+
 export function evidenceRecoveryHint(value) {
   return Object.entries(evidenceRecoveryDetails(value))
     .map(([key, ref]) => `${key}=${JSON.stringify(ref)}`).join("; ");
@@ -111,12 +129,14 @@ export function assertEvidenceDelivery(value, required = false) {
   const fail = (reason) => {
     const error = new Error(`EPWA delivery unavailable: ${reason}${recovery ? `; ${recovery}` : ""}`);
     error.code = "epwa_delivery_unavailable";
+    const scopeAdvice = evidenceScopeRecoveryAdvice(value);
     // Explicit allowlist: never copy the rejected payload, title, scope or links.
     error.delivery_error = Object.freeze({
       schema: "uiai.epwa_delivery_error.v1",
       code: error.code,
       delivery_state: "blocked",
       message: "EPWA delivery unavailable: delivery was not verified; no raw artifact bytes were returned.",
+      ...(scopeAdvice || {}),
       ...evidenceRecoveryDetails(value),
     });
     throw error;

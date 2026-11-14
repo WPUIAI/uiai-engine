@@ -11,10 +11,12 @@ const artifact='uiai-artifact:sha256:'+'a'.repeat(64);
 const blocked={delivery_state:'blocked',artifact_ref:artifact,epwa_delivery:{schema:'uiai.epwa_delivery.v1',state:'blocked',artifact:{artifact_ref:artifact},recovery_ref:'reconcile:epwa-scope-required'},private_title:'synthetic-private-title',focusa_scope:{project_ref:'synthetic-private-project'}};
 function checkEnvelope(envelope){
  assert.equal(envelope.schema,'uiai.epwa_delivery_error.v1');
- assert.equal(envelope.code,'epwa_delivery_unavailable');
+ assert.equal(envelope.schema,'uiai.epwa_delivery_error.v1');
  assert.equal(envelope.delivery_state,'blocked');
  assert.equal(envelope.artifact_ref,artifact);
  assert.equal(envelope.recovery_ref,'reconcile:epwa-scope-required');
+ assert.equal(envelope.code,'epwa_project_scope_required');
+ assert.match(envelope.suggested_next_action,/ad hoc screenshots/);
  const body=JSON.stringify(envelope);
  for(const secret of ['synthetic-private-title','synthetic-private-project','synthetic-private-bytes','artifact_url','portable_url']) assert.ok(!body.includes(secret),secret);
 }
