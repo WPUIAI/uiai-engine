@@ -52,6 +52,17 @@ async function fetchJSON(url, options = {}, contract = {}) {
   }
 }
 
+function redactAuthToolOutput(value, depth = 0) {
+  if (depth > 16) return "[bounded]";
+  if (Array.isArray(value)) return value.slice(0, 100).map(item => redactAuthToolOutput(item, depth + 1));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value)
+      .filter(([key]) => !/(?:resume_?token|token|secret|credential|password|authorization|cookie)/i.test(key))
+      .map(([key, item]) => [key, redactAuthToolOutput(item, depth + 1)]));
+  }
+  return value;
+}
+
 function formatError(data) {
   if (!data) return "unknown error";
   if (typeof data === "string") return data;
@@ -196,6 +207,29 @@ const BRIDGE_CORE_TOOLS = [
         name: { type: "string", description: "Optional account/name override/filter for Aegis-backed profiles" },
       },
       required: ["profile"],
+    },
+  },
+  {
+    name: "browser_auth_resolve",
+    description: "Resume a paused session only after approved private authentication completed. Requires the exact one-use resume token; does not retrieve credentials, solve CAPTCHA, or echo the token. Re-observe after success.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        session_id: { type: "string", minLength: 1, maxLength: 128, description: "Session ID paused in AWAITING_AUTH" },
+        resume_token: { type: "string", minLength: 1, maxLength: 256, writeOnly: true, description: "Private one-use token for this exact pending challenge; never place it in chat or logs" },
+      },
+      required: ["session_id", "resume_token"],
+    },
+  },
+  {
+    name: "browser_auth_cancel",
+    description: "Cancel a pending authentication challenge and close its browser session. No resume token or credential is required.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { session_id: { type: "string", minLength: 1, maxLength: 128, description: "Session ID paused in AWAITING_AUTH" } },
+      required: ["session_id"],
     },
   },
   {
@@ -344,6 +378,18 @@ async function toolsCall(name, args) {
       url = `${ENGINE}/api/2fa/code`;
       method = "POST";
       body = { profile: args.profile, issuer: args.issuer, name: args.name };
+      break;
+
+    case "browser_auth_resolve":
+      url = ENGINE + "/api/session/" + encodeURIComponent(args.session_id) + "/auth/resolve";
+      method = "POST";
+      body = { resume_token: args.resume_token };
+      break;
+
+    case "browser_auth_cancel":
+      url = ENGINE + "/api/session/" + encodeURIComponent(args.session_id) + "/auth/cancel";
+      method = "POST";
+      body = {};
       break;
 
     case "browser_search":
@@ -586,7 +632,9 @@ async function toolsCall(name, args) {
   }
 
   const content = [];
-  const summary = { ...data };
+  const summary = name === "browser_auth_resolve" || name === "browser_auth_cancel"
+    ? redactAuthToolOutput(data)
+    : { ...data };
   if (Object.keys(summary).length > 0) {
     content.push({ type: "text", text: JSON.stringify(summary, null, 2) });
   }

@@ -17,11 +17,13 @@ const (
 )
 
 type AuthChallenge struct {
-	Class       string    `json:"class"`
-	URLHint     string    `json:"url_hint,omitempty"`
-	SessionID   string    `json:"session_id"`
-	ActorRef    string    `json:"actor,omitempty"`
-	ResumeToken string    `json:"resume_token"`
+	Class     string `json:"class"`
+	URLHint   string `json:"url_hint,omitempty"`
+	SessionID string `json:"session_id"`
+	ActorRef  string `json:"actor,omitempty"`
+	// ResumeToken is delivered only through the private auth-broker event below.
+	// Ordinary session, pending, diagnostic, and tool payloads must never encode it.
+	ResumeToken string    `json:"-"`
 	DetectedAt  time.Time `json:"detected_at"`
 }
 

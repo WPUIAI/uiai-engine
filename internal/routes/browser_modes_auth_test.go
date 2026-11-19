@@ -32,7 +32,8 @@ func TestAuthPendingResponseOffersPrivateModeWithoutResuming(t *testing.T) {
 	if err != nil {
 		t.Fatal("explicit auth route fixture unavailable")
 	}
-	if _, err := session.DetectAuthChallenge(); err != nil {
+	challenge, err := session.DetectAuthChallenge()
+	if err != nil {
 		t.Fatal(err)
 	}
 	router := chi.NewRouter()
@@ -53,5 +54,16 @@ func TestAuthPendingResponseOffersPrivateModeWithoutResuming(t *testing.T) {
 		if session.LeaseState() != vision.LeaseAwaitingAuth {
 			t.Fatal("discovery hint resumed pending authentication")
 		}
+		if strings.Contains(response.Body.String(), challenge.ResumeToken) {
+			t.Fatal("ordinary pending auth response exposed the private resume token")
+		}
+	}
+	cancelled := httptest.NewRecorder()
+	router.ServeHTTP(cancelled, httptest.NewRequest("POST", "/"+session.ID+"/auth/cancel", strings.NewReader("{}")))
+	if cancelled.Code != http.StatusOK || !strings.Contains(cancelled.Body.String(), "\"cancelled\":true") {
+		t.Fatalf("auth cancel did not report closure: status=%d body=%s", cancelled.Code, cancelled.Body.String())
+	}
+	if _, ok := manager.Get(session.ID); ok {
+		t.Fatal("auth cancel did not close and evict the session")
 	}
 }

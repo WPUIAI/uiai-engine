@@ -352,6 +352,8 @@ func toolRelations() map[string][]string {
 		"browser_search":             {"source_to_markdown", "browser_open", "browser_read", "browser_diagnostics", "uiai_focusa_packet_build", "uiai_tool_search"},
 		"browser_fpv_share":          {"browser_open", "browser_screenshot", "browser_diagnostics"},
 		"browser_open":               {"browser_read", "browser_snapshot", "browser_diagnostics", "uiai_focusa_packet_build", "focusa_browser_diagnostics_intake", "browser_close"},
+		"browser_auth_resolve":       {"browser_snapshot", "browser_read", "browser_diagnostics", "browser_auth_cancel", "browser_close"},
+		"browser_auth_cancel":        {"browser_open"},
 		"browser_read":               {"browser_snapshot", "browser_text", "browser_diagnostics", "uiai_focusa_packet_build", "browser_close"},
 		"browser_snapshot":           {"browser_selector_resolve", "browser_click", "browser_fill", "browser_hover", "browser_text", "browser_diagnostics"},
 		"browser_click":              {"browser_snapshot", "browser_read", "browser_diagnostics", "browser_wait"},
@@ -900,6 +902,31 @@ func openAITools() []map[string]any {
 					"name":       map[string]string{"type": "string", "description": "Cookie name (for get-by-name, set, clear-by-name)"},
 					"value":      map[string]string{"type": "string", "description": "Cookie value (for set)"},
 					"domain":     map[string]string{"type": "string", "description": "Cookie domain (for set, default: current page domain)"},
+				},
+				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_auth_resolve",
+			"description": "Resume a session only after an approved private human or broker path completed the pending authentication challenge. Requires the exact one-use resume token; UIAI does not retrieve credentials, solve CAPTCHA, or echo the token. Re-observe the page after success.",
+			"parameters": map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties": map[string]any{
+					"session_id":   map[string]any{"type": "string", "description": "Session ID paused in AWAITING_AUTH", "minLength": 1, "maxLength": 128},
+					"resume_token": map[string]any{"type": "string", "description": "Private one-use token for this exact pending challenge; never place it in chat or logs", "minLength": 1, "maxLength": 256, "writeOnly": true},
+				},
+				"required": []string{"session_id", "resume_token"},
+			},
+		},
+		{
+			"name":        "browser_auth_cancel",
+			"description": "Cancel a pending authentication challenge and close its browser session. Use this when the private auth path is declined, stale, wrong, or cannot be completed; no credential or resume token is required.",
+			"parameters": map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties": map[string]any{
+					"session_id": map[string]any{"type": "string", "description": "Session ID paused in AWAITING_AUTH", "minLength": 1, "maxLength": 128},
 				},
 				"required": []string{"session_id"},
 			},

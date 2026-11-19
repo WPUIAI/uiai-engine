@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { createUIAIClient, modelProjection } from "./client.mjs";
 
-export const actions=["open","navigate","read","snapshot","click","type","fill","scroll","screenshot","diagnostics","close"];
+export const actions=["open","navigate","read","snapshot","click","type","fill","scroll","screenshot","diagnostics","auth_resolve","auth_cancel","close"];
 const string={type:"string",maxLength:8192};
 export const browserParameters={type:"object",additionalProperties:false,required:["action"],properties:{
- action:{type:"string",enum:actions},focusa_scope:{type:"object",maxProperties:16},session_id:{type:"string",maxLength:128},url:string,selector:string,text:string,
+ action:{type:"string",enum:actions},focusa_scope:{type:"object",maxProperties:16},session_id:{type:"string",maxLength:128},resume_token:{type:"string",maxLength:256,writeOnly:true,description:"Private one-use auth challenge token; never place it in chat or logs"},url:string,selector:string,text:string,
  label:{type:"string",maxLength:64},reuse:{type:"boolean"},width:{type:"integer",minimum:1,maximum:4096},height:{type:"integer",minimum:1,maximum:4096},
  x:{type:"integer"},y:{type:"integer"},deltaX:{type:"integer"},deltaY:{type:"integer"},max_chars:{type:"integer",minimum:1,maximum:30000},
  format:{type:"string",enum:["text","markdown","jpeg","png"]},mode:{type:"string",enum:["main_content","full"]},quality:{type:"integer",minimum:1,maximum:100},fullPage:{type:"boolean"},compact:{type:"boolean"},interactive:{type:"boolean"},include_links:{type:"boolean"},

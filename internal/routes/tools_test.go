@@ -352,3 +352,66 @@ func TestSearchResearchToolSchemaIsBoundedAndOptional(t *testing.T) {
 		t.Fatal("catalog silently pinned an omitted provider")
 	}
 }
+
+func TestAuthChallengeToolsAreDiscoverableAndSecretSafe(t *testing.T) {
+	wanted := map[string]bool{"browser_auth_resolve": false, "browser_auth_cancel": false}
+	for _, tool := range openAITools() {
+		name, _ := tool["name"].(string)
+		if _, ok := wanted[name]; !ok {
+			continue
+		}
+		params := tool["parameters"].(map[string]any)
+		if params["additionalProperties"] != false {
+			t.Fatalf("%s accepts undeclared auth inputs", name)
+		}
+		props := params["properties"].(map[string]any)
+		if _, ok := props["session_id"]; !ok {
+			t.Fatalf("%s missing session_id", name)
+		}
+		if name == "browser_auth_resolve" {
+			resume := props["resume_token"].(map[string]any)
+			if resume["writeOnly"] != true {
+				t.Fatal("resume_token is not marked write-only")
+			}
+		}
+		wanted[name] = true
+	}
+	for name, found := range wanted {
+		if !found {
+			t.Fatalf("missing auth tool %s", name)
+		}
+		matches := rankedToolSearch(openAITools(), name)
+		if len(matches) != 1 || matches[0]["name"] != name {
+			t.Fatalf("exact auth tool lookup failed for %s", name)
+		}
+	}
+	mcp := mcpTools()["tools"].([]map[string]any)
+	for name := range wanted {
+		found := false
+		for _, tool := range mcp {
+			if tool["name"] == name {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("MCP catalog missing %s", name)
+		}
+	}
+}
+
+func TestAuthChallengePendingGuidanceNamesExecutableToolsWithoutToken(t *testing.T) {
+	payload := authChallengePendingPayload(map[string]any{"error": "invalid auth challenge resume token"})
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(encoded)
+	for _, name := range []string{"browser_auth_resolve", "browser_auth_cancel"} {
+		if !strings.Contains(text, name) {
+			t.Fatalf("pending guidance omits %s: %s", name, text)
+		}
+	}
+	if strings.Contains(text, "resume_canary") {
+		t.Fatalf("pending guidance leaked a resume token: %s", text)
+	}
+}

@@ -1,14 +1,27 @@
 package vision
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/events"
 )
+
+func TestAuthChallengeOrdinaryJSONOmitsResumeToken(t *testing.T) {
+	challenge := AuthChallenge{Class: "credential_form", SessionID: "session-fixture", ResumeToken: "resume_private_canary"}
+	encoded, err := json.Marshal(challenge)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), challenge.ResumeToken) || strings.Contains(string(encoded), "resume_token") {
+		t.Fatalf("ordinary auth challenge JSON exposed private token: %s", encoded)
+	}
+}
 
 func TestAuthChallengeLeasePausesUntilResolution(t *testing.T) {
 	expired := make(chan struct{}, 1)

@@ -1,7 +1,7 @@
 import { readEngineResponse } from "../pi/uiai/engine-response.mjs";
 import { assertEvidenceDelivery } from "../pi/uiai/epwa-contract.mjs";
 
-const routes={navigate:"navigate",read:"read",snapshot:"snapshot",click:"click",type:"type",fill:"fill",scroll:"scroll",screenshot:"screenshot",diagnostics:"diagnostics",close:""};
+const routes={navigate:"navigate",read:"read",snapshot:"snapshot",click:"click",type:"type",fill:"fill",scroll:"scroll",screenshot:"screenshot",diagnostics:"diagnostics",auth_resolve:"auth/resolve",auth_cancel:"auth/cancel",close:""};
 const hidden=/cookie|password|token|authorization|credential|api.?key|secret|storage.?state|headers|url|uri|path/i;
 export function modelProjection(value,depth=0){
  if(depth>16)return "[bounded]";
@@ -36,11 +36,11 @@ export function createUIAIClient(config,{fetchImpl=fetch,resolveSecret=async val
   try{
    const response=await fetchImpl(origin+path,{method,redirect:"error",signal:controller.signal,headers:await headers(),body:body===undefined?undefined:JSON.stringify(body)});
    const data=await readEngineResponse(response,{opening,validate:value=>assertEvidenceDelivery(value,false),closeSession:async id=>{await request(`/api/session/${encodeURIComponent(id)}`,undefined,"DELETE");}});
-   if(!response.ok)throw blocked(/^[a-z][a-z0-9_]{0,63}$/.test(data.error_class||"")?data.error_class:"uiai_request_failed",{
+   if(!response.ok){const errorCode=data.error_class||data.code||"";throw blocked(/^[a-z][a-z0-9_]{0,63}$/.test(errorCode)?errorCode:"uiai_request_failed",{
     http_status:response.status,error_id:/^[a-zA-Z0-9:_-]{1,128}$/.test(data.error_id||"")?data.error_id:undefined,
     side_effects_may_have_occurred:data.details?.side_effects_may_have_occurred??"unknown",
-    retryable:data.retryable===true,recovery:"diagnostics_and_reobserve_before_any_authorized_retry",
-   });
+    retryable:data.retryable===true,recovery:data.code==="auth_challenge_pending"?"complete_private_auth_then_auth_resolve_or_auth_cancel":typeof data.suggested_next_action==="string"?data.suggested_next_action:"diagnostics_and_reobserve_before_any_authorized_retry",
+   });}
    if(["queued","pending","failed"].includes(data.status)||["queued","pending"].includes(data.state))throw blocked("uiai_call_unsettled",{retryable:false,recovery:"inspect_and_reconcile_without_replaying"});
    return data;
   }catch(error){
@@ -86,7 +86,7 @@ export function createUIAIClient(config,{fetchImpl=fetch,resolveSecret=async val
    if(!Object.hasOwn(routes,action))throw blocked("unsupported_action");
    const body={...args};delete body.session_id;
    const data=await request(`/api/session/${encodeURIComponent(id)}`+(routes[action]?"/"+routes[action]:""),action==="close"||action==="diagnostics"?undefined:body,action==="close"?"DELETE":action==="diagnostics"?"GET":"POST",signal);
-   if(action==="close"){owned.delete(id);for(const [label,item] of state.labels){if(item.id===id)state.labels.delete(label);}}
+   if(action==="close"||action==="auth_cancel"){owned.delete(id);for(const [label,item] of state.labels){if(item.id===id)state.labels.delete(label);}}
    return {data,image:action==="screenshot"?await attachment(data,signal):undefined};
   },
   ownedCount:()=>owned.size,
