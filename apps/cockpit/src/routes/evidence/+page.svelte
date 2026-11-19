@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import "$lib/ui/screen.css";
   import { engineClient, savedScope, type EngineHealth } from "$lib/engine-client";
   import type { EvidenceShareManifest, EvidenceSharePacket, EvidenceShareVerification } from "$lib/evidence-share";
@@ -15,7 +15,7 @@
   ] as const;
   let health: EngineHealth | null = null, error = "", loading = true, activeView = "current";
   let metadataLoading = false, metadataLoaded = false, destroyed = false;
-  $: requestedView = $page.url.searchParams.get("view") || "current";
+  $: requestedView = page.url.searchParams.get("view") || "current";
   $: activeView = views.some((view) => view.id === requestedView) ? requestedView : "current";
   $: unsupportedView = activeView === "needs-capture" || activeView === "needs-review";
   $: if (!loading && !unsupportedView && !["current", "recent"].includes(activeView) && !metadataLoading && !metadataLoaded) void loadFilterMetadata();

@@ -9,7 +9,7 @@ environment:
   GO111MODULE: on
   GOTOOLCHAIN: local
   GOROOT: c:\uiai-go\go
-  GO_SHA256: 7ecd2d7260e82c59bcbd7f1077a07cee2dea607295b858df67195a1e4e09629b
+  GO_SHA256: 71ae086f0137e665f855a811cc119152b6a783e0bbc1b906e709f46d80141eb0
   PATH: c:\uiai-go\go\bin;c:\gopath\bin;%PATH%
 install:
   - ps: |
