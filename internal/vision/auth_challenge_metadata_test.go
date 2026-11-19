@@ -13,6 +13,7 @@ func TestAuthChallengeMetadataUsesCanonicalURLRedaction(t *testing.T) {
 	sess := &Session{ID: "fixture-auth-redaction"}
 	before := events.LatestSeq()
 	challenge := sess.raiseAuthChallenge("credential_form", "https://user:"+secret+"@example.test/login?token="+secret+"#"+secret)
+	resumeToken := challenge.ResumeToken
 	for _, value := range []any{challenge, sess.CurrentAuthChallenge(), events.Since(before)} {
 		raw, err := json.Marshal(value)
 		if err != nil {
@@ -20,6 +21,9 @@ func TestAuthChallengeMetadataUsesCanonicalURLRedaction(t *testing.T) {
 		}
 		if strings.Contains(string(raw), secret) || strings.Contains(string(raw), "user:") {
 			t.Fatal("auth challenge metadata/event disclosed private URL material")
+		}
+		if strings.Contains(string(raw), resumeToken) || strings.Contains(string(raw), "resume_token") {
+			t.Fatal("auth challenge metadata/event disclosed the private resume token")
 		}
 	}
 	if challenge.URLHint != "https://example.test/login" {
