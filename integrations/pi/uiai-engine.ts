@@ -150,6 +150,17 @@ function textResult(data: any, details: Record<string, any> = {}) {
 	};
 }
 
+function redactAuthToolOutput(value: any, depth = 0): any {
+	if (depth > 16) return "[bounded]";
+	if (Array.isArray(value)) return value.slice(0, 100).map((item) => redactAuthToolOutput(item, depth + 1));
+	if (value && typeof value === "object") {
+		return Object.fromEntries(Object.entries(value)
+			.filter(([key]) => !/(?:resume_?token|token|secret|credential|password|authorization|cookie)/i.test(key))
+			.map(([key, item]) => [key, redactAuthToolOutput(item, depth + 1)]));
+	}
+	return value;
+}
+
 function withoutScreenshot(data: any) {
 	const summary = { ...data };
 	delete summary.screenshot;
@@ -677,6 +688,33 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			return textResult(await post("/api/fpv/share", params), { endpoint: "/api/fpv/share" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_auth_resolve",
+		label: "UIAI Browser Auth Resolve",
+		description: "Resume a paused session only after approved private authentication completed. Requires the exact one-use resume token; does not retrieve credentials, solve CAPTCHA, or echo the token. Re-observe after success.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "Session ID paused in AWAITING_AUTH", minLength: 1, maxLength: 128 }),
+			resume_token: Type.String({ description: "Private one-use token for this exact pending challenge; never place it in chat or logs", minLength: 1, maxLength: 256, writeOnly: true }),
+		}, { additionalProperties: false }),
+		async execute(_toolCallId, params) {
+			const data = await post("/api/session/" + encodeURIComponent(params.session_id) + "/auth/resolve", { resume_token: params.resume_token });
+			return textResult(redactAuthToolOutput(data), { endpoint: "/api/session/{id}/auth/resolve" });
+		},
+	});
+
+	pi.registerTool({
+		name: "uiai_browser_auth_cancel",
+		label: "UIAI Browser Auth Cancel",
+		description: "Cancel a pending authentication challenge and close its browser session. No resume token or credential is required.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "Session ID paused in AWAITING_AUTH", minLength: 1, maxLength: 128 }),
+		}, { additionalProperties: false }),
+		async execute(_toolCallId, params) {
+			const data = await post("/api/session/" + encodeURIComponent(params.session_id) + "/auth/cancel", {});
+			return textResult(redactAuthToolOutput(data), { endpoint: "/api/session/{id}/auth/cancel" });
 		},
 	});
 

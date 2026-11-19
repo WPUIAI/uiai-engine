@@ -5,7 +5,7 @@
   "type": "module",
   "description": "UIAI Engine Cockpit \u2014 Svelte/Tauri developer/operator desktop client (Slice 0).",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.17"
   },
   "scripts": {
     "dev": "vite dev",
@@ -21,8 +21,8 @@
   "devDependencies": {
     "@remotion/cli": "^4.0.512",
     "@remotion/media": "^4.0.512",
-    "@sveltejs/adapter-static": "^3.0.0",
-    "@sveltejs/kit": "^2.70.3",
+    "@sveltejs/adapter-static": "^4.0.1",
+    "@sveltejs/kit": "^3.4.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tauri-apps/cli": "^2.11.2",
     "@types/node": "^25.2.1",
@@ -33,7 +33,7 @@
     "svelte-check": "^4.0.0",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.0.0",
+    "typescript": "^6.0.3",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
   },
@@ -54,6 +54,8 @@
     "three": "^0.160.0"
   },
   "overrides": {
+    "runed": "^0.38.0",
+    "svelte-toolbelt": "^0.13.0",
     "zod": "^4.6.6"
   }
 }

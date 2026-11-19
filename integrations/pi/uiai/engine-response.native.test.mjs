@@ -192,3 +192,61 @@ test("native search errors retain safe setup next action",async()=>{
   finally{if(prior===undefined)delete process.env.UIAI_ENGINE_URL;else process.env.UIAI_ENGINE_URL=prior;await new Promise(resolve=>server.close(resolve))}
  }
 });
+
+test("native Pi auth tools route exactly, fail closed, and redact token fields", async () => {
+  const calls = [];
+  const server = createServer((req, res) => {
+    let raw = "";
+    req.on("data", chunk => raw += chunk);
+    req.on("end", () => {
+      const body = raw ? JSON.parse(raw) : {};
+      calls.push({ method: req.method, url: req.url, body });
+      res.setHeader("content-type", "application/json");
+      if (body.resume_token === "stale-private-token") {
+        res.statusCode = 409;
+        res.end(JSON.stringify({
+          code: "auth_challenge_pending",
+          error: "invalid auth challenge resume token",
+          suggested_next_action: "Call uiai_browser_auth_cancel or obtain the current private token before uiai_browser_auth_resolve.",
+          resume_token: "resume_server_must_not_leak",
+          private_secret: "server-secret-must-not-leak",
+        }));
+        return;
+      }
+      if (req.url.endsWith("/auth/resolve")) {
+        res.end(JSON.stringify({ resolved: true, session: { id: "pi/auth fixture" }, resume_token: "resume_success_must_not_leak", credential: "pi-secret" }));
+        return;
+      }
+      res.end(JSON.stringify({ cancelled: true, resume_token: "resume_cancel_must_not_leak", password: "pi-password" }));
+    });
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  const prior = process.env.UIAI_ENGINE_URL;
+  process.env.UIAI_ENGINE_URL = "http://127.0.0.1:" + server.address().port;
+  try {
+    const resolve = tools.get("uiai_browser_auth_resolve");
+    const cancel = tools.get("uiai_browser_auth_cancel");
+    assert.ok(resolve); assert.ok(cancel);
+    assert.equal(resolve.parameters.properties.resume_token.writeOnly, true);
+    assert.equal(resolve.parameters.additionalProperties, false);
+
+    const resolved = await resolve.execute("resolve", { session_id: "pi/auth fixture", resume_token: "current-private-token" });
+    assert.deepEqual(calls.at(-1), { method: "POST", url: "/api/session/pi%2Fauth%20fixture/auth/resolve", body: { resume_token: "current-private-token" } });
+    assert.match(resolved.content[0].text, /"resolved": true/);
+    assert.doesNotMatch(resolved.content[0].text, /resume_success|pi-secret|resume_token|credential/);
+
+    await assert.rejects(resolve.execute("stale", { session_id: "pi/auth fixture", resume_token: "stale-private-token" }), error => {
+      assert.match(error.message, /409|auth_challenge_pending|uiai_browser_auth_cancel/);
+      assert.doesNotMatch(error.message, /stale-private-token|resume_server|server-secret|resume_token|private_secret/);
+      return true;
+    });
+
+    const cancelled = await cancel.execute("cancel", { session_id: "pi/auth fixture" });
+    assert.deepEqual(calls.at(-1), { method: "POST", url: "/api/session/pi%2Fauth%20fixture/auth/cancel", body: {} });
+    assert.match(cancelled.content[0].text, /"cancelled": true/);
+    assert.doesNotMatch(cancelled.content[0].text, /resume_cancel|pi-password|resume_token|password/);
+  } finally {
+    if (prior === undefined) delete process.env.UIAI_ENGINE_URL; else process.env.UIAI_ENGINE_URL = prior;
+    await new Promise(resolve => server.close(resolve));
+  }
+});

@@ -96,3 +96,31 @@ test("explicit scope is forwarded as metadata, never synthesized",async()=>{
  const data=modelProjection({recordUrl:"https://private",storagePath:"/secret/path",credentialHandle:"private",artifact_ref:"artifact:keep"});
  assert.deepEqual(data,{artifact_ref:"artifact:keep"});
 });
+
+test("auth resolve and cancel actions use existing routes, fail closed, and project no tokens", async()=>{
+ const calls=[];
+ const fetchImpl=async(url,options={})=>{
+  const body=options.body?JSON.parse(options.body):{};calls.push({url,method:options.method,body});
+  if(url.endsWith("/api/session"))return Response.json({session:{id:"auth-owned"}},{headers:{"X-UIAI-Created-Session-ID":"auth-owned"}});
+  if(url.endsWith("/auth/resolve")&&body.resume_token==="stale-private-token")return Response.json({code:"auth_challenge_pending",suggested_next_action:"Use auth_cancel or obtain the current private token before auth_resolve.",resume_token:"resume_server_must_not_leak",private_secret:"server-secret"},{status:409});
+  if(url.endsWith("/auth/resolve"))return Response.json({resolved:true,session:{id:"auth-owned"},resume_token:"resume_success_must_not_leak",credential:"private-credential"});
+  if(url.endsWith("/auth/cancel"))return Response.json({cancelled:true,resume_token:"resume_cancel_must_not_leak",password:"private-password"});
+  return Response.json({error:"unexpected"},{status:404});
+ };
+ const client=createUIAIClient({}, {fetchImpl});
+ await client.execute("open",{url:"https://example.test"});
+ const resolved=await client.execute("auth_resolve",{session_id:"auth-owned",resume_token:"current-private-token"});
+ assert.equal(calls.at(-1).url,"http://127.0.0.1:7456/api/session/auth-owned/auth/resolve");
+ assert.deepEqual(calls.at(-1).body,{resume_token:"current-private-token"});
+ const projected=JSON.stringify(modelProjection(resolved.data));
+ assert.match(projected,/resolved/);assert.doesNotMatch(projected,/resume_success|private-credential|resume_token|credential/);
+ await assert.rejects(client.execute("auth_resolve",{session_id:"auth-owned",resume_token:"stale-private-token"}),error=>{
+  assert.equal(error.code,"auth_challenge_pending");assert.match(error.details.recovery,/auth_cancel/);assert.doesNotMatch(JSON.stringify(error.details),/stale-private-token|resume_server|server-secret/);return true;
+ });
+ const cancelled=await client.execute("auth_cancel",{session_id:"auth-owned"});
+ assert.equal(calls.at(-1).url,"http://127.0.0.1:7456/api/session/auth-owned/auth/cancel");
+ assert.deepEqual(calls.at(-1).body,{});assert.equal(client.ownedCount(),0);
+ assert.doesNotMatch(JSON.stringify(modelProjection(cancelled.data)),/resume_cancel|private-password|resume_token|password/);
+ assert.ok(actions.includes("auth_resolve")&&actions.includes("auth_cancel"));
+ assert.equal(browserParameters.properties.resume_token.writeOnly,true);
+});

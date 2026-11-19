@@ -196,3 +196,101 @@ test("MCP search errors retain safe setup next action",async(t)=>{
   assert.equal(reply.error,undefined);assert.equal(reply.result.isError,true);const text=reply.result.content[0].text;assert.ok(text.includes(`Next: ${tc.action}`));assert.ok(text.includes(tc.hint));assert.doesNotMatch(text,/synthetic-private-extra-never-echo/);
  }
 });
+
+test("MCP auth tools are discoverable, route exactly, fail closed, and redact secrets", async (t) => {
+  const calls = [];
+  const server = createServer(async (req, res) => {
+    if (req.method === "GET" && req.url === "/api/tools/mcp") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ tools: [] }));
+      return;
+    }
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
+    calls.push({ method: req.method, url: req.url, body });
+    res.setHeader("content-type", "application/json");
+    if (req.url.endsWith("/auth/resolve") && body.resume_token === "stale-private-token") {
+      res.statusCode = 409;
+      res.end(JSON.stringify({
+        code: "auth_challenge_pending",
+        state: "AWAITING_AUTH",
+        error: "invalid auth challenge resume token",
+        suggested_next_action: "Call browser_auth_cancel or obtain the current private token before browser_auth_resolve.",
+        resume_token: "resume_server_must_not_leak",
+        private_secret: "server-secret-must-not-leak",
+      }));
+      return;
+    }
+    if (req.url.endsWith("/auth/resolve")) {
+      res.end(JSON.stringify({
+        resolved: true,
+        session: { id: "session/auth fixture", lease_state: "ACTIVE" },
+        resume_token: "resume_success_must_not_leak",
+        private_secret: "success-secret-must-not-leak",
+      }));
+      return;
+    }
+    if (req.url.endsWith("/auth/cancel")) {
+      res.end(JSON.stringify({
+        cancelled: true,
+        resume_token: "resume_cancel_must_not_leak",
+        credential: "cancel-secret-must-not-leak",
+      }));
+      return;
+    }
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "unexpected route" }));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const child = spawn(process.execPath, [process.env.UIAI_TEST_MCP_SCRIPT || "mcp/browser-session-mcp.mjs"], {
+    cwd: root,
+    env: { ...process.env, UIAI_ENGINE_URL: "http://127.0.0.1:" + server.address().port },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  t.after(() => { child.kill(); server.close(); });
+
+  const listed = await callMcp(child, { jsonrpc: "2.0", id: 30, method: "tools/list", params: {} });
+  for (const name of ["browser_auth_resolve", "browser_auth_cancel"]) {
+    assert.ok(listed.result.tools.find(tool => tool.name === name), "missing " + name);
+  }
+  const resolveSchema = listed.result.tools.find(tool => tool.name === "browser_auth_resolve").inputSchema;
+  assert.equal(resolveSchema.properties.resume_token.writeOnly, true);
+  assert.equal(resolveSchema.additionalProperties, false);
+
+  const resolved = await callMcp(child, { jsonrpc: "2.0", id: 31, method: "tools/call", params: {
+    name: "browser_auth_resolve",
+    arguments: { session_id: "session/auth fixture", resume_token: "current-private-token" },
+  } });
+  assert.equal(resolved.result.isError, undefined);
+  assert.deepEqual(calls.at(-1), {
+    method: "POST",
+    url: "/api/session/session%2Fauth%20fixture/auth/resolve",
+    body: { resume_token: "current-private-token" },
+  });
+  const resolvedText = resolved.result.content[0].text;
+  assert.match(resolvedText, /"resolved": true/);
+  assert.doesNotMatch(resolvedText, /resume_success|success-secret|resume_token|private_secret/);
+
+  const stale = await callMcp(child, { jsonrpc: "2.0", id: 32, method: "tools/call", params: {
+    name: "browser_auth_resolve",
+    arguments: { session_id: "session/auth fixture", resume_token: "stale-private-token" },
+  } });
+  assert.equal(stale.result.isError, true);
+  assert.match(stale.result.content[0].text, /auth_challenge_pending|browser_auth_cancel/);
+  assert.doesNotMatch(stale.result.content[0].text, /stale-private-token|resume_server|server-secret|resume_token|private_secret/);
+
+  const cancelled = await callMcp(child, { jsonrpc: "2.0", id: 33, method: "tools/call", params: {
+    name: "browser_auth_cancel", arguments: { session_id: "session/auth fixture" },
+  } });
+  assert.equal(cancelled.result.isError, undefined);
+  assert.deepEqual(calls.at(-1), {
+    method: "POST",
+    url: "/api/session/session%2Fauth%20fixture/auth/cancel",
+    body: {},
+  });
+  const cancelledText = cancelled.result.content[0].text;
+  assert.match(cancelledText, /"cancelled": true/);
+  assert.doesNotMatch(cancelledText, /resume_cancel|cancel-secret|resume_token|credential/);
+});

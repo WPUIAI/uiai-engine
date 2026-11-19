@@ -17,11 +17,13 @@ const (
 )
 
 type AuthChallenge struct {
-	Class       string    `json:"class"`
-	URLHint     string    `json:"url_hint,omitempty"`
-	SessionID   string    `json:"session_id"`
-	ActorRef    string    `json:"actor,omitempty"`
-	ResumeToken string    `json:"resume_token"`
+	Class     string `json:"class"`
+	URLHint   string `json:"url_hint,omitempty"`
+	SessionID string `json:"session_id"`
+	ActorRef  string `json:"actor,omitempty"`
+	// ResumeToken remains process-private until a dedicated private broker path is admitted.
+	// General session, event, diagnostic, and tool payloads must never encode it.
+	ResumeToken string    `json:"-"`
 	DetectedAt  time.Time `json:"detected_at"`
 }
 
@@ -113,7 +115,7 @@ func (s *Session) raiseAuthChallenge(class, urlHint string) *AuthChallenge {
 	copy := *challenge
 	s.mu.Unlock()
 	events.Emit("auth_challenge_required", map[string]any{"session_id": s.ID, "actor": actor}, nil, map[string]any{
-		"type": "auth_challenge_required", "class": class, "url_hint": urlHint, "session_id": s.ID, "actor": actor, "resume_token": challenge.ResumeToken,
+		"type": "auth_challenge_required", "class": class, "url_hint": urlHint, "session_id": s.ID, "actor": actor,
 	})
 	return &copy
 }

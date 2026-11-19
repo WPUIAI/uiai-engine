@@ -91,7 +91,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 					next.ServeHTTP(w, req)
 					return
 				}
-				writeJSON(w, http.StatusConflict, map[string]any{"state": vision.LeaseAwaitingAuth, "code": "auth_challenge_pending", "next_mode": browserModePrivateAuth, "session": sessionInfoPayload(sess)})
+				writeJSON(w, http.StatusConflict, authChallengePendingPayload(map[string]any{"session": sessionInfoPayload(sess)}))
 			})
 		})
 
@@ -118,7 +118,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			_ = json.NewDecoder(req.Body).Decode(&body)
 			if err := sess.ResolveAuthChallenge(body.ResumeToken); err != nil {
-				writeJSON(w, http.StatusConflict, map[string]any{"state": vision.LeaseAwaitingAuth, "code": "auth_challenge_pending", "next_mode": browserModePrivateAuth, "error": err.Error()})
+				writeJSON(w, http.StatusConflict, authChallengePendingPayload(map[string]any{"error": err.Error()}))
 				return
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"resolved": true, "session": sessionInfoPayload(sess)})
@@ -862,6 +862,21 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			MountSessionCaptchaRoute(r, solver[0], sm)
 		}
 	})
+}
+
+func authChallengePendingPayload(extra map[string]any) map[string]any {
+	out := map[string]any{
+		"state":     vision.LeaseAwaitingAuth,
+		"code":      "auth_challenge_pending",
+		"next_mode": browserModePrivateAuth,
+		"suggested_next_action": "Complete authentication only through an approved private human or broker path, then call browser_auth_resolve with this session_id and its private one-use resume_token. " +
+			"If the challenge is declined, stale, wrong, or cannot be completed, call browser_auth_cancel to close the session. Re-observe after a successful resolve.",
+		"next_tools": []string{"browser_auth_resolve", "browser_auth_cancel"},
+	}
+	for key, value := range extra {
+		out[key] = value
+	}
+	return out
 }
 
 func sessionInfoPayload(sess *vision.Session) map[string]any {

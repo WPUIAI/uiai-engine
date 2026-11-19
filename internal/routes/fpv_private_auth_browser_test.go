@@ -38,8 +38,9 @@ func TestPublicFPVShareRejectsAuthenticationSessionsBrowser(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		var challenge *vision.AuthChallenge
 		if state != "fresh" {
-			if _, err = session.DetectAuthChallenge(); err != nil {
+			if challenge, err = session.DetectAuthChallenge(); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -55,8 +56,11 @@ func TestPublicFPVShareRejectsAuthenticationSessionsBrowser(t *testing.T) {
 		if response.Code != http.StatusForbidden || !strings.Contains(response.Body.String(), "fpv_private_session") {
 			t.Fatalf("public auth share was not denied (state=%s status=%d)", state, response.Code)
 		}
-		if strings.Contains(response.Body.String(), `"token"`) || strings.Contains(response.Body.String(), "resume_") {
+		if strings.Contains(response.Body.String(), `"token"`) || strings.Contains(response.Body.String(), "resume_") || strings.Contains(response.Body.String(), "\"resume_token\"") {
 			t.Fatal("denial exposed a capability")
+		}
+		if challenge != nil && strings.Contains(response.Body.String(), challenge.ResumeToken) {
+			t.Fatal("FPV payload exposed the private resume token value")
 		}
 		after := 0
 		fpvShares.Range(func(_, _ any) bool { after++; return true })

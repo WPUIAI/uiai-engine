@@ -51,6 +51,8 @@ Commands:
   session read <sid> [--selector S] [--max-chars N] [--format text|markdown] [--mode main_content|full]
   session snapshot <sid>
   session diagnostics <sid> [--limit N] [--failed-only]
+  session auth resolve <sid>       Resolve after private auth; reads one-use token from stdin (preferred) or UIAI_AUTH_RESUME_TOKEN fallback
+  session auth cancel <sid>        Cancel pending auth and close the session
   session close <sid>
   smoke agent                    Run scripts/smoke-agent-integrations.sh
   smoke browser                  Run scripts/stress-browser-diagnostics.sh
@@ -80,7 +82,9 @@ need jq
 api() {
   local method="$1" path="$2" body="${3:-}"
   local args=(-sS --max-time "$TIMEOUT_SECONDS" -X "$method" ${SCOPE_ARGS[@]+"${SCOPE_ARGS[@]}"} "$ENGINE_URL$path")
-  if [[ -n "$body" ]]; then
+  if [[ "$body" == "-" ]]; then
+    args+=(-H "Content-Type: application/json" --data-binary @-)
+  elif [[ -n "$body" ]]; then
     args+=(-H "Content-Type: application/json" -d "$body")
   fi
   local tmp status
@@ -131,6 +135,10 @@ format_error() {
     (v(.diagnostics) | "diagnostics: " + .)'
 }
 
+redact_auth_output() {
+  jq 'walk(if type == "object" then with_entries(select(.key | test("resume_?token|token|secret|credential|password|authorization|cookie"; "i") | not)) else . end)'
+}
+
 emit() {
   case "$FORMAT" in
     json) cat ;;
@@ -154,6 +162,10 @@ compact_emit() {
     elif has("tools") then
       "tools: count=" + ((.count // (.tools|length))|tostring),
       (.tools[]? | "- " + .name + " — " + (.description // ""))
+    elif .resolved == true then
+      "auth: resolved session=" + (.session.id // "?") + " — re-observe before the next action"
+    elif has("cancelled") then
+      "auth: " + (if .cancelled then "cancelled and session closed" else "no pending challenge" end)
     elif has("session") then
       "session: " + (.session.id // .id // "?") + " " + (.session.url // .url // "")
     elif has("tree") or has("stats") then
@@ -431,8 +443,33 @@ cmd_session() {
       done
       api GET "/api/session/$sid/diagnostics?limit=$limit$failed" | emit
       ;;
+    auth)
+      [[ $# -ge 1 ]] || { err "usage: uiai session auth resolve|cancel <sid>"; exit 2; }
+      local auth_action="$1"; shift
+      case "$auth_action" in
+        resolve)
+          [[ $# -ge 1 ]] || { err "usage: uiai session auth resolve <sid>"; exit 2; }
+          local sid="$1" resume_token=""
+          if [[ -t 0 ]]; then
+            read -r -s -p "Private one-use resume token: " resume_token
+            printf '\n' >&2
+          else
+            IFS= read -r resume_token || true
+          fi
+          if [[ -z "$resume_token" && -n "${UIAI_AUTH_RESUME_TOKEN+x}" ]]; then resume_token="$UIAI_AUTH_RESUME_TOKEN"; fi
+          [[ -n "$resume_token" ]] || { err "a private one-use resume token is required on stdin (preferred) or UIAI_AUTH_RESUME_TOKEN fallback"; exit 2; }
+          jq -cn --arg resume_token "$resume_token" '{resume_token:$resume_token}' | api POST "/api/session/$(urlencode "$sid")/auth/resolve" - | redact_auth_output | emit
+          unset resume_token
+          ;;
+        cancel)
+          [[ $# -ge 1 ]] || { err "usage: uiai session auth cancel <sid>"; exit 2; }
+          api POST "/api/session/$(urlencode "$1")/auth/cancel" '{}' | redact_auth_output | emit
+          ;;
+        *) err "usage: uiai session auth resolve|cancel <sid>"; exit 2 ;;
+      esac
+      ;;
     close) [[ $# -ge 1 ]] || { err "usage: uiai session close <sid>"; exit 2; }; api DELETE "/api/session/$1" | emit ;;
-    *) err "usage: uiai session open|read|snapshot|diagnostics|close"; exit 2 ;;
+    *) err "usage: uiai session open|read|snapshot|diagnostics|auth|close"; exit 2 ;;
   esac
 }
 
