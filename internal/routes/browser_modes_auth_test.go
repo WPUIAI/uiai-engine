@@ -38,6 +38,11 @@ func TestAuthPendingResponseOffersPrivateModeWithoutResuming(t *testing.T) {
 	}
 	router := chi.NewRouter()
 	MountSessionRoutes(router, &config.Config{}, manager)
+	info := httptest.NewRecorder()
+	router.ServeHTTP(info, httptest.NewRequest("GET", "/"+session.ID+"/", nil))
+	if info.Code != http.StatusOK || strings.Contains(info.Body.String(), challenge.ResumeToken) || strings.Contains(info.Body.String(), "\"resume_token\"") {
+		t.Fatalf("ordinary session payload exposed private auth material: status=%d body=%s", info.Code, info.Body.String())
+	}
 	for _, action := range []string{"click", "auth/resolve"} {
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, httptest.NewRequest("POST", "/"+session.ID+"/"+action, strings.NewReader(`{"resume_token":"synthetic-invalid"}`)))
