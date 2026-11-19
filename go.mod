@@ -1,6 +1,6 @@
 module github.com/WPUIAI/uiai-engine
 
-go 1.26.10
+go 1.26.11
 
 require (
 	github.com/go-chi/chi/v5 v5.5.0

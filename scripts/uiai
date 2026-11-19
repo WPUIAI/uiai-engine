@@ -456,7 +456,7 @@ cmd_session() {
           else
             IFS= read -r resume_token || true
           fi
-          if [[ -z "$resume_token" && -v UIAI_AUTH_RESUME_TOKEN ]]; then resume_token="$UIAI_AUTH_RESUME_TOKEN"; fi
+          if [[ -z "$resume_token" && -n "${UIAI_AUTH_RESUME_TOKEN+x}" ]]; then resume_token="$UIAI_AUTH_RESUME_TOKEN"; fi
           [[ -n "$resume_token" ]] || { err "a private one-use resume token is required on stdin (preferred) or UIAI_AUTH_RESUME_TOKEN fallback"; exit 2; }
           jq -cn --arg resume_token "$resume_token" '{resume_token:$resume_token}' | api POST "/api/session/$(urlencode "$sid")/auth/resolve" - | redact_auth_output | emit
           unset resume_token
