@@ -432,7 +432,7 @@ function compactSummary(data: any, details: Record<string, any> = {}) {
 		const pending = findNonReadyArtifactDelivery(data);
 		if (pending) {
 			const recovery = evidenceRecoveryHint(data);
-			return `${endpoint} evidence pending: ${pending}${recovery ? ` · ${recovery}` : ""} — pending reconciliation is not delivery${recovery?.includes("reconcile:epwa-scope-required") ? "; supply the verified complete focusa_scope and required work-item projections; never invent references" : ""}`;
+			return `${endpoint} evidence pending: ${pending}${recovery ? ` · ${recovery}` : ""} — pending reconciliation is not delivery${recovery?.includes("reconcile:epwa-scope-required") ? "; formal project: obtain the canonical Focusa evidence scope and work-item projections, never invent refs; ad hoc visual capture is a separate secure path, not a project evidence bypass" : ""}`;
 		}
 	} catch {
 		return `${endpoint} evidence delivery unavailable — inspect result for reconciliation`;

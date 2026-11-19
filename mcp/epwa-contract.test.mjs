@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assertEvidenceDelivery, evidenceScopeHeaders, findNonReadyArtifactDelivery, findRawArtifactField } from "./epwa-contract.mjs";
+import { assertEvidenceDelivery, evidenceScopeHeaders, findNonReadyArtifactDelivery, findRawArtifactField, evidenceScopeRecoveryAdvice } from "./epwa-contract.mjs";
 
 test("evidenceScopeHeaders forwards complete scope without inventing values", () => {
   const workItems = [{ work_item_ref: "work-item:196", revision: "4" }];
@@ -122,4 +122,31 @@ test("discovery artifact parameter descriptors are not inline artifacts", () => 
  }
  assert.throws(()=>assertEvidenceDelivery({imageBase64:{type:"string",description:"not discovery"}}),/EPWA delivery unavailable/);
  assert.throws(()=>assertEvidenceDelivery({screenshot:"synthetic-inline-data"}),/EPWA delivery unavailable/);
+});
+
+
+test("missing project evidence scope returns actionable but non-authorizing guidance", () => {
+  const pending = {
+    delivery_state:"blocked",
+    epwa_delivery:{state:"blocked",recovery_ref:"reconcile:epwa-scope-required"},
+    focusa_scope:{project_ref:"sensitive-private-name"},
+  };
+  const guidance=evidenceScopeRecoveryAdvice(pending);
+  assert.equal(guidance.reason_code,"epwa_project_scope_required");
+  assert.deepEqual(guidance.required_fields,[
+    "project_ref","workstream_ref","workset_ref","callgraph_ref",
+    "workpoint_ref","work_item_ref","continuity_ref","work_items",
+  ]);
+  assert.match(guidance.suggested_next_action,/Do not invent references/);
+  assert.match(guidance.suggested_next_action,/ad hoc screenshots/);
+  assert.doesNotMatch(JSON.stringify(guidance),/sensitive-private-name/);
+  assert.throws(()=>assertEvidenceDelivery(pending,true),error=>{
+    assert.equal(error.delivery_error.code,"epwa_delivery_unavailable");
+    assert.equal(error.delivery_error.reason_code,"epwa_project_scope_required");
+    assert.equal(error.delivery_error.delivery_state,"blocked");
+    assert.equal(error.delivery_error.required_fields.length,8);
+    assert.ok(!JSON.stringify(error.delivery_error).includes("sensitive-private-name"));
+    return true;
+  });
+  assert.equal(evidenceScopeRecoveryAdvice({recovery_ref:"reconcile:epwa-https-required"}),null);
 });
