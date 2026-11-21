@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
@@ -41,7 +42,7 @@ func MountToolsDiscovery(r chi.Router, cfg *config.Config, states ...*SearchRunt
 	})
 
 	r.Get("/agent-card", func(w http.ResponseWriter, req *http.Request) {
-		card := agentBootstrapCard()
+		card := agentBootstrapCard(cfg)
 		state := firstSearchRuntime(states...)
 		card["setup"] = searchSetupGuide(buildSearchProviderInventory(cfg, state), state != nil)
 		writeJSON(w, 200, card)
@@ -92,11 +93,21 @@ func MountToolsDiscovery(r chi.Router, cfg *config.Config, states ...*SearchRunt
 	})
 }
 
-func agentBootstrapCard() map[string]any {
+// baseURLFromConfig reports the engine's real listen address for discovery
+// surfaces, falling back to localhost for wildcard/empty bind hosts (#296).
+func baseURLFromConfig(cfg *config.Config) string {
+	host := strings.TrimSpace(cfg.Server.Host)
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
+	}
+	return "http://" + host + ":" + strconv.Itoa(cfg.Server.Port)
+}
+
+func agentBootstrapCard(cfg *config.Config) map[string]any {
 	return map[string]any{
 		"service":       "uiai-engine",
 		"purpose":       "Lightweight browser, web search, Source-to-Markdown, screenshot, visual QA, and diagnostics backend for local and remote agents.",
-		"base_url":      "http://localhost:7456",
+		"base_url":      baseURLFromConfig(cfg),
 		"browser_modes": browserModeDecisionCard(openAITools()),
 		"top_benefits": []string{
 			"Discover UIAI features quickly through agent cards, tool search, graph routing, docs metadata, Pi cards, MCP cards, and CLI discovery.",

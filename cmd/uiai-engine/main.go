@@ -12,22 +12,27 @@ import (
 	"log"
 	"os"
 
+	"github.com/WPUIAI/uiai-engine/internal/buildinfo"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/server"
 )
 
-var (
-	version   = "2.0.24"
-	buildTime = "unknown"
-)
+// version is the canonical in-source release identity; scripts/stamp-uiai-version.py
+// and the preflight version-surface gate parse this literal.
+var version = "2.0.24"
 
 func main() {
+	// Without a release ldflags stamp, buildinfo must still report the true
+	// in-source version rather than a placeholder (#317).
+	if buildinfo.BuildTime == "unknown" {
+		buildinfo.Version = version
+	}
 	configPath := flag.String("config", "", "Path to config.yaml")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("uiai-engine %s (built %s)\n", version, buildTime)
+		fmt.Printf("uiai-engine %s (built %s)\n", buildinfo.Version, buildinfo.BuildTime)
 		os.Exit(0)
 	}
 
@@ -55,7 +60,7 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Printf("uiai-engine %s starting (config: %s)", version, cfgPath)
+	log.Printf("uiai-engine %s starting (config: %s)", buildinfo.Version, cfgPath)
 
 	// Ensure data directory exists
 	if err := os.MkdirAll(cfg.Storage.DataDir, 0750); err != nil {

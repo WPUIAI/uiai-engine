@@ -46,6 +46,39 @@ type cachedResult struct {
 	expiry   time.Time
 }
 
+// Auth failure reason codes — one machine-readable taxonomy across all
+// credential transports so clients can distinguish missing/bad/expired/revoked/
+// scope conditions instead of receiving an equally-opaque 401 (#314).
+const (
+	ReasonMissingCredential = "missing_credential"
+	ReasonBadCredentialType = "bad_credential_type"
+	ReasonInvalidAPIKey     = "invalid_api_key"
+	ReasonUnknownLicense    = "unknown_license"
+	ReasonLicenseNotPaired  = "license_not_paired"
+)
+
+// AuthFailure is a typed authentication error carrying a machine-readable
+// reason_code.
+type AuthFailure struct {
+	Reason string
+	Msg    string
+}
+
+func (e *AuthFailure) Error() string { return e.Msg }
+
+func reasonCodeFor(err error) string {
+	if af, ok := err.(*AuthFailure); ok && af.Reason != "" {
+		return af.Reason
+	}
+	return ReasonInvalidAPIKey
+}
+
+func writeAuthError(w http.ResponseWriter, status int, err error) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": err.Error(), "reason_code": reasonCodeFor(err)})
+}
+
 type Authenticator struct {
 	cfg   *config.Config
 	cache sync.Map // key → *cachedResult
@@ -73,9 +106,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(401)
-			json.NewEncoder(w).Encode(map[string]string{"error": "authentication required for remote browser/session/search API access"})
+			writeAuthError(w, 401, &AuthFailure{Reason: ReasonMissingCredential, Msg: "authentication required for remote browser/session/search API access"})
 			return
 		}
 
@@ -86,6 +117,11 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			p == "/api/critique/models" || p == "/api/critique/dimensions" ||
 			p == "/api/ui-reverse/models" || p == "/api/ui-reverse/operations" ||
 			p == "/api/copilot/health" || p == "/api/intelligence/health" ||
+			// Discovery / documentation — must be readable without the credential
+			// they exist to help a client obtain (#316)
+			p == "/llms.txt" || p == "/openapi.json" || p == "/api/openapi.json" || p == "/api/docs" ||
+			p == "/api/capabilities" || p == "/api/agent/capabilities" || p == "/api/agent/card" ||
+			p == "/api/schema" || strings.HasPrefix(p, "/api/schema/") ||
 			// Extension verify + token handled inside handler (Bun returns 400/401 itself)
 			p == "/api/extension/verify" || p == "/api/extension/token" ||
 			// Memory, usage, workflow, training, intelligence — Bun has no global auth
@@ -113,9 +149,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 
 		id, err := a.Authenticate(r)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(401)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			writeAuthError(w, 401, err)
 			return
 		}
 
@@ -146,10 +180,16 @@ func (a *Authenticator) Authenticate(r *http.Request) (*Identity, error) {
 		if id, ok := validateLocalToken(lk); ok {
 			return id, nil
 		}
+		if id, ok := validateServerAPIKey(a.cfg, lk); ok {
+			return id, nil
+		}
 		return a.validateLicense(lk)
 	}
 	if ak := r.Header.Get("X-API-Key"); ak != "" {
 		if id, ok := validateLocalToken(ak); ok {
+			return id, nil
+		}
+		if id, ok := validateServerAPIKey(a.cfg, ak); ok {
 			return id, nil
 		}
 		return a.validateAPIKey(ak)
@@ -164,10 +204,27 @@ func (a *Authenticator) Authenticate(r *http.Request) (*Identity, error) {
 			if id, ok := validateLocalToken(bearer); ok {
 				return id, nil
 			}
+			if id, ok := validateServerAPIKey(a.cfg, bearer); ok {
+				return id, nil
+			}
 			return a.validateLicense(bearer)
 		}
+		return nil, &AuthFailure{Reason: ReasonBadCredentialType, Msg: "unsupported Authorization scheme (expected Bearer)"}
 	}
-	return nil, fmt.Errorf("missing authentication header")
+	return nil, &AuthFailure{Reason: ReasonMissingCredential, Msg: "missing authentication header"}
+}
+
+// validateServerAPIKey honours server.api_key from the operator config. A match
+// authenticates as a local operator identity without an out-of-band lookup (#315).
+func validateServerAPIKey(cfg *config.Config, token string) (*Identity, bool) {
+	key := strings.TrimSpace(cfg.Server.APIKey)
+	if key == "" || strings.TrimSpace(token) == "" {
+		return nil, false
+	}
+	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(token)), []byte(key)) == 1 {
+		return &Identity{APIKey: token, ClientID: "local-server-key", Tier: "internal"}, true
+	}
+	return nil, false
 }
 
 func validateLocalToken(token string) (*Identity, bool) {
@@ -226,7 +283,12 @@ func (a *Authenticator) validateLicense(key string) (*Identity, error) {
 		return nil, fmt.Errorf("invalid license response")
 	}
 	if !data.Valid {
-		e := fmt.Errorf("invalid license: %s", data.Error)
+		reason := ReasonUnknownLicense
+		msg := strings.ToLower(data.Error)
+		if strings.Contains(msg, "not found") || strings.Contains(msg, "not paired") || strings.Contains(msg, "unpaired") {
+			reason = ReasonLicenseNotPaired
+		}
+		e := &AuthFailure{Reason: reason, Msg: fmt.Sprintf("invalid license: %s", data.Error)}
 		a.cache.Store(cacheKey, &cachedResult{nil, e, time.Now().Add(60 * time.Second)})
 		return nil, e
 	}
@@ -265,7 +327,7 @@ func (a *Authenticator) validateAPIKey(key string) (*Identity, error) {
 		return nil, fmt.Errorf("invalid key response")
 	}
 	if !data.Valid {
-		e := fmt.Errorf("invalid API key")
+		e := &AuthFailure{Reason: ReasonInvalidAPIKey, Msg: "invalid API key"}
 		a.cache.Store(cacheKey, &cachedResult{nil, e, time.Now().Add(60 * time.Second)})
 		return nil, e
 	}

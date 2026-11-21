@@ -17,6 +17,7 @@ import (
 	"github.com/WPUIAI/uiai-engine/internal/ai"
 	"github.com/WPUIAI/uiai-engine/internal/auth"
 	captchaPkg "github.com/WPUIAI/uiai-engine/internal/captcha"
+	"github.com/WPUIAI/uiai-engine/internal/buildinfo"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
 	"github.com/WPUIAI/uiai-engine/internal/desktop"
@@ -498,7 +499,7 @@ func (e *Engine) mountRoutes() {
 func (e *Engine) handleRoot(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"service": "WPUIAI AI Server",
-		"version": "2.0.0",
+		"version": buildinfo.Version,
 		"status":  "running",
 		"runtime": "go",
 		"endpoints": map[string]string{

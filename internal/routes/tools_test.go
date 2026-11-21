@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -48,9 +49,13 @@ func TestRankedToolSearchHandlesMultiTokenVisualFailureDiagnostics(t *testing.T)
 }
 
 func TestAgentBootstrapCardOrientsLocalAndRemoteAgents(t *testing.T) {
-	card := agentBootstrapCard()
+	cfg := &config.Config{Server: config.ServerConfig{Host: "127.0.0.1", Port: 7456}}
+	card := agentBootstrapCard(cfg)
 	if got := card["service"]; got != "uiai-engine" {
 		t.Fatalf("expected service uiai-engine, got %v", got)
+	}
+	if got := card["base_url"]; got != "http://127.0.0.1:7456" {
+		t.Fatalf("expected real base_url, got %v", got)
 	}
 	discovery, ok := card["discovery"].(map[string]string)
 	if !ok {

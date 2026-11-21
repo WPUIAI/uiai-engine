@@ -90,10 +90,13 @@ api() {
   local tmp status
   tmp="$(mktemp)"
   status="$(uiai_curl_auth "${args[@]}" -w '%{http_code}' -o "$tmp" || true)"
-  if [[ ! "$status" =~ ^[0-9]+$ ]]; then
-    cat "$tmp" >&2 || true
+  # curl reports 000 when it never received an HTTP response (connection refused,
+  # DNS failure, or timeout). That must not read as empty success (#297).
+  if [[ ! "$status" =~ ^[0-9]+$ ]] || [[ "$status" == "000" ]]; then
+    err "engine unreachable at $ENGINE_URL (no HTTP response — connection refused/timeout?)"
+    if [[ -s "$tmp" ]]; then cat "$tmp" >&2; fi
     rm -f "$tmp"
-    exit 1
+    exit 3
   fi
   if (( status >= 400 )); then
     if jq -e . >/dev/null 2>&1 <"$tmp"; then

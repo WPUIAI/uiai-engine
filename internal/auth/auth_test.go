@@ -257,3 +257,38 @@ func TestLocalAPITokensSupportsCommaSeparatedFallbacks(t *testing.T) {
 		t.Fatalf("unexpected local token identity: %#v", id)
 	}
 }
+
+func TestServerAPIKeyAuthenticatesAPIKeyAndBearer(t *testing.T) {
+	authenticator := New(&config.Config{Server: config.ServerConfig{APIKey: "server-static-key"}})
+
+	apiReq, _ := http.NewRequest("GET", "http://example.test/api/media/frame/catalog", nil)
+	apiReq.Header.Set("X-API-Key", "server-static-key")
+	if id, err := authenticator.Authenticate(apiReq); err != nil {
+		t.Fatalf("expected X-API-Key server key to authenticate: %v", err)
+	} else if id.ClientID != "local-server-key" {
+		t.Fatalf("unexpected server key identity: %#v", id)
+	}
+
+	bearerReq, _ := http.NewRequest("GET", "http://example.test/api/media/frame/catalog", nil)
+	bearerReq.Header.Set("Authorization", "Bearer server-static-key")
+	if id, err := authenticator.Authenticate(bearerReq); err != nil {
+		t.Fatalf("expected Bearer server key to authenticate: %v", err)
+	} else if id.ClientID != "local-server-key" {
+		t.Fatalf("unexpected bearer server key identity: %#v", id)
+	}
+}
+
+func TestAuthFailureReasonCodes(t *testing.T) {
+	if got := reasonCodeFor(&AuthFailure{Reason: ReasonMissingCredential}); got != "missing_credential" {
+		t.Fatalf("missing credential reason: got %q", got)
+	}
+	if got := reasonCodeFor(&AuthFailure{Reason: ReasonBadCredentialType}); got != "bad_credential_type" {
+		t.Fatalf("bad credential type reason: got %q", got)
+	}
+	if got := reasonCodeFor(&AuthFailure{Reason: ReasonInvalidAPIKey}); got != "invalid_api_key" {
+		t.Fatalf("invalid api key reason: got %q", got)
+	}
+	if got := reasonCodeFor(nil); got != ReasonInvalidAPIKey {
+		t.Fatalf("unexpected default reason: got %q", got)
+	}
+}

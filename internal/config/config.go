@@ -172,6 +172,10 @@ type ServerConfig struct {
 	WriteTimeout   time.Duration `yaml:"write_timeout"`
 	DisableVision  bool          `yaml:"disable_vision"`
 	VisionPoolSize int           `yaml:"vision_pool_size"`
+	// APIKey is an optional static server credential. When set, X-API-Key or
+	// Authorization: Bearer requests carrying this exact value authenticate as
+	// a local operator identity without an out-of-band license/key lookup.
+	APIKey string `yaml:"api_key,omitempty"`
 }
 
 type WordPressConfig struct {

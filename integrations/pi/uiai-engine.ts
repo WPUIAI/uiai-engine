@@ -1037,6 +1037,20 @@ export default function uiaiEngineExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "uiai_browser_resolve_auth",
+		label: "UIAI Browser Resolve Auth",
+		description: "Resume a browser session parked on an authentication challenge (AWAITING_AUTH / auth_challenge_pending). Supply the resume_token from the session's auth_challenge to re-enable session actions once the credential/OIDC step completes, without destroying flow state.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "UIAI browser session id" }),
+			resume_token: Type.String({ description: "resume_token from the session's auth_challenge object" }),
+		}),
+		async execute(_toolCallId, params) {
+			const { session_id, resume_token } = params;
+			return textResult(await post(`/api/session/${session_id}/auth/resolve`, { resume_token }), { endpoint: "/api/session/{id}/auth/resolve" });
+		},
+	});
+
+	pi.registerTool({
 		name: "uiai_screenshot",
 		label: "UIAI Screenshot",
 		description: "Capture a one-shot screenshot and automatically create a beautiful portable Evidence Share Packet. Returns artifact_ref plus a human-viewable artifact_url; use sessions for multi-step browsing.",

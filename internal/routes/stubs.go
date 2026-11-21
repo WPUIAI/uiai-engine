@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/ai"
+	"github.com/WPUIAI/uiai-engine/internal/buildinfo"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/go-chi/chi/v5"
 )
@@ -19,7 +20,8 @@ func MountHealth(r chi.Router, cfg *config.Config, aiProv *ai.Provider) {
 		writeJSON(w, 200, map[string]any{
 			"status":    "healthy",
 			"service":   "uiai-engine",
-			"version":   "2.0.0",
+			"version":   buildinfo.Version,
+			"buildTime": buildinfo.BuildTime,
 			"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
 		})
 	})
