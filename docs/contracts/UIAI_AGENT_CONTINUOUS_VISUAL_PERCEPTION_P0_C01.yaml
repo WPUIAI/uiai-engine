@@ -114,12 +114,49 @@ requirements:
     implementation_packet: E
     state: open
     acceptance: Pinned source-to-installed build plus real-browser screenshots, action traces and honest verification on two sites.
+  - id: AVP-015
+    statement: The observer binds verified Focusa Workstream Root, Continuity, Attachment, Workpoint, actor and UIAI runtime identity without inferring authority from active tabs.
+    owner: UIAI_Engine_and_Focusa_bridge
+    implementation_packet: F
+    state: open
+    acceptance: Correct scope passes; cross-project/cross-workstream/cross-attachment/stale-generation fixtures fail closed.
+  - id: AVP-016
+    statement: Bounded UIAI material changes map to existing Focusa evidence, Workspace Artifact and typed visual candidate contracts rather than an independent frame/history store.
+    owner: UIAI_Engine_and_Focusa_bridge
+    implementation_packet: F
+    state: open
+    acceptance: No per-frame Focusa writes; exact refs, provenance, privacy and capture status; no unsealed image promoted as verified Evidence.
+  - id: AVP-017
+    statement: Focusa Foreman and Radar consume only suitable existing typed observations under their respective Spec182 and Spec183 authority and capability status.
+    owner: Focusa
+    implementation_packet: F
+    state: open
+    acceptance: One material incident produces one correctly scoped, deduplicated Episode/Signal and Foreman routing if installed; truthful pending status otherwise.
+  - id: AVP-018
+    statement: Spec138 prediction and metacognition are entered only on meaningful fix/outcome, with verified Evidence and governed learning promotion.
+    owner: Focusa
+    implementation_packet: F
+    state: open
+    acceptance: Prediction before fix, outcome after UIAI Eval, scoped lesson candidate, promotion/retrieval tests; no automatic canon from model confidence.
+  - id: AVP-019
+    statement: Existing Spec135C/135F/135G Artifact, candidate and Mission Canvas projection paths expose reviewed visual findings without new renderer or authority.
+    owner: Focusa
+    implementation_packet: F
+    state: open
+    acceptance: Correct bound Work Surface updates on approved artifact/event; unrelated Workstreams do not; UI-only invalidation never changes semantic truth.
+  - id: AVP-020
+    statement: Real installed KH Focusa to OVH UIAI interoperability, privacy, recovery and visual acceptance are independently proven end to end.
+    owner: UIAI_Engine_and_Focusa
+    implementation_packet: F
+    state: open
+    acceptance: One complete verified Workpoint correction, restart/resume, adapter parity, negative tests, measured writes/costs and independent visual review.
 dependencies:
-  order: [A, B, C, D, E]
+  order: [A, B, C, D, F, E]
   A: [AVP-002, AVP-008]
   B: [AVP-001, AVP-003, AVP-004]
   C: [AVP-005, AVP-006, AVP-007, AVP-010]
   D: [AVP-009, AVP-011, AVP-012]
+  F: [AVP-015, AVP-016, AVP-017, AVP-018, AVP-019, AVP-020]
   E: [AVP-013, AVP-014]
 proving_ground:
   product: The Entrepreneurs Path
@@ -159,9 +196,13 @@ invariants:
   - no_silent_visual_inference_when_pixels_unavailable
   - no_silent_scope_addition_or_removal
   - no_claim_of_runtime_success_from_spec_commit
+  - focusa_workstream_and_attachment_binding_is_authoritative
+  - no_raw_frame_flood_to_focusa_controller
+  - no_duplicate_radar_foreman_browser_or_memory_store
+  - no_learning_promotion_without_evidence_and_authority
 closure:
   state: open
-  required_packets: [A, B, C, D, E]
+  required_packets: [A, B, C, D, F, E]
   requires_independent_installed_proof: true
   requires_exact_owner_scope_approval: true
   source_only_pr_cannot_close: true
