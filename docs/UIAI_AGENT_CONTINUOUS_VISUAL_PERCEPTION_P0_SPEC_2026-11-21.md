@@ -123,3 +123,150 @@ On every visual repair: source/spec/reference -> installed/staging rendering -> 
 - Related UIAI issues #68 #238 #299 #294 and open PR #308.
 
 **Definition of done:** an authorized working agent continuously receives meaningful, correctly bound visual perception of the live rendered UI, uses it in its own reasoning/action loop, catches visible defects humans notice, rechecks edits visually, and produces independent reproducible cost/accuracy/latency/safety proof. A document alone never closes this P0.
+
+
+## 11. P0 cross-system binding — Focusa-native visual feedback (MANDATORY)
+
+**Owner clarification (2026-11-21):** Visual perception must be fully intertwined with Focusa's current and target architecture. This section adds integration requirements to the same P0 rather than creating a separate brain, authority, memory, Radar or browser test system. Exact implementation decisions remain reviewable under the architecture constitution; no existing capability or requirement is removed or silently deferred. Focusa is canonical controller; OVH UIAI/browser workers are execution capacity, not a second Focusa daemon.
+
+### 11.1 Ownership and source authority
+
+| Layer / existing owner | P0 duty | Never allowed |
+| --- | --- | --- |
+| UIAI Engine / UIAI Engine Eval | Actual rendered pixels, session/CDP frame observation, semantic + accessibility readings, runtime-bound visual findings, pixel comparison, browser verification, Evidence/artifact source handles | Declare project completion, create Focusa Foreman/Radar/memory authority, secretly stream private screenshots via FPV share |
+| Focusa Workstream Root / Context Authority / reducer / Workpoint / Trajectory | Verify scope, grants, active work and next safe action; accept/reject candidate findings, assign action, reconcile versioned evidence, determine closure | Trust model prose or browser scope claims as grant; equate focused tab with global Workpoint |
+| Focusa Spec 135F / Visual UI docs 58–65 | Semantic candidate/ontology mapping, typed visual ComparisonResult, CritiqueResult and VerificationFinding, verified promotion, approved quality rubric, VisualRun/VisualIteration/VisualFix/CompletionReview conceptual flows | Promote visual guesses directly to canonical graph or introduce a second browser eval runtime |
+| Focusa Spec 182 Foreman | Workstream-scoped interpretation, delegate current visual repair work through existing Work Loop/Silent Sessions, prioritize with approved scope, rehydrate from bounded evidence and decisions | Become a separate agent/process/state store or self-mint architecture/operation authority |
+| Focusa Spec 183 Radar | Consume *meaningful UIAI structured change summaries*, deduplicate defects into Episodes, score attention and route Signals to the exact Foreman | Poll screenshots independently; turn each frame into a notification or Workpoint |
+| Focusa Spec 138 Prediction + Metacognition | Prediction before significant fix, outcome evaluation after UIAI Eval, scoped learning candidate and evidence/authority-gated promotion; reusable lessons through existing retrieval | Treat every observation as durable memory or allow an LLM reflection to self-promote |
+| Focusa Spec 135C/135G and Mission Canvas | Scope-safe artifact/Work Surface projection; current viewport review, active defect status, image/annotation handles, freshness and redaction, targeted event invalidation | Build another state store/renderer or promote on UI selection |
+| Focusa Spec 133 Silent Sessions / Spec 136 Receipts | Durable execution lifecycle, grants, checkpoints, artifact refs, evidence-linked result/settlement and worker recovery | Claim completed on process exit, an image score or an agent message |
+| Veragensia / Wirebot | OS enforcement/desktop projection; exact Workstream routing by Wirebot chief of staff; external life/business product composition | Override Focusa mission authority, alter UIAI browser truth, or merge Workstreams implicitly |
+
+**Implementation reality:** the 182/183/135F contracts include target-state semantics; their presence in the repo is not proof of installed Radar/Foreman/semantic-promotion operations. The P0 integration MUST capability-discover the installed Focusa operations. Until a particular projection is verified operational, it remains a typed proposal/Evidence candidate linked to the existing Workpoint/diagnostics path, with an explicit `integration_pending` / `unsupported` result and an owning follow-up. Never fabricate an endpoint or claim a Radar episode was stored when it was only described.
+
+### 11.2 Dual-rate feedback path — foreground versus proactive
+
+```text
+FOREGROUND (fast, agent-owned)
+UIAI session/CDP frame -> changed-tile + semantic event triage -> selected real pixels
+  -> authorized worker's VLM -> typed defect / question / evidence candidate
+  -> existing Focusa-verified Workpoint/Foreman (when installed)
+  -> existing grant/lease/policy -> UIAI action -> fresh browser evaluation
+  -> Focusa Evidence/Receipt + Workpoint checkpoint -> next Workpoint
+
+PROACTIVE (low-rate, Focusa-owned attention, optional only when installed)
+UIAI material change summary / diagnostic / failed browser verification ref
+  -> existing Focusa RadarObservation ingestion contract
+  -> fingerprint + deduplicate into RadarEpisode -> economic RadarSignal
+  -> exact Workstream Foreman inbox -> investigate/prepare/delegate UNDER GRANT
+  -> existing Workpoint/action/evidence paths -> Radar sees outcome
+
+LEARNING (post-outcome, never every frame)
+Focusa prediction before action -> UIAI verified result -> outcome evaluation
+  -> Spec138 reflection/learning candidate -> applicability/scope/evidence review
+  -> governed promotion or rejection -> bounded Focus Slice retrieval next session
+```
+
+Do **not** route every sampled frame, image token, model thought, private pixel, or modal transition to the Focusa daemon. Frames and short-lived local observation ring remain UIAI-owned on the OVH browser worker. Focusa's KH controller receives bounded, origin-bound **material findings, typed state changes, artifact handles, candidates and verification outcomes**, not a duplicate frame log. Adaptive sampling rate is an internal UIAI resource budget; Radar attention rate belongs to Focusa. These are not the same loop.
+
+### 11.3 Verified scope and provenance contract — use existing types
+
+Before a project-bound observer starts, resolve actual installed Focusa scope/Context Authority and the current Workpoint. Minimum binding:
+
+```yaml
+# Visual observation identity projection; mapping of existing fields, not a new Focusa DTO or grant
+focusa_scope:
+  project_root_key: verified_ProjectRootKey
+  workstream_key: verified_WorkstreamKey
+  continuity_id: verified_ContinuityId
+  project_identity_ref: verified_ref
+  workpoint_ref: exact_current_ref
+  attachment_key: verified_Instance_Session_Attachment_binding
+  work_surface_ref: exact_work_surface_ref_if_present
+  silent_session_ref: existing_if_delegated
+  silent_run_ref: existing_if_delegated
+  actor_instance_ref: existing_actor_if_present
+  scope_source: focusa_verified
+uiai_origin:
+  session_id: owned_session_ref
+  browser_context_id: exact_context_ref
+  target_id: exact_tab_ref
+  document_id: current_document
+  navigation_id: current_navigation
+  runtime_generation: current_generation
+  viewport_css_px: current_width_and_height
+  dpr: measured_ratio
+  scroll_offset_css_px: measured_position
+  observation_ref: uiai_owned_visual_observation_ref
+  observed_at: captured_timestamp
+  capture_class: approved_ad_hoc_unsealed_or_project_evidence_grade
+```
+
+Names above show *conceptual bindings*, not a claim that one runtime schema exposes all fields by these spellings. Consume installed generated Focusa/Spec141 contracts and UIAI's existing observation envelope; do not hand-fork Focusa request DTOs. `project_root + continuity_id` are necessary lookup/lineage context, **not sufficient authorization by themselves**. Validate verified scope, attachment origin, Workstream isolation, actor, grant, target and current generation. Never infer project from foreground Cockpit tab/URL. Follow existing `docs/current/FOCUSA_UIAI_CROSS_PROJECT_SCOPE_GUARD.md` rules when linking evidence.
+
+### 11.4 Native Focusa intake, classification, verification
+
+Use `focusa_browser_diagnostics_intake`, `focusa_evidence_capture`, `focusa_workpoint_link_evidence`, current Workspace Artifact bridge and Focusa generated Operation Registry **only where the installed adapter advertises those operations and the scope is verified**. `crates/focusa-api/src/routes/browser_interop.rs` currently validates WebMCP capability claims; do not misclassify that endpoint as a generic visual observation ingestion endpoint. Any missing Focusa-side intake interface is an explicit compatibility gap, not a reason to invent a competing database or ship a new global store.
+
+Represent a UIAI visual finding as a **candidate, not truth**, using the existing Visual/UI Verification and Critique conceptual shape:
+
+```yaml
+# Candidate finding: only existing typed refs and bounded summaries travel to Focusa
+finding_class: responsive_issue # or fidelity_gap, spacing_mismatch, cohesion_issue, ...
+severity: major
+expected: approved_design_or_spec_reference
+observed: bounded_image_grounded_description
+remediation_hint: permission_scoped_candidate
+ui_ai_observation_ref: uiai_artifact_reference
+reference_artifact_ref: approved_reference_image_ref
+comparison_diff_ref: optional_actual_two_image_comparison_ref
+source_code_revision_ref: checked_out_and_deployed_revision_if_known
+workpoint_ref: exact_verified_workpoint
+scope_source: focusa_verified
+verification_posture: candidate_unverified
+confidence: calibrated_not_authority
+```
+
+Map to existing `focusa.workspace_artifact.v1` (Spec 135C) plus Visual/UI `ComparisonResult` / `CritiqueResult` / `VerificationFinding` (docs/60) and `VisualRun` / `VisualIteration` / `VisualFix` / `CompletionReview` (docs/62) **when those workflows are implemented or through explicitly labeled proposals**. Preserve images in UIAI/EPWA artifact storage by handle; Focusa stores bounded links, origin, trust status and candidate semantics. Link screenshots through Focusa Evidence only after verified scope and required Evidence grade; unsealed ad hoc images never become project proof retroactively.
+
+Split read-model invalidation from semantic-change/promotion: Spec 135C `focusa.workspace_event.v1` may ask authorized clients to refetch a relevant Work Surface; Spec 135F semantic delta may suggest verification/action, but neither automatically promotes ontology nor authorizes a mutation. A UI-only 'visual red dot' is not a canonical task.
+
+### 11.5 Three feedback recipients with different semantics
+
+**Working agent:** receives live selected pixels/ROI, current visual defect with uncertainty and screen coordinates grounded in fresh UIAI observation, plus exact approved artifact/reference spec. It repairs through existing writer lease and rechecks rendered output on the same governed Workpoint. This is the hot path.
+
+**Project Foreman:** receives deduplicated material defects and verification status relevant to its Workstream; can hydrate `recent_evidence_refs`, `recent_receipt_refs`, `radar_episode_refs` and current Workpoint. It may adjust proposed task priority **within approved scope**, delegate via Spec 133, and route the right worker. Not allowed to change product spec or auto-merge merely because a vision model scored something poorly.
+
+**Radar:** receives a low-rate, typed `focusa.radar_observation.v1` projection only for distinct material conditions (for example a persistent desktop header collision, critical checkout CTA hidden, repeated regression after deploy, stale visual baseline). It keys deduplication by workstream + target + condition + generation/revision rather than frames/timestamps. Existing Radar Episodes and economic signals govern interruptions; do not create a parallel Master Observer or a screenshot-based Radar.
+
+### 11.6 Prediction, metacognition, portable memory and Master Loop
+
+Before a major visual repair, retrieve existing scoped lessons (`focusa_metacog_retrieve`) and record a falsifiable predicted effect (`focusa_predict_record` where supported). After a real UIAI visual/functional Eval, link Outcome/Evidence and evaluate prediction, then capture only a reusable learning candidate via Spec 138 metacognition. The learned rule could be 'At 1024px, keep this specific headline at constrained measure; do not stretch art to 100vw', *not* 'make everything premium'. Require similarity/applicability, confidence, negative-transfer checks, version, review and rollback before reuse. Do not silently promote a subjective assessment or unverified model hypothesis to durable policy.
+
+Master Loop/Portable Memory/Perpetua/Master Observer compositions, when/where implemented in the estate, must consume the **existing Focusa-verified Workpoint, Outcome, Evidence, Spec138 learning and Radar/Foreman projections**, not store an independent canonical screenshot history or re-scrape each live page. Integration with those target-state systems is a consuming adapter decision and does not activate new authority by mention. No duplicate learning store, decision store, event bus, archive, scheduler or new model identity.
+
+### 11.7 Installed provenance, placement, error and budget gates
+
+- **KH/OVH:** Focusa canonical loopback daemon remains KH; UIAI Chromium, frame processing, crop selection, inference and browser Eval remain OVH worker execution where configured. Use existing authorized relay/tailnet/private gateway only. No sending raw frames to KH or using public FPV viewer tokens as a shortcut.
+- **Freshness and authority:** A source image, visual analysis or new page load never upgrades authority. On target/session/lease/runtime changes, drop stale visual-action bindings. Human takeover requires UIAI lease fencing and Focusa intervention reconciliation before resumption.
+- **Failure truth:** `source_scope_unverified`, `image_not_delivered`, `observation_stale`, `model_provider_unavailable`, `focusa_intake_pending`, `evidence_unsealed`, `radar_unavailable` and `verification_inconclusive` are illustrative typed failure classes; map to existing released tool_result_v1/result codes, proposing a new enum only after compatibility review. Never mark a task visually verified while pixels are unavailable.
+- **Budget:** hot-loop compute and retained frames are UIAI-costed; Focusa decides Workpoint/mission priority and authorized overall spend; Radar attention and Spec 138 learning evaluation have their own budget classes. No unlimited screenshot stream, model tokens, unbounded memory or caller-paid cloud provider enabled by default.
+- **Cross-project/privacy:** Never attach an image/condition from one Workstream to another; origin and scope independently checked, with proof for hidden/cross-origin/authenticated content, URL secrets, redaction and EPWA before Focusa Evidence intake.
+
+### 11.8 Mandatory cross-system closure and installed proofs
+
+This P0 **cannot close as a UIAI-only demo**. In addition to AVP-001–014:
+
+1. Verify exact Focusa ProjectRootKey/WorkstreamKey/AttachmentKey/Workpoint and UIAI session/context/target/document generation bind correctly, with denied cross-project/cross-workstream and stale-action tests.
+2. Run a working agent through *real rendered screenshot* → visual issue candidate → current Focusa Workpoint/provenance → approved fix → UIAI recheck → Evidence/Receipt → verified Workpoint continuation. A model-generated sentence and raw screenshot handle do not count.
+3. Demonstrate that 480 frames sampled over 60 s do **not** generate 480 Focusa writes; only bounded material summaries/refs/intentional checkpoint outputs cross the boundary. Measure event/writes per minute and network bytes on realistic traces.
+4. If installed: prove Radar dedup groups repeated frame-level observations into one Episode/Signal and the Foreman receives it in the correct Workstream without duplicate work or authority expansion. If not installed, mark the contract as target-state and preserve an explicit follow-up blocker; do not falsely claim runtime closure of those sections.
+5. Demonstrate prediction before a visual fix, outcome/evidence evaluation after, and approved reusable lesson retrieval on a subsequent session; if unavailable, record it as pending, not complete.
+6. Prove precise source -> rendered observation -> Focusa Evidence -> Verification -> Workpoint/Receipt chain with cross-client resource refs, actual installed adapter compatibility and independent human review of premium visual quality.
+7. Show source+deployment revision and screenshot/reference matching for *The Entrepreneur's Path* at 365, 768, 1024, 1440 plus intermediate widths and interactive states; do not let a few screenshots pass a human-quality visual gate.
+8. Complete per-packet tests, installed real-browser proof, permission/secret/retention negative tests, cost/perception tradeoff benchmarks and rollback before marking complete.
+
+## 12. Cross-repository documentation and provenance
+
+Focusa-side companion is an additive section of the **existing** `docs/current/UIAI_BROWSER_DIAGNOSTICS_FOCUSA_INTEGRATION_SPEC.md`; no new Focusa Spec135 letter, canonical handler, or duplicate Visual UI subsystem. The operational adapters must be qualified against **actual installed versions**, and any missing API/contract noted with exact owner and gate. The UIAI P0 machine-readable ledger records AVP-015–020 integration closure separately from baseline AVP-001–014. The Focusa companion PR and this UIAI PR cross-reference one another for agent handoff and approval.
