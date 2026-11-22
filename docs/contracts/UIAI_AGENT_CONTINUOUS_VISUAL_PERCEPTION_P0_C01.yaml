@@ -1,0 +1,167 @@
+schema: uiai.agent_visual_perception_p0.implementation_ledger.v1
+version: 1
+priority: P0
+status: proposed_advisory
+implementation_status: unimplemented
+approval:
+  priority_and_goal: owner_requested
+  technology_choices: owner_review_required
+  autonomous_scope_change: forbidden
+scope:
+  owner_system: UIAI_Engine
+  browser_runtime_authority: UIAI_Engine
+  task_authority: Focusa
+  desktop_composition: Veragensia
+  human_fpv: separate
+  first_proving_ground: The Entrepreneurs Path
+  existing_canonical_sources:
+    - docs/UIAI_COCKPIT_002_AGENT_FIRST_BROWSER_AMENDMENT_2026-07-19_v1.0.md
+    - docs/contracts/UIAI_COCKPIT_008_C03_OPERATOR_CONTROL_LEASE_TAKEOVER_RECONCILIATION_v1.yaml
+    - docs/UIAI_VERAGENSIA_COMPUTER_CONTROL_AND_VOICE_BINDING_2026-09-04.md
+existing_implementation:
+  - internal/vision/session_screencast.go
+  - internal/routes/screenshot_compare.go
+  - internal/routes/critique.go
+  - integrations/pi/uiai-engine.ts
+related_open_work:
+  - https://github.com/WPUIAI/uiai-engine/issues/68
+  - https://github.com/WPUIAI/uiai-engine/issues/238
+  - https://github.com/WPUIAI/uiai-engine/issues/299
+  - https://github.com/WPUIAI/uiai-engine/issues/294
+  - https://github.com/WPUIAI/uiai-engine/pull/308
+requirements:
+  - id: AVP-001
+    statement: Existing CDP one-producer/session screencast hub supplies a private agent subscriber without starting a second pump.
+    owner: UIAI_Engine
+    implementation_packet: B
+    state: open
+    acceptance: Same page has human and agent subscribers without collision; one stopped consumer cannot stop another; all slots cleaned up.
+  - id: AVP-002
+    statement: Agent actually consumes authorized pixel content in native Pi and other supported transports.
+    owner: UIAI_Engine
+    implementation_packet: A
+    state: open
+    acceptance: Model-visible real pixels or resolvable authorized image items; URL/hash-only result cannot count as success.
+  - id: AVP-003
+    statement: Cheap deterministic changed-region triage with complete-scene and short-event coverage.
+    owner: UIAI_Engine
+    implementation_packet: B
+    state: open
+    acceptance: No missed required short text/toast/modal/imagery/viewport fixture; bounded background CPU, memory and latency.
+  - id: AVP-004
+    statement: Observation binds session target document navigation generation viewport DPR scroll position time and sequence.
+    owner: UIAI_Engine
+    implementation_packet: B
+    state: open
+    acceptance: Changed target/navigation/restart invalidates stale visual coordinates and any dependent action.
+  - id: AVP-005
+    statement: Agent modes SCAN FOCUS READ COMPARE TIMELINE use one agent exchange boundary and budget controls.
+    owner: UIAI_Engine
+    implementation_packet: C
+    state: open
+    acceptance: Agent selects mode, receives genuinely observed pixels for visual modes, and bounded response/usage.
+  - id: AVP-006
+    statement: Visual compare supplies both actual images to supported provider or states it cannot compare them.
+    owner: UIAI_Engine
+    implementation_packet: C
+    state: open
+    acceptance: Two-image differing-only-in-reference fixture gives supported result; unsupported provider returns typed failure.
+  - id: AVP-007
+    statement: Agent action remains Focusa/UIAI authorized and tied to fresh observation, control lease and influence checks.
+    owner: UIAI_Engine
+    implementation_packet: C
+    state: open
+    acceptance: Stale and unauthorized action fixtures all blocked; no privileged expansion through visual content.
+  - id: AVP-008
+    statement: Image/crop/EPWA delivery is private by default and redaction safe; project-bound evidence is not downgraded.
+    owner: UIAI_Engine
+    implementation_packet: A
+    state: open
+    acceptance: Cross-session/cross-project image access and secret-leak fixtures fail closed; ad hoc has explicit non-evidence classification.
+  - id: AVP-009
+    statement: Design critique evaluates approved reference and overall visual composition without generic decorative bias.
+    owner: UIAI_Engine
+    implementation_packet: D
+    state: open
+    acceptance: Premium light editorial site can pass with plain white background if visual evidence meets exact approved spec.
+  - id: AVP-010
+    statement: Native Pi MCP CLI and related Focusa Pi adapter agree on image-content, ref-resolution and error states.
+    owner: UIAI_Engine
+    implementation_packet: C
+    state: open
+    acceptance: Contract parity and installed consumer-visible pixel tests pass; no raw image in generic transcript.
+  - id: AVP-011
+    statement: Visual quality acceptance includes fluid widths, scroll and interactions, not a handful of screenshots.
+    owner: UIAI_Engine
+    implementation_packet: D
+    state: open
+    acceptance: Proving ground includes 320 365 390 768 1024 1440 CSS px, intermediate sweep and dynamic states with reviewable evidence.
+  - id: AVP-012
+    statement: Efficiency is measured against both naive dense-frame and conventional screenshot-after-action baselines.
+    owner: UIAI_Engine
+    implementation_packet: D
+    state: open
+    acceptance: Exact identical action traces, hardware and model; report total time, cost, tokens, detector false negatives and task success.
+  - id: AVP-013
+    statement: Session cleanup, cancellation, failure recovery and concurrent fairness remain correct with observer active.
+    owner: UIAI_Engine
+    implementation_packet: E
+    state: open
+    acceptance: Session close, watcher cancellation, browser restart and contention soak cause no leaks or blocked unrelated work.
+  - id: AVP-014
+    statement: Actual installed browser visual proof and independent review are mandatory for P0 closure.
+    owner: UIAI_Engine
+    implementation_packet: E
+    state: open
+    acceptance: Pinned source-to-installed build plus real-browser screenshots, action traces and honest verification on two sites.
+dependencies:
+  order: [A, B, C, D, E]
+  A: [AVP-002, AVP-008]
+  B: [AVP-001, AVP-003, AVP-004]
+  C: [AVP-005, AVP-006, AVP-007, AVP-010]
+  D: [AVP-009, AVP-011, AVP-012]
+  E: [AVP-013, AVP-014]
+proving_ground:
+  product: The Entrepreneurs Path
+  widths_css_px: [320, 365, 390, 768, 1024, 1440]
+  intermediate_width_scan: required
+  visual_checks:
+    - approved_artwork_fidelity
+    - optical_type_and_whitespace
+    - header_and_navigation_by_viewport
+    - image_crop_and_focal_point
+    - full_page_composition
+    - scrolling_and_animations
+    - hover_focus_menu_and_modal
+    - font_loading_and_zoom
+    - checkout_and_delivery_states
+  human_aesthetic_review: required
+telemetry:
+  - browser_frames_produced
+  - browser_frames_triaged
+  - model_frames_submitted
+  - perceptual_change_regions
+  - p50_p95_change_detection_ms
+  - p50_p95_agent_visual_latency_ms
+  - model_image_tokens
+  - model_cost_usd
+  - browser_cpu_ram
+  - network_bytes
+  - critical_visual_false_negatives
+  - functional_success_rate
+  - verified_visual_defects_resolved
+  - cost_per_verified_outcome
+invariants:
+  - no_new_browser_or_competing_observer
+  - no_public_fpv_token_for_private_agent_pixels
+  - no_authority_escalation_through_web_content
+  - no_stale_coordinate_actions
+  - no_silent_visual_inference_when_pixels_unavailable
+  - no_silent_scope_addition_or_removal
+  - no_claim_of_runtime_success_from_spec_commit
+closure:
+  state: open
+  required_packets: [A, B, C, D, E]
+  requires_independent_installed_proof: true
+  requires_exact_owner_scope_approval: true
+  source_only_pr_cannot_close: true
