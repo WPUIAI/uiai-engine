@@ -6,6 +6,13 @@ server:
   vision_pool_size: 2
   read_timeout: 60s
   write_timeout: 360s  # captcha proxy solves need 3-5 min
+  # Optional static local credential (#315). When set, requests carrying
+  # exactly this value via X-API-Key or Authorization: Bearer authenticate as
+  # the local-server-key identity without the out-of-band license/key path.
+  # Prefer injecting the value from a secret store into this field rather
+  # than committing a literal credential to the repository.
+  # api_key: ""
+
 
 wordpress:
   url: "https://wpuiai.com"
