@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -64,22 +65,23 @@ type DiagnosticsSummary struct {
 }
 
 type DiagnosticsSnapshot struct {
-	Pacing         *PaceStats                 `json:"pacing,omitempty"`
-	SessionID      string                     `json:"session_id"`
-	ActorRef       string                     `json:"actor_ref,omitempty"`
-	URL            string                     `json:"url"`
-	Title          string                     `json:"title"`
-	Seq            uint64                     `json:"seq"`
-	GeneratedAt    string                     `json:"generated_at"`
-	Mode           string                     `json:"mode,omitempty"`
-	Filters        map[string]any             `json:"filters,omitempty"`
-	FocusaScope    *FocusaScope               `json:"focusa_scope,omitempty"`
-	Console        []ConsoleEvent             `json:"console"`
-	Exceptions     []ExceptionEvent           `json:"exceptions"`
-	Network        []NetworkEvent             `json:"network"`
-	FailedRequests []NetworkEvent             `json:"failed_requests"`
-	Summary        DiagnosticsSummary         `json:"summary"`
-	Focusa         *DiagnosticsFocusaMetadata `json:"focusa,omitempty"`
+	Pacing           *PaceStats                 `json:"pacing,omitempty"`
+	SessionID        string                     `json:"session_id"`
+	ActorRef         string                     `json:"actor_ref,omitempty"`
+	URL              string                     `json:"url"`
+	Title            string                     `json:"title"`
+	Seq              uint64                     `json:"seq"`
+	GeneratedAt      string                     `json:"generated_at"`
+	Mode             string                     `json:"mode,omitempty"`
+	Filters          map[string]any             `json:"filters,omitempty"`
+	FocusaScope      *FocusaScope               `json:"focusa_scope,omitempty"`
+	OriginDiagnostic map[string]any             `json:"origin_diagnostic,omitempty"`
+	Console          []ConsoleEvent             `json:"console"`
+	Exceptions       []ExceptionEvent           `json:"exceptions"`
+	Network          []NetworkEvent             `json:"network"`
+	FailedRequests   []NetworkEvent             `json:"failed_requests"`
+	Summary          DiagnosticsSummary         `json:"summary"`
+	Focusa           *DiagnosticsFocusaMetadata `json:"focusa,omitempty"`
 }
 
 type DiagnosticsOptions struct {
@@ -228,6 +230,27 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 	} else {
 		format = "full"
 	}
+	// #320: when the page reports failed 4xx traffic, attach a precise origin
+	// metadata diagnostic so an agent can distinguish "the engine strips
+	// request metadata" from "the page/provider context is the cause". The
+	// engine does not rewrite Origin/Referer for engine-launched pages; a
+	// null-Origin rejection against a committed page origin points at an
+	// opaque (sandboxed iframe / data:) context on the page or the provider's
+	// own domain policy — not at engine transport.
+	var originDiagnostic map[string]any
+	if summary.HTTP4xx > 0 {
+		committedOrigin, originErr := s.CurrentOriginContext(context.Background())
+		posture := "committed_https"
+		if originErr != nil || committedOrigin == "" {
+			posture = "unavailable_or_opaque"
+		}
+		originDiagnostic = map[string]any{
+			"page_origin":             committedOrigin,
+			"origin_posture":          posture,
+			"engine_metadata_posture": "engine sessions preserve page Origin/Referer request metadata; the engine does not rewrite outbound subresource headers",
+			"hint":                    "A provider rejection citing a null/missing Origin while page_origin is committed means the request came from an opaque page context (sandboxed iframe, data: document) or the provider's domain allowlist — not engine stripping. Compare an identical side-browser flow before treating the page as broken, and complete third-party login challenges through the approved private handoff lane rather than replaying them.",
+		}
+	}
 	return DiagnosticsSnapshot{
 		Pacing:      pacing,
 		SessionID:   s.ID,
@@ -244,13 +267,14 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 			"category":    category,
 			"since_seq":   opts.SinceSeq,
 		},
-		FocusaScope:    s.FocusaScope,
-		Console:        console,
-		Exceptions:     exceptions,
-		Network:        network,
-		FailedRequests: failed,
-		Summary:        summary,
-		Focusa:         buildDiagnosticsFocusaMetadata(s.ID, seq, s.URL, title, summary, s.FocusaScope),
+		FocusaScope:      s.FocusaScope,
+		OriginDiagnostic: originDiagnostic,
+		Console:          console,
+		Exceptions:       exceptions,
+		Network:          network,
+		FailedRequests:   failed,
+		Summary:          summary,
+		Focusa:           buildDiagnosticsFocusaMetadata(s.ID, seq, s.URL, title, summary, s.FocusaScope),
 	}
 }
 

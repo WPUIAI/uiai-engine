@@ -129,6 +129,32 @@ func TestDiagnosticsFailedOnly(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsAttachesOriginDiagnosticOnlyFor4xx(t *testing.T) {
+	// #320: a 4xx-bearing snapshot must distinguish engine metadata posture
+	// from page/provider causes; a clean snapshot must stay quiet.
+	s := &Session{ID: "sid", URL: "https://example.test", diagnostics: newDiagnosticsRecorder()}
+	clean := s.Diagnostics(10, "", false)
+	if clean.OriginDiagnostic != nil {
+		t.Fatalf("clean snapshot attached origin diagnostic: %#v", clean.OriginDiagnostic)
+	}
+	s.diagnostics.network = append(s.diagnostics.network,
+		NetworkEvent{Seq: 1, URL: "https://example.test/sdk/send", Status: 400, Failed: true},
+	)
+	snap := s.Diagnostics(10, "", false)
+	if snap.OriginDiagnostic == nil {
+		t.Fatal("4xx snapshot missing origin diagnostic")
+	}
+	if snap.OriginDiagnostic["origin_posture"] != "unavailable_or_opaque" {
+		t.Fatalf("fake session without a page must report opaque posture: %#v", snap.OriginDiagnostic)
+	}
+	if snap.OriginDiagnostic["page_origin"] != "" {
+		t.Fatalf("no page must yield empty committed origin: %#v", snap.OriginDiagnostic)
+	}
+	if hint, _ := snap.OriginDiagnostic["engine_metadata_posture"].(string); hint == "" {
+		t.Fatal("engine metadata posture hint missing")
+	}
+}
+
 func TestDiagnosticsIncludesFocusaScope(t *testing.T) {
 	s := &Session{ID: "sid", diagnostics: newDiagnosticsRecorder(), FocusaScope: &FocusaScope{WorkpointID: "wp1", ContinuityID: "cont1"}}
 	diag := s.Diagnostics(10, "all", false)
