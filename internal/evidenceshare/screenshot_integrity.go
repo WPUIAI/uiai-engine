@@ -43,11 +43,27 @@ func VerifyScreenshotArtifactBytes(directory, id string) (Manifest, error) {
 		return Manifest{}, ErrInvalidInput
 	}
 	format, mime, ok := normalizedFormat(manifest.Format)
-	if !ok || manifest.Schema != Schema || manifest.ArtifactSHA256 != id || manifest.ArtifactRef != "uiai-evidence-share:sha256:"+id || manifest.Format != format || manifest.MIME != mime || manifest.ScreenshotRef != "./screenshot."+format || manifest.Bytes <= 0 || manifest.Width <= 0 || manifest.Height <= 0 || manifest.CapturedAt.IsZero() {
+	if !ok || manifest.Schema != Schema || manifest.ArtifactSHA256 != id || manifest.ArtifactRef != "uiai-evidence-share:sha256:"+id || manifest.Format != format || manifest.MIME != mime || manifest.Bytes <= 0 || manifest.Width <= 0 || manifest.Height <= 0 || manifest.CapturedAt.IsZero() {
 		return Manifest{}, ErrInvalidInput
 	}
 	want, err := screenshotPackageID(manifest.ScreenshotSHA256, Input{Width: manifest.Width, Height: manifest.Height, SourceURL: manifest.SourceURL, CapturedAt: manifest.CapturedAt, Scope: manifest.Scope})
 	if err != nil || want != id {
+		return Manifest{}, ErrInvalidInput
+	}
+	// #313: a scope-blocked package is genuine containment — it must neither
+	// reference nor carry payload bytes on disk. Legacy blocked packages that
+	// persisted pixels fail verification and resolve as unknown, never as
+	// readable blocked metadata.
+	if manifest.Availability == "blocked" && !manifest.Scope.Complete() {
+		if manifest.ScreenshotRef != "" || manifest.InspectionRef != "" {
+			return Manifest{}, ErrInvalidInput
+		}
+		if _, statErr := os.Lstat(filepath.Join(directory, "screenshot."+format)); statErr == nil || !os.IsNotExist(statErr) {
+			return Manifest{}, ErrInvalidInput
+		}
+		return manifest, nil
+	}
+	if manifest.ScreenshotRef != "./screenshot."+format {
 		return Manifest{}, ErrInvalidInput
 	}
 	path := filepath.Join(directory, "screenshot."+format)

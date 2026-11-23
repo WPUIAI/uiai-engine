@@ -20,7 +20,7 @@ import (
 )
 
 func TestArtifactResolverReportsUnsealedScreenshotWithoutPublishingIt(t *testing.T) {
-	for _, mutation := range []string{"none", "partial_scope", "bytes", "manifest", "symlink"} {
+	for _, mutation := range []string{"none", "partial_scope", "bytes", "manifest", "payload_injected"} {
 		t.Run(mutation, func(t *testing.T) {
 			root := t.TempDir()
 			t.Setenv("UIAI_EVIDENCE_SHARE_DIR", root)
@@ -60,12 +60,11 @@ func TestArtifactResolverReportsUnsealedScreenshotWithoutPublishingIt(t *testing
 					t.Fatal(err)
 				}
 			}
-			if mutation == "symlink" {
-				path := filepath.Join(packet.Directory, "screenshot.png")
-				if err := os.Rename(path, path+".owned-original"); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Symlink(path+".owned-original", path); err != nil {
+			if mutation == "payload_injected" {
+				// #313: scope-incomplete captures persist no payload; injecting the
+				// pixels back must make the package unverifiable rather than
+				// readable blocked metadata.
+				if err := os.WriteFile(filepath.Join(packet.Directory, "screenshot.png"), pixels.Bytes(), 0600); err != nil {
 					t.Fatal(err)
 				}
 			}

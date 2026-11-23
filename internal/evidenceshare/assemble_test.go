@@ -170,6 +170,59 @@ func assertBlockedShare(t *testing.T, input Input) {
 	if _, err := os.Stat(filepath.Join(result.Directory, "projection.json")); !os.IsNotExist(err) {
 		t.Fatal("projection emitted from incomplete lineage")
 	}
+	// #313: blocked must be containment, not a label — no payload bytes on disk.
+	if manifest.ScreenshotRef != "" || manifest.InspectionRef != "" {
+		t.Fatalf("scope-incomplete capture references persisted payload: %+v", manifest)
+	}
+	if _, err := os.Stat(filepath.Join(result.Directory, "screenshot."+manifest.Format)); !os.IsNotExist(err) {
+		t.Fatal("pixels persisted for scope-incomplete capture")
+	}
+	if _, err := os.Stat(filepath.Join(result.Directory, "inspection.json")); !os.IsNotExist(err) {
+		t.Fatal("pixel inspection persisted for scope-incomplete capture")
+	}
+	verified, verifyErr := VerifyScreenshotArtifactBytes(result.Directory, manifest.ArtifactSHA256)
+	if verifyErr != nil || verified.Availability != "blocked" || verified.Scope.Complete() {
+		t.Fatalf("withheld blocked package no longer resolves as blocked metadata: %v %+v", verifyErr, verified)
+	}
+	archive, zipErr := zip.OpenReader(filepath.Join(result.Directory, "portable.zip"))
+	if zipErr == nil {
+		defer archive.Close()
+		for _, file := range archive.File {
+			if file.Name == "screenshot."+manifest.Format || file.Name == "inspection.json" {
+				t.Fatalf("portable archive carries withheld payload: %s", file.Name)
+			}
+		}
+	}
+}
+
+func TestVerifyRejectsLegacyBlockedPackageWithPersistedPayload(t *testing.T) {
+	root := t.TempDir()
+	input := validInput()
+	input.Scope = Scope{WorkpointRef: "workpoint:legacy"}
+	result, err := Assemble(root, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(result.Directory, "artifact.json")
+	body, _ := os.ReadFile(manifestPath)
+	var legacy Manifest
+	if err := json.Unmarshal(body, &legacy); err != nil {
+		t.Fatal(err)
+	}
+	// Forge the pre-fix shape: blocked manifest that still references and
+	// stores the raw pixels — verification must reject it as unknown so it can
+	// never be advertised as readable blocked metadata.
+	legacy.ScreenshotRef = "./screenshot." + legacy.Format
+	legacyBytes, _ := json.MarshalIndent(legacy, "", "  ")
+	if err := os.WriteFile(manifestPath, legacyBytes, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(result.Directory, "screenshot."+legacy.Format), input.Screenshot, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := VerifyScreenshotArtifactBytes(result.Directory, legacy.ArtifactSHA256); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("legacy blocked package with persisted payload was accepted: %v", err)
+	}
 }
 
 func TestAssembleFailsClosed(t *testing.T) {

@@ -46,17 +46,25 @@ func Assemble(root string, input Input) (Result, error) {
 	}
 	artifactRef := "uiai-evidence-share:sha256:" + id
 	_, inspectionBody, inspectionErr := inspectScreenshot(input.Screenshot, mime, screenshotSHA)
+	// #313: a scope-incomplete capture must be containment, not a label.
+	// Withhold every payload byte (pixels and pixel inspection) from the
+	// persisted package so `availability: blocked` is a real control. The
+	// manifest still binds the capture identity (digest, dimensions, bytes).
+	withholdPayload := !input.Scope.Complete()
 	availability := "blocked"
 	projectionRef := ""
 	inspectionRef := ""
-	if inspectionErr == nil {
+	screenshotRef := "./screenshot." + format
+	if withholdPayload {
+		screenshotRef = ""
+	} else if inspectionErr == nil {
 		inspectionRef = "./inspection.json"
 	}
-	if input.Scope.Complete() && inspectionErr == nil {
+	if !withholdPayload && input.Scope.Complete() && inspectionErr == nil {
 		availability = "ready"
 		projectionRef = "./projection.json"
 	}
-	manifest := Manifest{Schema: Schema, ArtifactRef: artifactRef, ArtifactSHA256: id, ScreenshotRef: "./screenshot." + format, ScreenshotSHA256: screenshotSHA, Format: format, MIME: mime, Bytes: len(input.Screenshot), Width: input.Width, Height: input.Height, SourceURL: sanitizeURL(input.SourceURL), CapturedAt: input.CapturedAt.UTC(), DurationMS: input.DurationMS, Availability: availability, Access: "public_safe_read_only", Interaction: "read_only", Scope: input.Scope, TruthNotice: "This screenshot proves only the captured visual state. It does not by itself prove review, completion, provider closure, or settlement.", ProjectionRef: projectionRef, InspectionRef: inspectionRef}
+	manifest := Manifest{Schema: Schema, ArtifactRef: artifactRef, ArtifactSHA256: id, ScreenshotRef: screenshotRef, ScreenshotSHA256: screenshotSHA, Format: format, MIME: mime, Bytes: len(input.Screenshot), Width: input.Width, Height: input.Height, SourceURL: sanitizeURL(input.SourceURL), CapturedAt: input.CapturedAt.UTC(), DurationMS: input.DurationMS, Availability: availability, Access: "public_safe_read_only", Interaction: "read_only", Scope: input.Scope, TruthNotice: "This screenshot proves only the captured visual state. It does not by itself prove review, completion, provider closure, or settlement.", ProjectionRef: projectionRef, InspectionRef: inspectionRef}
 	body, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return Result{}, err
@@ -111,9 +119,11 @@ func Assemble(root string, input Input) (Result, error) {
 	}
 	defer os.RemoveAll(staging)
 	writes := map[string][]byte{"artifact.json": body}
-	if inspectionErr == nil {
+	if !withholdPayload {
 		writes["screenshot."+format] = input.Screenshot
-		writes["inspection.json"] = inspectionBody
+		if inspectionErr == nil {
+			writes["inspection.json"] = inspectionBody
+		}
 	}
 	if len(projectionBody) != 0 {
 		writes["projection.json"] = projectionBody
