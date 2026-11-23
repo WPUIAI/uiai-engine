@@ -284,7 +284,18 @@ func writeSessionSnapshot(w http.ResponseWriter, req *http.Request, cfg *config.
 			response[key] = value
 		}
 	}
-	if delivery.State != epwadelivery.StateReady {
+	// #299: a session that never attempted a Focusa/evidence binding works ad
+	// hoc by default — the capture succeeded and the caller gets viewable
+	// pixels through the private short-lived route, while the formal EPWA
+	// sub-envelope stays truthfully blocked and no public evidence is minted.
+	if sess != nil && sess.FocusaScope == nil && delivery.State == epwadelivery.StateBlocked {
+		if data, decodeErr := base64.StdEncoding.DecodeString(snap.Screenshot); decodeErr == nil {
+			adhocUnsealedResponse(response, data, snap.Format)
+		}
+	}
+	if response["delivery_state"] == "unsealed" {
+		successStatus = http.StatusOK
+	} else if delivery.State != epwadelivery.StateReady {
 		successStatus = http.StatusAccepted
 	}
 	writeJSON(w, successStatus, response)
@@ -324,6 +335,12 @@ func evidenceScopeFromRequest(req *http.Request) evidenceshare.Scope {
 		_ = json.Unmarshal([]byte(raw), &scope.WorkItems)
 	}
 	return scope
+}
+
+func evidenceScopeAttempted(scope evidenceshare.Scope) bool {
+	return scope.ProjectRef != "" || scope.WorkstreamRef != "" || scope.WorksetRef != "" ||
+		scope.CallGraphRef != "" || scope.WorkpointRef != "" || scope.WorkItemRef != "" ||
+		scope.ContinuityRef != "" || len(scope.WorkItems) > 0
 }
 
 func publishLegacyVisualEPWA(req *http.Request, cfg *config.Config, pixels []byte, format string, width, height int, sourceURL string, producers ...epwadelivery.ProducerID) (epwadelivery.Delivery, error) {

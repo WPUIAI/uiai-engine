@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assertEvidenceDelivery, evidenceScopeHeaders, findNonReadyArtifactDelivery, findRawArtifactField } from "./epwa-contract.mjs";
+import { assertEvidenceDelivery, evidenceScopeHeaders, findNonReadyArtifactDelivery, findRawArtifactField, unsealedAdhocLink } from "./epwa-contract.mjs";
 
 test("evidenceScopeHeaders forwards complete scope without inventing values", () => {
   const workItems = [{ work_item_ref: "work-item:196", revision: "4" }];
@@ -122,4 +122,27 @@ test("discovery artifact parameter descriptors are not inline artifacts", () => 
  }
  assert.throws(()=>assertEvidenceDelivery({imageBase64:{type:"string",description:"not discovery"}}),/EPWA delivery unavailable/);
  assert.throws(()=>assertEvidenceDelivery({screenshot:"synthetic-inline-data"}),/EPWA delivery unavailable/);
+});
+
+test("unsealedAdhocLink accepts only the narrow engine ad hoc shape (#299)", () => {
+  const adhoc = { ok: true, delivery_state: "unsealed", private_image_url: "/api/screenshot/adhoc/9b3b7d0336f7cd995773b0d25213e953", epwa_delivery: { state: "blocked", scope: {} } };
+  assert.equal(unsealedAdhocLink(adhoc), "/api/screenshot/adhoc/9b3b7d0336f7cd995773b0d25213e953");
+  // A scoped request can never downgrade into the ad hoc path.
+  assert.equal(unsealedAdhocLink({ ...adhoc, epwa_delivery: { state: "blocked", scope: { project_ref: "project:x" } } }), "");
+  assert.equal(unsealedAdhocLink({ ...adhoc, epwa_delivery: { state: "blocked", scope: { workpoint_ref: "workpoint:x" } } }), "");
+  assert.equal(unsealedAdhocLink({ ...adhoc, epwa_delivery: { state: "ready" } }), "");
+  assert.equal(unsealedAdhocLink({ ...adhoc, ok: false }), "");
+  assert.equal(unsealedAdhocLink({ delivery_state: "ready", epwa_delivery: { state: "ready" } }), "");
+});
+
+test("assertEvidenceDelivery accepts unsealed ad hoc only when explicitly allowed and unscoped (#299)", () => {
+  const adhoc = { ok: true, delivery_state: "unsealed", private_image_url: "/api/screenshot/adhoc/9b3b7d0336f7cd995773b0d25213e953", epwa_delivery: { state: "blocked", scope: {} } };
+  assertEvidenceDelivery(adhoc, true, { allowAdhoc: true });
+  assertEvidenceDelivery(adhoc, false, { allowAdhoc: true });
+  // Evidence consumers without the explicit allowance still fail closed.
+  assert.throws(() => assertEvidenceDelivery(adhoc, true), /EPWA delivery unavailable/);
+  // Scoped results can never downgrade, even with the allowance on.
+  assert.throws(() => assertEvidenceDelivery({ ...adhoc, epwa_delivery: { state: "blocked", scope: { continuity_ref: "cont" } } }, true, { allowAdhoc: true }), /EPWA delivery unavailable/);
+  // Raw artifact bytes stay forbidden even in the ad hoc path.
+  assert.throws(() => assertEvidenceDelivery({ ...adhoc, screenshot: "synthetic-inline-data" }, false, { allowAdhoc: true }), /EPWA delivery unavailable/);
 });

@@ -23,7 +23,7 @@
  */
 
 import { createInterface } from "readline";
-import { evidenceScopeHeaders, assertEvidenceDelivery } from "./epwa-contract.mjs";
+import { evidenceScopeHeaders, assertEvidenceDelivery, unsealedAdhocLink } from "./epwa-contract.mjs";
 import { readEngineResponse } from "../integrations/pi/uiai/engine-response.mjs";
 
 const ENGINE = (process.env.UIAI_ENGINE_URL || "http://localhost:7456").replace(/\/$/, "");
@@ -603,12 +603,15 @@ async function toolsCall(name, args) {
 
   const fetchOpts = { method, headers: { "Content-Type": "application/json", ...evidenceScopeHeaders(args.focusa_scope) } };
   if (body && method !== "GET") fetchOpts.body = JSON.stringify(body);
+  // #299: a caller that attempted no scope gets the unsealed ad hoc capture as
+  // a delivered work result; a scoped call can never downgrade into it.
+  const scopeAttempted = Boolean(args && args.focusa_scope && Object.keys(args.focusa_scope).length > 0);
 
   let res, data;
   try {
     ({ res, data } = await fetchJSON(url, fetchOpts, {
       opening: name === "browser_open",
-      validate: data => assertEvidenceDelivery(data, name === "screenshot" || name === "browser_screenshot"),
+      validate: data => assertEvidenceDelivery(data, name === "screenshot" || name === "browser_screenshot", { allowAdhoc: !scopeAttempted }),
     }));
   } catch (err) {
     if (err.code === "epwa_delivery_unavailable" && err.delivery_error) {

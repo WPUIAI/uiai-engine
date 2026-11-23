@@ -119,23 +119,74 @@ func TestScreenshotEPWADeliveryCannotBeDisabledAndMissingScopeIsBlocked(t *testi
 	request := httptest.NewRequest(http.MethodPost, "https://engine.example/api/screenshot/", bytes.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusAccepted {
-		t.Fatalf("blocked capture status=%d body=%s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("unscoped ad hoc capture status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 	var response map[string]any
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if response["delivery_state"] != "blocked" || response["artifact_url"] != nil || response["portable_url"] != nil || response["screenshot"] != nil || response["inline_posture"] != "withheld_by_mandatory_epwa_delivery" {
-		t.Fatalf("mandatory blocked EPWA posture missing: %#v", response)
+	// #299: an authorized capture with no scope attempted is now unsealed ad hoc
+	// work — HTTP 200, viewable private pixels, formal EPWA still blocked.
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("unscoped capture status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if response["delivery_state"] != "unsealed" || response["ok"] != true ||
+		response["artifact_url"] != nil || response["portable_url"] != nil || response["screenshot"] != nil ||
+		response["inline_posture"] != "withheld_by_mandatory_epwa_delivery" {
+		t.Fatalf("unsealed ad hoc posture missing: %#v", response)
+	}
+	privateLink, _ := response["private_image_url"].(string)
+	if !strings.HasPrefix(privateLink, "/api/screenshot/adhoc/") {
+		t.Fatalf("private image link missing: %#v", response)
 	}
 	delivery := response["epwa_delivery"].(map[string]any)
+	if delivery["state"] != "blocked" {
+		t.Fatalf("formal EPWA sub-envelope not truthfully blocked: %#v", delivery)
+	}
 	binding := delivery["epwa"].(map[string]any)
 	packageID := binding["package_id"].(string)
 	blockedViewer := httptest.NewRecorder()
 	router.ServeHTTP(blockedViewer, httptest.NewRequest(http.MethodGet, "/e/"+packageID[:shortShareIDLength]+"/", nil))
 	if blockedViewer.Code != http.StatusNotFound {
 		t.Fatalf("unscoped package was exposed: status=%d", blockedViewer.Code)
+	}
+	// The private link must actually serve the captured pixels, privately.
+	privateFetch := httptest.NewRecorder()
+	router.ServeHTTP(privateFetch, httptest.NewRequest(http.MethodGet, privateLink, nil))
+	if privateFetch.Code != http.StatusOK || !strings.HasPrefix(privateFetch.Header().Get("Content-Type"), "image/") ||
+		privateFetch.Header().Get("Cache-Control") != "private, no-store" || privateFetch.Body.Len() == 0 {
+		t.Fatalf("private ad hoc image not served: status=%d headers=%v len=%d", privateFetch.Code, privateFetch.Header(), privateFetch.Body.Len())
+	}
+	// A malformed or expired token must never serve pixels.
+	badFetch := httptest.NewRecorder()
+	router.ServeHTTP(badFetch, httptest.NewRequest(http.MethodGet, "/api/screenshot/adhoc/deadbeef", nil))
+	if badFetch.Code != http.StatusNotFound {
+		t.Fatalf("unknown ad hoc token served: status=%d", badFetch.Code)
+	}
+}
+
+func TestScreenshotPartialScopeStaysBlockedWithoutAdhocPixels(t *testing.T) {
+	// #299/#308: ad hoc is not an evidence bypass. Once a scope is ATTEMPTED,
+	// the strict blocked contract stays: no unsealed link, no pixels.
+	cfg := &config.Config{Storage: config.StorageConfig{DataDir: t.TempDir()}}
+	router := chi.NewRouter()
+	MountShortShare(router, cfg)
+	router.Route("/api/screenshot", func(r chi.Router) { MountScreenshotReal(r, cfg, screenshotSharePool{}, nil, nil) })
+	body, _ := json.Marshal(map[string]any{"url": "https://example.test", "format": "png", "focusa_scope": map[string]any{"workpoint_id": "workpoint:partial"}})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "https://engine.example/api/screenshot/", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("attempted-scope capture status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var response map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response["delivery_state"] != "blocked" || response["private_image_url"] != nil || response["ok"] != nil {
+		t.Fatalf("attempted scope leaked ad hoc pixels: %#v", response)
 	}
 }
 

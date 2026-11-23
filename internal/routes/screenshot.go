@@ -104,6 +104,8 @@ func scopeWorkstream(scope *vision.FocusaScope) string {
 }
 
 func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSource, usage *storage.UsageStore, artifacts *evidenceartifact.Store) {
+	// #299: private short-lived ad hoc image route (in-memory only).
+	mountAdhocCaptureRoutes(r)
 	settingsStore, settingsErr := evidenceshare.NewSettingsStore(cfg.Storage.DataDir)
 	if settingsErr == nil {
 		mountEvidenceShareSettings(r, settingsStore, artifacts)
@@ -206,6 +208,7 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 		}
 		capturedAt := time.Now().UTC()
 		shareInput := evidenceshare.Input{Screenshot: result.Data, Format: result.Format, Width: result.Width, Height: result.Height, SourceURL: body.URL, CapturedAt: capturedAt, DurationMS: result.Duration.Milliseconds()}
+		requestScope := evidenceScopeFromRequest(req)
 		if body.EvidenceScope != nil {
 			shareInput.Scope = *body.EvidenceScope
 		} else if body.FocusaScope != nil {
@@ -215,6 +218,10 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 				WorkpointRef: body.FocusaScope.WorkpointID, WorkItemRef: body.FocusaScope.WorkItemRef,
 				WorkItems: body.FocusaScope.WorkItems, ContinuityRef: body.FocusaScope.ContinuityID,
 			}
+		} else {
+			// Honor CLI/Pi/MCP request-header scope on the one-shot capture route
+			// so header-scoped formal captures publish ready instead of blocked.
+			shareInput.Scope = requestScope
 		}
 		delivery, err := publishScreenshotEPWA(req, cfg, shareInput)
 		if err != nil {
@@ -232,6 +239,13 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 			response["artifact_url"] = delivery.EPWA.RecordURL
 			response["portable_url"] = delivery.EPWA.PortableURL
 		}
+		// #299: an authorized capture with no scope attempted (body or headers) is
+		// productive ad hoc work, not a formal-evidence failure. Keep the honest
+		// blocked epwa sub-envelope and the metadata-only package on disk, and
+		// serve the pixels through the private short-lived route instead of nothing.
+		if !evidenceScopeAttempted(requestScope) && body.EvidenceScope == nil && body.FocusaScope == nil && delivery.State == epwadelivery.StateBlocked {
+			adhocUnsealedResponse(response, result.Data, result.Format)
+		}
 		if body.Inline != nil && *body.Inline {
 			response["inline_posture"] = "withheld_by_mandatory_epwa_delivery"
 		}
@@ -239,7 +253,9 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 			response["dom_report_posture"] = "withheld_pending_epwa_projection"
 		}
 		status := http.StatusCreated
-		if delivery.State != epwadelivery.StateReady {
+		if response["delivery_state"] == "unsealed" {
+			status = http.StatusOK
+		} else if delivery.State != epwadelivery.StateReady {
 			status = http.StatusAccepted
 		}
 		writeJSON(w, status, response)

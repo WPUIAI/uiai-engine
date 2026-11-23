@@ -62,6 +62,35 @@ export function findRawArtifactField(value, path = "$") {
   return "";
 }
 
+export function unsealedAdhocLink(value, path = "$") {
+  if (!value || typeof value !== "object") return "";
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = unsealedAdhocLink(item, `${path}[?]`);
+      if (found) return found;
+    }
+    return "";
+  }
+  // #299: an unscoped capture that succeeded is productive work, not a pending
+  // evidence failure. Accept it only in the narrow engine shape: ok:true,
+  // unsealed work state, a private loopback image route, an epwa sub-envelope
+  // still honestly blocked, and NO scope references attempted anywhere — a
+  // scoped request can never downgrade into the ad hoc path.
+  if (value.delivery_state === "unsealed" && value.ok === true &&
+      typeof value.private_image_url === "string" && value.private_image_url.startsWith("/api/screenshot/adhoc/") &&
+      value.epwa_delivery?.state === "blocked" &&
+      !value.epwa_delivery?.scope?.project_ref &&
+      !value.epwa_delivery?.scope?.workpoint_ref &&
+      !value.epwa_delivery?.scope?.continuity_ref) {
+    return value.private_image_url;
+  }
+  for (const child of Object.values(value)) {
+    const found = unsealedAdhocLink(child, `${path}.?`);
+    if (found) return found;
+  }
+  return "";
+}
+
 export function findNonReadyArtifactDelivery(value, path = "$") {
   if (!value || typeof value !== "object") return "";
   if (Array.isArray(value)) {
@@ -104,7 +133,8 @@ export function evidenceRecoveryHint(value) {
 // closed for artifact consumers (required=true) and surfaces truthfully for
 // read-only callers (required=false): pending reconciliation never becomes
 // success, but it also no longer blocks record-page navigation or status reads.
-export function assertEvidenceDelivery(value, required = false) {
+export function assertEvidenceDelivery(value, required = false, options = {}) {
+  const allowAdhoc = options.allowAdhoc === true;
   const rawProblem = findRawArtifactField(value);
   const problem = rawProblem || (required ? findNonReadyArtifactDelivery(value) : "");
   const recovery = evidenceRecoveryHint(value);
@@ -121,6 +151,14 @@ export function assertEvidenceDelivery(value, required = false) {
     });
     throw error;
   };
+  if (allowAdhoc && !rawProblem && unsealedAdhocLink(value)) {
+    // #299: the caller attempted no evidence scope, and the engine returned
+    // the narrow unsealed ad hoc shape (private short-lived link, honestly
+    // blocked formal envelope, no raw bytes). That is a delivered work result,
+    // not a formal-evidence failure — read-only and evidence consumers may
+    // proceed; formal evidence still requires a complete scope.
+    return null;
+  }
   if (problem) fail(problem);
   if (required && value?.schema !== "uiai.epwa_delivery.v1" && !value?.epwa_delivery) {
     fail("required evidence envelope missing; producer reconciliation required");

@@ -3,7 +3,7 @@ import { keyHint } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { assertEvidenceDelivery, evidenceRecoveryHint, evidenceScopeHeaders, findNonReadyArtifactDelivery } from "./uiai/epwa-contract.mjs";
+import { assertEvidenceDelivery, evidenceRecoveryHint, evidenceScopeHeaders, findNonReadyArtifactDelivery, unsealedAdhocLink } from "./uiai/epwa-contract.mjs";
 import { readEngineResponse } from "./uiai/engine-response.mjs";
 
 const evidenceRequestScope = new AsyncLocalStorage<unknown>();
@@ -106,6 +106,15 @@ function authHeaders(): Record<string, string> {
 	return headers;
 }
 
+function scopeAttemptedInRequest(store: any, headers: any): boolean {
+	const storeRefKeys = ["project_ref", "project_root", "workstream_ref", "workset_ref", "callgraph_ref", "workpoint_ref", "workpoint_id", "work_item_ref", "continuity_ref", "continuity_id"];
+	if (store && storeRefKeys.some(key => typeof store[key] === "string" && store[key].trim())) return true;
+	if (store && Array.isArray(store.work_items) && store.work_items.length > 0) return true;
+	const scopeHeaders = ["X-UIAI-Project-Ref", "X-UIAI-Workstream-Ref", "X-UIAI-Workset-Ref", "X-UIAI-CallGraph-Ref", "X-UIAI-Workpoint-Ref", "X-UIAI-Work-Item-Ref", "X-UIAI-Continuity-Ref"];
+	const requestHeaders = (headers || {}) as Record<string, any>;
+	return scopeHeaders.some(name => typeof requestHeaders[name] === "string" && requestHeaders[name].trim() !== "");
+}
+
 async function callEngine(path: string, init?: RequestInit, requiresEvidence = false, skipEvidence = false): Promise<any> {
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -117,7 +126,12 @@ async function callEngine(path: string, init?: RequestInit, requiresEvidence = f
 		});
 		const data = await readEngineResponse(res, {
       opening: path === "/api/session" && init?.method === "POST",
-      validate: data => { if (!skipEvidence) assertEvidenceDelivery(data, requiresEvidence); },
+      validate: data => {
+        if (skipEvidence) return;
+        // #299: unscoped ad hoc captures are delivered work, not evidence failures.
+        const allowAdhoc = !scopeAttemptedInRequest(evidenceRequestScope.getStore(), init?.headers);
+        assertEvidenceDelivery(data, requiresEvidence, { allowAdhoc });
+      },
       closeSession: id => callEngine(`/api/session/${encodeURIComponent(id)}`, { method: "DELETE" }, false, true),
     });
 		if (!res.ok) {
@@ -429,6 +443,8 @@ function compactSummary(data: any, details: Record<string, any> = {}) {
 	try {
 		const links = assertEvidenceDelivery(data);
 		if (links) return `Evidence ready · ${links.recordURL}\nPortable copy · ${links.portableURL}`;
+		const adhoc = unsealedAdhocLink(data);
+		if (adhoc) return `Ad hoc capture delivered · ${engineUrl()}${adhoc}\nUnsealed: private short-lived link for authorized work, not formal evidence; re-capture after it expires.`;
 		const pending = findNonReadyArtifactDelivery(data);
 		if (pending) {
 			const recovery = evidenceRecoveryHint(data);

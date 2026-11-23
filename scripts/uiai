@@ -111,13 +111,24 @@ api() {
   if jq -e 'type == "object" and (has("artifact_ref") or has("delivery_state") or has("epwa_delivery"))' >/dev/null 2>&1 <"$tmp"; then
     if ! jq -e '
       ([.. | objects | keys[]] | any(. == "screenshot" or . == "screenshot_path" or . == "imageBase64" or . == "image_base64" or . == "inline_bytes" or . == "artifact_path" or . == "result_path" or . == "result_url") | not) and
-      (.epwa_delivery.schema == "uiai.epwa_delivery.v1") and
-      (.delivery_state == "ready" and .epwa_delivery.state == .delivery_state) and
-      (.epwa_delivery.artifact.artifact_ref == .artifact_ref) and
-      (.artifact_url | type == "string" and startswith("https://")) and
-      (.portable_url | type == "string" and startswith("https://")) and
-      (.artifact_url == .epwa_delivery.epwa.record_url) and
-      (.portable_url == .epwa_delivery.epwa.portable_url)' >/dev/null <"$tmp"; then
+      (
+        (.epwa_delivery.schema == "uiai.epwa_delivery.v1") and
+        (.delivery_state == "ready" and .epwa_delivery.state == .delivery_state) and
+        (.epwa_delivery.artifact.artifact_ref == .artifact_ref) and
+        (.artifact_url | type == "string" and startswith("https://")) and
+        (.portable_url | type == "string" and startswith("https://")) and
+        (.artifact_url == .epwa_delivery.epwa.record_url) and
+        (.portable_url == .epwa_delivery.epwa.portable_url)
+      ) or (
+        # #299: authorized ad hoc capture with no scope attempted — productive
+        # work result, not a formal-evidence failure.
+        (.delivery_state == "unsealed" and .ok == true) and
+        (.epwa_delivery.schema == "uiai.epwa_delivery.v1") and
+        (.epwa_delivery.state == "blocked") and
+        (.private_image_url | type == "string" and startswith("/api/screenshot/adhoc/")) and
+        (.epwa_delivery.scope.project_ref == null) and
+        (.epwa_delivery.scope.workpoint_ref == null)
+      )' >/dev/null <"$tmp"; then
       err "artifact delivery is not a ready, identity-bound HTTPS EPWA result"
       jq '{schema,artifact_ref,delivery_state,epwa_delivery,error,recovery_ref}' <"$tmp" >&2 || cat "$tmp" >&2
       rm -f "$tmp"
@@ -177,6 +188,9 @@ compact_emit() {
       .text
     elif has("summary") and has("session_id") then
       "diagnostics: session=" + .session_id + " errors=" + ((.summary.console_errors // 0)|tostring) + " exceptions=" + ((.summary.exceptions // 0)|tostring) + " failed_requests=" + ((.summary.failed_requests // 0)|tostring)
+    elif has("private_image_url") and .delivery_state == "unsealed" then
+      "adhoc capture: " + .private_image_url + " (unsealed, not formal evidence; expires in " + (.private_image_expires_in // "10m") + ")",
+      "fetch: curl -s \"$ENGINE_URL" + .private_image_url + "\" -o capture." + (.format // "png")
     elif has("status") then
       "status: " + (.status|tostring)
     else
