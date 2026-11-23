@@ -186,6 +186,48 @@ fi
 rm -- "$health_output"
 # END HEALTH READINESS GATE
 systemctl is-active "$service_name"
+# BEGIN INSTALLATION RECEIPT (activation record; exercised by tests/test_deploy_receipt.py)
+# #318: the upgrade path rewrites installation-receipt.json as part of
+# activation, after the new binary passed health, so rollback/verify tooling
+# never reads a stale version claim for a replaced binary.
+version_output=$("$binary_path" -version)
+binary_sha=$(sha256sum "$binary_path" | awk '{print $1}')
+config_path=$(systemctl show "$service_name" -p ExecStart --value | grep -oE -- '-config [^ ]+' | awk '{print $2}')
+config_sha=""
+if [[ -n "${config_path:-}" && -f "$config_path" ]]; then
+  config_sha=$(sha256sum "$config_path" | awk '{print $1}')
+fi
+receipt_tmp=$(mktemp)
+owner_run python3 - "$receipt_tmp" "$release_tag" "$version_output" "$binary_sha" "$service_name" "$health_url" "${http_code:-}" "${config_path:-}" "${config_sha:-}" <<'RECEIPT_PY'
+import datetime, json, pathlib, sys, urllib.request
+tmp, release_tag, version_output, binary_sha, service, health_url, http_code, config_path, config_sha = sys.argv[1:10]
+receipt = {
+    "schema": "uiai.installation_receipt.v1",
+    "release_tag": release_tag,
+    "version": version_output,
+    "binary_sha256": binary_sha,
+    "installed_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+    "service": service,
+    "health_url": health_url,
+    "health_http_code": http_code or "unknown",
+    "health_version": None,
+    "config_path": config_path or "unknown",
+    "config_sha256": config_sha or None,
+}
+# Prefer the running engine's own reported version (#317); never fabricate it.
+try:
+    with urllib.request.urlopen(health_url, timeout=5) as response:
+        health = json.load(response)
+    if isinstance(health, dict) and isinstance(health.get("version"), str) and health["version"]:
+        receipt["health_version"] = health["version"]
+except Exception:
+    pass
+pathlib.Path(tmp).write_text(json.dumps(receipt, indent=2) + "\n")
+RECEIPT_PY
+owner_run install -m 0640 "$receipt_tmp" "$install_root/installation-receipt.json"
+rm -f "$receipt_tmp"
+echo "installation_receipt=$install_root/installation-receipt.json"
+# END INSTALLATION RECEIPT
 for extra in $extra_services; do
   if [[ -n "$epwa_base_url" ]]; then
     extra_dropin="/etc/systemd/system/${extra}.d"
