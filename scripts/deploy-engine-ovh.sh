@@ -197,7 +197,7 @@ config_sha=""
 if [[ -n "${config_path:-}" && -f "$config_path" ]]; then
   config_sha=$(sha256sum "$config_path" | awk '{print $1}')
 fi
-receipt_tmp=$(mktemp)
+receipt_tmp=$(owner_run mktemp)
 owner_run python3 - "$receipt_tmp" "$release_tag" "$version_output" "$binary_sha" "$service_name" "$health_url" "${http_code:-}" "${config_path:-}" "${config_sha:-}" <<'RECEIPT_PY'
 import datetime, json, pathlib, sys, urllib.request
 tmp, release_tag, version_output, binary_sha, service, health_url, http_code, config_path, config_sha = sys.argv[1:10]

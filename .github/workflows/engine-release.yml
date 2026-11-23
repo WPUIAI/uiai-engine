@@ -146,7 +146,7 @@ jobs:
           mkdir -p dist
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
             -trimpath \
-            -ldflags "-s -w -X main.version=${{ steps.meta.outputs.version }} -X main.buildTime=${{ steps.meta.outputs.build_time }}" \
+            -ldflags "-s -w -X github.com/WPUIAI/uiai-engine/internal/buildinfo.Version=${{ steps.meta.outputs.version }} -X github.com/WPUIAI/uiai-engine/internal/buildinfo.BuildTime=${{ steps.meta.outputs.build_time }}" \
             -o "dist/${ENGINE_ASSET_NAME}" \
             ./cmd/uiai-engine
           chmod +x "dist/${ENGINE_ASSET_NAME}"
