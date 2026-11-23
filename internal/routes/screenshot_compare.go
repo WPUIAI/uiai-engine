@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/ai"
@@ -31,8 +32,16 @@ func MountScreenshotCompare(r chi.Router, cfg *config.Config, pool vision.PoolSo
 			Model    string `json:"model"`
 			Provider string `json:"provider"`
 		}
-		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
-			writeJSON(w, 400, map[string]string{"error": "invalid JSON"})
+		// #312: strict wire contract — unknown fields are rejected with a
+		// machine-readable reason instead of being silently ignored.
+		dec := json.NewDecoder(req.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&body); err != nil {
+			reason := "invalid_json"
+			if strings.Contains(err.Error(), "unknown field") {
+				reason = "unknown_field"
+			}
+			writeJSON(w, 400, map[string]string{"error": err.Error(), "reason_code": reason})
 			return
 		}
 

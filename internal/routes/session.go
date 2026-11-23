@@ -166,7 +166,19 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				Output      string              `json:"output"`
 				FocusaScope *vision.FocusaScope `json:"focusa_scope"`
 			}
-			json.NewDecoder(req.Body).Decode(&body)
+			// #312: keep the wire contract strict and truthful — unknown fields
+			// are rejected with a machine-readable reason instead of silently
+			// ignored; an empty body keeps its default-capture meaning.
+			dec := json.NewDecoder(req.Body)
+			dec.DisallowUnknownFields()
+			if err := dec.Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+				reason := "invalid_json"
+				if strings.Contains(err.Error(), "unknown field") {
+					reason = "unknown_field"
+				}
+				writeJSON(w, 400, map[string]string{"error": err.Error(), "reason_code": reason})
+				return
+			}
 			if body.FocusaScope != nil {
 				sess.SetFocusaScope(mergeFocusaScope(sess.FocusaScope, body.FocusaScope))
 			}

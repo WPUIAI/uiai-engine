@@ -91,6 +91,96 @@ artifact_routes = {
 for path, (method, summary) in artifact_routes.items():
     openapi["paths"].setdefault(path, {})[method] = {"summary": summary, "responses": artifact_responses}
 
+# #312: capture routes must document their request contracts. /api/screenshot
+# rejects unknown fields with reason_code unknown_field (#311), so the published
+# spec must make a correct call constructible instead of forcing clients to
+# guess field names that the engine would silently or loudly ignore.
+capture_request_bodies = {
+    "/api/screenshot": {
+        "required": True,
+        "content": {"application/json": {
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["url"],
+                "properties": {
+                    "url": {"type": "string", "description": "Absolute http(s) URL to capture; required"},
+                    "width": {"type": "integer", "minimum": 1, "description": "Viewport width; omitted uses the engine default viewport"},
+                    "height": {"type": "integer", "minimum": 1, "description": "Viewport height; omitted uses the engine default viewport"},
+                    "fullPage": {"type": "boolean", "description": "Capture the full scrollable page instead of the viewport"},
+                    "format": {"type": "string", "enum": ["png", "jpg", "jpeg", "webp"]},
+                    "quality": {"type": "integer", "minimum": 1, "maximum": 100},
+                    "waitFor": {"type": "string", "description": "CSS selector to wait for before capture"},
+                    "delay": {"type": "integer", "minimum": 0, "description": "Extra settle delay in milliseconds"},
+                    "cookies": {"type": "string", "description": "Cookie header string: name=value; name2=value2"},
+                    "timeout": {"type": "integer", "minimum": 1, "description": "Overall capture timeout in seconds (default 30)"},
+                    "nocache": {"type": "boolean", "description": "Skip the capture cache and force a fresh page load"},
+                    "inline": {"type": "boolean", "description": "Deprecated posture hint; raw output stays withheld by mandatory EPWA delivery"},
+                    "focusa_scope": {"type": "object", "description": "Focusa evidence scope binding (project/workstream/workset/callgraph/workpoint/work item/continuity refs)"},
+                    "evidence_scope": {"type": "object", "description": "Direct evidence scope binding; equivalent to focusa_scope for EPWA publication gating"},
+                },
+            },
+            "example": {
+                "url": "https://example.com/",
+                "width": 390,
+                "height": 844,
+                "format": "png",
+                "fullPage": False,
+                "focusa_scope": {
+                    "project_ref": "project:example",
+                    "workpoint_ref": "workpoint:example",
+                    "work_item_ref": "work-item:example",
+                    "continuity_id": "example-continuity",
+                },
+            },
+        }},
+    },
+    "/api/screenshot/compare": {
+        "required": True,
+        "content": {"application/json": {
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "url1": {"type": "string", "description": "First page URL (or supply base64_1)"},
+                    "url2": {"type": "string", "description": "Second page URL (or supply base64_2)"},
+                    "base64_1": {"type": "string", "description": "First image as base64; ignored when url1 is present"},
+                    "base64_2": {"type": "string", "description": "Second image as base64; ignored when url2 is present"},
+                    "width": {"type": "integer", "minimum": 1, "description": "Capture viewport width (default 1280)"},
+                    "height": {"type": "integer", "minimum": 1, "description": "Capture viewport height (default 800)"},
+                    "model": {"type": "string", "description": "Comparison model; default from engine AI config"},
+                    "provider": {"type": "string", "description": "Comparison provider; default from engine AI config"},
+                },
+            },
+            "example": {"url1": "https://example.com/", "url2": "https://example.org/", "width": 1280, "height": 800},
+        }},
+    },
+    "/api/session/{sessionID}/screenshot": {
+        "content": {"application/json": {
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "format": {"type": "string", "enum": ["png", "jpg", "jpeg", "webp"]},
+                    "quality": {"type": "integer", "minimum": 1, "maximum": 100},
+                    "fullPage": {"type": "boolean", "description": "Capture the full scrollable page instead of the viewport"},
+                    "output": {"type": "string", "description": "Delivery output mode for the captured visual"},
+                    "focusa_scope": {"type": "object", "description": "Focusa evidence scope binding applied to this capture"},
+                },
+            },
+        }},
+    },
+}
+for path, request_body in capture_request_bodies.items():
+    openapi["paths"][path]["post"]["requestBody"] = request_body
+
+capture_path_parameters = {
+    "/api/session/{sessionID}/screenshot": [{"name": "sessionID", "in": "path", "required": True, "schema": {"type": "string"}}],
+    "/api/share/{id}/screenshot": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}, "description": "Existing share id; the share URL is re-captured at 1280x800 jpeg with no request body"}],
+}
+for path, parameters in capture_path_parameters.items():
+    openapi["paths"][path]["post"]["parameters"] = parameters
+
 # Browser reading is GET-canonical; retain POST for existing tool transports.
 read_operation = dict(openapi["paths"]["/api/session/{sessionID}/read"]["post"])
 read_operation["summary"] = "Read bounded page text with mandatory EPWA delivery (canonical GET)"
