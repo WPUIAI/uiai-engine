@@ -765,11 +765,11 @@ func (s *Session) ClickContext(caller context.Context, selector string) (*SnapRe
 	if err != nil {
 		return nil, fail("locate", err, false)
 	}
-	if _, err = element.Eval(`() => {
-  this.scrollIntoView({ block: 'center', inline: 'center' });
-  this.click();
-  return true;
- }`); err != nil {
+	// Native input preserves user activation; DOM click() silently loses it.
+	if _, err = page.Activate(); err != nil {
+		return nil, fail("focus", err, false)
+	}
+	if err = element.Click(proto.InputMouseButtonLeft, 1); err != nil {
 		return nil, fail("dispatch", err, true)
 	}
 	if err := waitSessionDelay(ctx, 300*time.Millisecond); err != nil {

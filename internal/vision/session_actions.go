@@ -194,7 +194,7 @@ func (s *Session) Press(key string) (*SnapResult, error) {
 		return nil, fmt.Errorf("page focus failed before key press: %w", err)
 	}
 	if k, ok := keyMap[trimmed]; ok {
-		if err := s.page.Keyboard.Press(k); err != nil {
+		if err := s.page.Keyboard.Type(k); err != nil {
 			return nil, fmt.Errorf("press %s failed: %w", trimmed, err)
 		}
 	} else {

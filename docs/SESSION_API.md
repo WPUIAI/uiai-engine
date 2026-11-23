@@ -69,6 +69,19 @@ not browser actuation. Invalid query option types or malformed JSON return 400.
 
 The exact current route list remains in code/tool discovery and must be generated into the endpoint-feature coverage ledger before release.
 
+### Trusted input qualification (#305)
+
+The source correction uses native CDP element input for `click` and a complete
+key-down/key-up stroke for named `press` keys. Existing session scope, action
+policy, pacing, timeouts and possible-effects failures remain controlling; a
+possible dispatch must not be blindly replayed. Media activation requires a
+trusted browser gesture, not an evaluated DOM `click()`.
+
+**Source-only pending qualification/deployment:** installed workers may still use
+scripted clicks. Synthetic guest regressions cover trusted audio advancement and
+named Space activation/release; they do not prove protected customer playback or
+a released runtime. Never repeat a consumed customer attempt to qualify input.
+
 ## Authentication state restoration
 
 `POST /api/session/{id}/auth/load` accepts the state returned by `/auth/save`.
