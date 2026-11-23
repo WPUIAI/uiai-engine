@@ -16,8 +16,8 @@ import (
 
 	"github.com/WPUIAI/uiai-engine/internal/ai"
 	"github.com/WPUIAI/uiai-engine/internal/auth"
-	captchaPkg "github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/buildinfo"
+	captchaPkg "github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/credits"
 	"github.com/WPUIAI/uiai-engine/internal/desktop"
