@@ -128,6 +128,15 @@ api() {
         (.private_image_url | type == "string" and startswith("/api/screenshot/adhoc/")) and
         (.epwa_delivery.scope.project_ref == null) and
         (.epwa_delivery.scope.workpoint_ref == null)
+      ) or (
+        # #299: unscoped ad hoc text/report artifacts — delivered content, no
+        # formal evidence attempted.
+        (.delivery_state == "unsealed" and .ok == true) and
+        (.epwa_delivery.schema == "uiai.epwa_delivery.v1") and
+        (.epwa_delivery.state == "blocked") and
+        (.artifact_payload_posture == "unsealed_no_epwa_scope") and
+        (.epwa_delivery.scope.project_ref == null) and
+        (.epwa_delivery.scope.workpoint_ref == null)
       )' >/dev/null <"$tmp"; then
       err "artifact delivery is not a ready, identity-bound HTTPS EPWA result"
       jq '{schema,artifact_ref,delivery_state,epwa_delivery,error,recovery_ref}' <"$tmp" >&2 || cat "$tmp" >&2

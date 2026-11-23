@@ -215,6 +215,17 @@ receipt = {
     "config_sha256": config_sha or None,
 }
 # Prefer the running engine's own reported version (#317); never fabricate it.
+# The deploy health URL is the minimal /health route; the versioned surface
+# lives at /api/health, so probe that derived path first.
+try:
+    import urllib.request as _urllib
+    versioned = health_url.rstrip("/").removesuffix("/health") + "/api/health"
+    with _urllib.urlopen(versioned, timeout=5) as response:
+        health = json.load(response)
+    if isinstance(health, dict) and isinstance(health.get("version"), str) and health["version"]:
+        receipt["health_version"] = health["version"]
+except Exception:
+    pass
 try:
     with urllib.request.urlopen(health_url, timeout=5) as response:
         health = json.load(response)

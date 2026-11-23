@@ -411,12 +411,18 @@ func writeJSONArtifactEPWA(w http.ResponseWriter, req *http.Request, cfg *config
 	} else if scope.Empty() {
 		// No evidence scope was supplied at all, so the caller is not doing
 		// evidence-bound work: serve the content unsealed instead of withholding
-		// it. Nothing is published or delivered — delivery_state still says so —
-		// and no EPWA URLs are minted. A present-but-incomplete scope keeps the
-		// strict path: the caller attempted evidence binding and must reconcile.
+		// it. Nothing is published or delivered — the epwa sub-envelope still
+		// says so — and no EPWA URLs are minted. A present-but-incomplete scope
+		// keeps the strict path: the caller attempted evidence binding and must
+		// reconcile. #299: the delivered content is productive ad hoc work, so
+		// the top-level work state must not read as a formal-evidence failure.
 		response["artifact_payload_posture"] = "unsealed_no_epwa_scope"
 		response["epwa_unsealed_reason"] = "no_evidence_scope_supplied: content served without EPWA publication; not sealed evidence"
+		response["delivery_state"] = "unsealed"
+		response["ok"] = true
+		response["capture_posture"] = "adhoc_unsealed_not_formal_evidence"
 		includePayload = true
+		status = successStatus
 	}
 	if includePayload {
 		var object map[string]any

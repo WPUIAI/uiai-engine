@@ -19,15 +19,20 @@ func TestJSONArtifactPayloadIsWithheldUntilEPWADeliveryIsReady(t *testing.T) {
 	unsealedReq := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/report", nil)
 	unsealedRec := httptest.NewRecorder()
 	writeJSONArtifactEPWA(unsealedRec, unsealedReq, cfg, evidenceshare.Scope{}, "report:test", "Test report", "generated_report", payload, http.StatusOK)
-	if unsealedRec.Code != http.StatusAccepted {
+	if unsealedRec.Code != http.StatusOK {
 		t.Fatalf("unsealed status=%d body=%s", unsealedRec.Code, unsealedRec.Body.String())
 	}
 	var unsealed map[string]any
 	if err := json.Unmarshal(unsealedRec.Body.Bytes(), &unsealed); err != nil {
 		t.Fatal(err)
 	}
-	if unsealed["delivery_state"] != "blocked" || unsealed["epwa_delivery"] == nil {
-		t.Fatalf("missing fail-closed delivery: %#v", unsealed)
+	// #299: unscoped content is delivered work — unsealed, ok, formal
+	// envelope still truthfully blocked, and no delivery URLs minted.
+	if unsealed["delivery_state"] != "unsealed" || unsealed["ok"] != true || unsealed["epwa_delivery"] == nil {
+		t.Fatalf("missing truthful unsealed work state: %#v", unsealed)
+	}
+	if delivery, _ := unsealed["epwa_delivery"].(map[string]any); delivery == nil || delivery["state"] != "blocked" {
+		t.Fatalf("formal epwa envelope not truthfully blocked: %#v", unsealed["epwa_delivery"])
 	}
 	if unsealed["artifact_payload_posture"] != "unsealed_no_epwa_scope" {
 		t.Fatalf("wrong posture for scopless content: %#v", unsealed)
