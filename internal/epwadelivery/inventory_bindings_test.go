@@ -53,7 +53,7 @@ func TestConsumerAdaptersRequireReadyEPWA(t *testing.T) {
 		{consumer: "Cockpit live workspace", file: "../../apps/cockpit/src/lib/ui/LiveWorkspace.svelte", tokens: []string{"artifact_url", "portable_url", "durable EPWA"}},
 		{consumer: "Cockpit Studio", file: "../../apps/cockpit/src/routes/studio/+page.svelte", tokens: []string{"artifactRequest<ArtifactDeliveryResult>", "comparison:delivery-failed", "media:produce:not-connected"}},
 		{consumer: "Chrome, Veragensia, and Pi MCP bridge", file: "../../mcp/browser-session-mcp.mjs", tokens: []string{"assertEvidenceDelivery(data,", "evidenceScopeHeaders(args.focusa_scope)"}},
-		{consumer: "native Pi", file: "../../integrations/pi/uiai-engine.ts", tokens: []string{"assertEvidenceDelivery(data, requiresEvidence)", "evidenceScopeHeaders(evidenceRequestScope.getStore())", "./uiai/epwa-contract.mjs"}},
+		{consumer: "native Pi", file: "../../integrations/pi/uiai-engine.ts", tokens: []string{"assertEvidenceDelivery(data, requiresEvidence, { allowAdhoc })", "evidenceScopeHeaders(evidenceRequestScope.getStore())", "./uiai/epwa-contract.mjs"}},
 		{consumer: "shared Pi/MCP delivery validator", file: "../../integrations/pi/uiai/epwa-contract.mjs", tokens: []string{"findRawArtifactField(value)", "findNonReadyArtifactDelivery(value)", "url.protocol !== \"https:\"", "required evidence envelope missing"}},
 		{consumer: "MCP compatibility export", file: "../../mcp/epwa-contract.mjs", tokens: []string{"export * from \"../integrations/pi/uiai/epwa-contract.mjs\""}},
 		{consumer: "portable native installer", file: "../../scripts/install-agent-integrations.sh", tokens: []string{"PI_CONTRACT_DEST=", "run cp \"$PI_CONTRACT_SRC\" \"$PI_CONTRACT_DEST\""}},
