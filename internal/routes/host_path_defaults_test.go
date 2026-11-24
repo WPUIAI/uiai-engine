@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
 )
 
 // #298: defaults must never assume one Linux host. Screenshot artifact store
