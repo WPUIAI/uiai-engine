@@ -3,8 +3,8 @@
   "release_version": "0.3.3",
   "artifacts": {},
   "compatibility_status": "compatible",
-  "source_commit": "c9eceb0",
-  "generated_at": "2026-11-23T23:43:15.640237Z",
+  "source_commit": "3e9c4fa",
+  "generated_at": "2026-11-24T00:00:25.804161Z",
   "engine_version": "2.0.27",
   "cockpit_version": "0.3.3",
   "release_track": "cockpit"
