@@ -82,6 +82,17 @@ scripted clicks. Synthetic guest regressions cover trusted audio advancement and
 named Space activation/release; they do not prove protected customer playback or
 a released runtime. Never repeat a consumed customer attempt to qualify input.
 
+## Origin and cross-origin semantics (#320)
+
+Engine sessions launch Chromium with web security ENABLED. Pages keep normal
+browser origin semantics: page-initiated cross-origin requests carry the page's
+real `Origin` (and `Referer`) and are subject to ordinary CORS enforcement, so
+domain-allowlisted provider SDKs accept engine sessions. A provider rejecting
+with a null-Origin complaint means the request came from an opaque page context
+(sandboxed iframe, data: document) or the provider's own domain policy — not
+engine transport; `origin_diagnostic` on failed-4xx diagnostics records the
+committed page origin for that distinction.
+
 ## Authentication state restoration
 
 `POST /api/session/{id}/auth/load` accepts the state returned by `/auth/save`.

@@ -214,7 +214,12 @@ drained:
 		// Flags NOT in Rod defaults — add explicitly
 		Set("disable-gpu").
 		Set("no-sandbox").
-		Set("disable-web-security").
+		// Web security STAYS ENABLED (#320/#152): Chromium with web security
+		// disabled stamps `Origin: null` on every cross-origin request and skips
+		// CORS, which is exactly what makes domain-allowlisted provider SDKs
+		// (Stytch, OIDC providers, Google OAuth) reject engine sessions as
+		// opaque origins. Engine pages keep normal browser origin semantics;
+		// page-initiated cross-origin calls now carry the page's real Origin.
 		Set("disable-extensions").
 		Set("disable-translate").
 		Set("mute-audio").
