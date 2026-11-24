@@ -103,7 +103,10 @@ func NewRenderer(manifestPath string) (*Renderer, error) {
 func discoverManifestPath() string {
 	candidates := []string{
 		"internal/media/deviceframes/manifest.json",
-		"/home/wpuiai/uiai-engine/internal/media/deviceframes/manifest.json",
+	}
+	// #298: operator override instead of a hard-coded checkout location.
+	if env := os.Getenv("UIAI_DEVICEFRAMES_MANIFEST"); env != "" {
+		candidates = append([]string{env}, candidates...)
 	}
 	for _, p := range candidates {
 		if _, err := os.Stat(p); err == nil {

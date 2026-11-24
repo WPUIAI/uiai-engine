@@ -350,7 +350,9 @@ func (d *mediaDeps) produceMockup(job *media.Job) (string, error) {
 
 	scriptDir := d.cfg.Media.ScriptDir
 	if scriptDir == "" {
-		scriptDir = "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"
+		// #298: no host-path fallback — media helpers are cleanly disabled when
+		// media.script_dir is not configured instead of assuming one checkout.
+		return "", fmt.Errorf("media helpers disabled: media.script_dir not configured")
 	}
 	script := filepath.Join(scriptDir, "generate-mockup.mjs")
 
@@ -387,7 +389,8 @@ func (d *mediaDeps) produceGIF(job *media.Job) (string, error) {
 
 	scriptDir := d.cfg.Media.ScriptDir
 	if scriptDir == "" {
-		scriptDir = "/home/wpuiai/public_html/wp-content/plugins/wpuiai/assets/templates/devices"
+		// #298: same clean-disable contract as mockups — no host-path fallback.
+		return "", fmt.Errorf("media helpers disabled: media.script_dir not configured")
 	}
 	script := filepath.Join(scriptDir, "generate-gif.mjs")
 
@@ -431,7 +434,11 @@ func (d *mediaDeps) produceGIF(job *media.Job) (string, error) {
 
 // findNode returns the full path to Node.js.
 func findNode() string {
-	// Try common locations
+	// #298: PATH first — a portable engine must find Node the way the host
+	// resolves executables; fixed absolute locations are only fallbacks.
+	if p, err := exec.LookPath("node"); err == nil {
+		return p
+	}
 	for _, p := range []string{
 		"/opt/cpanel/ea-nodejs20/bin/node",
 		"/usr/local/bin/node",
@@ -441,7 +448,7 @@ func findNode() string {
 			return p
 		}
 	}
-	return "node" // fallback to PATH
+	return "node"
 }
 
 // validateMediaURL checks that a URL is safe to screenshot (no SSRF).

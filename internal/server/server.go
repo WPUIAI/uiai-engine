@@ -202,6 +202,21 @@ func New(cfg *config.Config) *Engine {
 	if cfg.Captcha.Proxy.MaxRetries > 0 {
 		captchaCfg.Proxy.MaxRetries = cfg.Captcha.Proxy.MaxRetries
 	}
+	// #298: apply captcha.stats from config.yaml (previously parsed but never
+	// applied) and default the log file into storage.data_dir instead of a
+	// hard-coded /var/log path, so a fresh start on any OS writes only inside
+	// its data directory unless the operator sets an explicit log_file.
+	if cfg.Captcha.Stats != nil {
+		if v, ok := cfg.Captcha.Stats["enabled"].(bool); ok {
+			captchaCfg.Stats.Enabled = v
+		}
+		if v, ok := cfg.Captcha.Stats["log_file"].(string); ok && v != "" {
+			captchaCfg.Stats.LogFile = v
+		}
+	}
+	if captchaCfg.Stats.LogFile == "" {
+		captchaCfg.Stats.LogFile = filepath.Join(cfg.Storage.DataDir, "captcha-stats.jsonl")
+	}
 	if cfg.Captcha.DefaultProvider != "" {
 		captchaCfg.DefaultProvider = cfg.Captcha.DefaultProvider
 	}

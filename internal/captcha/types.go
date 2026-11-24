@@ -236,7 +236,9 @@ func DefaultCaptchaConfig() CaptchaConfig {
 		},
 		Stats: StatsConfig{
 			Enabled: true,
-			LogFile: "/var/log/uiai/captcha-stats.jsonl",
+			// #298: no host-specific default. The server merge defaults this into
+			// storage.data_dir; an explicitly configured log_file is honored.
+			LogFile: "",
 		},
 		Profiles: map[string]ProfileConfig{
 			"prlog": {

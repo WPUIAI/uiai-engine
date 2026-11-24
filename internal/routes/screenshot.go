@@ -281,7 +281,10 @@ func MountScreenshotReal(r chi.Router, cfg *config.Config, pool vision.PoolSourc
 func screenshotStoreDir() string {
 	dir := os.Getenv("UIAI_SCREENSHOT_DIR")
 	if dir == "" {
-		dir = "/home/wpuiai/uiai-engine/data/screenshots"
+		// #298: no host-specific fallback — resolve relative to the engine
+		// working directory (the canonical deployment runs from the checkout
+		// root, so this is the same durable store path, portably).
+		dir = filepath.Join("data", "screenshots")
 	}
 	return dir
 }

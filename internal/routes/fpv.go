@@ -661,7 +661,7 @@ func fpvContext(sess *vision.Session) map[string]any {
 	return map[string]any{
 		"project": map[string]any{
 			"name":   "uiai-engine",
-			"root":   "/home/wpuiai/uiai-engine",
+			"root":   fpvProjectRoot(),
 			"branch": branch,
 			"head":   head,
 			"dirty":  dirty,
@@ -806,12 +806,23 @@ func fpvCompactFocusaSummary(decoded map[string]any) string {
 
 func fpvGit(args ...string) string {
 	cmd := exec.Command("git", args...)
-	cmd.Dir = "/home/wpuiai/uiai-engine"
+	cmd.Dir = fpvProjectRoot()
 	out, err := cmd.Output()
 	if err != nil {
 		return "unknown"
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// fpvProjectRoot resolves the checkout this engine runs from (#298: never a
+// hard-coded host path; the engine working directory is the checkout root on
+// the canonical deployment and stays correct on any OS).
+func fpvProjectRoot() string {
+	root, err := os.Getwd()
+	if err != nil || root == "" {
+		return "."
+	}
+	return root
 }
 
 func fpvHistory(logLines string) []map[string]string {
