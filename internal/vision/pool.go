@@ -300,7 +300,12 @@ drained:
 		}
 	case <-time.After(LaunchTimeout):
 		// Kill the half-launched browser so nothing leaks (2026-08-23 fix).
-		if pid = l.PID(); pid > 0 {
+		pid = l.PID()
+		// #292: a wedged launch must leave one journal line naming the cause,
+		// the managed PID, and the private profile dir so an operator can
+		// correlate the typed browser_launch_failed refusal with real state.
+		log.Printf("[vision] browser launch timed out after %s (pid=%d, profile_dir=%s); killing half-launched browser", LaunchTimeout, pid, profileDir)
+		if pid > 0 {
 			exec.Command("kill", "-9", fmt.Sprintf("%d", pid)).Run() // #nosec G204 -- managed launcher PID
 		}
 		l.Cleanup()
@@ -482,7 +487,14 @@ func (p *Pool) restartBrowser() error {
 
 // LaunchTimeout bounds browser launch + CDP connect + pre-warm. Without it a
 // wedged chromium startup holds the pool forever (2026-08-23 outage).
-const LaunchTimeout = 45 * time.Second
+//
+// #292: the launch budget MUST stay strictly under the /api/session route
+// deadline (routes.WithDeadline(45s)). At 45s the wedged launch consumed the
+// whole route budget, so callers got a bare deadline_exceeded 503 with no
+// cause; at 35s the pool returns ErrLaunchTimeout in time for the route to
+// answer with a typed browser_launch_failed refusal, and the 10s headroom
+// still covers response publication.
+const LaunchTimeout = 35 * time.Second
 
 // ErrLaunchTimeout is returned when the browser did not become ready in time.
 var ErrLaunchTimeout = fmt.Errorf("browser launch timed out after %s", LaunchTimeout)

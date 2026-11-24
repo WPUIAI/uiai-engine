@@ -4,9 +4,12 @@ package routes
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/WPUIAI/uiai-engine/internal/observability"
 )
 
 // WithDeadline buffers finite API responses until the handler completes. Only
@@ -60,10 +63,21 @@ func WithDeadline(d time.Duration) func(http.Handler) http.Handler {
 				buffered.mu.Lock()
 				buffered.timedOut = true
 				buffered.mu.Unlock()
+				// #292: a deadline trip must never be silent — one journal line naming
+				// the route, method, and budget so a caller-facing 503 is correlatable
+				// with engine state without guessing.
+				observability.Record(observability.ErrorEvent{
+					Source:  "http_deadline",
+					Class:   "deadline_exceeded",
+					Status:  http.StatusServiceUnavailable,
+					Method:  r.Method,
+					Path:    r.URL.Path,
+					Message: fmt.Sprintf("route deadline exceeded: %s %s did not complete within %s", r.Method, r.URL.Path, d),
+				})
 				w.Header().Del("Content-Length")
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = w.Write([]byte(`{"status":"degraded","error":"deadline_exceeded","deadline_ms":` + itoa64(d.Milliseconds()) + `,"retry":true,"recovery":"retry_once_then_backoff"}`))
+				_, _ = w.Write([]byte(`{"status":"degraded","error":"deadline_exceeded","reason_code":"route_deadline_exceeded","deadline_ms":` + itoa64(d.Milliseconds()) + `,"retry":true,"recovery":"retry_once_then_backoff; for session opens check /api/browser/health fail_count and current_capacity if this repeats"}`))
 			}
 		})
 	}

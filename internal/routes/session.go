@@ -987,6 +987,10 @@ func writeSessionError(w http.ResponseWriter, status int, class string, err erro
 		status = http.StatusRequestTimeout
 	case "pending_side_effect_unknown":
 		status = http.StatusConflict
+	case "browser_launch_failed":
+		// #292: the browser process is unavailable, not the caller's input;
+		// 503 names the dependency while error_class carries the cause.
+		status = http.StatusServiceUnavailable
 	case "selector_not_found":
 		if status >= 500 {
 			status = http.StatusNotFound
@@ -1090,6 +1094,8 @@ func suggestedNextSessionAction(class string) string {
 		return "Call /api/session/{id}/snapshot or /diagnostics, then retry using a current @ref or more specific selector."
 	case "timeout", "navigation_failed":
 		return "Read diagnostics for console/network failures; retry once if transient, otherwise fix the page/navigation target."
+	case "browser_launch_failed":
+		return "Retry once after a short backoff; if it persists, check /api/browser/health (fail_count, current_capacity) before reopening — the browser process failed to become ready, not the page."
 	case "page_unavailable":
 		return "Close the stale session and open a new session before retrying the action."
 	case "url_not_allowed":
@@ -1122,6 +1128,18 @@ func classifySessionError(err error) string {
 	}
 	msg := strings.ToLower(classificationError.Error())
 	switch {
+	// #292: pool launch/queue failures are dependency conditions, not page
+	// work; classify them before the generic timeout bucket so callers get
+	// the distinguishing cause (browser_launch_failed / session_capacity).
+	case errors.Is(err, vision.ErrLaunchTimeout), errors.Is(err, vision.ErrQueueFull), errors.Is(err, vision.ErrQueueTimeout):
+		if errors.Is(err, vision.ErrLaunchTimeout) {
+			return "browser_launch_failed"
+		}
+		return "session_capacity"
+	case strings.Contains(msg, "launch"):
+		return "browser_launch_failed"
+	case strings.Contains(msg, "queue full") || strings.Contains(msg, "queue timeout"):
+		return "session_capacity"
 	case strings.Contains(msg, "selector") || strings.Contains(msg, "element"):
 		return "selector_not_found"
 	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline") || strings.Contains(msg, "timed out"):
