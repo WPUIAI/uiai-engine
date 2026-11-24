@@ -97,8 +97,8 @@ document.getElementById('board').addEventListener('click', function(e) {
 	response = httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest("GET", "/api/session", nil))
 	var list struct {
-		Max           int `json:"max"`
-		MaxGlobal     int `json:"max_global"`
+		Max            int `json:"max"`
+		MaxGlobal      int `json:"max_global"`
 		IdleTTLMinutes int `json:"idle_ttl_minutes"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &list); err != nil {
