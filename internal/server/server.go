@@ -169,7 +169,13 @@ func New(cfg *config.Config) *Engine {
 	// Session manager for persistent browser sessions (LLM tool API)
 	var sessionMgr *vision.SessionManager
 	if visionPool != nil {
-		sessionMgr = vision.NewSessionManagerWithPools(visionPool)
+		// #303: idle lifetime and concurrency caps come from config (zero
+		// values keep the built-in defaults) instead of compile-time constants.
+		sessionMgr = vision.NewSessionManagerWithPoolsOptions(visionPool, vision.SessionLimits{
+			IdleTTL:     time.Duration(cfg.Session.IdleTTLMinutes) * time.Minute,
+			MaxPerScope: cfg.Session.MaxPerScope,
+			MaxGlobal:   cfg.Session.MaxGlobal,
+		})
 		// Spec 76 pillar 3 — self-healing lifecycle: periodic registry↔CDP
 		// diff closes orphan targets and reaps dead sessions (#45).
 		sessionMgr.StartReconciler(30 * time.Second)

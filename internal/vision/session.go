@@ -123,6 +123,7 @@ type Session struct {
 	page              *rod.Page
 	pool              PoolSource
 	timer             *time.Timer
+	idleTTL           time.Duration
 	mu                sync.Mutex
 	refs              map[string]SnapshotRef // @ref → CSS selector, populated by Snapshot()
 	diagnostics       *diagnosticsRecorder
@@ -139,9 +140,47 @@ type SessionManager struct {
 	sessions   map[string]*Session // id → Session (Scope inside)
 	pool       PoolSource
 	reconciler *Reconciler
+	// #303: lifetime and caps are operator config, not compile-time destiny;
+	// defaults preserve the historic contract (MaxSessions, globalMaxSessions,
+	// SessionTTL).
+	limits SessionLimits
 }
 
-const globalMaxSessions = 16 // hard global cap across all scopes
+const globalMaxSessions = 16 // default hard global cap across all scopes
+
+// SessionLimits carries the operator-configurable session policy (#303).
+type SessionLimits struct {
+	IdleTTL     time.Duration
+	MaxPerScope int
+	MaxGlobal   int
+}
+
+func (l SessionLimits) normalized() SessionLimits {
+	out := l
+	if out.IdleTTL <= 0 {
+		out.IdleTTL = SessionTTL
+	}
+	if out.MaxPerScope <= 0 {
+		out.MaxPerScope = MaxSessions
+	}
+	if out.MaxGlobal <= 0 {
+		out.MaxGlobal = globalMaxSessions
+	}
+	return out
+}
+
+// Limits reports the effective session policy for health and API surfaces.
+func (sm *SessionManager) Limits() SessionLimits { return sm.limits }
+
+// NewSessionManagerWithPoolsOptions creates a manager with operator-set
+// session limits; zero values keep the defaults.
+func NewSessionManagerWithPoolsOptions(pool PoolSource, limits SessionLimits) *SessionManager {
+	return &SessionManager{
+		sessions: make(map[string]*Session),
+		pool:     pool,
+		limits:   limits.normalized(),
+	}
+}
 
 func (sm *SessionManager) countForScopeLocked(scope ScopeRef) int {
 	n := 0
@@ -155,10 +194,7 @@ func (sm *SessionManager) countForScopeLocked(scope ScopeRef) int {
 
 // NewSessionManager creates a session manager backed by a single vision pool.
 func NewSessionManager(pool *Pool) *SessionManager {
-	return &SessionManager{
-		sessions: make(map[string]*Session),
-		pool:     pool,
-	}
+	return NewSessionManagerWithPoolsOptions(pool, SessionLimits{})
 }
 
 // NewSessionManagerWithPools creates a session manager backed by a slice of independent pools.
@@ -166,10 +202,7 @@ func NewSessionManager(pool *Pool) *SessionManager {
 // Pool's *rod.Page to be tracked alongside the Session by extending PoolSource (already
 // done via the implementation methods).
 func NewSessionManagerWithPools(pool PoolSource) *SessionManager {
-	return &SessionManager{
-		sessions: make(map[string]*Session),
-		pool:     pool,
-	}
+	return NewSessionManagerWithPoolsOptions(pool, SessionLimits{})
 }
 
 // WrapPage creates a Session from a raw rod.Page, without a pool or manager.
@@ -247,13 +280,13 @@ func (sm *SessionManager) OpenScoped(url string, width, height int, scope ScopeR
 
 	sm.mu.Lock()
 	perScope := sm.countForScopeLocked(scope)
-	if perScope >= MaxSessions {
+	if perScope >= sm.limits.MaxPerScope {
 		sm.mu.Unlock()
-		return nil, nil, fmt.Errorf("max sessions for scope %s reached (%d) — close one in that scope first (global %d/%d)", scope.String(), MaxSessions, len(sm.sessions), globalMaxSessions)
+		return nil, nil, fmt.Errorf("max sessions for scope %s reached (%d) — close one in that scope first (global %d/%d)", scope.String(), sm.limits.MaxPerScope, len(sm.sessions), sm.limits.MaxGlobal)
 	}
-	if len(sm.sessions) >= globalMaxSessions {
+	if len(sm.sessions) >= sm.limits.MaxGlobal {
 		sm.mu.Unlock()
-		return nil, nil, fmt.Errorf("global max sessions reached (%d) — close one first", globalMaxSessions)
+		return nil, nil, fmt.Errorf("global max sessions reached (%d) — close one first", sm.limits.MaxGlobal)
 	}
 	sm.mu.Unlock()
 
@@ -311,7 +344,8 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 	page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
 	sess.Title = safePageTitle(page)
 	sess.NavCount = 1
-	sess.timer = time.AfterFunc(SessionTTL, func() {
+	sess.idleTTL = sm.limits.IdleTTL
+	sess.timer = time.AfterFunc(sm.limits.IdleTTL, func() {
 		sm.expireSession(sess.ID)
 	})
 
@@ -427,14 +461,18 @@ func (sm *SessionManager) closeSession(id string, idleOnly bool) error {
 		sm.mu.Unlock()
 		return ErrSessionNotFound
 	}
-	if idleOnly && (sess.authChallenge != nil || time.Since(sess.LastUsed) < SessionTTL) {
+	idleTTL := sess.idleTTL
+	if idleTTL <= 0 {
+		idleTTL = SessionTTL
+	}
+	if idleOnly && (sess.authChallenge != nil || time.Since(sess.LastUsed) < idleTTL) {
 		sm.mu.Unlock()
 		return nil
 	}
 	delete(sm.sessions, id)
 	sm.mu.Unlock()
 	if idleOnly {
-		log.Printf("[session] %s expired after %s idle", id, SessionTTL)
+		log.Printf("[session] %s expired after %s idle", id, idleTTL)
 	}
 	if sess.timer != nil {
 		sess.timer.Stop()
@@ -521,7 +559,11 @@ func (s *Session) touch() {
 	s.LastUsed = time.Now()
 	s.SnapCount++
 	if s.timer != nil && s.authChallenge == nil {
-		s.timer.Reset(SessionTTL)
+		idleTTL := s.idleTTL
+		if idleTTL <= 0 {
+			idleTTL = SessionTTL
+		}
+		s.timer.Reset(idleTTL)
 	}
 }
 
@@ -1378,6 +1420,53 @@ func readFocusaScopeStatus(scope *FocusaScope) string {
 		return string(focusapacket.ScopePresent)
 	}
 	return string(focusapacket.ScopePartial)
+}
+
+// WaitForText waits until the page body contains the given text, then
+// screenshots (#303: wait conditions beyond CSS selectors).
+func (s *Session) WaitForText(text string, timeoutMs int) (*SnapResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.page == nil {
+		return nil, fmt.Errorf("session closed")
+	}
+	if strings.TrimSpace(text) == "" {
+		return nil, fmt.Errorf("wait text required")
+	}
+	start := time.Now()
+	if timeoutMs <= 0 {
+		timeoutMs = 5000
+	}
+	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+	for {
+		found, err := s.page.Eval(`(t) => !!document.body && document.body.innerText.indexOf(t) !== -1`, text)
+		if err == nil && found.Value.Bool() {
+			break
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("wait timeout: text %q not found within %dms", text, timeoutMs)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
+		Format:  proto.PageCaptureScreenshotFormatJpeg,
+		Quality: gson(60),
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.touch()
+	return &SnapResult{
+		Screenshot: base64.StdEncoding.EncodeToString(data),
+		Width:      s.Width,
+		Height:     s.Height,
+		Format:     "jpeg",
+		Size:       len(data),
+		URL:        s.URL,
+		Title:      s.Title,
+		Duration:   time.Since(start).Milliseconds(),
+	}, nil
 }
 
 // WaitFor waits for a CSS selector to appear, then screenshots.

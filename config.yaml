@@ -254,6 +254,13 @@ captcha:
     enabled: true
     log_file: "/var/log/uiai/captcha-stats.jsonl"
 
+# Browser session policy (#303): zero/absent keeps defaults
+# (idle lifetime 10 minutes, 4 sessions per scope, 16 global).
+# session:
+#   idle_ttl_minutes: 30
+#   max_per_scope: 4
+#   max_global: 16
+
 storage:
   data_dir: "/home/wpuiai/uiai-engine/data"
   usage_file: "usage.json"

@@ -38,7 +38,9 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		for _, s := range sessions {
 			out = append(out, sessionInfoPayload(s))
 		}
-		writeJSON(w, 200, map[string]any{"sessions": out, "count": len(out), "max": vision.MaxSessions, "max_sessions": vision.MaxSessions})
+		limits := sm.Limits()
+		writeJSON(w, 200, map[string]any{"sessions": out, "count": len(out), "max": limits.MaxPerScope, "max_sessions": limits.MaxPerScope,
+			"max_global": limits.MaxGlobal, "idle_ttl_minutes": int(limits.IdleTTL.Minutes())})
 	})
 
 	// Open a new session
@@ -276,10 +278,31 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			var body struct {
 				Selector   string `json:"selector"`
 				AutoWaitMs int    `json:"auto_wait_ms"`
+				X          *int   `json:"x"`
+				Y          *int   `json:"y"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
+			// #303: selector OR x/y coordinates — canvas apps have no selectable
+			// element at the point the agent needs to hit.
+			if body.Selector == "" && (body.X == nil || body.Y == nil) {
+				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) or x/y coordinates required"})
+				return
+			}
 			if body.Selector == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector required (CSS or @ref)"})
+				if *body.X < 0 || *body.Y < 0 {
+					writeJSON(w, 400, map[string]string{"error": "x/y must be non-negative viewport coordinates"})
+					return
+				}
+				snap, target, err := sess.ClickAt(*body.X, *body.Y)
+				if err != nil {
+					writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "click", "x": *body.X, "y": *body.Y, "resolved_selector": target})
+					return
+				}
+				if err := applyAutoWait(sess, body.AutoWaitMs); err != nil {
+					writeSessionError(w, 500, "auto_wait_failed", err, sess)
+					return
+				}
+				writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 				return
 			}
 
@@ -347,8 +370,9 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				AutoWaitMs int    `json:"auto_wait_ms"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
-			if body.Selector == "" || body.Text == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) and text required"})
+			// #303: empty text is legitimate — it clears the field.
+			if body.Selector == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) required; empty text clears the field"})
 				return
 			}
 			originalSelector := body.Selector
@@ -487,8 +511,9 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				AutoWaitMs int    `json:"auto_wait_ms"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
-			if body.Selector == "" || body.Text == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) and text required"})
+			// #303: empty text clears the field through Fill's clear-then-input path.
+			if body.Selector == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector (CSS or @ref) required; empty text clears the field"})
 				return
 			}
 			resolved, resolveErr := sess.ResolveSelector(body.Selector)
@@ -861,11 +886,22 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			}
 			var body struct {
 				Selector  string `json:"selector"`
+				Text      string `json:"text"`
 				TimeoutMs int    `json:"timeout_ms"`
 			}
 			json.NewDecoder(req.Body).Decode(&body)
+			// #303: wait conditions are selector OR text, not selector only.
+			if body.Selector == "" && strings.TrimSpace(body.Text) == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector or text required"})
+				return
+			}
 			if body.Selector == "" {
-				writeJSON(w, 400, map[string]string{"error": "selector required"})
+				snap, err := sess.WaitForText(body.Text, body.TimeoutMs)
+				if err != nil {
+					writeSessionError(w, 408, "timeout", err, sess)
+					return
+				}
+				writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 				return
 			}
 

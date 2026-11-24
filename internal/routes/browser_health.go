@@ -204,6 +204,20 @@ func cachePressureLevel(cache map[string]any) string {
 	return "normal"
 }
 
+// sessionLimitsSnapshot reports the effective session policy (#303).
+func sessionLimitsSnapshot(sessions *vision.SessionManager) map[string]any {
+	if sessions == nil {
+		return map[string]any{"configured": false}
+	}
+	limits := sessions.Limits()
+	return map[string]any{
+		"configured":       true,
+		"idle_ttl_minutes": int(limits.IdleTTL.Minutes()),
+		"max_per_scope":    limits.MaxPerScope,
+		"max_global":       limits.MaxGlobal,
+	}
+}
+
 // reconcilerSnapshot returns lifecycle self-healing counters (nil-safe).
 func reconcilerSnapshot(sessions *vision.SessionManager) map[string]any {
 	if sessions == nil {
@@ -328,6 +342,9 @@ func browserHealthPayload(pool vision.PoolSource, visionEnabled bool, sessions *
 		"diagnostics_enabled": true,
 		"eval_async_enabled":  true,
 		"agent_pressure":      agentPressureSummary(stats, reconcilerSnapshot(sessions), cfg, states...),
+		// #303: operator-set session policy is reported so capacity planning
+		// reads the effective contract, not source constants.
+		"session_limits": sessionLimitsSnapshot(sessions),
 		"actions": map[string]string{
 			"open_session": "/api/session",
 			"diagnostics":  "/api/session/{id}/diagnostics",

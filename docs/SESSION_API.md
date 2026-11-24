@@ -82,6 +82,21 @@ scripted clicks. Synthetic guest regressions cover trusted audio advancement and
 named Space activation/release; they do not prove protected customer playback or
 a released runtime. Never repeat a consumed customer attempt to qualify input.
 
+## Input and session policy (#303)
+
+- `fill`/`type` accept empty `text`: the field is cleared (fill clears then
+  inputs nothing). Only the selector is required.
+- `click` accepts viewport coordinates: `{"x":120,"y":90}` instead of a
+  selector, which is how canvas targets (no selectable element) are driven.
+  Selector and coordinates are mutually exclusive; both empty is a 400.
+- `wait` accepts `{"text":"...","timeout_ms":...}` to wait for page text in
+  addition to the selector condition; empty selector and empty text is a 400.
+- Session lifetime and caps are operator config (`session.idle_ttl_minutes`,
+  `session.max_per_scope`, `session.max_global`; zero keeps defaults 10/4/16).
+  Effective values are reported by `GET /api/session` (`max`,
+  `max_global`, `idle_ttl_minutes`) and `/api/browser/health`
+  (`session_limits`).
+
 ## Origin and cross-origin semantics (#320)
 
 Engine sessions launch Chromium with web security ENABLED. Pages keep normal

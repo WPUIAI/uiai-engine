@@ -25,6 +25,20 @@ type Config struct {
 	TwoFactor        TwoFactorConfig        `yaml:"two_factor"`
 	EvidenceRegistry EvidenceRegistryConfig `yaml:"evidence_registry"`
 	Search           SearchConfig           `yaml:"search"`
+	Session          SessionConfig          `yaml:"session"`
+}
+
+// SessionConfig carries operator-set browser session policy (#303): idle
+// lifetime and concurrency caps are deployment decisions, not compile-time
+// destiny. Zero values keep the built-in defaults.
+type SessionConfig struct {
+	// IdleTTLMinutes bounds how long an idle session survives before
+	// auto-cleanup. Zero keeps the default (10).
+	IdleTTLMinutes int `yaml:"idle_ttl_minutes"`
+	// MaxPerScope bounds concurrent sessions per scope. Zero keeps the default (4).
+	MaxPerScope int `yaml:"max_per_scope"`
+	// MaxGlobal bounds concurrent sessions engine-wide. Zero keeps the default (16).
+	MaxGlobal int `yaml:"max_global"`
 }
 
 // SearchConfig makes search providers and their credentials operator-configurable
