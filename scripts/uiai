@@ -371,11 +371,29 @@ try:
     require_delivery(opened,'session open')
     sid=(opened.get('session') or {}).get('id') or opened.get('id')
     if not sid: raise SystemExit(json.dumps({'ok':False,'error':'session id missing','opened':opened}, indent=2))
-    read=req('POST',f'/api/session/{sid}/read',{'max_chars':int(max_chars),'include_links':True})
+    read=None
+    read_errors=[]
+    # #300: one slow read must not discard a search that already worked — retry
+    # once with an extended bounded read timeout, then continue partially.
+    for attempt in (1,2):
+        try:
+            read=req('POST',f'/api/session/{sid}/read',{'max_chars':int(max_chars),'include_links':True,'timeout_ms':15000})
+            break
+        except SystemExit as e:
+            read_errors.append(str(e))
+    steps=[]
+    if read is not None:
+        require_delivery(read,'source read')
+        responses.append(read)
+        steps.append({'step':'source read','ok':True})
+    else:
+        steps.append({'step':'source read','ok':False,'retried':True,'partial':True,'errors':read_errors})
     snapshot=req('POST',f'/api/session/{sid}/snapshot',{'interactive':True,'compact':True})
     diagnostics=req('GET',f'/api/session/{sid}/diagnostics?limit=100')
-    for operation,response in [('source read',read),('snapshot',snapshot),('diagnostics',diagnostics)]: require_delivery(response,operation)
-    responses.extend([read,snapshot,diagnostics])
+    for operation,response in [('snapshot',snapshot),('diagnostics',diagnostics)]: require_delivery(response,operation)
+    responses.extend([snapshot,diagnostics])
+    steps.append({'step':'snapshot','ok':True})
+    steps.append({'step':'diagnostics','ok':True})
     packet=req('POST','/api/agent/research-packet',{
         'mode':'research' if query else 'proof',
         'goal':goal,
@@ -393,7 +411,7 @@ finally:
         except Exception:
             session_closed=False
 
-report={'schema':'uiai.cli_research_summary.v2','posture':'client_summary_non_evidence','ok':True,'query':query or None,'selected_url':selected_url,'session_id':sid,'session_closed':session_closed,'out':out,'packet':packet}
+report={'schema':'uiai.cli_research_summary.v2','posture':'client_summary_non_evidence','ok':True,'partial':bool(steps and any(s.get('partial') for s in steps)),'steps':steps,'query':query or None,'selected_url':selected_url,'session_id':sid,'session_closed':session_closed,'out':out,'packet':packet}
 with open(out,'w') as f: json.dump(report,f,indent=2)
 if fmt == 'json':
     print(json.dumps(report,separators=(',',':')))
@@ -401,7 +419,8 @@ elif fmt == 'pretty':
     print(json.dumps(report,indent=2))
 else:
     rf=packet.get('recommended_focusa',{}) if isinstance(packet,dict) else {}
-    print(f"research packet ok: out={out} url={selected_url} session_closed={session_closed} schema={packet.get('schema')} evidence_refs={len(packet.get('evidence_refs',[]))} preferred_tool={rf.get('preferred_tool')}")
+    partial_flag='partial' if report.get('partial') else 'complete'
+    print(f"research packet ok ({partial_flag}): out={out} url={selected_url} session_closed={session_closed} schema={packet.get('schema')} evidence_refs={len(packet.get('evidence_refs',[]))} preferred_tool={rf.get('preferred_tool')}")
 PY
       ;;
     *) err "usage: uiai research packet [--query Q|--url URL] [--goal G] [--out PATH]"; exit 2 ;;

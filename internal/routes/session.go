@@ -640,6 +640,14 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 					}
 					body.MaxChars = parsed
 				}
+				if value := q.Get("timeout_ms"); value != "" {
+					parsed, err := strconv.Atoi(value)
+					if err != nil {
+						writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid timeout_ms"})
+						return
+					}
+					body.TimeoutMs = parsed
+				}
 				for key, target := range map[string]*bool{"include_links": &body.IncludeLinks, "include_images": &body.IncludeImages} {
 					if value := q.Get(key); value != "" {
 						parsed, err := strconv.ParseBool(value)

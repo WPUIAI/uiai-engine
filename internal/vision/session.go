@@ -1077,6 +1077,10 @@ type ReadOptions struct {
 	Format        string `json:"format,omitempty"`
 	Mode          string `json:"mode,omitempty"`
 	IncludeImages bool   `json:"include_images,omitempty"`
+	// TimeoutMs bounds this read's DOM evaluation. Default 5000, maximum 30000
+	// (#300): a slow page must be readable instead of discarding a whole
+	// research flow for one slow read.
+	TimeoutMs int `json:"timeout_ms,omitempty"`
 }
 
 // PageReadResult is a compact, screenshot-free page reading payload.
@@ -1104,6 +1108,22 @@ type ReadFocusaMetadata struct {
 	Summary           string   `json:"summary"`
 	NextTools         []string `json:"next_tools"`
 	FocusaScopeStatus string   `json:"focusa_scope_status"`
+}
+
+// ReadDeadlineMS returns the bounded read timeout in milliseconds: default
+// 5000, clamped to [1000, 30000] (#300). Invalid values fall back to the
+// default so a caller cannot disable or blow up the read budget.
+func ReadDeadlineMS(opts ReadOptions) int {
+	if opts.TimeoutMs <= 0 {
+		return 5000
+	}
+	if opts.TimeoutMs < 1000 {
+		return 1000
+	}
+	if opts.TimeoutMs > 30000 {
+		return 30000
+	}
+	return opts.TimeoutMs
 }
 
 // ReadPage extracts bounded, readable page text without taking a screenshot.
@@ -1207,7 +1227,7 @@ func (s *Session) ReadPageContext(caller context.Context, opts ReadOptions) (*Pa
 	if err := caller.Err(); err != nil {
 		return nil, err
 	}
-	ctx, cancel := sessionActionContext(s.page.GetContext(), caller, 5*time.Second)
+	ctx, cancel := sessionActionContext(s.page.GetContext(), caller, time.Duration(ReadDeadlineMS(opts))*time.Millisecond)
 	defer cancel()
 	result, err := s.page.Context(ctx).Eval(js)
 	if caller.Err() != nil {
