@@ -136,6 +136,10 @@ type Session struct {
 	// foreign session's targets.
 	popups           []PopupTarget
 	originalTargetID string
+	// #301 downloads: governed per-session download directory and the
+	// bounded download event ring.
+	downloadsDir   string
+	downloadEvents []DownloadEvent
 }
 
 // SessionManager manages persistent browser sessions.
@@ -158,6 +162,9 @@ type SessionLimits struct {
 	IdleTTL     time.Duration
 	MaxPerScope int
 	MaxGlobal   int
+	// DownloadsRoot is the governed root for session download directories;
+	// empty falls back to the OS temp dir under uiai-session-downloads.
+	DownloadsRoot string
 }
 
 func (l SessionLimits) normalized() SessionLimits {
@@ -338,6 +345,7 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 	sess := &Session{ID: generateID(), URL: url, Width: width, Height: height, CreatedAt: now, LastUsed: now, Scope: scope, page: page, pool: sm.pool, refs: make(map[string]SnapshotRef), diagnostics: newDiagnosticsRecorder()}
 	sess.initDiagnostics()
 	sess.initPopupsListener()
+	sess.initDownloads(sm.limits.DownloadsRoot)
 
 	if err := page.Timeout(18 * time.Second).Navigate(url); err != nil {
 		if sess.diagnosticsCancel != nil {
@@ -542,6 +550,7 @@ func (sm *SessionManager) closeSession(id string, idleOnly bool) error {
 	}
 
 	sess.stopScreencastLocked()
+	sess.clearDownloadsLocked()
 	if sess.page != nil {
 		sm.pool.ReleasePage(sess.page)
 		sess.page = nil

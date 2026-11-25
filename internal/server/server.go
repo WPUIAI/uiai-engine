@@ -175,6 +175,9 @@ func New(cfg *config.Config) *Engine {
 			IdleTTL:     time.Duration(cfg.Session.IdleTTLMinutes) * time.Minute,
 			MaxPerScope: cfg.Session.MaxPerScope,
 			MaxGlobal:   cfg.Session.MaxGlobal,
+			// #301 downloads: session download directories root at the
+			// configured storage data dir; empty keeps the OS temp fallback.
+			DownloadsRoot: cfg.Storage.DataDir,
 		})
 		// Spec 76 pillar 3 — self-healing lifecycle: periodic registry↔CDP
 		// diff closes orphan targets and reaps dead sessions (#45).

@@ -148,6 +148,12 @@ func (s *Session) initDiagnostics() {
 		func(e *proto.RuntimeConsoleAPICalled) {
 			s.recordConsole(e)
 		},
+		func(e *proto.PageDownloadWillBegin) {
+			s.noteDownloadBegin(e)
+		},
+		func(e *proto.PageDownloadProgress) {
+			s.noteDownloadProgress(e)
+		},
 		func(e *proto.PageJavascriptDialogOpening) {
 			// #301: an unanswered JavaScript dialog blocks the renderer main
 			// thread; record it for the agent and auto-dismiss so the page

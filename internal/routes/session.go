@@ -276,6 +276,35 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			})
 		})
 
+		// #301 downloads: list and fetch files that landed in the session's
+		// governed download directory; bytes are served bounded.
+		r.Get("/downloads", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{
+				"downloads": sess.Downloads(),
+				"events":    sess.DownloadEvents(),
+			})
+		})
+
+		r.Get("/downloads/{name}", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			data, err := sess.DownloadFileBytes(chi.URLParam(req, "name"))
+			if err != nil {
+				writeJSON(w, 404, map[string]string{"error": err.Error()})
+				return
+			}
+			w.Header().Set("Content-Type", "application/octet-stream")
+			_, _ = w.Write(data)
+		})
+
 		r.Post("/popups/switch", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
