@@ -86,11 +86,13 @@ never use forced audit downgrades or silence peer conflicts to obtain green gate
 
 ### Go toolchain and vulnerability gate
 
-`go.mod` owns the Go baseline (1.26.10); GitHub builds and the Windows installer
-derive that version rather than maintaining a separate version pin. Windows still
-verifies the archive against its independently published SHA-256. OVH verification
-uses the approved side-by-side Go-managed toolchain (`GOTOOLCHAIN=go1.26.10`),
-retaining `/opt/go1.26.7` for rollback without changing global service configuration.
+`go.mod` owns the Go baseline (1.26.11, raised from 1.26.10 for the
+GO-2026-6859 `net/http` `MaxBytesReader` header-race fix — issue #306); GitHub
+builds and the Windows installer derive that version rather than maintaining a
+separate version pin. Windows still verifies the archive against its
+independently published SHA-256. OVH verification uses the approved
+side-by-side Go-managed toolchain (`GOTOOLCHAIN=go1.26.11`), retaining the
+older toolchain for rollback without changing global service configuration.
 
 Build `govulncheck` with that same compiler; an older scanner's source loader may
 reject newer Go syntax. CI runs the pinned `golang.org/x/vuln/cmd/govulncheck@v1.3.0`
