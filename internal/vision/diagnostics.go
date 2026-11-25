@@ -3,6 +3,7 @@ package vision
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ const (
 	maxConsoleEvents   = 200
 	maxExceptionEvents = 100
 	maxNetworkEvents   = 300
+	maxDialogEvents    = 50
 )
 
 type ConsoleEvent struct {
@@ -38,6 +40,19 @@ type ExceptionEvent struct {
 	Line         int    `json:"line,omitempty"`
 	Column       int    `json:"column,omitempty"`
 	StackPreview string `json:"stack_preview,omitempty"`
+}
+
+// DialogEvent records one JavaScript dialog (alert/confirm/prompt/
+// beforeunload) the page opened. Unanswered dialogs block the renderer main
+// thread, so the session listener auto-dismisses and keeps the event here for
+// the agent (#301).
+type DialogEvent struct {
+	Seq           uint64 `json:"seq"`
+	TS            string `json:"ts"`
+	Type          string `json:"type"`
+	Message       string `json:"message"`
+	DefaultPrompt string `json:"default_prompt,omitempty"`
+	URL           string `json:"url,omitempty"`
 }
 
 type NetworkEvent struct {
@@ -65,23 +80,24 @@ type DiagnosticsSummary struct {
 }
 
 type DiagnosticsSnapshot struct {
-	Pacing           *PaceStats                 `json:"pacing,omitempty"`
-	SessionID        string                     `json:"session_id"`
-	ActorRef         string                     `json:"actor_ref,omitempty"`
-	URL              string                     `json:"url"`
-	Title            string                     `json:"title"`
-	Seq              uint64                     `json:"seq"`
-	GeneratedAt      string                     `json:"generated_at"`
-	Mode             string                     `json:"mode,omitempty"`
-	Filters          map[string]any             `json:"filters,omitempty"`
-	FocusaScope      *FocusaScope               `json:"focusa_scope,omitempty"`
-	OriginDiagnostic map[string]any             `json:"origin_diagnostic,omitempty"`
-	Console          []ConsoleEvent             `json:"console"`
-	Exceptions       []ExceptionEvent           `json:"exceptions"`
-	Network          []NetworkEvent             `json:"network"`
-	FailedRequests   []NetworkEvent             `json:"failed_requests"`
-	Summary          DiagnosticsSummary         `json:"summary"`
-	Focusa           *DiagnosticsFocusaMetadata `json:"focusa,omitempty"`
+	Pacing            *PaceStats                 `json:"pacing,omitempty"`
+	SessionID         string                     `json:"session_id"`
+	ActorRef          string                     `json:"actor_ref,omitempty"`
+	URL               string                     `json:"url"`
+	Title             string                     `json:"title"`
+	Seq               uint64                     `json:"seq"`
+	GeneratedAt       string                     `json:"generated_at"`
+	Mode              string                     `json:"mode,omitempty"`
+	Filters           map[string]any             `json:"filters,omitempty"`
+	FocusaScope       *FocusaScope               `json:"focusa_scope,omitempty"`
+	OriginDiagnostic  map[string]any             `json:"origin_diagnostic,omitempty"`
+	Console           []ConsoleEvent             `json:"console"`
+	Exceptions        []ExceptionEvent           `json:"exceptions"`
+	JavascriptDialogs []DialogEvent              `json:"javascript_dialogs"`
+	Network           []NetworkEvent             `json:"network"`
+	FailedRequests    []NetworkEvent             `json:"failed_requests"`
+	Summary           DiagnosticsSummary         `json:"summary"`
+	Focusa            *DiagnosticsFocusaMetadata `json:"focusa,omitempty"`
 }
 
 type DiagnosticsOptions struct {
@@ -107,6 +123,7 @@ type diagnosticsRecorder struct {
 	seq        uint64
 	console    []ConsoleEvent
 	exceptions []ExceptionEvent
+	dialogs    []DialogEvent
 	network    []NetworkEvent
 	requests   map[string]int
 }
@@ -124,11 +141,22 @@ func (s *Session) initDiagnostics() {
 	}
 	_ = proto.RuntimeEnable{}.Call(s.page)
 	_ = proto.NetworkEnable{}.Call(s.page)
+	_ = proto.PageEnable{}.Call(s.page)
 	eventPage, cancel := s.page.WithCancel()
 	s.diagnosticsCancel = cancel
 	go eventPage.EachEvent(
 		func(e *proto.RuntimeConsoleAPICalled) {
 			s.recordConsole(e)
+		},
+		func(e *proto.PageJavascriptDialogOpening) {
+			// #301: an unanswered JavaScript dialog blocks the renderer main
+			// thread; record it for the agent and auto-dismiss so the page
+			// stays usable. The event remains visible in diagnostics
+			// (javascript_dialogs) with its message and default prompt.
+			s.recordDialog(e)
+			if derr := (proto.PageHandleJavaScriptDialog{Accept: false, PromptText: ""}).Call(eventPage); derr != nil {
+				log.Printf("[vision] dialog auto-dismiss failed (session %s): %v", s.ID, derr)
+			}
 		},
 		func(e *proto.RuntimeExceptionThrown) {
 			s.recordException(e)
@@ -154,6 +182,7 @@ func (s *Session) ClearDiagnostics() {
 	defer s.diagnostics.mu.Unlock()
 	s.diagnostics.console = nil
 	s.diagnostics.exceptions = nil
+	s.diagnostics.dialogs = nil
 	s.diagnostics.network = nil
 	s.diagnostics.requests = make(map[string]int)
 	s.diagnostics.seq = 0
@@ -188,6 +217,7 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 
 	console := filterConsoleSince(s.diagnostics.console, limit, opts.Level, opts.SinceSeq)
 	exceptions := tailExceptionsSince(s.diagnostics.exceptions, limit, opts.SinceSeq)
+	dialogs := tailDialogsSince(s.diagnostics.dialogs, limit, opts.SinceSeq)
 	network := filterNetworkSince(s.diagnostics.network, limit, opts.FailedOnly, opts.SinceSeq)
 	failed := filterNetworkSince(s.diagnostics.network, limit, true, opts.SinceSeq)
 
@@ -252,14 +282,15 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 		}
 	}
 	return DiagnosticsSnapshot{
-		Pacing:      pacing,
-		SessionID:   s.ID,
-		ActorRef:    s.ActorRef,
-		URL:         redactURL(s.URL),
-		Title:       title,
-		Seq:         seq,
-		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
-		Mode:        format,
+		JavascriptDialogs: dialogs,
+		Pacing:            pacing,
+		SessionID:         s.ID,
+		ActorRef:          s.ActorRef,
+		URL:               redactURL(s.URL),
+		Title:             title,
+		Seq:               seq,
+		GeneratedAt:       time.Now().UTC().Format(time.RFC3339),
+		Mode:              format,
 		Filters: map[string]any{
 			"limit":       limit,
 			"level":       opts.Level,
@@ -317,6 +348,37 @@ func (s *Session) recordConsole(e *proto.RuntimeConsoleAPICalled) {
 		Line:        line,
 		Column:      col,
 	}, maxConsoleEvents)
+}
+
+// truncateDialogText bounds dialog text to max runes without splitting a rune.
+func truncateDialogText(value string, max int) string {
+	runes := []rune(value)
+	if len(runes) <= max {
+		return value
+	}
+	return string(runes[:max])
+}
+
+// recordDialog appends one dialog event to the bounded ring.
+func (s *Session) recordDialog(e *proto.PageJavascriptDialogOpening) {
+	if s.diagnostics == nil {
+		return
+	}
+	s.diagnostics.mu.Lock()
+	defer s.diagnostics.mu.Unlock()
+	s.diagnostics.seq++
+	event := DialogEvent{
+		Seq:           s.diagnostics.seq,
+		TS:            time.Now().UTC().Format(time.RFC3339),
+		Type:          string(e.Type),
+		Message:       truncateDialogText(e.Message, 400),
+		DefaultPrompt: truncateDialogText(e.DefaultPrompt, 200),
+		URL:           focusapacket.SanitizeURL(e.URL),
+	}
+	s.diagnostics.dialogs = append(s.diagnostics.dialogs, event)
+	if len(s.diagnostics.dialogs) > maxDialogEvents {
+		s.diagnostics.dialogs = s.diagnostics.dialogs[len(s.diagnostics.dialogs)-maxDialogEvents:]
+	}
 }
 
 func (s *Session) recordException(e *proto.RuntimeExceptionThrown) {
@@ -461,6 +523,20 @@ func tailExceptions(items []ExceptionEvent, limit int) []ExceptionEvent {
 
 func tailExceptionsSince(items []ExceptionEvent, limit int, sinceSeq uint64) []ExceptionEvent {
 	out := make([]ExceptionEvent, 0, minInt(limit, len(items)))
+	for i := len(items) - 1; i >= 0 && len(out) < limit; i-- {
+		if sinceSeq > 0 && items[i].Seq <= sinceSeq {
+			continue
+		}
+		out = append(out, items[i])
+	}
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out
+}
+
+func tailDialogsSince(items []DialogEvent, limit int, sinceSeq uint64) []DialogEvent {
+	out := make([]DialogEvent, 0, minInt(limit, len(items)))
 	for i := len(items) - 1; i >= 0 && len(out) < limit; i-- {
 		if sinceSeq > 0 && items[i].Seq <= sinceSeq {
 			continue
