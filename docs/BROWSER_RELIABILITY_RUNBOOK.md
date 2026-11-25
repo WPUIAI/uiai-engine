@@ -11,6 +11,30 @@ Current local runbook for UIAI browser/session reliability gates.
 
 ## Commands
 
+## Private LB health monitor vs public routes (#309)
+
+The OVH shared route is Caddy on loopback `:7460` (`uiai-caddy-rr.service`,
+`/etc/caddy/uiai-rr.Caddyfile`) balancing the two engine workers on
+`127.0.0.1:7456` and `127.0.0.1:7457`. Its active health probe is
+`health_uri /api/health/browser` — the current engine health contract. The
+legacy `/health` probe 404s on current builds and silently marks healthy
+workers unavailable; `scripts/check-ovh-lb-health.sh` rejects that obsolete
+probe (and a probe-less reverse_proxy) and is the regression gate for any
+Caddyfile change on the LB host:
+
+```bash
+bash scripts/check-ovh-lb-health.sh /etc/caddy/uiai-rr.Caddyfile
+```
+
+This monitor target is **private**: loopback-only on OVH, and separate from
+the public surface by design. The public Cloudflare ingress for
+`ai.wpuiai.com` routes only evidence/share paths (`/e/*`,
+`/api/screenshot/share/*`) to the engine; `ai.wpuiai.com/health` answers a
+minimal ingress status stub (`{"status":"ok"}` from the tunnel's `:7459`
+responder), not engine telemetry, and all engine control/health routes
+(e.g. `/api/health`) 404 publicly. Do not add engine health or control
+routes to the public ingress when changing the LB.
+
 ```bash
 make browser-stress
 make browser-soak
