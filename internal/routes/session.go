@@ -236,6 +236,68 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
+		// #301 popups/tabs: list, close, and switch targets this session's
+		// pages opened; foreign session targets are never attachable.
+		r.Get("/popups", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{
+				"popups":             sess.Popups(),
+				"current_target_id":  sess.CurrentTargetID(),
+				"original_target_id": sess.OriginalTargetID(),
+			})
+		})
+
+		r.Post("/popups/close", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				TargetID string `json:"target_id"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.TargetID == "" {
+				writeJSON(w, 400, map[string]string{"error": "target_id required"})
+				return
+			}
+			if err := sess.ClosePopup(body.TargetID); err != nil {
+				writeSessionError(w, 400, classifySessionError(err), err, sess)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{
+				"closed":            body.TargetID,
+				"popups":            sess.Popups(),
+				"current_target_id": sess.CurrentTargetID(),
+			})
+		})
+
+		r.Post("/popups/switch", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				TargetID string `json:"target_id"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.TargetID == "" {
+				writeJSON(w, 400, map[string]string{"error": "target_id required"})
+				return
+			}
+			snap, err := sess.SwitchToPopup(body.TargetID)
+			if err != nil {
+				writeSessionError(w, 400, classifySessionError(err), err, sess)
+				return
+			}
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
+		})
+
 		// Scroll (relative)
 		r.Post("/scroll", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))

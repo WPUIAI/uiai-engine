@@ -131,6 +131,11 @@ type Session struct {
 	authChallenge     *AuthChallenge
 	pacer             *sessionPacer
 	screencast        *screencastHub
+	// #301 popups/tabs: targets this session's pages opened, tracked so the
+	// agent can list, switch, and close them without ever attaching to a
+	// foreign session's targets.
+	popups           []PopupTarget
+	originalTargetID string
 }
 
 // SessionManager manages persistent browser sessions.
@@ -332,6 +337,7 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 	now := time.Now()
 	sess := &Session{ID: generateID(), URL: url, Width: width, Height: height, CreatedAt: now, LastUsed: now, Scope: scope, page: page, pool: sm.pool, refs: make(map[string]SnapshotRef), diagnostics: newDiagnosticsRecorder()}
 	sess.initDiagnostics()
+	sess.initPopupsListener()
 
 	if err := page.Timeout(18 * time.Second).Navigate(url); err != nil {
 		if sess.diagnosticsCancel != nil {
@@ -529,6 +535,7 @@ func (sm *SessionManager) closeSession(id string, idleOnly bool) error {
 		sess.diagnosticsCancel()
 		sess.diagnosticsCancel = nil
 	}
+
 	sess.stopScreencastLocked()
 	if sess.page != nil {
 		sm.pool.ReleasePage(sess.page)
