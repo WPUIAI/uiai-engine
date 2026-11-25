@@ -1172,6 +1172,11 @@ func classifySessionError(err error) string {
 			return "browser_launch_failed"
 		}
 		return "session_capacity"
+	// #293: navigation completed; only the capture failed. Classify by the
+	// typed sentinel before the message buckets — the wrapped text mentions
+	// navigation and would otherwise be mislabeled navigation_failed.
+	case errors.Is(err, vision.ErrPageCaptureFailed):
+		return "page_capture_failed"
 	case strings.Contains(msg, "launch"):
 		return "browser_launch_failed"
 	case strings.Contains(msg, "queue full") || strings.Contains(msg, "queue timeout"):

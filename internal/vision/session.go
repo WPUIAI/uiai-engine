@@ -383,6 +383,38 @@ func retryElement(page *rod.Page, selector string) (*rod.Element, error) {
 	return nil, fmt.Errorf("element not found after %s: %s (%w)", elementRetryBudget.Round(time.Millisecond), selector, lastErr)
 }
 
+// ErrPageCaptureFailed reports that navigation COMPLETED but the page target
+// failed to render/capture (#293: degraded engine browsers fail CDP
+// PageCaptureScreenshot with internal errors while the target still serves
+// navigation; a failed capture must never be reported as if the navigation
+// had no effect).
+var ErrPageCaptureFailed = errors.New("page capture failed")
+
+// captureFailureAfterNavigation wraps a post-navigation capture failure with
+// the completed navigation, its sanitized URL, and the stage timing.
+func captureFailureAfterNavigation(url string, start time.Time, err error) error {
+	return fmt.Errorf("%w after %s: navigation to %s completed, but the page target failed to capture: %w",
+		ErrPageCaptureFailed, time.Since(start).Round(time.Millisecond), focusapacket.SanitizeURL(url), err)
+}
+
+// captureAfterNavigation performs the post-navigation capture with the shared
+// snapshot bound. On failure it strikes the pool's browser degradation
+// counter (three strikes recycle the browser) and returns the typed
+// #293 capture error. Caller must hold s.mu.
+func (s *Session) captureAfterNavigation(url string, start time.Time) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(s.page.GetContext(), sessionSnapshotTimeout)
+	defer cancel()
+	data, err := s.page.Context(ctx).Screenshot(false, &proto.PageCaptureScreenshot{
+		Format:  proto.PageCaptureScreenshotFormatJpeg,
+		Quality: gson(60),
+	})
+	if err != nil {
+		s.pool.MarkFailure()
+		return nil, captureFailureAfterNavigation(url, start, err)
+	}
+	return data, nil
+}
+
 func retryNavigate(page *rod.Page, url string) error {
 	var lastErr error
 	for attempt := 1; attempt <= 2; attempt++ {
@@ -952,16 +984,18 @@ func (s *Session) Navigate(url string) (*SnapResult, error) {
 		return nil, err
 	}
 
-	s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
+	// #293: the DOM-stability wait is advisory, but a page that never
+	// settles is the first visible symptom of a degraded browser target;
+	// record it instead of silently discarding it.
+	if werr := s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15); werr != nil {
+		log.Printf("[vision] navigate %s: page did not settle within budget: %v", focusapacket.SanitizeURL(url), werr)
+	}
 
 	s.URL = url
 	s.Title = safePageTitle(s.page)
 	s.NavCount++
 
-	data, err := s.page.Screenshot(false, &proto.PageCaptureScreenshot{
-		Format:  proto.PageCaptureScreenshotFormatJpeg,
-		Quality: gson(60),
-	})
+	data, err := s.captureAfterNavigation(url, start)
 	if err != nil {
 		return nil, err
 	}

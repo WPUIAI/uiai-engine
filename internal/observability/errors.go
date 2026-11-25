@@ -96,6 +96,11 @@ func classRecovery(class string) (bool, []string) {
 		return false, []string{"adjust_target"}
 	case "page_unavailable":
 		return true, []string{"reopen_session"}
+	case "page_capture_failed":
+		// #293: navigation completed, so the same session may still serve
+		// reads/diagnostics; repeated capture failures mean the browser is
+		// degraded and the pool strikes its restart counter automatically.
+		return true, []string{"read_or_diagnostics_same_session", "reopen_fresh_session_if_repeated", "check_browser_health"}
 	case "timeout", "navigation_failed", "screenshot_failed", "click_failed", "eval_failed":
 		return true, []string{"retry", "diagnostics"}
 	default:
