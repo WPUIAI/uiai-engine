@@ -33,6 +33,12 @@ jobs:
     timeout-minutes: 15
     env:
       OUT_DIR: /tmp/uiai-browser-reliability/${{ github.run_id }}-${{ github.run_attempt }}
+      # Self-hosted lane isolation: four Actions runners share this host and
+      # its default ~/go/pkg/mod; concurrent extraction by other repos'
+      # jobs with different toolchains corrupts shared extracts mid-build
+      # (recurring sqlite/uuid/gson/rod "no such file" failures). uiai-engine
+      # uses its own module cache.
+      GOMODCACHE: /home/wirebot/go/pkg/mod/uiai-engine
     steps:
       - uses: actions/checkout@v4
       - name: Bound OVH runner queue wait

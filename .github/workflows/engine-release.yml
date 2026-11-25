@@ -107,6 +107,9 @@ jobs:
     name: Build parent UIAI Engine release
     needs: [open-issue-release-gate, pull-request-release-gate, version-policy, tag-ci-proof]
     runs-on: [self-hosted, ovh, uiai-engine]
+    env:
+      # Self-hosted module-cache isolation (see browser-reliability.yml).
+      GOMODCACHE: /home/wirebot/go/pkg/mod/uiai-engine
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       asset_name: ${{ env.ENGINE_ASSET_NAME }}
@@ -213,6 +216,11 @@ jobs:
             dist/${{ env.ENGINE_ASSET_NAME }}.sha256
 
   deploy-ovh:
+    env:
+      # Self-hosted module-cache isolation (see browser-reliability.yml).
+      GOMODCACHE: /home/wirebot/go/pkg/mod/uiai-engine
+      # Self-hosted module-cache isolation (see browser-reliability.yml).
+      GOMODCACHE: /home/wirebot/go/pkg/mod/uiai-engine
     name: Deploy parent UIAI Engine to OVH worker
     needs: build-release
     runs-on: [self-hosted, ovh, uiai-engine]
@@ -290,6 +298,9 @@ jobs:
     if: ${{ needs.deploy-ovh.result == 'success' && (github.event_name == 'push' || (inputs.deploy_to_ovh && !inputs.dry_run)) }}
     runs-on: [self-hosted, ovh, uiai-engine]
     environment: production
+    env:
+      # Self-hosted module-cache isolation (see browser-reliability.yml).
+      GOMODCACHE: /home/wirebot/go/pkg/mod/uiai-engine
     steps:
       - name: Verify draft bytes and publish
         env:
