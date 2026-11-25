@@ -169,7 +169,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 			return m[type] || 'textbox';
 		}
 
-		function getName(el) {
+		function getName(el, doc) {
 			// aria-label takes priority
 			const al = el.getAttribute('aria-label');
 			if (al) return al.trim();
@@ -177,7 +177,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 			// aria-labelledby
 			const alb = el.getAttribute('aria-labelledby');
 			if (alb) {
-				const label = document.getElementById(alb);
+				const label = doc.getElementById(alb);
 				if (label) return label.textContent.trim().substring(0, 80);
 			}
 
@@ -190,7 +190,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 			if (tag === 'input' || tag === 'textarea') {
 				// Check associated label
 				if (el.id) {
-					const lbl = document.querySelector('label[for="' + el.id + '"]');
+					const lbl = doc.querySelector('label[for="' + el.id + '"]');
 					if (lbl) return lbl.textContent.trim().substring(0, 80);
 				}
 				return (el.placeholder || el.value || el.name || '').trim();
@@ -209,7 +209,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 			return '';
 		}
 
-		function getSelector(el) {
+		function getSelector(el, doc) {
 			if (el.id) return '#' + CSS.escape(el.id);
 			const tag = el.tagName.toLowerCase();
 
@@ -218,7 +218,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 				const cls = el.className.trim().split(/\s+/).filter(c => c && !c.startsWith('_') && c.length < 40).slice(0, 2).join('.');
 				if (cls) {
 					const sel = tag + '.' + cls;
-					try { if (document.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
+					try { if (doc.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
 				}
 			}
 
@@ -226,7 +226,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 			const al = el.getAttribute('aria-label');
 			if (al) {
 				const sel = tag + '[aria-label="' + al.replace(/"/g, '\\"') + '"]';
-				try { if (document.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
+				try { if (doc.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
 			}
 
 			// Try href (for links)
@@ -234,30 +234,30 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 				const href = el.getAttribute('href');
 				if (href && href.length < 80 && !href.startsWith('javascript:')) {
 					const sel = 'a[href="' + href.replace(/"/g, '\\"') + '"]';
-					try { if (document.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
+					try { if (doc.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
 				}
 			}
 
 			// Try name attr (for inputs)
 			if (el.name) {
 				const sel = tag + '[name="' + el.name.replace(/"/g, '\\"') + '"]';
-				try { if (document.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
+				try { if (doc.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
 			}
 
 			// Try placeholder (for inputs)
 			if (el.placeholder) {
 				const sel = tag + '[placeholder="' + el.placeholder.replace(/"/g, '\\"') + '"]';
-				try { if (document.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
+				try { if (doc.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
 			}
 
 			// Build path from nearest ancestor with ID
-			return buildUniqueSelector(el);
+			return buildUniqueSelector(el, doc);
 		}
 
-		function buildUniqueSelector(el) {
+		function buildUniqueSelector(el, doc) {
 			const parts = [];
 			let cur = el;
-			while (cur && cur !== document.body && parts.length < 4) {
+			while (cur && cur !== doc.body && parts.length < 4) {
 				const tag = cur.tagName.toLowerCase();
 				if (cur.id) {
 					parts.unshift('#' + CSS.escape(cur.id));
@@ -279,7 +279,7 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 			if (parts.length === 0) return el.tagName.toLowerCase();
 			// Verify uniqueness
 			const sel = parts.join(' > ');
-			try { if (document.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
+			try { if (doc.querySelectorAll(sel).length === 1) return sel; } catch(e) {}
 			// Fallback: add body prefix
 			return 'body > ' + parts.join(' > ');
 		}
@@ -291,7 +291,8 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 		}
 
 		const results = [];
-		function walk(el, depth) {
+		let frameCounter = 0;
+		function walk(el, depth, doc, prefix) {
 			if (depth > MAX_DEPTH) return;
 			if (!el || el.nodeType !== 1) return;
 
@@ -300,23 +301,41 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 			if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'template') return;
 			if (el.hidden || el.getAttribute('aria-hidden') === 'true') return;
 
+			// #301 iframes: same-origin iframe documents descend with a
+			// frame-qualified selector prefix; cross-origin frames stay
+			// opaque by browser design.
+			if (tag === 'iframe') {
+				const vis = isVisible(el);
+				if (vis) {
+					const entry = { role: 'iframe', name: (el.title || el.getAttribute('aria-label') || el.src || '').substring(0, 120), tag, depth, selector: prefix + getSelector(el, doc), visible: vis };
+					results.push(entry);
+				}
+				let fdoc = null;
+				try { fdoc = el.contentDocument; } catch (e) { fdoc = null; }
+				if (fdoc && fdoc.body) {
+					const fidx = frameCounter++;
+					walk(fdoc.body, depth + 1, fdoc, prefix + 'frame:' + fidx + '::');
+				}
+				return;
+			}
+
 			const role = getRole(el);
-			const name = getName(el);
+			const name = getName(el, doc);
 			const vis = isVisible(el);
 
 			if (role && vis) {
-				const entry = { role, name: name.substring(0, 120), tag, depth, selector: getSelector(el), visible: vis };
+				const entry = { role, name: name.substring(0, 120), tag, depth, selector: prefix + getSelector(el, doc), visible: vis };
 				if (/^h[1-6]$/.test(tag)) entry.level = parseInt(tag[1]);
 				results.push(entry);
 			}
 
 			for (const child of el.children) {
-				walk(child, depth + 1);
+				walk(child, depth + 1, doc, prefix);
 			}
 		}
 
 		const root = document.querySelector(SCOPE);
-		if (root) walk(root, 0);
+		if (root) walk(root, 0, document, '');
 		return JSON.stringify(results);
 	}`, maxDepth, scopeSelector)
 

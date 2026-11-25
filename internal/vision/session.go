@@ -369,6 +369,11 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 }
 
 func retryElement(page *rod.Page, selector string) (*rod.Element, error) {
+	// #301 iframes: frame-qualified selectors ("frame:<idx>::<sel>") resolve
+	// inside same-origin iframe documents through the frame-aware lookup.
+	if strings.HasPrefix(selector, "frame:") {
+		return retryFrameElement(page, selector)
+	}
 	deadline := time.Now().Add(elementRetryBudget)
 	var lastErr error
 	for attempt := 1; ; attempt++ {
@@ -858,16 +863,26 @@ func (s *Session) ClickContext(caller context.Context, selector string) (*SnapRe
 	if err := s.waitPaceLocked(ctx, "click"); err != nil {
 		return nil, fail("pace", err, false)
 	}
-	element, err := actionElement(page, selector)
-	if err != nil {
-		return nil, fail("locate", err, false)
-	}
 	// Native input preserves user activation; DOM click() silently loses it.
-	if _, err = page.Activate(); err != nil {
-		return nil, fail("focus", err, false)
+	if _, aerr := page.Activate(); aerr != nil {
+		return nil, fail("focus", aerr, false)
 	}
-	if err = element.Click(proto.InputMouseButtonLeft, 1); err != nil {
-		return nil, fail("dispatch", err, true)
+	// #301 iframes: frame-qualified elements report frame-relative geometry,
+	// so a rod element click lands at untranslated coordinates. Dispatch
+	// native input at the page-absolute center instead; the compositor hit
+	// test routes the press to the rendered element inside the frame.
+	if isFrameSelector(selector) {
+		if cerr := s.frameClickLocked(page, selector); cerr != nil {
+			return nil, fail("dispatch", cerr, true)
+		}
+	} else {
+		element, err := actionElement(page, selector)
+		if err != nil {
+			return nil, fail("locate", err, false)
+		}
+		if err = element.Click(proto.InputMouseButtonLeft, 1); err != nil {
+			return nil, fail("dispatch", err, true)
+		}
 	}
 	if err := waitSessionDelay(ctx, 300*time.Millisecond); err != nil {
 		return nil, fail("settle", err, true)
