@@ -341,7 +341,7 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 		return nil, nil, fmt.Errorf("navigation failed: %w", err)
 	}
 
-	page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15)
+	settleAfterNavigation(page, url)
 	sess.Title = safePageTitle(page)
 	sess.NavCount = 1
 	sess.idleTTL = sm.limits.IdleTTL
@@ -381,6 +381,22 @@ func retryElement(page *rod.Page, selector string) (*rod.Element, error) {
 		time.Sleep(backoff)
 	}
 	return nil, fmt.Errorf("element not found after %s: %s (%w)", elementRetryBudget.Round(time.Millisecond), selector, lastErr)
+}
+
+// settleAfterNavigation waits for the page's load event plus a short fixed
+// settle. It deliberately does NOT use rod's WaitDOMStable: that helper
+// polls DOMSnapshot.captureSnapshot every interval with LCS diffing, and on
+// continuously-mutating pages (Docusaurus doc pages with docsearch/scroll
+// mutations) the full polling budget wedges the renderer main thread —
+// evaluate hangs forever and PageCaptureScreenshot fails with
+// {-32603 Internal error } (#293, reproduced 3/3 standalone). The load event
+// wait is a single CDP event evaluation and cannot busy-loop the renderer.
+func settleAfterNavigation(page *rod.Page, url string) {
+	if err := page.Timeout(8 * time.Second).WaitLoad(); err != nil {
+		log.Printf("[vision] navigate %s: load event did not arrive within budget: %v", focusapacket.SanitizeURL(url), err)
+	}
+	// Fixed post-load settle for hydration ripples; bounded and poll-free.
+	time.Sleep(250 * time.Millisecond)
 }
 
 // ErrPageCaptureFailed reports that navigation COMPLETED but the page target
@@ -984,12 +1000,7 @@ func (s *Session) Navigate(url string) (*SnapResult, error) {
 		return nil, err
 	}
 
-	// #293: the DOM-stability wait is advisory, but a page that never
-	// settles is the first visible symptom of a degraded browser target;
-	// record it instead of silently discarding it.
-	if werr := s.page.Timeout(4*time.Second).WaitDOMStable(150*time.Millisecond, 0.15); werr != nil {
-		log.Printf("[vision] navigate %s: page did not settle within budget: %v", focusapacket.SanitizeURL(url), werr)
-	}
+	settleAfterNavigation(s.page, url)
 
 	s.URL = url
 	s.Title = safePageTitle(s.page)
