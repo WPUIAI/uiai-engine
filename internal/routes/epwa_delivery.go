@@ -59,9 +59,16 @@ func publishScreenshotEPWA(req *http.Request, cfg *config.Config, input evidence
 	scopePosture := epwadelivery.ScopeComplete
 	access := epwadelivery.AccessPublicSafe
 	recoveryRef, recordURL, portableURL := "", "", ""
+	scopeMissing := ""
 	if !input.Scope.Complete() || share.ProjectionRef == "" {
 		state, scopePosture, access = epwadelivery.StateBlocked, epwadelivery.ScopeBlocked, epwadelivery.AccessRedacted
 		recoveryRef = "reconcile:epwa-scope-required"
+		// #236: name the exact missing bindings so the caller can repair
+		// the scope envelope without guessing.
+		scopeMissing = strings.Join(input.Scope.MissingRequirements(), ",")
+		if input.Scope.Complete() && share.ProjectionRef == "" {
+			scopeMissing = "epwa_projection_ref"
+		}
 	} else if base, baseErr := canonicalEPWABase(req); baseErr != nil {
 		state = epwadelivery.StatePendingReconcile
 		recoveryRef = "reconcile:epwa-https-required"
@@ -85,7 +92,8 @@ func publishScreenshotEPWA(req *http.Request, cfg *config.Config, input evidence
 			RecordURL: recordURL, PortableURL: portableURL, Access: access,
 		},
 		Scope: epwadelivery.ScopeBinding{
-			Posture: scopePosture, ProjectRef: input.Scope.ProjectRef, WorkstreamRef: input.Scope.WorkstreamRef,
+			Posture: scopePosture, Missing: splitScopeMissing(scopeMissing),
+			ProjectRef: input.Scope.ProjectRef, WorkstreamRef: input.Scope.WorkstreamRef,
 			WorksetRef: input.Scope.WorksetRef, CallGraphRef: input.Scope.CallGraphRef,
 			WorkpointRef: input.Scope.WorkpointRef, WorkItemRef: input.Scope.WorkItemRef, ContinuityRef: input.Scope.ContinuityRef,
 		},
@@ -111,9 +119,11 @@ func publishGenericEPWAAtBase(cfg *config.Config, input evidenceshare.GenericInp
 	state, scopePosture, access := epwadelivery.StatePendingReconcile, epwadelivery.ScopeComplete, epwadelivery.AccessPublicSafe
 	recoveryRef := "reconcile:epwa-https-required"
 	recordURL, portableURL := "", ""
+	scopeMissing := ""
 	if !input.Scope.Complete() {
 		state, scopePosture, access = epwadelivery.StateBlocked, epwadelivery.ScopeBlocked, epwadelivery.AccessRedacted
 		recoveryRef = "reconcile:epwa-scope-required"
+		scopeMissing = strings.Join(input.Scope.MissingRequirements(), ",")
 	} else if base != nil && base.Scheme == "https" && base.Host != "" {
 		state, recoveryRef = epwadelivery.StateReady, ""
 		recordURL, portableURL = shortShareURLs(base, share.PackageID)
@@ -136,7 +146,8 @@ func publishGenericEPWAAtBase(cfg *config.Config, input evidenceshare.GenericInp
 			RecordURL: recordURL, PortableURL: portableURL, Access: access,
 		},
 		Scope: epwadelivery.ScopeBinding{
-			Posture: scopePosture, ProjectRef: input.Scope.ProjectRef, WorkstreamRef: input.Scope.WorkstreamRef,
+			Posture: scopePosture, Missing: splitScopeMissing(scopeMissing),
+			ProjectRef: input.Scope.ProjectRef, WorkstreamRef: input.Scope.WorkstreamRef,
 			WorksetRef: input.Scope.WorksetRef, CallGraphRef: input.Scope.CallGraphRef, WorkpointRef: input.Scope.WorkpointRef,
 			WorkItemRef: input.Scope.WorkItemRef, ContinuityRef: input.Scope.ContinuityRef,
 		},
@@ -319,6 +330,22 @@ func evidenceScopeFromSession(sess *vision.Session) evidenceshare.Scope {
 		return evidenceshare.Scope{}
 	}
 	return evidenceScopeFromFocusa(sess.FocusaScope)
+}
+
+// splitScopeMissing turns the joined missing-binding list into the delivery
+// ScopeBinding.Missing slice; an empty string means nothing was missing.
+func splitScopeMissing(joined string) []string {
+	if joined == "" {
+		return nil
+	}
+	parts := strings.Split(joined, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 func evidenceScopeFromRequest(req *http.Request) evidenceshare.Scope {

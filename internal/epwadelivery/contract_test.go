@@ -2,6 +2,7 @@ package epwadelivery
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,10 @@ func TestDeliveryContractRequiresHTTPSPortableEPWA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second || !strings.HasPrefix(first.DeliveryID, "uiai-epwa-delivery:sha256:") {
+	// #236: ScopeBinding now carries the Missing []string diagnostic list, so
+	// delivery determinism is asserted with reflect.DeepEqual rather than the
+	// former struct == comparison.
+	if !reflect.DeepEqual(first, second) || !strings.HasPrefix(first.DeliveryID, "uiai-epwa-delivery:sha256:") {
 		t.Fatalf("delivery is not deterministic: %#v %#v", first, second)
 	}
 	if err := RequireReady(first); err != nil {

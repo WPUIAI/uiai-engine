@@ -29,6 +29,49 @@ func (s Scope) Empty() bool {
 		s.CallGraphRef == "" && s.WorkpointRef == "" && s.WorkItemRef == "" && s.ContinuityRef == "" && len(s.WorkItems) == 0
 }
 
+// MissingRequirements names, in canonical order, every binding a complete
+// evidence scope still lacks (#236): the six core refs plus continuity_ref,
+// the work-items projection itself, and the matching entry for work_item_ref.
+// Blocked deliveries surface this list so callers see exactly which field to
+// supply instead of a single generic scope-required recovery ref.
+func (s Scope) MissingRequirements() []string {
+	missing := make([]string, 0, 8)
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"project_ref", s.ProjectRef},
+		{"workstream_ref", s.WorkstreamRef},
+		{"workset_ref", s.WorksetRef},
+		{"callgraph_ref", s.CallGraphRef},
+		{"workpoint_ref", s.WorkpointRef},
+		{"work_item_ref", s.WorkItemRef},
+		{"continuity_ref", s.ContinuityRef},
+	} {
+		if field.value == "" {
+			missing = append(missing, field.name)
+		}
+	}
+	if len(s.WorkItems) == 0 {
+		missing = append(missing, "work_items")
+	} else {
+		match := false
+		for _, item := range s.WorkItems {
+			if item.WorkItemRef == s.WorkItemRef {
+				match = true
+				break
+			}
+		}
+		if !match {
+			missing = append(missing, "work_items_matching_work_item_ref")
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return missing
+}
+
 func (s Scope) Complete() bool {
 	// Aligned with the epwadelivery delivery contract (contract_test "continuity
 	// missing"): a complete evidence scope requires all seven bindings — the six

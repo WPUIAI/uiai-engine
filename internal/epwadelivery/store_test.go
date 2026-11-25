@@ -3,6 +3,7 @@ package epwadelivery
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -47,7 +48,9 @@ func TestDeliveryStoreReplaysIdempotentReconciliation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if replayed != settled {
+	// #236: ScopeBinding carries the Missing []string diagnostic list, so
+	// replay equality is asserted with reflect.DeepEqual.
+	if !reflect.DeepEqual(replayed, settled) {
 		t.Fatalf("replay mismatch: got=%#v want=%#v", replayed, settled)
 	}
 }

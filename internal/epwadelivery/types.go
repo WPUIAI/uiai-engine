@@ -50,14 +50,18 @@ type EPWABinding struct {
 }
 
 type ScopeBinding struct {
-	Posture       ScopePosture `json:"posture"`
-	ProjectRef    string       `json:"project_ref,omitempty"`
-	WorkstreamRef string       `json:"workstream_ref,omitempty"`
-	WorksetRef    string       `json:"workset_ref,omitempty"`
-	CallGraphRef  string       `json:"callgraph_ref,omitempty"`
-	WorkpointRef  string       `json:"workpoint_ref,omitempty"`
-	WorkItemRef   string       `json:"work_item_ref,omitempty"`
-	ContinuityRef string       `json:"continuity_ref,omitempty"`
+	Posture ScopePosture `json:"posture"`
+	// Missing names the exact scope bindings still absent when the posture
+	// is blocked (#236) — the caller-facing delivery contract answer to
+	// "which field is missing or unregistered".
+	Missing       []string `json:"missing,omitempty"`
+	ProjectRef    string   `json:"project_ref,omitempty"`
+	WorkstreamRef string   `json:"workstream_ref,omitempty"`
+	WorksetRef    string   `json:"workset_ref,omitempty"`
+	CallGraphRef  string   `json:"callgraph_ref,omitempty"`
+	WorkpointRef  string   `json:"workpoint_ref,omitempty"`
+	WorkItemRef   string   `json:"work_item_ref,omitempty"`
+	ContinuityRef string   `json:"continuity_ref,omitempty"`
 }
 
 type Delivery struct {
