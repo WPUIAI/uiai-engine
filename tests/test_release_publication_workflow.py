@@ -72,7 +72,14 @@ class ReleasePublicationTests(unittest.TestCase):
         gh.write_text(FAKE_GH)
         gh.chmod(0o755)
         (self.root/'dist').mkdir()
-        for name in ('uiai-engine-linux-amd64', 'uiai-engine-linux-amd64.sha256', 'release-notes.md'):
+        # #295: the stage/upload steps publish darwin/arm64 + darwin/amd64
+        # assets alongside linux-amd64; the fake gh rejects uploads whose file
+        # arguments do not exist, so every published asset name needs a
+        # fixture file.
+        for name in ('uiai-engine-linux-amd64', 'uiai-engine-linux-amd64.sha256',
+                     'uiai-engine-darwin-arm64', 'uiai-engine-darwin-arm64.sha256',
+                     'uiai-engine-darwin-amd64', 'uiai-engine-darwin-amd64.sha256',
+                     'release-notes.md'):
             (self.root/'dist'/name).write_text('candidate')
         self.env = dict(os.environ, PATH=str(self.root/'bin')+os.pathsep+os.environ['PATH'],
             BASH_ENV='/dev/null', ENV='/dev/null', GH_CALLS=str(self.root/'calls.jsonl'), RELEASE_TAG='engine-v2.0.24',
