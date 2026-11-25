@@ -26,13 +26,24 @@ func main() {
 	// in-source version rather than a placeholder (#317).
 	if buildinfo.BuildTime == "unknown" {
 		buildinfo.Version = version
+		// #295: a plain `go build` embeds VCS revision/time in the binary's
+		// build settings; surface them so an unstamped build still identifies
+		// the exact commit it came from instead of printing "unknown".
+		if commit, built, ok := buildinfo.VCSBuildInfo(); ok {
+			buildinfo.Commit = commit
+			buildinfo.BuildTime = built
+		}
 	}
 	configPath := flag.String("config", "", "Path to config.yaml")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("uiai-engine %s (built %s)\n", buildinfo.Version, buildinfo.BuildTime)
+		if buildinfo.Commit != "" {
+			fmt.Printf("uiai-engine %s (commit %s, built %s)\n", buildinfo.Version, buildinfo.Commit, buildinfo.BuildTime)
+		} else {
+			fmt.Printf("uiai-engine %s (built %s)\n", buildinfo.Version, buildinfo.BuildTime)
+		}
 		os.Exit(0)
 	}
 

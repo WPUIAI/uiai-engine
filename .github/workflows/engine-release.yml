@@ -156,6 +156,20 @@ jobs:
           chmod +x "dist/${ENGINE_ASSET_NAME}"
           "dist/${ENGINE_ASSET_NAME}" -version
 
+      - name: Build darwin engine binaries (cross-compile, #295)
+        shell: bash
+        run: |
+          mkdir -p dist
+          for arch in arm64 amd64; do
+            name="uiai-engine-darwin-${arch}"
+            CGO_ENABLED=0 GOOS=darwin GOARCH="${arch}" go build \
+              -trimpath \
+              -ldflags "-s -w -X github.com/WPUIAI/uiai-engine/internal/buildinfo.Version=${{ steps.meta.outputs.version }} -X github.com/WPUIAI/uiai-engine/internal/buildinfo.BuildTime=${{ steps.meta.outputs.build_time }}" \
+              -o "dist/${name}" \
+              ./cmd/uiai-engine
+            sha256sum "dist/${name}" | tee "dist/${name}.sha256"
+          done
+
       - name: Hash release artifact
         id: hash
         shell: bash
@@ -197,12 +211,16 @@ jobs:
           state="$(gh release list --limit 1000 --json tagName,isDraft | jq -r --arg tag "$RELEASE_TAG" '.[] | select(.tagName == $tag) | .isDraft')"
           case "$state" in
             true)
-              gh release upload "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" --clobber
+              gh release upload "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" \
+                "dist/uiai-engine-darwin-arm64" "dist/uiai-engine-darwin-arm64.sha256" \
+                "dist/uiai-engine-darwin-amd64" "dist/uiai-engine-darwin-amd64.sha256" --clobber
               gh release edit "$RELEASE_TAG" --notes-file "$notes"
               ;;
             false) echo 'Published releases are immutable; refusing replacement' >&2; exit 2 ;;
             '')
               gh release create "$RELEASE_TAG" "dist/${ENGINE_ASSET_NAME}" "dist/${ENGINE_ASSET_NAME}.sha256" \
+                "dist/uiai-engine-darwin-arm64" "dist/uiai-engine-darwin-arm64.sha256" \
+                "dist/uiai-engine-darwin-amd64" "dist/uiai-engine-darwin-amd64.sha256" \
                 --verify-tag --draft --title "UIAI Engine ${RELEASE_TAG}" --notes-file "$notes"
               ;;
             *) echo 'Ambiguous release metadata; refusing mutation' >&2; exit 2 ;;
