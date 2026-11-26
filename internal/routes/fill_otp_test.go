@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
@@ -115,5 +116,61 @@ func TestFillOTPRoundTripBrowser(t *testing.T) {
 	router.ServeHTTP(after, httptest.NewRequest("POST", "/"+session.ID+"/eval", strings.NewReader(`{"js":"return 1;"}`)))
 	if after.Code == http.StatusConflict || strings.Contains(after.Body.String(), "auth_challenge_pending") {
 		t.Fatalf("ops still blocked after in-band otp resolution: status=%d", after.Code)
+	}
+}
+
+// #84 acceptance: fill_otp succeeds across a FORCED period boundary - the
+// first resolution lands below the floor, the fill waits for the next
+// window, re-resolves, and fills the fresh code (attempts == 2).
+func TestFillOTPForcedWindowBoundaryBrowser(t *testing.T) {
+	if os.Getenv("UIAI_AUTH_TESTS") == "" {
+		t.Skip("set UIAI_AUTH_TESTS=1 for fill_otp browser tests")
+	}
+	site := otpProbeServer()
+	defer site.Close()
+	pool, err := vision.NewPoolWithConfig(vision.PoolConfig{MaxPages: 2, AllowPrivateURLs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	manager := vision.NewSessionManager(pool)
+	defer manager.CloseAll()
+
+	session, _, err := manager.Open(site.URL, 640, 480)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if _, err := session.DetectAuthChallenge(); err != nil {
+		t.Fatalf("detect: %v", err)
+	}
+
+	// Align to the last second of a 5s window so the first resolution is
+	// guaranteed to land below the floor (expires_in == 1 < floor 3).
+	period := 5
+	for i := 0; i < 12; i++ {
+		if time.Now().Unix()%int64(period) == int64(period)-1 {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	router := chi.NewRouter()
+	MountSessionRoutes(router, fillOTPTestConfig(), manager)
+	resolved := httptest.NewRecorder()
+	router.ServeHTTP(resolved, httptest.NewRequest("POST", "/"+session.ID+"/fill_otp",
+		strings.NewReader(`{"selector":"#otp","profile":"probe","floor_s":3}`)))
+	body := resolved.Body.String()
+	if resolved.Code != http.StatusOK || !strings.Contains(body, `"filled":true`) {
+		t.Fatalf("forced-boundary fill failed: status=%d body=%.200s", resolved.Code, body)
+	}
+	if !strings.Contains(body, `"attempts":2`) {
+		t.Fatalf("forced boundary did not take the wait-and-refetch path: %.200s", body)
+	}
+	valueOK, _, err := session.Eval(`return document.getElementById('otp').value.length === 6 && /^[0-9]{6}$/.test(document.getElementById('otp').value);`)
+	if err != nil || valueOK != "true" {
+		t.Fatalf("otp field not filled with the fresh code: %v %q", err, valueOK)
+	}
+	if session.LeaseState() != vision.LeaseActive {
+		t.Fatalf("lease not restored after in-band fill: %s", session.LeaseState())
 	}
 }
