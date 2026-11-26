@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"os"
+
 	"context"
 	"encoding/json"
 	"errors"
@@ -26,6 +28,20 @@ import (
 //   - Minimal required params, sensible defaults
 //   - Session ID in URL path (clear resource identity)
 //   - DOM info included so LLM can reason about interactive elements
+//
+// resolveWhisperURL returns the transcription provider endpoint. The
+// UIAI_WHISPER_URL environment override lets each deployment point at the
+// address its Whisper service actually binds (the config default is the
+// CAPTCHA audio path's loopback address, which is not where every host's
+// service listens).
+func resolveWhisperURL(cfg *config.Config) string {
+	if v := strings.TrimSpace(os.Getenv("UIAI_WHISPER_URL")); v != "" {
+		return v
+	}
+	v, _ := cfg.Captcha.Recaptcha["whisper_url"].(string)
+	return v
+}
+
 func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager, solver ...*captcha.Solver) {
 	if sm == nil {
 		return
@@ -294,8 +310,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeJSON(w, 400, map[string]string{"error": "selector or url is required"})
 				return
 			}
-			whisperURL, _ := cfg.Captcha.Recaptcha["whisper_url"].(string)
-			result, err := sess.MediaTranscript(body.Selector, body.URL, whisperURL)
+			result, err := sess.MediaTranscript(body.Selector, body.URL, resolveWhisperURL(cfg))
 			if err != nil {
 				writeSessionError(w, 400, classifySessionError(err), err, sess)
 				return
