@@ -25,7 +25,9 @@ func MountAttachRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManag
 	}
 
 	// Bounded discovery: names plus reachability, never endpoint internals.
-	r.Get("/attach", func(w http.ResponseWriter, _ *http.Request) {
+	// Paths are relative to the mounting prefix (the server mounts this under
+	// r.Route("/api/attach")), matching the session-route convention.
+	r.Get("/", func(w http.ResponseWriter, _ *http.Request) {
 		out := make([]map[string]any, 0, len(cfg.Attach.Endpoints))
 		for _, ep := range cfg.Attach.Endpoints {
 			pool := registry.GetOrCreate(ep.Name, ep.URL, ep.AllowPrivate)
@@ -41,7 +43,7 @@ func MountAttachRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManag
 		})
 	})
 
-	r.Post("/attach", func(w http.ResponseWriter, req *http.Request) {
+	r.Post("/", func(w http.ResponseWriter, req *http.Request) {
 		var body struct {
 			Endpoint     string              `json:"endpoint"`
 			URL          string              `json:"url"`
