@@ -57,6 +57,7 @@ type Engine struct {
 	evidenceArtifacts *evidenceartifact.Store
 	evidenceRegistry  *evidenceregistry.Manager
 	evidenceSync      *evidenceregistry.ContinuousSync
+	attachRegistry    *vision.AttachRegistry
 }
 
 // New creates a new Engine with all routes wired.
@@ -270,6 +271,7 @@ func New(cfg *config.Config) *Engine {
 		evidenceArtifacts: evidenceArtifacts,
 		evidenceRegistry:  evidenceRegistry,
 		evidenceSync:      evidenceSync,
+		attachRegistry:    vision.NewAttachRegistry(),
 	}
 
 	e.mountRoutes()
@@ -447,6 +449,13 @@ func (e *Engine) mountRoutes() {
 		r.Use(routes.WithDeadline(45 * time.Second)) // C-010-04
 		routes.MountSessionRoutes(r, e.cfg, e.sessions, e.captcha)
 		routes.MountSessionPresentationRoute(r, e.presenter)
+	})
+	// #143: attach to an operator-owned, already-running browser over CDP.
+	// Strictly allow-list driven; disabled unless configured.
+	r.Route("/api/attach", func(r chi.Router) {
+		r.Use(routes.CostMiddleware)
+		r.Use(routes.WithDeadline(45 * time.Second))
+		routes.MountAttachRoutes(r, e.cfg, e.sessions, e.attachRegistry)
 	})
 	r.Route("/api/presentation", func(r chi.Router) {
 		routes.MountPresentationRoutes(r, e.presenter)

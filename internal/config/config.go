@@ -26,6 +26,27 @@ type Config struct {
 	EvidenceRegistry EvidenceRegistryConfig `yaml:"evidence_registry"`
 	Search           SearchConfig           `yaml:"search"`
 	Session          SessionConfig          `yaml:"session"`
+	Attach           AttachConfig           `yaml:"attach"`
+}
+
+// AttachConfig carries the #143 CDP-attach allow-list. Attaching is disabled
+// unless the operator explicitly enables it and names the endpoints; the
+// engine never connects to a caller-supplied debugger URL.
+type AttachConfig struct {
+	Enabled   bool             `yaml:"enabled"`
+	Endpoints []AttachEndpoint `yaml:"endpoints"`
+}
+
+// AttachEndpoint is one operator-allow-listed CDP debugger endpoint.
+type AttachEndpoint struct {
+	// Name is the operator-chosen handle callers use to select this endpoint.
+	Name string `yaml:"name"`
+	// URL is the http(s) debugger endpoint of the already-running browser
+	// (loopback or an approved tailnet/SSH-tunneled address).
+	URL string `yaml:"url"`
+	// AllowPrivate permits private/internal navigation targets inside the
+	// attached browser (private URLs stay blocked by default).
+	AllowPrivate bool `yaml:"allow_private"`
 }
 
 // SessionConfig carries operator-set browser session policy (#303): idle

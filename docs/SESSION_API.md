@@ -525,3 +525,31 @@ The same binary embeds the canonical FPV template and generated asset bundle;
 Native MJPEG readers receive the retained last JPEG on idle output ticks so decoders
 can finalize a frame without waiting for another page repaint; this playback does
 not assert new capture/freshness. Smooth selects8FPS, balanced4FPS, saver1FPS.
+
+## Attach to an existing browser (#143)
+
+`POST /api/attach` opens a session inside an operator-owned, already-running
+browser exposed over CDP. The new tab inherits the owner profile's cookies
+and authenticated sessions, so already-logged-in surfaces (Discord, SSO
+dashboards, Google flows) are directly operable with every native session
+action: screenshot, snapshot, click, fill, diagnostics, FPV share.
+
+    POST /api/attach  {"endpoint": "owner-chrome", "url": "https://discord.com/channels", "width": 1280, "height": 800}
+    GET  /api/attach  → {"enabled": true, "endpoints": [{"name": "owner-chrome", "alive": true}]}
+
+Security boundaries (fail-safe by construction):
+
+- **Allow-list only.** The caller selects an endpoint by its configured name;
+  the request shape has no debugger-URL field, so a caller can never direct
+  the engine to connect to an arbitrary host. Unknown names answer
+  `400 attach_endpoint_unknown`; disabled deployments answer
+  `404 attach_disabled`.
+- **Operator opt-in.** `attach.enabled` plus named endpoints in config:
+  `attach: {enabled: true, endpoints: [{name: owner-chrome, url: http://127.0.0.1:9222, allow_private: true}]}`.
+  Loopback and approved tailnet/SSH-tunneled endpoints only; private
+  navigation targets stay blocked unless the endpoint opts in.
+- **The engine never owns the attached browser's lifecycle.** Releasing a
+  session closes that tab only; closing the attach source disconnects
+  without ever asking the owner's browser to shut down. Session caps, idle
+  TTL, diagnostics, and the auth-challenge machinery apply to attached
+  sessions exactly like native ones.

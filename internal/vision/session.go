@@ -330,19 +330,60 @@ func (sm *SessionManager) openOnce(url string, width, height int) (*Session, *Sn
 	return sm.openOnceScoped(url, width, height, DefaultHostScope())
 }
 
+// OpenAttached (#143) opens a session inside an operator-owned, already-
+// running browser (CDP attach). The attached source supplies the page; the
+// session registers into the same manager map, so every existing route
+// (screenshot, snapshot, click, fill, diagnostics, FPV share) operates on it
+// and the shared per-scope/global caps apply unchanged.
+func (sm *SessionManager) OpenAttached(source PoolSource, url string, width, height int, scope ScopeRef) (*Session, *SnapResult, error) {
+	if source == nil {
+		return nil, nil, fmt.Errorf("attach source required")
+	}
+	if err := source.ValidateNavigationURL(url); err != nil {
+		return nil, nil, err
+	}
+
+	sm.mu.Lock()
+	if sm.countForScopeLocked(scope) >= sm.limits.MaxPerScope {
+		sm.mu.Unlock()
+		return nil, nil, fmt.Errorf("max sessions for scope %s reached (%d) — close one in that scope first (global %d/%d)", scope.String(), sm.limits.MaxPerScope, len(sm.sessions), sm.limits.MaxGlobal)
+	}
+	if len(sm.sessions) >= sm.limits.MaxGlobal {
+		sm.mu.Unlock()
+		return nil, nil, fmt.Errorf("global max sessions reached (%d) — close one first", sm.limits.MaxGlobal)
+	}
+	sm.mu.Unlock()
+
+	if width <= 0 {
+		width = 1280
+	}
+	if height <= 0 {
+		height = 800
+	}
+	return sm.openOnceWithSource(source, url, width, height, scope)
+}
+
 func (sm *SessionManager) openOnceScoped(url string, width, height int, scope ScopeRef) (*Session, *SnapResult, error) {
-	page, err := sm.pool.GetPage()
+	return sm.openOnceWithSource(sm.pool, url, width, height, scope)
+}
+
+// openOnceWithSource is the shared session-open sequence for any PoolSource
+// — the native pool or an attached operator browser (#143). The source owns
+// page acquisition and release; sessions keep full lifecycle (TTL, caps,
+// diagnostics) regardless of origin.
+func (sm *SessionManager) openOnceWithSource(source PoolSource, url string, width, height int, scope ScopeRef) (*Session, *SnapResult, error) {
+	page, err := source.GetPage()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get page: %w", err)
 	}
 
 	if err := page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: width, Height: height, DeviceScaleFactor: 1}); err != nil {
-		sm.pool.ReleasePage(page)
+		source.ReleasePage(page)
 		return nil, nil, fmt.Errorf("viewport failed: %w", err)
 	}
 
 	now := time.Now()
-	sess := &Session{ID: generateID(), URL: url, Width: width, Height: height, CreatedAt: now, LastUsed: now, Scope: scope, page: page, pool: sm.pool, refs: make(map[string]SnapshotRef), diagnostics: newDiagnosticsRecorder()}
+	sess := &Session{ID: generateID(), URL: url, Width: width, Height: height, CreatedAt: now, LastUsed: now, Scope: scope, page: page, pool: source, refs: make(map[string]SnapshotRef), diagnostics: newDiagnosticsRecorder()}
 	sess.initDiagnostics()
 	sess.initPopupsListener()
 	sess.initDownloads(sm.limits.DownloadsRoot)
@@ -352,7 +393,7 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 		if sess.diagnosticsCancel != nil {
 			sess.diagnosticsCancel()
 		}
-		sm.pool.ReleasePage(page)
+		source.ReleasePage(page)
 		return nil, nil, fmt.Errorf("navigation failed: %w", err)
 	}
 

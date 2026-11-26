@@ -194,7 +194,7 @@ func agentDocsExamples() map[string]any {
 			{"name": "remote_auth", "surface": "env", "command": "export UIAI_ENGINE_URL=https://uiai.example.invalid; export UIAI_API_KEY=REDACTED_API_KEY_VALUE", "related_docs": []string{"docs/REMOTE_AUTH_EXAMPLES.md", "docs/ENDPOINT_AUTH_MATRIX.md"}},
 			{"name": "mcp_refresh", "surface": "shell", "command": "node --check mcp/browser-session-mcp.mjs && scripts/smoke-mcp-tool-routes.sh", "related_docs": []string{"docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md"}},
 		},
-		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render", "browser_video_frames", "browser_media_transcript", "browser_media_understand", "browser_upload", "browser_downloads", "browser_popups", "browser_captcha_solve", "browser_fill_otp"},
+		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render", "browser_video_frames", "browser_media_transcript", "browser_media_understand", "browser_upload", "browser_downloads", "browser_popups", "browser_captcha_solve", "browser_fill_otp", "browser_attach"},
 		"auth_classification": map[string]string{
 			"endpoint": "/api/tools/docs",
 			"mode":     "public",
@@ -374,6 +374,7 @@ func toolRelations() map[string][]string {
 		"browser_click":              {"browser_snapshot", "browser_read", "browser_diagnostics", "browser_wait"},
 		"browser_fill":               {"browser_snapshot", "browser_press", "browser_diagnostics", "uiai_2fa_code", "browser_fill_otp"},
 		"browser_fill_otp":           {"browser_snapshot", "browser_press", "browser_click", "browser_diagnostics", "browser_auth_resolve"},
+		"browser_attach":             {"browser_snapshot", "browser_click", "browser_fill", "browser_diagnostics", "browser_close"},
 		"browser_type":               {"browser_snapshot", "browser_fill", "browser_diagnostics"},
 		"browser_press":              {"browser_snapshot", "browser_read", "browser_diagnostics"},
 		"browser_eval":               {"browser_eval_async", "browser_diagnostics", "browser_read"},
@@ -969,6 +970,21 @@ func openAITools() []map[string]any {
 					"type":       map[string]any{"type": "string", "enum": []string{"text", "recaptcha_v2", "turnstile"}, "description": "Override the detected captcha type"},
 				},
 				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_attach",
+			"description": "Open a session inside an operator-owned, already-running browser (CDP attach): the new tab inherits the owner profile's cookies and authenticated sessions, so already-logged-in surfaces (Discord, dashboards, SSO portals) are directly operable with full native actions - screenshot, snapshot, click, fill, diagnostics, FPV share. Endpoints are operator-allow-listed by name; the caller never supplies a debugger URL. Returns typed refusals when attach is disabled or the endpoint name is not configured. Useful queries: attach, authenticated, logged in, existing browser, CDP, owner profile, session adoption.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"endpoint":  map[string]string{"type": "string", "description": "Name of an operator-configured attach endpoint"},
+					"url":       map[string]string{"type": "string", "description": "URL to open in the attached browser's new tab"},
+					"width":     map[string]any{"type": "integer", "description": "Viewport width (default 1280)"},
+					"height":    map[string]any{"type": "integer", "description": "Viewport height (default 800)"},
+					"actor_ref": map[string]string{"type": "string", "description": "Optional actor attribution for audit"},
+				},
+				"required": []string{"endpoint", "url"},
 			},
 		},
 		{
