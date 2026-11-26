@@ -276,6 +276,36 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			})
 		})
 
+		// #294 watch: bounded frame sampling from a session <video> element.
+		r.Post("/video/frames", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector string `json:"selector"`
+				Count    int    `json:"count"`
+				StartMs  int64  `json:"start_ms"`
+				EndMs    int64  `json:"end_ms"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector is required"})
+				return
+			}
+			frames, truncated, err := sess.SampleVideoFrames(body.Selector, body.Count, body.StartMs, body.EndMs)
+			if err != nil {
+				writeSessionError(w, 400, classifySessionError(err), err, sess)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"frames":    frames,
+				"truncated": truncated,
+				"count":     len(frames),
+			})
+		})
+
 		// #301 upload: the agent supplies file bytes; the engine writes them
 		// into the session's governed file area and sets them on the page's
 		// file input.
