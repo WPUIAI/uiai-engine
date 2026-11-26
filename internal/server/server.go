@@ -360,6 +360,9 @@ func (e *Engine) mountRoutes() {
 	})
 	r.Route("/api/admin", func(r chi.Router) {
 		routes.MountAdminReal(r, e.cfg, e.usage, e.limiter, e.auth)
+		// #86: broker revocation entry - fences the cached credential
+		// snapshot immediately (global auth middleware gates this path).
+		routes.MountCredentialRevocationRoutes(r, e.ai)
 	})
 	r.Route("/api/reference", func(r chi.Router) {
 		r.Use(license.RequireFeatureMiddleware(license.FeatureReferenceAccess))
