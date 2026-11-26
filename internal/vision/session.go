@@ -346,6 +346,7 @@ func (sm *SessionManager) openOnceScoped(url string, width, height int, scope Sc
 	sess.initDiagnostics()
 	sess.initPopupsListener()
 	sess.initDownloads(sm.limits.DownloadsRoot)
+	sess.initWebAuthnObserver()
 
 	if err := page.Timeout(18 * time.Second).Navigate(url); err != nil {
 		if sess.diagnosticsCancel != nil {

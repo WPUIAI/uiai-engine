@@ -109,6 +109,7 @@ type DiagnosticsSnapshot struct {
 	Exceptions        []ExceptionEvent           `json:"exceptions"`
 	JavascriptDialogs []DialogEvent              `json:"javascript_dialogs"`
 	MediaElements     []MediaElementInfo         `json:"media_elements,omitempty"`
+	WebAuthnHint      string                     `json:"webauthn_hint,omitempty"`
 	MediaIssues       []string                   `json:"media_issues,omitempty"`
 	Network           []NetworkEvent             `json:"network"`
 	FailedRequests    []NetworkEvent             `json:"failed_requests"`
@@ -361,10 +362,13 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 	}
 	var mediaElements []MediaElementInfo
 	var mediaIssues []string
+	var webAuthnHint string
 	if category == "all" && format == "full" {
 		mediaElements, mediaIssues = s.probePageMedia()
+		webAuthnHint = FormatWebAuthnHint(s.WebAuthnAttempts())
 	}
 	return DiagnosticsSnapshot{
+		WebAuthnHint:      webAuthnHint,
 		JavascriptDialogs: dialogs,
 		MediaElements:     mediaElements,
 		MediaIssues:       mediaIssues,
