@@ -5,10 +5,7 @@
 
 # EPWA delivery — agent-first contract, zero-config guarantee, human guide
 
-**EPWA = Evidence Package Web Archive.** One call publishes a durable,
-self-contained evidence package: a machine-readable delivery record plus a
-portable `.zip` that renders offline on any host, any domain, forever — with
-**zero mandatory configuration**.
+**EPWA = Evidence Progressive Web App.** This is the owner-confirmed product name. The app publishes durable, self-contained **evidence packages**, including a machine-readable delivery record and a portable `.zip` for offline viewing on other hosts or domains with **zero mandatory configuration**. Earlier documentation using “Evidence Package Web Archive” describes the portable packaging concept, not the official expansion of EPWA.
 
 ---
 

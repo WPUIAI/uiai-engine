@@ -14,3 +14,19 @@
 html[dir="rtl"] .lineage li:not(:last-child)::after{content:"←"}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,[tabindex="-1"]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .registry-spacer,.registry-spacer:hover{background:transparent!important}.registry-spacer td{padding:0!important;border:0!important}@media(min-width:601px){.registry-table tbody tr:not(.registry-spacer){height:3.5rem}.registry-record strong,.registry-record code{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 @layer components{.review-panel{display:grid;gap:1rem;padding:1.1rem;border:1px solid var(--line-strong);background:var(--accent-soft)}.review-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}.review-summary>div{padding:.7rem;background:var(--cell);border:1px solid var(--line)}.review-summary dt{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}.review-summary dd{margin-top:.3rem;overflow-wrap:anywhere}.review-gaps{color:var(--danger);font-weight:650}.review-decision-form{display:grid;gap:.8rem;padding-top:.4rem}.review-decision-form label{display:grid;gap:.35rem;color:var(--muted);font-size:.9rem}.review-decision-form textarea{width:100%;resize:vertical;padding:.65rem;border:1px solid var(--line-strong);background:var(--cell);color:var(--ink)}.button-row{display:flex;flex-wrap:wrap;gap:.6rem}.button{border:1px solid var(--line-strong);border-radius:.35rem;padding:.65rem .85rem;cursor:pointer}.button:disabled{cursor:not-allowed;opacity:.55}.button-primary{background:var(--ok);color:#fff;border-color:var(--ok)}.button-secondary{background:var(--danger);color:#fff;border-color:var(--danger)}.review-panel[data-state="blocked"]{border-color:var(--danger)}.review-panel[data-state="accepted"]{border-color:var(--ok)}}
+
+/* Progressive disclosure keeps source evidence and reviewer actions intact and accessible. */
+@layer components {
+.record-heading{display:block}
+.reader-intro{max-width:65ch;margin:1.1rem 0 .75rem;font-size:.97rem;line-height:1.6;color:var(--muted)}
+.reader-primary-link{display:inline-block;padding:.75rem 1rem;margin:0 0 1.25rem;background:var(--accent);color:#fff;border-radius:4px;font-weight:720;text-decoration:none}
+.reader-primary-link:hover,.reader-primary-link:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.technical-details{margin:0 0 .8rem;border:1px solid var(--line);border-radius:5px;background:var(--cell)}
+.technical-details>summary{cursor:pointer;padding:1rem 1.1rem;font-size:.88rem;font-weight:730;line-height:1.5}
+.technical-details>summary:hover{background:var(--accent-soft)}
+.technical-details>summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.technical-details-content{padding:0 1.1rem 1.1rem}
+.technical-details .record-identity{margin:0 0 1.1rem}
+.technical-details .authority-pair{margin-top:.6rem}
+.technical-details .review-panel{margin-top:.8rem}
+}

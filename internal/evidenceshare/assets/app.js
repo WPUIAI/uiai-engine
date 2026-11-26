@@ -151,6 +151,8 @@ async function renderReviewCase() {
     const terminal = reviewCase.posture === "accepted";
     const eligible = required && assigned && !terminal;
     form.hidden = !eligible;
+    // A real, authorized review decision must remain discoverable even in the reader-first layout.
+    if (eligible) byId("technical-review")?.setAttribute("open", "");
     form.querySelectorAll("button").forEach((button) => { button.disabled = !eligible; });
     if (!required) text(byId("review-truth"), tr("review_not_required"));
     else if (!assigned) text(byId("review-truth"), tr("review_unassigned"));
