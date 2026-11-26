@@ -276,6 +276,33 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			})
 		})
 
+		// #301 upload: the agent supplies file bytes; the engine writes them
+		// into the session's governed file area and sets them on the page's
+		// file input.
+		r.Post("/upload", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector      string `json:"selector"`
+				Filename      string `json:"filename"`
+				ContentBase64 string `json:"content_base64"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector == "" || body.Filename == "" || body.ContentBase64 == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector, filename, and content_base64 are required"})
+				return
+			}
+			snap, err := sess.UploadFile(body.Selector, body.Filename, body.ContentBase64)
+			if err != nil {
+				writeSessionError(w, 400, classifySessionError(err), err, sess)
+				return
+			}
+			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
+		})
+
 		// #301 downloads: list and fetch files that landed in the session's
 		// governed download directory; bytes are served bounded.
 		r.Get("/downloads", func(w http.ResponseWriter, req *http.Request) {
