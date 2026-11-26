@@ -194,7 +194,7 @@ func agentDocsExamples() map[string]any {
 			{"name": "remote_auth", "surface": "env", "command": "export UIAI_ENGINE_URL=https://uiai.example.invalid; export UIAI_API_KEY=REDACTED_API_KEY_VALUE", "related_docs": []string{"docs/REMOTE_AUTH_EXAMPLES.md", "docs/ENDPOINT_AUTH_MATRIX.md"}},
 			{"name": "mcp_refresh", "surface": "shell", "command": "node --check mcp/browser-session-mcp.mjs && scripts/smoke-mcp-tool-routes.sh", "related_docs": []string{"docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md"}},
 		},
-		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render"},
+		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render", "browser_video_frames", "browser_media_transcript", "browser_media_understand", "browser_upload", "browser_downloads", "browser_popups"},
 		"auth_classification": map[string]string{
 			"endpoint": "/api/tools/docs",
 			"mode":     "public",
@@ -342,6 +342,7 @@ func toolGraph() map[string]any {
 			{"name": "search_then_browse", "steps": []string{"browser_search", "browser_open selected result", "browser_read", "browser_snapshot", "browser_diagnostics", "browser_close"}},
 			{"name": "web_surfing", "steps": []string{"browser_open", "browser_read", "browser_snapshot", "browser_click/browser_fill/browser_press", "browser_diagnostics", "browser_close"}},
 			{"name": "visual_debug", "steps": []string{"browser_open", "browser_screenshot", "browser_diagnostics", "browser_eval_async", "browser_close"}},
+			{"name": "watch_hear_media", "steps": []string{"browser_open", "browser_media_understand (or browser_video_frames plus browser_media_transcript)", "browser_close"}},
 			{"name": "single_capture", "steps": []string{"screenshot", "frame_catalog", "frame_render"}},
 			{"name": "focusa_evidence", "steps": []string{"browser_open with focusa_scope", "browser_diagnostics", "focusa_browser_diagnostics_intake", "browser_search result evidence_ref", "browser_read", "focusa_evidence_capture/link", "screenshot/share evidence handles"}},
 		},
@@ -362,6 +363,9 @@ func toolRelations() map[string][]string {
 		"source_to_markdown":         {"browser_open", "browser_read", "browser_diagnostics", "uiai_focusa_packet_compose", "focusa_evidence_capture", "focusa_active_object_resolve", "focusa_predict_record"},
 		"browser_search":             {"source_to_markdown", "browser_open", "browser_read", "browser_diagnostics", "uiai_focusa_packet_build", "uiai_tool_search"},
 		"browser_fpv_share":          {"browser_open", "browser_screenshot", "browser_diagnostics"},
+		"browser_media_understand":   {"browser_open", "browser_diagnostics"},
+		"browser_video_frames":       {"browser_open", "browser_media_understand", "browser_diagnostics"},
+		"browser_media_transcript":   {"browser_open", "browser_media_understand", "browser_diagnostics"},
 		"browser_open":               {"browser_read", "browser_snapshot", "browser_diagnostics", "uiai_focusa_packet_build", "focusa_browser_diagnostics_intake", "browser_close"},
 		"browser_auth_resolve":       {"browser_snapshot", "browser_read", "browser_diagnostics", "browser_auth_cancel", "browser_close"},
 		"browser_auth_cancel":        {"browser_open"},
@@ -951,6 +955,85 @@ func openAITools() []map[string]any {
 					"session_id": map[string]string{"type": "string", "description": "Session ID"},
 				},
 				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_video_frames",
+			"description": "Watch a page's video: sample bounded frames from a session <video> element at evenly spaced timestamps (up to 12, 6MB total). Returns base64 JPEG frames with timestamps, sizes, and hashes. Useful queries: video, watch, frames, media.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector of the video element"},
+					"count":      map[string]any{"type": "integer", "description": "Frame count (default 3, max 12)"},
+					"start_ms":   map[string]any{"type": "integer", "description": "Sample range start in milliseconds"},
+					"end_ms":     map[string]any{"type": "integer", "description": "Sample range end in milliseconds (defaults to the video duration)"},
+				},
+				"required": []string{"session_id", "selector"},
+			},
+		},
+		{
+			"name":        "browser_media_transcript",
+			"description": "Hear a page's media: transcribe a session media element (selector) or a direct media URL through the configured Whisper endpoint. Returns transcript text, language, duration, and provider latency. Useful queries: audio, hear, transcript, speech, listen.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector of the audio/video element"},
+					"url":        map[string]string{"type": "string", "description": "Direct media URL (either selector or url)"},
+				},
+				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_media_understand",
+			"description": "Understand a page's video in one call: bounded frames plus the transcript of the same media, sized for a vision model. Audio-only elements and direct URLs return the transcript with honest notes for what frames cannot cover.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector of the video element"},
+					"url":        map[string]string{"type": "string", "description": "Direct media URL (either selector or url)"},
+					"count":      map[string]any{"type": "integer", "description": "Frame count (default 3, max 12)"},
+				},
+				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_upload",
+			"description": "Attach a file to a page: supply file bytes (base64, never a host path) and the engine writes them into the session's governed file area and sets them on the page's file input, so the page's own handling shows the picked name and size.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id":     map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"selector":       map[string]string{"type": "string", "description": "CSS selector of the input[type=file] element"},
+					"filename":       map[string]string{"type": "string", "description": "Plain file name (no paths)"},
+					"content_base64": map[string]string{"type": "string", "description": "File content, base64 encoded, bounded to 25MB"},
+				},
+				"required": []string{"session_id", "selector", "filename", "content_base64"},
+			},
+		},
+		{
+			"name":        "browser_downloads",
+			"description": "List and fetch files that landed in the session's governed download directory, with sizes and SHA-256 digests; PDFs also read back as bounded plain text. Useful queries: download, file, pdf, artifact.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"name":       map[string]string{"type": "string", "description": "File name to fetch (omit to list); append /text for PDF text"},
+				},
+			},
+		},
+		{
+			"name":        "browser_popups",
+			"description": "Work with windows a page opened: list tracked popups, switch to one, or close one. Only this session's own targets are attachable; foreign targets are refused. Useful queries: popup, tab, window, switch.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"action":     map[string]any{"type": "string", "enum": []string{"list", "switch", "close"}, "default": "list"},
+					"target_id":  map[string]string{"type": "string", "description": "Popup target id for switch/close"},
+				},
 			},
 		},
 		{

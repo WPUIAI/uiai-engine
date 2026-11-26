@@ -1,6 +1,8 @@
 package vision
 
 import (
+	"encoding/json"
+
 	"context"
 	"fmt"
 	"log"
@@ -69,6 +71,18 @@ type NetworkEvent struct {
 	UpdatedAt     string `json:"updated_at"`
 }
 
+// MediaElementInfo is one detected page media element in the diagnostics
+// inventory, so an agent knows what video/audio the page carries and whether
+// it consumed any of it (#294 diagnose slice).
+type MediaElementInfo struct {
+	Ref         string  `json:"ref"`
+	Tag         string  `json:"tag"`
+	HasSource   bool    `json:"has_source"`
+	CrossOrigin bool    `json:"cross_origin,omitempty"`
+	DurationS   float64 `json:"duration_s,omitempty"`
+	ReadyState  int     `json:"ready_state"`
+}
+
 type DiagnosticsSummary struct {
 	ConsoleErrors   int `json:"console_errors"`
 	ConsoleWarnings int `json:"console_warnings"`
@@ -94,6 +108,8 @@ type DiagnosticsSnapshot struct {
 	Console           []ConsoleEvent             `json:"console"`
 	Exceptions        []ExceptionEvent           `json:"exceptions"`
 	JavascriptDialogs []DialogEvent              `json:"javascript_dialogs"`
+	MediaElements     []MediaElementInfo         `json:"media_elements,omitempty"`
+	MediaIssues       []string                   `json:"media_issues,omitempty"`
 	Network           []NetworkEvent             `json:"network"`
 	FailedRequests    []NetworkEvent             `json:"failed_requests"`
 	Summary           DiagnosticsSummary         `json:"summary"`
@@ -194,6 +210,62 @@ func (s *Session) ClearDiagnostics() {
 	s.diagnostics.seq = 0
 }
 
+// probePageMedia inventories the page's <video>/<audio> elements (bounded
+// to 20) and builds the honest "present but not consumed" hints, so an
+// agent knows a page carried media it did not sample or transcribe. A
+// failing probe never breaks the diagnostics snapshot.
+func (s *Session) probePageMedia() ([]MediaElementInfo, []string) {
+	s.mu.Lock()
+	page := s.page
+	s.mu.Unlock()
+	if page == nil {
+		return nil, nil
+	}
+	res, err := page.Eval(`() => {
+		const els = document.querySelectorAll('video, audio');
+		const out = [];
+		let vi = 0, ai = 0;
+		for (const el of els) {
+			if (out.length >= 20) break;
+			const idx = el.tagName === 'VIDEO' ? vi++ : ai++;
+			let src = '';
+			try { src = el.currentSrc || el.src || (el.querySelector('source') || {}).src || ''; } catch (e) {}
+			let cross = false;
+			try { cross = !!src && new URL(src, location.href).origin !== location.origin; } catch (e) {}
+			out.push({
+				ref: el.tagName.toLowerCase() + '[' + idx + ']',
+				tag: el.tagName.toLowerCase(),
+				has_source: !!src,
+				cross_origin: cross,
+				duration_s: isFinite(el.duration) ? el.duration : 0,
+				ready_state: el.readyState || 0,
+			});
+		}
+		return JSON.stringify(out);
+	}`)
+	if err != nil || res == nil {
+		return nil, nil
+	}
+	var elements []MediaElementInfo
+	if jerr := json.Unmarshal([]byte(res.Value.Str()), &elements); jerr != nil {
+		return nil, nil
+	}
+	var issues []string
+	for _, el := range elements {
+		if !el.HasSource {
+			continue
+		}
+		state := ""
+		if el.CrossOrigin {
+			state = " (cross-origin source)"
+		}
+		issues = append(issues, fmt.Sprintf(
+			"media present but not sampled/transcribed: %s%s duration=%.1fs ready_state=%d - sample with POST /api/session/{id}/video/frames, transcribe with POST /media/transcript, or combine with POST /media/understand",
+			el.Ref, state, el.DurationS, el.ReadyState))
+	}
+	return elements, issues
+}
+
 func (s *Session) Diagnostics(limit int, level string, failedOnly bool) DiagnosticsSnapshot {
 	return s.DiagnosticsWithOptions(DiagnosticsOptions{Limit: limit, Level: level, FailedOnly: failedOnly})
 }
@@ -287,8 +359,15 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 			"hint":                    "A provider rejection citing a null/missing Origin while page_origin is committed means the request came from an opaque page context (sandboxed iframe, data: document) or the provider's domain allowlist — not engine stripping. Compare an identical side-browser flow before treating the page as broken, and complete third-party login challenges through the approved private handoff lane rather than replaying them.",
 		}
 	}
+	var mediaElements []MediaElementInfo
+	var mediaIssues []string
+	if category == "all" && format == "full" {
+		mediaElements, mediaIssues = s.probePageMedia()
+	}
 	return DiagnosticsSnapshot{
 		JavascriptDialogs: dialogs,
+		MediaElements:     mediaElements,
+		MediaIssues:       mediaIssues,
 		Pacing:            pacing,
 		SessionID:         s.ID,
 		ActorRef:          s.ActorRef,
