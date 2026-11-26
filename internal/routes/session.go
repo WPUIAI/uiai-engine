@@ -113,7 +113,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
-				if !ok || sess.LeaseState() != vision.LeaseAwaitingAuth || req.Method == http.MethodGet || req.Method == http.MethodDelete || strings.HasSuffix(req.URL.Path, "/auth/resolve") || strings.HasSuffix(req.URL.Path, "/auth/cancel") {
+				if !ok || sess.LeaseState() != vision.LeaseAwaitingAuth || req.Method == http.MethodGet || req.Method == http.MethodDelete || strings.HasSuffix(req.URL.Path, "/auth/resolve") || strings.HasSuffix(req.URL.Path, "/auth/cancel") || strings.HasSuffix(req.URL.Path, "/captcha/solve") {
 					next.ServeHTTP(w, req)
 					return
 				}

@@ -448,8 +448,10 @@ func (s *Solver) resolveType(req SolveRequest, sess *vision.Session) string {
 	if sess != nil {
 		result, _, _ := sess.Eval(`
 			if (document.querySelector("iframe[title='reCAPTCHA']")) return "recaptcha_v2";
-			if (document.querySelector("[data-sitekey]")) return "recaptcha_v2";
+			// Turnstile widgets also carry data-sitekey; the turnstile class must
+			// win or every managed challenge would dispatch to the reCAPTCHA path.
 			if (document.querySelector(".cf-turnstile")) return "turnstile";
+			if (document.querySelector("[data-sitekey]")) return "recaptcha_v2";
 			return "text";
 		`)
 		if result != "" && result != "<nil>" {
