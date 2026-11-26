@@ -19,7 +19,7 @@ import (
 
 // version is the canonical in-source release identity; scripts/stamp-uiai-version.py
 // and the preflight version-surface gate parse this literal.
-var version = "2.0.38"
+var version = "2.0.39"
 
 func main() {
 	// Without a release ldflags stamp, buildinfo must still report the true
