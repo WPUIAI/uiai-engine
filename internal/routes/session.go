@@ -276,6 +276,33 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			})
 		})
 
+		// #294 hear: transcribe a page media element or a direct media URL
+		// through the configured Whisper endpoint (the CAPTCHA audio provider
+		// reused, no new secret surface).
+		r.Post("/media/transcript", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector string `json:"selector"`
+				URL      string `json:"url"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector == "" && body.URL == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector or url is required"})
+				return
+			}
+			whisperURL, _ := cfg.Captcha.Recaptcha["whisper_url"].(string)
+			result, err := sess.MediaTranscript(body.Selector, body.URL, whisperURL)
+			if err != nil {
+				writeSessionError(w, 400, classifySessionError(err), err, sess)
+				return
+			}
+			writeJSON(w, http.StatusOK, result)
+		})
+
 		// #294 watch: bounded frame sampling from a session <video> element.
 		r.Post("/video/frames", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
