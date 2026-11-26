@@ -76,7 +76,7 @@ func (s *Session) DetectAuthChallengeContext(caller context.Context) (*AuthChall
 			el.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}));
 		let cls = '';
 		if (has('input[type="password"], form[action*="login" i]')) cls = 'credential_form';
-		else if (has('[data-sitekey], [name*="captcha" i], [id*="captcha" i], [id*="turnstile" i], iframe[src*="recaptcha" i]')) cls = 'captcha';
+		else if (has('[data-sitekey], [name*="captcha" i], [id*="captcha" i], [id*="turnstile" i], .cf-turnstile, iframe[src*="recaptcha" i]') || text.includes('just a moment') || text.includes('verifying you are human')) cls = 'captcha';
 		else if (text.includes('webauthn') || text.includes('security key') || text.includes('passkey')) cls = 'webauthn';
 		else if (text.includes('3-d secure') || text.includes('3ds') || text.includes('strong customer authentication')) cls = 'payment_sca';
 		else if (/[?&/](oauth|authorize|authorization|login)([/?=&]|$)/i.test(url)) cls = 'oidc_redirect';

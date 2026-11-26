@@ -194,7 +194,7 @@ func agentDocsExamples() map[string]any {
 			{"name": "remote_auth", "surface": "env", "command": "export UIAI_ENGINE_URL=https://uiai.example.invalid; export UIAI_API_KEY=REDACTED_API_KEY_VALUE", "related_docs": []string{"docs/REMOTE_AUTH_EXAMPLES.md", "docs/ENDPOINT_AUTH_MATRIX.md"}},
 			{"name": "mcp_refresh", "surface": "shell", "command": "node --check mcp/browser-session-mcp.mjs && scripts/smoke-mcp-tool-routes.sh", "related_docs": []string{"docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md"}},
 		},
-		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render", "browser_video_frames", "browser_media_transcript", "browser_media_understand", "browser_upload", "browser_downloads", "browser_popups"},
+		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render", "browser_video_frames", "browser_media_transcript", "browser_media_understand", "browser_upload", "browser_downloads", "browser_popups", "browser_captcha_solve"},
 		"auth_classification": map[string]string{
 			"endpoint": "/api/tools/docs",
 			"mode":     "public",
@@ -953,6 +953,19 @@ func openAITools() []map[string]any {
 				"type": "object",
 				"properties": map[string]any{
 					"session_id": map[string]string{"type": "string", "description": "Session ID"},
+				},
+				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_captcha_solve",
+			"description": "Attempt the session's CAPTCHA challenge: text CAPTCHAs (OCR/VLM), reCAPTCHA v2 (grid + audio fallback), and Cloudflare Turnstile (bounded token wait after a widget click). Sessions auto-invoke this once on captcha detection; call it explicitly for retries. Useful queries: captcha, turnstile, challenge, cloudflare, recaptcha.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"profile":    map[string]string{"type": "string", "description": "Optional site profile name from the captcha config"},
+					"type":       map[string]any{"type": "string", "enum": []string{"text", "recaptcha_v2", "turnstile"}, "description": "Override the detected captcha type"},
 				},
 				"required": []string{"session_id"},
 			},

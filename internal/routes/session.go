@@ -89,7 +89,15 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		w.Header().Set("X-UIAI-Created-Session-ID", sess.ID)
 		sess.SetActorRef(body.ActorRef)
 		sess.SetFocusaScope(resolveFocusaScope(body.FocusaScope, body.WorkpointID, body.ContinuityID, body.ProjectRoot, body.EvidenceRef))
-		_, _ = sess.DetectAuthChallenge()
+		challenge, _ := sess.DetectAuthChallenge()
+		// #70: a detected captcha/turnstile challenge auto-invokes the solver
+		// once (bounded by the solver's own budgets); a solved challenge clears
+		// the auth-pending lease immediately through the in-process token.
+		if len(solver) > 0 && solver[0] != nil && challenge != nil && challenge.Class == "captcha" {
+			if resp := solver[0].SolveInSession(req.Context(), sess, captcha.SolveRequest{}); resp.Solved {
+				_ = sess.ResolveAuthChallenge(challenge.ResumeToken)
+			}
+		}
 
 		if !writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusCreated, map[string]any{"session": sessionInfoPayload(sess)}) {
 			// The caller never received a session id, so the session would

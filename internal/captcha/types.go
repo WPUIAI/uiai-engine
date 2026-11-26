@@ -16,15 +16,16 @@ type SolveRequest struct {
 
 // SolveConfig provides captcha-specific parameters.
 type SolveConfig struct {
-	ImageSelector  string            `json:"image_selector,omitempty"`
-	AnswerSelector string            `json:"answer_selector,omitempty"`
-	SubmitSelector string            `json:"submit_selector,omitempty"`
-	AutoSubmit     bool              `json:"auto_submit,omitempty"`
-	MaxAttempts    int               `json:"max_attempts,omitempty"`
-	Hint           string            `json:"hint,omitempty"`
-	PromptTemplate string            `json:"prompt_template,omitempty"` // "blind_assistant" | "verification_code"
-	Preprocessing  *PreprocessConfig `json:"preprocessing,omitempty"`
-	Strategy       string            `json:"strategy,omitempty"` // reCAPTCHA: "full_grid" | "per_tile"
+	ImageSelector        string            `json:"image_selector,omitempty"`
+	AnswerSelector       string            `json:"answer_selector,omitempty"`
+	SubmitSelector       string            `json:"submit_selector,omitempty"`
+	AutoSubmit           bool              `json:"auto_submit,omitempty"`
+	MaxAttempts          int               `json:"max_attempts,omitempty"`
+	Hint                 string            `json:"hint,omitempty"`
+	PromptTemplate       string            `json:"prompt_template,omitempty"` // "blind_assistant" | "verification_code"
+	Preprocessing        *PreprocessConfig `json:"preprocessing,omitempty"`
+	Strategy             string            `json:"strategy,omitempty"`               // reCAPTCHA: "full_grid" | "per_tile"
+	TurnstileWaitSeconds int               `json:"turnstile_wait_seconds,omitempty"` // bounded wait for the Turnstile token
 }
 
 // PreprocessConfig for image cleaning before OCR/VLM.

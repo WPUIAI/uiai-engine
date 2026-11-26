@@ -55,6 +55,8 @@ func (s *Solver) SolveInSession(ctx context.Context, sess *vision.Session, req S
 		resp = s.solveTextInSession(ctx, sess, cfg)
 	case "recaptcha_v2":
 		resp = s.SolveRecaptchaV2(ctx, sess, cfg)
+	case "turnstile":
+		resp = s.SolveTurnstile(ctx, sess, cfg)
 	default:
 		resp = &SolveResponse{
 			Solved: false,
