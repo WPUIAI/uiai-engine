@@ -45,6 +45,7 @@ func browserModeDecisionCard(tools []map[string]any) map[string]any {
 			{"when": "auth_challenge_pending", "mode": browserModePrivateAuth, "next": "Keep paused; an otp_input challenge resolves in-band with browser_fill_otp (code resolved at fill moment, never echoed); every other class uses only approved private broker/human path, then fresh observation and authority"},
 			{"when": "popup_or_external_target_not_attached", "mode": "semantic_control", "next": "List popup targets with browser_popups and act through switch/close; never lose opener semantics"},
 			{"when": "page_exists_in_persistent_owner_browser", "mode": "external_cdp_attach", "next": "Use browser_attach with an operator-configured endpoint; the attached tab inherits the owner profile's authenticated sessions"},
+			{"when": "provider_rejects_automated_browser", "mode": "external_cdp_attach", "next": "Do not retry credentials in the rejected context; complete consent in an official headed operator browser, browser_attach to an explicitly authorized operator profile, or use the provider's native CLI/device flow, then resume with the resulting token"},
 			{"when": "credential_form_in_public_or_shared_profile", "mode": browserModePrivateAuth, "next": "Block credential injection; require approved private context"},
 		},
 		"recipes": []map[string]any{

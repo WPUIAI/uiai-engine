@@ -94,27 +94,28 @@ type DiagnosticsSummary struct {
 }
 
 type DiagnosticsSnapshot struct {
-	Pacing            *PaceStats                 `json:"pacing,omitempty"`
-	SessionID         string                     `json:"session_id"`
-	ActorRef          string                     `json:"actor_ref,omitempty"`
-	URL               string                     `json:"url"`
-	Title             string                     `json:"title"`
-	Seq               uint64                     `json:"seq"`
-	GeneratedAt       string                     `json:"generated_at"`
-	Mode              string                     `json:"mode,omitempty"`
-	Filters           map[string]any             `json:"filters,omitempty"`
-	FocusaScope       *FocusaScope               `json:"focusa_scope,omitempty"`
-	OriginDiagnostic  map[string]any             `json:"origin_diagnostic,omitempty"`
-	Console           []ConsoleEvent             `json:"console"`
-	Exceptions        []ExceptionEvent           `json:"exceptions"`
-	JavascriptDialogs []DialogEvent              `json:"javascript_dialogs"`
-	MediaElements     []MediaElementInfo         `json:"media_elements,omitempty"`
-	WebAuthnHint      string                     `json:"webauthn_hint,omitempty"`
-	MediaIssues       []string                   `json:"media_issues,omitempty"`
-	Network           []NetworkEvent             `json:"network"`
-	FailedRequests    []NetworkEvent             `json:"failed_requests"`
-	Summary           DiagnosticsSummary         `json:"summary"`
-	Focusa            *DiagnosticsFocusaMetadata `json:"focusa,omitempty"`
+	Pacing                *PaceStats                 `json:"pacing,omitempty"`
+	SessionID             string                     `json:"session_id"`
+	ActorRef              string                     `json:"actor_ref,omitempty"`
+	URL                   string                     `json:"url"`
+	Title                 string                     `json:"title"`
+	Seq                   uint64                     `json:"seq"`
+	GeneratedAt           string                     `json:"generated_at"`
+	Mode                  string                     `json:"mode,omitempty"`
+	Filters               map[string]any             `json:"filters,omitempty"`
+	FocusaScope           *FocusaScope               `json:"focusa_scope,omitempty"`
+	OriginDiagnostic      map[string]any             `json:"origin_diagnostic,omitempty"`
+	Console               []ConsoleEvent             `json:"console"`
+	Exceptions            []ExceptionEvent           `json:"exceptions"`
+	JavascriptDialogs     []DialogEvent              `json:"javascript_dialogs"`
+	MediaElements         []MediaElementInfo         `json:"media_elements,omitempty"`
+	WebAuthnHint          string                     `json:"webauthn_hint,omitempty"`
+	ProviderRejectionHint string                     `json:"provider_rejection_hint,omitempty"`
+	MediaIssues           []string                   `json:"media_issues,omitempty"`
+	Network               []NetworkEvent             `json:"network"`
+	FailedRequests        []NetworkEvent             `json:"failed_requests"`
+	Summary               DiagnosticsSummary         `json:"summary"`
+	Focusa                *DiagnosticsFocusaMetadata `json:"focusa,omitempty"`
 }
 
 type DiagnosticsOptions struct {
@@ -363,23 +364,28 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 	var mediaElements []MediaElementInfo
 	var mediaIssues []string
 	var webAuthnHint string
+	var providerRejectionHint string
 	if category == "all" && format == "full" {
 		mediaElements, mediaIssues = s.probePageMedia()
 		webAuthnHint = FormatWebAuthnHint(s.WebAuthnAttempts())
+		if challenge := s.CurrentAuthChallenge(); challenge != nil && challenge.Class == ProviderBrowserRejectedClass {
+			providerRejectionHint = FormatProviderRejectionHint()
+		}
 	}
 	return DiagnosticsSnapshot{
-		WebAuthnHint:      webAuthnHint,
-		JavascriptDialogs: dialogs,
-		MediaElements:     mediaElements,
-		MediaIssues:       mediaIssues,
-		Pacing:            pacing,
-		SessionID:         s.ID,
-		ActorRef:          s.ActorRef,
-		URL:               redactURL(s.URL),
-		Title:             title,
-		Seq:               seq,
-		GeneratedAt:       time.Now().UTC().Format(time.RFC3339),
-		Mode:              format,
+		WebAuthnHint:          webAuthnHint,
+		ProviderRejectionHint: providerRejectionHint,
+		JavascriptDialogs:     dialogs,
+		MediaElements:         mediaElements,
+		MediaIssues:           mediaIssues,
+		Pacing:                pacing,
+		SessionID:             s.ID,
+		ActorRef:              s.ActorRef,
+		URL:                   redactURL(s.URL),
+		Title:                 title,
+		Seq:                   seq,
+		GeneratedAt:           time.Now().UTC().Format(time.RFC3339),
+		Mode:                  format,
 		Filters: map[string]any{
 			"limit":       limit,
 			"level":       opts.Level,

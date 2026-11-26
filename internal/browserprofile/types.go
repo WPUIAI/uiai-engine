@@ -57,44 +57,44 @@ type Profile struct {
 }
 
 type LaunchConfig struct {
-	ExecutablePath   string   `yaml:"executable_path,omitempty" json:"executable_path,omitempty"`
-	DriverEndpoint   string   `yaml:"driver_endpoint,omitempty" json:"driver_endpoint,omitempty"`
-	UserDataDir      string   `yaml:"user_data_dir,omitempty" json:"user_data_dir,omitempty"`
-	Persistent       bool     `yaml:"persistent_context,omitempty" json:"persistent_context,omitempty"`
-	NoSandbox        *bool    `yaml:"no_sandbox,omitempty" json:"no_sandbox,omitempty"`
-	DisableGPU       *bool    `yaml:"disable_gpu,omitempty" json:"disable_gpu,omitempty"`
-	DisableExtensions *bool   `yaml:"disable_extensions,omitempty" json:"disable_extensions,omitempty"`
-	DisableWebSecurity *bool  `yaml:"disable_web_security,omitempty" json:"disable_web_security,omitempty"`
-	IgnoreCertErrors *bool    `yaml:"ignore_cert_errors,omitempty" json:"ignore_cert_errors,omitempty"`
-	BlockTrackers    *bool    `yaml:"block_trackers,omitempty" json:"block_trackers,omitempty"`
-	ExtraArgs        []string `yaml:"extra_args,omitempty" json:"extra_args,omitempty"`
+	ExecutablePath     string   `yaml:"executable_path,omitempty" json:"executable_path,omitempty"`
+	DriverEndpoint     string   `yaml:"driver_endpoint,omitempty" json:"driver_endpoint,omitempty"`
+	UserDataDir        string   `yaml:"user_data_dir,omitempty" json:"user_data_dir,omitempty"`
+	Persistent         bool     `yaml:"persistent_context,omitempty" json:"persistent_context,omitempty"`
+	NoSandbox          *bool    `yaml:"no_sandbox,omitempty" json:"no_sandbox,omitempty"`
+	DisableGPU         *bool    `yaml:"disable_gpu,omitempty" json:"disable_gpu,omitempty"`
+	DisableExtensions  *bool    `yaml:"disable_extensions,omitempty" json:"disable_extensions,omitempty"`
+	DisableWebSecurity *bool    `yaml:"disable_web_security,omitempty" json:"disable_web_security,omitempty"`
+	IgnoreCertErrors   *bool    `yaml:"ignore_cert_errors,omitempty" json:"ignore_cert_errors,omitempty"`
+	BlockTrackers      *bool    `yaml:"block_trackers,omitempty" json:"block_trackers,omitempty"`
+	ExtraArgs          []string `yaml:"extra_args,omitempty" json:"extra_args,omitempty"`
 }
 
 type IdentityConfig struct {
-	BundleID            string            `yaml:"bundle_id,omitempty" json:"bundle_id,omitempty"`
-	UserAgent           string            `yaml:"user_agent,omitempty" json:"user_agent,omitempty"`
-	RandomUserAgent     bool              `yaml:"random_user_agent,omitempty" json:"random_user_agent,omitempty"`
-	UserAgents          []string          `yaml:"user_agents,omitempty" json:"user_agents,omitempty"`
-	Platform            string            `yaml:"platform,omitempty" json:"platform,omitempty"`
-	Locale              string            `yaml:"locale,omitempty" json:"locale,omitempty"`
-	Languages           []string          `yaml:"languages,omitempty" json:"languages,omitempty"`
-	Timezone            string            `yaml:"timezone,omitempty" json:"timezone,omitempty"`
-	Geolocation         *Geolocation      `yaml:"geolocation,omitempty" json:"geolocation,omitempty"`
-	Viewport            Viewport          `yaml:"viewport,omitempty" json:"viewport,omitempty"`
-	PatchWebDriver      bool              `yaml:"patch_webdriver,omitempty" json:"patch_webdriver,omitempty"`
-	PatchChromeObject   bool              `yaml:"patch_chrome_object,omitempty" json:"patch_chrome_object,omitempty"`
-	PatchPlugins        bool              `yaml:"patch_plugins,omitempty" json:"patch_plugins,omitempty"`
-	PatchLanguages      bool              `yaml:"patch_languages,omitempty" json:"patch_languages,omitempty"`
-	DisableAutomationControlled bool      `yaml:"disable_automation_controlled,omitempty" json:"disable_automation_controlled,omitempty"`
-	ClientHints         map[string]string `yaml:"client_hints,omitempty" json:"client_hints,omitempty"`
-	HardwareConcurrency int               `yaml:"hardware_concurrency,omitempty" json:"hardware_concurrency,omitempty"`
-	DeviceMemoryGB      int               `yaml:"device_memory_gb,omitempty" json:"device_memory_gb,omitempty"`
-	WebGLVendor         string            `yaml:"webgl_vendor,omitempty" json:"webgl_vendor,omitempty"`
-	WebGLRenderer       string            `yaml:"webgl_renderer,omitempty" json:"webgl_renderer,omitempty"`
-	FontsProfile        string            `yaml:"fonts_profile,omitempty" json:"fonts_profile,omitempty"`
-	CanvasProfile       string            `yaml:"canvas_profile,omitempty" json:"canvas_profile,omitempty"`
-	AudioProfile        string            `yaml:"audio_profile,omitempty" json:"audio_profile,omitempty"`
-	MediaDevicesProfile string            `yaml:"media_devices_profile,omitempty" json:"media_devices_profile,omitempty"`
+	BundleID                    string            `yaml:"bundle_id,omitempty" json:"bundle_id,omitempty"`
+	UserAgent                   string            `yaml:"user_agent,omitempty" json:"user_agent,omitempty"`
+	RandomUserAgent             bool              `yaml:"random_user_agent,omitempty" json:"random_user_agent,omitempty"`
+	UserAgents                  []string          `yaml:"user_agents,omitempty" json:"user_agents,omitempty"`
+	Platform                    string            `yaml:"platform,omitempty" json:"platform,omitempty"`
+	Locale                      string            `yaml:"locale,omitempty" json:"locale,omitempty"`
+	Languages                   []string          `yaml:"languages,omitempty" json:"languages,omitempty"`
+	Timezone                    string            `yaml:"timezone,omitempty" json:"timezone,omitempty"`
+	Geolocation                 *Geolocation      `yaml:"geolocation,omitempty" json:"geolocation,omitempty"`
+	Viewport                    Viewport          `yaml:"viewport,omitempty" json:"viewport,omitempty"`
+	PatchWebDriver              bool              `yaml:"patch_webdriver,omitempty" json:"patch_webdriver,omitempty"`
+	PatchChromeObject           bool              `yaml:"patch_chrome_object,omitempty" json:"patch_chrome_object,omitempty"`
+	PatchPlugins                bool              `yaml:"patch_plugins,omitempty" json:"patch_plugins,omitempty"`
+	PatchLanguages              bool              `yaml:"patch_languages,omitempty" json:"patch_languages,omitempty"`
+	DisableAutomationControlled bool              `yaml:"disable_automation_controlled,omitempty" json:"disable_automation_controlled,omitempty"`
+	ClientHints                 map[string]string `yaml:"client_hints,omitempty" json:"client_hints,omitempty"`
+	HardwareConcurrency         int               `yaml:"hardware_concurrency,omitempty" json:"hardware_concurrency,omitempty"`
+	DeviceMemoryGB              int               `yaml:"device_memory_gb,omitempty" json:"device_memory_gb,omitempty"`
+	WebGLVendor                 string            `yaml:"webgl_vendor,omitempty" json:"webgl_vendor,omitempty"`
+	WebGLRenderer               string            `yaml:"webgl_renderer,omitempty" json:"webgl_renderer,omitempty"`
+	FontsProfile                string            `yaml:"fonts_profile,omitempty" json:"fonts_profile,omitempty"`
+	CanvasProfile               string            `yaml:"canvas_profile,omitempty" json:"canvas_profile,omitempty"`
+	AudioProfile                string            `yaml:"audio_profile,omitempty" json:"audio_profile,omitempty"`
+	MediaDevicesProfile         string            `yaml:"media_devices_profile,omitempty" json:"media_devices_profile,omitempty"`
 }
 
 type Geolocation struct {
@@ -154,17 +154,20 @@ type ObservabilityConfig struct {
 }
 
 type DomainRule struct {
-	Pattern        string `yaml:"pattern" json:"pattern"`
-	Profile        string `yaml:"profile" json:"profile"`
+	Pattern         string          `yaml:"pattern" json:"pattern"`
+	Profile         string          `yaml:"profile" json:"profile"`
 	ChallengePolicy ChallengePolicy `yaml:"challenge_policy,omitempty" json:"challenge_policy,omitempty"`
-	Priority       int    `yaml:"priority,omitempty" json:"priority,omitempty"`
+	Priority        int             `yaml:"priority,omitempty" json:"priority,omitempty"`
 }
 
 // ResolvedProfile is complete, validated, immutable launch input.
 type ResolvedProfile struct {
-	ID        string    `json:"profile_id"`
-	Digest    string    `json:"profile_digest"`
+	ID         string    `json:"profile_id"`
+	Digest     string    `json:"profile_digest"`
 	ResolvedAt time.Time `json:"resolved_at"`
+	// IdentityWarnings carries typed identity-coherence findings (#152);
+	// a cross-OS UA override is a proven provider-rejection input.
+	IdentityWarnings []string `json:"identity_warnings,omitempty"`
 	Profile
 }
 
