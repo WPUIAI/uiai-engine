@@ -305,6 +305,19 @@ func browserHealthPayload(pool vision.PoolSource, visionEnabled bool, sessions *
 		sessionCount = sessions.CountAll()
 	}
 	stats["session_count"] = sessionCount
+	// #80: fleet health groups active sessions by actor so attribution is
+	// visible without per-session lookups; anonymous sessions are named.
+	if sessions != nil {
+		byActor := map[string]int{}
+		for _, sess := range sessions.List() {
+			key := sess.ActorRef
+			if key == "" {
+				key = "anonymous"
+			}
+			byActor[key]++
+		}
+		stats["sessions_by_actor"] = byActor
+	}
 	stats["capacity_note"] = "max_pages is the browser page pool; sessions are scoped handles and may exceed pages via queueing"
 	status := "healthy"
 	if state, _ := stats["browser_state"].(string); state == "idle-off" {
@@ -342,6 +355,8 @@ func browserHealthPayload(pool vision.PoolSource, visionEnabled bool, sessions *
 		"diagnostics_enabled": true,
 		"eval_async_enabled":  true,
 		"agent_pressure":      agentPressureSummary(stats, reconcilerSnapshot(sessions), cfg, states...),
+		// #80: fleet attribution — active sessions grouped by actor.
+		"sessions_by_actor": stats["sessions_by_actor"],
 		// #303: operator-set session policy is reported so capacity planning
 		// reads the effective contract, not source constants.
 		"session_limits": sessionLimitsSnapshot(sessions),

@@ -162,6 +162,9 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 			"schema": "uiai.fpv_share_result.v2", "delivery_state": delivery.State, "epwa_delivery": delivery,
 			"operational_mirror": share, "operational_mirror_posture": "ephemeral_non_evidence",
 			"token": share["token"], "session_id": share["session_id"], "expires_at": share["mirror_url_expires_at"],
+			// #80: the share metadata carries the session's actor so every
+			// observation surface is audit-attributable.
+			"actor_ref": sess.ActorRef,
 		}
 		if delivery.State == epwadelivery.StateReady {
 			response["artifact_url"] = delivery.EPWA.RecordURL
