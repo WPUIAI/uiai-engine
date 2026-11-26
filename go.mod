@@ -6,6 +6,7 @@ require (
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-rod/rod v0.116.2
 	github.com/google/uuid v1.6.0
+	github.com/ledongthuc/pdf v0.0.0-20261125152515-e8918f005efa
 	github.com/ysmood/gson v0.7.3
 	golang.org/x/image v0.47.0
 	golang.org/x/net v0.62.0

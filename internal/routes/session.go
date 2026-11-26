@@ -317,6 +317,21 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			})
 		})
 
+		r.Get("/downloads/{name}/text", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			text, err := sess.DownloadFileText(chi.URLParam(req, "name"))
+			if err != nil {
+				writeJSON(w, 400, map[string]string{"error": err.Error()})
+				return
+			}
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = w.Write([]byte(text))
+		})
+
 		r.Get("/downloads/{name}", func(w http.ResponseWriter, req *http.Request) {
 			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
 			if !ok {
