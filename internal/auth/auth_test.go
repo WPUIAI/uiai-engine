@@ -9,7 +9,7 @@ import (
 )
 
 func TestLoopbackToolPathClassification(t *testing.T) {
-	for _, path := range []string{"/api/session", "/api/session/abc/read", "/api/attach", "/api/attach/owner", "/api/screenshot", "/api/screenshot/share", "/api/search", "/api/search/providers", "/api/markdown", "/api/markdown/", "/api/agent/research-packet", "/api/fpv/events"} {
+	for _, path := range []string{"/api/session", "/api/session/abc/read", "/api/attach", "/api/attach/owner", "/api/proof/publish", "/api/screenshot", "/api/screenshot/share", "/api/search", "/api/search/providers", "/api/markdown", "/api/markdown/", "/api/agent/research-packet", "/api/fpv/events"} {
 		if !isLoopbackToolPath(path) {
 			t.Fatalf("expected loopback tool path: %s", path)
 		}

@@ -159,7 +159,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 }
 
 func isLoopbackToolPath(path string) bool {
-	return path == "/api/screenshot" || strings.HasPrefix(path, "/api/screenshot/") || strings.HasPrefix(path, "/api/session") || strings.HasPrefix(path, "/api/attach") || path == "/api/search" || strings.HasPrefix(path, "/api/search/") || path == "/api/markdown" || strings.HasPrefix(path, "/api/markdown/") || path == "/api/agent/research-packet" || path == "/api/fpv/share" || path == "/api/fpv/revoke" || path == "/api/fpv/events" || strings.HasPrefix(path, "/api/media/frame/") || path == "/api/errors" || strings.HasPrefix(path, "/api/errors/")
+	return path == "/api/screenshot" || strings.HasPrefix(path, "/api/screenshot/") || strings.HasPrefix(path, "/api/session") || strings.HasPrefix(path, "/api/attach") || strings.HasPrefix(path, "/api/proof") || path == "/api/search" || strings.HasPrefix(path, "/api/search/") || path == "/api/markdown" || strings.HasPrefix(path, "/api/markdown/") || path == "/api/agent/research-packet" || path == "/api/fpv/share" || path == "/api/fpv/revoke" || path == "/api/fpv/events" || strings.HasPrefix(path, "/api/media/frame/") || path == "/api/errors" || strings.HasPrefix(path, "/api/errors/")
 }
 
 func isLoopbackRequest(r *http.Request) bool {

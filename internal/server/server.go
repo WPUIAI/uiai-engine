@@ -460,6 +460,12 @@ func (e *Engine) mountRoutes() {
 		r.Use(routes.WithDeadline(45 * time.Second))
 		routes.MountAttachRoutes(r, e.cfg, e.sessions, e.attachRegistry)
 	})
+	// #106: durable Browser Proof report publication.
+	r.Route("/api/proof", func(r chi.Router) {
+		r.Use(routes.CostMiddleware)
+		r.Use(routes.WithDeadline(30 * time.Second))
+		routes.MountProofPublishRoutes(r, e.cfg)
+	})
 	r.Route("/api/presentation", func(r chi.Router) {
 		routes.MountPresentationRoutes(r, e.presenter)
 	})

@@ -194,7 +194,7 @@ func agentDocsExamples() map[string]any {
 			{"name": "remote_auth", "surface": "env", "command": "export UIAI_ENGINE_URL=https://uiai.example.invalid; export UIAI_API_KEY=REDACTED_API_KEY_VALUE", "related_docs": []string{"docs/REMOTE_AUTH_EXAMPLES.md", "docs/ENDPOINT_AUTH_MATRIX.md"}},
 			{"name": "mcp_refresh", "surface": "shell", "command": "node --check mcp/browser-session-mcp.mjs && scripts/smoke-mcp-tool-routes.sh", "related_docs": []string{"docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md"}},
 		},
-		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render", "browser_video_frames", "browser_media_transcript", "browser_media_understand", "browser_upload", "browser_downloads", "browser_popups", "browser_captcha_solve", "browser_fill_otp", "browser_attach"},
+		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render", "browser_video_frames", "browser_media_transcript", "browser_media_understand", "browser_upload", "browser_downloads", "browser_popups", "browser_captcha_solve", "browser_fill_otp", "browser_attach", "browser_proof_publish"},
 		"auth_classification": map[string]string{
 			"endpoint": "/api/tools/docs",
 			"mode":     "public",
@@ -375,6 +375,7 @@ func toolRelations() map[string][]string {
 		"browser_fill":               {"browser_snapshot", "browser_press", "browser_diagnostics", "uiai_2fa_code", "browser_fill_otp"},
 		"browser_fill_otp":           {"browser_snapshot", "browser_press", "browser_click", "browser_diagnostics", "browser_auth_resolve"},
 		"browser_attach":             {"browser_snapshot", "browser_click", "browser_fill", "browser_diagnostics", "browser_close"},
+		"browser_proof_publish":      {"browser_screenshot", "browser_diagnostics", "browser_close"},
 		"browser_type":               {"browser_snapshot", "browser_fill", "browser_diagnostics"},
 		"browser_press":              {"browser_snapshot", "browser_read", "browser_diagnostics"},
 		"browser_eval":               {"browser_eval_async", "browser_diagnostics", "browser_read"},
@@ -970,6 +971,22 @@ func openAITools() []map[string]any {
 					"type":       map[string]any{"type": "string", "enum": []string{"text", "recaptcha_v2", "turnstile"}, "description": "Override the detected captcha type"},
 				},
 				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_proof_publish",
+			"description": "Compose a durable, human-viewable Browser Proof report from existing proof responses: per-viewport screenshot cards, structured assertions with pass/fail, diagnostics summary, and an interaction trace - published as one immutable artifact that outlives the session and the browser. Read-only by default; caller text is redacted before assembly. Returns the durable artifact URL instead of session-bound FPV links or terminal handles. Useful queries: proof, report, qa evidence, shareable, artifact, responsive matrix.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title":             map[string]string{"type": "string", "description": "Report title"},
+					"target_url":        map[string]string{"type": "string", "description": "The page under proof"},
+					"viewports":         map[string]any{"type": "array", "description": "Viewport cards (1-12): width, height, screenshot_url, optional screenshot_ref"},
+					"assertions":        map[string]any{"type": "array", "description": "Checks (max 64): name, expected, actual, passed"},
+					"diagnostics":       map[string]any{"type": "object", "description": "Console/exception/failed-request/4xx/5xx counts"},
+					"interaction_notes": map[string]any{"type": "array", "description": "Interaction trace steps (max 16)"},
+				},
+				"required": []string{"title", "viewports"},
 			},
 		},
 		{
