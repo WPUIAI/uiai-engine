@@ -292,6 +292,32 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			})
 		})
 
+		// #294 understand: bounded frames plus transcript of the same media
+		// in one call, sized for a vision model.
+		r.Post("/media/understand", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector string `json:"selector"`
+				URL      string `json:"url"`
+				Count    int    `json:"count"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector == "" && body.URL == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector or url is required"})
+				return
+			}
+			result, err := sess.MediaUnderstand(body.Selector, body.URL, resolveWhisperURL(cfg), body.Count)
+			if err != nil {
+				writeSessionError(w, 400, classifySessionError(err), err, sess)
+				return
+			}
+			writeJSON(w, http.StatusOK, result)
+		})
+
 		// #294 hear: transcribe a page media element or a direct media URL
 		// through the configured Whisper endpoint (the CAPTCHA audio provider
 		// reused, no new secret surface).
