@@ -372,7 +372,7 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 			providerRejectionHint = FormatProviderRejectionHint()
 		}
 	}
-	return DiagnosticsSnapshot{
+	snapshot := DiagnosticsSnapshot{
 		WebAuthnHint:          webAuthnHint,
 		ProviderRejectionHint: providerRejectionHint,
 		JavascriptDialogs:     dialogs,
@@ -402,6 +402,23 @@ func (s *Session) DiagnosticsWithOptions(opts DiagnosticsOptions) DiagnosticsSna
 		Summary:          summary,
 		Focusa:           buildDiagnosticsFocusaMetadata(s.ID, seq, s.URL, title, summary, s.FocusaScope),
 	}
+	// Bound injected values never surface in diagnostics channels (#81):
+	// console text, exception text, and network/failed URLs are scrubbed at
+	// the session-owned exit, after capture-time pattern redaction.
+	// Diagnostics already holds the session mutex; lock-free direct scrub.
+	for i := range snapshot.Console {
+		snapshot.Console[i].Text = s.boundSecrets.scrub(snapshot.Console[i].Text)
+	}
+	for i := range snapshot.Exceptions {
+		snapshot.Exceptions[i].Text = s.boundSecrets.scrub(snapshot.Exceptions[i].Text)
+	}
+	for i := range snapshot.Network {
+		snapshot.Network[i].URL = s.boundSecrets.scrub(snapshot.Network[i].URL)
+	}
+	for i := range snapshot.FailedRequests {
+		snapshot.FailedRequests[i].URL = s.boundSecrets.scrub(snapshot.FailedRequests[i].URL)
+	}
+	return snapshot
 }
 
 func buildDiagnosticsFocusaMetadata(sessionID string, seq uint64, pageURL, title string, summary DiagnosticsSummary, scope *FocusaScope) *DiagnosticsFocusaMetadata {

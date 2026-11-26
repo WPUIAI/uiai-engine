@@ -126,6 +126,7 @@ type Session struct {
 	idleTTL           time.Duration
 	mu                sync.Mutex
 	refs              map[string]SnapshotRef // @ref → CSS selector, populated by Snapshot()
+	boundSecrets      *boundSecrets          // #81 injected values never surfaced verbatim
 	diagnostics       *diagnosticsRecorder
 	diagnosticsCancel func()
 	authChallenge     *AuthChallenge
@@ -223,16 +224,17 @@ func WrapPage(page *rod.Page, url string, width, height int) *Session {
 	now := time.Now()
 	title := safePageTitle(page)
 	sess := &Session{
-		ID:          generateID(),
-		URL:         url,
-		Title:       title,
-		Width:       width,
-		Height:      height,
-		CreatedAt:   now,
-		LastUsed:    now,
-		page:        page,
-		refs:        make(map[string]SnapshotRef),
-		diagnostics: newDiagnosticsRecorder(),
+		ID:           generateID(),
+		URL:          url,
+		Title:        title,
+		Width:        width,
+		Height:       height,
+		CreatedAt:    now,
+		LastUsed:     now,
+		page:         page,
+		refs:         make(map[string]SnapshotRef),
+		boundSecrets: newBoundSecrets(),
+		diagnostics:  newDiagnosticsRecorder(),
 	}
 	sess.initDiagnostics()
 	return sess
@@ -383,7 +385,7 @@ func (sm *SessionManager) openOnceWithSource(source PoolSource, url string, widt
 	}
 
 	now := time.Now()
-	sess := &Session{ID: generateID(), URL: url, Width: width, Height: height, CreatedAt: now, LastUsed: now, Scope: scope, page: page, pool: source, refs: make(map[string]SnapshotRef), diagnostics: newDiagnosticsRecorder()}
+	sess := &Session{ID: generateID(), URL: url, Width: width, Height: height, CreatedAt: now, LastUsed: now, Scope: scope, page: page, pool: source, refs: make(map[string]SnapshotRef), boundSecrets: newBoundSecrets(), diagnostics: newDiagnosticsRecorder()}
 	sess.initDiagnostics()
 	sess.initPopupsListener()
 	sess.initDownloads(sm.limits.DownloadsRoot)
@@ -1418,6 +1420,13 @@ func (s *Session) ReadPageContext(caller context.Context, opts ReadOptions) (*Pa
 		return nil, fmt.Errorf("%s: %s", raw.Error, opts.Selector)
 	}
 
+	// Bound injected values are replaced first (#81): an injected secret that
+	// does not look secret-shaped still never surfaces verbatim.
+	// The reader already holds the session mutex; call the lock-free scrub.
+	raw.Text = s.boundSecrets.scrub(raw.Text)
+	raw.Title = s.boundSecrets.scrub(raw.Title)
+	raw.Description = s.boundSecrets.scrub(raw.Description)
+	raw.SiteName = s.boundSecrets.scrub(raw.SiteName)
 	// Redact before truncation so a character budget cannot split a credential
 	// pattern and accidentally disclose its prefix. Keep page reads independent
 	// of the shorter diagnostics-preview budget.

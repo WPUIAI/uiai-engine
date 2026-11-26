@@ -116,7 +116,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
-				if !ok || sess.LeaseState() != vision.LeaseAwaitingAuth || req.Method == http.MethodGet || req.Method == http.MethodDelete || strings.HasSuffix(req.URL.Path, "/auth/resolve") || strings.HasSuffix(req.URL.Path, "/auth/cancel") || strings.HasSuffix(req.URL.Path, "/captcha/solve") || strings.HasSuffix(req.URL.Path, "/fill_otp") {
+				if !ok || sess.LeaseState() != vision.LeaseAwaitingAuth || req.Method == http.MethodGet || req.Method == http.MethodDelete || strings.HasSuffix(req.URL.Path, "/auth/resolve") || strings.HasSuffix(req.URL.Path, "/auth/cancel") || strings.HasSuffix(req.URL.Path, "/captcha/solve") || strings.HasSuffix(req.URL.Path, "/fill_otp") || strings.HasSuffix(req.URL.Path, "/fill_secret") {
 					next.ServeHTTP(w, req)
 					return
 				}
@@ -775,6 +775,87 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
 		})
 
+		// Storage-state export — GET /api/session/{sessionID}/storage/export
+		// (#81): cookies + web storage as an opaque blob for login reuse.
+		r.Get("/storage/export", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			state, err := sess.ExportStorageState()
+			if err != nil {
+				writeSessionError(w, 500, "storage_export_failed", err, sess, map[string]any{"action": "storage_export"})
+				return
+			}
+			writeJSON(w, 200, map[string]any{"storage_state": state})
+		})
+
+		// Storage-state import — POST /api/session/{sessionID}/storage/import
+		// (#81): apply a previously exported blob; authenticated state lands
+		// without any secret re-entering model context.
+		r.Post("/storage/import", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				StorageState *vision.StorageState `json:"storage_state"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.StorageState == nil {
+				writeJSON(w, 400, map[string]string{"error": "storage_state required", "code": "storage_import_invalid"})
+				return
+			}
+			if err := sess.ImportStorageState(body.StorageState); err != nil {
+				writeSessionError(w, 400, "storage_import_failed", err, sess, map[string]any{"action": "storage_import", "schema": body.StorageState.Schema})
+				return
+			}
+			writeJSON(w, 200, map[string]any{"imported": true, "schema": vision.StorageStateSchema, "session": sessionInfoPayload(sess)})
+		})
+
+		// Broker-bound credential fill — POST /api/session/{sessionID}/fill_secret
+		// (#81): the value reaches the field through the normal fill path and is
+		// then bound: every textual output channel (snapshot, read, eval,
+		// diagnostics, errors) replaces its exact occurrences with [secret].
+		// The response is metadata-only; the value is never echoed.
+		r.Post("/fill_secret", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector string `json:"selector"`
+				Value    string `json:"value"`
+				Label    string `json:"label"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector == "" || body.Value == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector and value are required", "code": "secret_fill_invalid"})
+				return
+			}
+			resolvedSelector, resolveErr := sess.ResolveSelector(body.Selector)
+			if resolveErr != nil {
+				writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "fill_secret", "selector": body.Selector})
+				return
+			}
+			// The snapshot is deliberately discarded: metadata-only response.
+			if _, err := sess.Fill(resolvedSelector, body.Value); err != nil {
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "fill_secret", "selector": body.Selector, "resolved_selector": resolvedSelector})
+				return
+			}
+			sess.BindSecret(body.Value, body.Label)
+			writeJSON(w, 200, map[string]any{
+				"filled":    true,
+				"label":     body.Label,
+				"selector":  body.Selector,
+				"bound":     true,
+				"redaction": vision.BoundSecretMarker,
+			})
+		})
+
 		// Fill-time OTP resolution — POST /api/session/{sessionID}/fill_otp
 		// (#84): the code is resolved at the fill moment through the local
 		// two-factor custody point, never pre-fetched, and never echoed in
@@ -856,6 +937,9 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "fill_otp", "selector": body.Selector, "resolved_selector": resolvedSelector})
 				return
 			}
+			// The one-time code is bound as an injected secret (#81): later
+			// readbacks of the field value surface [secret], never the code.
+			sess.BindSecret(resp.Code, "otp")
 			// In-band resolution: a successful fill clears a pending
 			// otp_input challenge; the vision layer emits the audit event.
 			if challenge := sess.CurrentAuthChallenge(); challenge != nil && challenge.Class == "otp_input" {

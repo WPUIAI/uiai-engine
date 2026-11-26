@@ -367,10 +367,12 @@ func (s *Session) Snapshot(opts SnapshotOptions) (*SnapshotResult, error) {
 	names := make([]any, len(elements))
 	controls := make([]any, len(elements))
 	for i, element := range elements {
-		names[i] = element.Name
-		controls[i] = map[string]any{"tag": element.Tag, "selector": element.Selector, "text": element.Name}
+		// Snapshot already holds the session mutex; lock-free direct scrub.
+		scrubbedName := s.boundSecrets.scrub(element.Name)
+		names[i] = scrubbedName
+		controls[i] = map[string]any{"tag": element.Tag, "selector": element.Selector, "text": scrubbedName}
 	}
-	projection := redactPageFields(map[string]any{"names": names, "controls": controls, "title": s.Title})
+	projection := redactPageFields(map[string]any{"names": names, "controls": controls, "title": s.boundSecrets.scrub(s.Title)})
 	for i, name := range projection["names"].([]any) {
 		elements[i].Name = name.(string)
 	}

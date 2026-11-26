@@ -87,6 +87,9 @@ func (s *Session) evaluateContext(caller context.Context, operation, script stri
 	// Structured credential labels and aliases must be classified before the
 	// diagnostic budget can cut JSON in half and erase its sensitive fields.
 	s.Title, value = title, sanitizeDiagnosticText(values[0])
+	// Bound injected values never surface in eval results (#81): the exact
+	// match scrub runs after pattern redaction, before the result returns.
+	value = s.boundSecrets.scrub(value)
 	if err := ctx.Err(); err != nil {
 		return "", nil, failure("observe", err, true)
 	}
