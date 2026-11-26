@@ -194,7 +194,7 @@ func agentDocsExamples() map[string]any {
 			{"name": "remote_auth", "surface": "env", "command": "export UIAI_ENGINE_URL=https://uiai.example.invalid; export UIAI_API_KEY=REDACTED_API_KEY_VALUE", "related_docs": []string{"docs/REMOTE_AUTH_EXAMPLES.md", "docs/ENDPOINT_AUTH_MATRIX.md"}},
 			{"name": "mcp_refresh", "surface": "shell", "command": "node --check mcp/browser-session-mcp.mjs && scripts/smoke-mcp-tool-routes.sh", "related_docs": []string{"docs/MCP_CACHE_RECONNECT_TROUBLESHOOTING.md"}},
 		},
-		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render", "browser_video_frames", "browser_media_transcript", "browser_media_understand", "browser_upload", "browser_downloads", "browser_popups", "browser_captcha_solve"},
+		"relevant_tools": []string{"uiai_agent_card", "uiai_tool_search", "uiai_tool_graph", "uiai_health", "source_to_markdown", "uiai_source_to_markdown", "browser_search", "browser_open", "browser_read", "browser_snapshot", "browser_diagnostics", "uiai_2fa_code", "uiai_focusa_packet_compose", "screenshot", "frame_catalog", "frame_render", "browser_video_frames", "browser_media_transcript", "browser_media_understand", "browser_upload", "browser_downloads", "browser_popups", "browser_captcha_solve", "browser_fill_otp"},
 		"auth_classification": map[string]string{
 			"endpoint": "/api/tools/docs",
 			"mode":     "public",
@@ -372,7 +372,8 @@ func toolRelations() map[string][]string {
 		"browser_read":               {"browser_snapshot", "browser_text", "browser_diagnostics", "uiai_focusa_packet_build", "browser_close"},
 		"browser_snapshot":           {"browser_selector_resolve", "browser_click", "browser_fill", "browser_hover", "browser_text", "browser_diagnostics"},
 		"browser_click":              {"browser_snapshot", "browser_read", "browser_diagnostics", "browser_wait"},
-		"browser_fill":               {"browser_snapshot", "browser_press", "browser_diagnostics", "uiai_2fa_code"},
+		"browser_fill":               {"browser_snapshot", "browser_press", "browser_diagnostics", "uiai_2fa_code", "browser_fill_otp"},
+		"browser_fill_otp":           {"browser_snapshot", "browser_press", "browser_click", "browser_diagnostics", "browser_auth_resolve"},
 		"browser_type":               {"browser_snapshot", "browser_fill", "browser_diagnostics"},
 		"browser_press":              {"browser_snapshot", "browser_read", "browser_diagnostics"},
 		"browser_eval":               {"browser_eval_async", "browser_diagnostics", "browser_read"},
@@ -968,6 +969,22 @@ func openAITools() []map[string]any {
 					"type":       map[string]any{"type": "string", "enum": []string{"text", "recaptcha_v2", "turnstile"}, "description": "Override the detected captcha type"},
 				},
 				"required": []string{"session_id"},
+			},
+		},
+		{
+			"name":        "browser_fill_otp",
+			"description": "Fill a page's one-time-code (OTP/TOTP) field with a code resolved at the fill moment through the engine's local two-factor service - never pre-fetched, so the code cannot expire before submit. Below-floor validity waits for the next period window and re-resolves. The code is never echoed in any response, snapshot, or diagnostic; the response carries only metadata (profile, provider, expires_in, period, digits, attempts). Admitted while a session holds a pending otp_input auth challenge; a successful fill clears it in-band. Useful queries: otp, totp, two-factor, 2fa, one-time code, authenticator.",
+			"parameters": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"session_id": map[string]string{"type": "string", "description": "Session ID from browser_open"},
+					"selector":   map[string]string{"type": "string", "description": "CSS selector or @ref of the one-time-code input"},
+					"profile":    map[string]string{"type": "string", "description": "Two-factor profile name from the engine config"},
+					"floor_s":    map[string]any{"type": "integer", "description": "Minimum remaining code validity in seconds (default 5, must be below the code period)"},
+					"issuer":     map[string]string{"type": "string", "description": "Optional issuer filter for vault-backed profiles"},
+					"name":       map[string]string{"type": "string", "description": "Optional account-name filter for vault-backed profiles"},
+				},
+				"required": []string{"session_id", "selector", "profile"},
 			},
 		},
 		{

@@ -78,6 +78,7 @@ func (s *Session) DetectAuthChallengeContext(caller context.Context) (*AuthChall
 		if (has('input[type="password"], form[action*="login" i]')) cls = 'credential_form';
 		else if (has('[data-sitekey], [name*="captcha" i], [id*="captcha" i], [id*="turnstile" i], .cf-turnstile, iframe[src*="recaptcha" i]') || text.includes('just a moment') || text.includes('verifying you are human')) cls = 'captcha';
 		else if ((window.__uiaiWebAuthnAttempts || []).length > 0 || document.querySelector('iframe[src*="webauthn" i], iframe[src*="fido" i]') !== null || text.includes('webauthn') || text.includes('security key') || text.includes('passkey')) cls = 'webauthn';
+		else if (has('input[autocomplete="one-time-code"], input[name*="otp" i], input[id*="otp" i], input[name*="2fa" i], input[id*="2fa" i], input[name*="totp" i], input[id*="totp" i]')) cls = 'otp_input';
 		else if (text.includes('3-d secure') || text.includes('3ds') || text.includes('strong customer authentication')) cls = 'payment_sca';
 		else if (/[?&/](oauth|authorize|authorization|login)([/?=&]|$)/i.test(url)) cls = 'oidc_redirect';
 		return JSON.stringify({class: cls, url_hint: url.split('#')[0].split('?')[0]});

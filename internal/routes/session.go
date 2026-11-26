@@ -6,16 +6,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/WPUIAI/uiai-engine/internal/captcha"
 	"github.com/WPUIAI/uiai-engine/internal/config"
 	"github.com/WPUIAI/uiai-engine/internal/evidencepwa"
 	"github.com/WPUIAI/uiai-engine/internal/focusapacket"
 	"github.com/WPUIAI/uiai-engine/internal/observability"
+	"github.com/WPUIAI/uiai-engine/internal/twofactor"
 	"github.com/WPUIAI/uiai-engine/internal/vision"
 	"github.com/go-chi/chi/v5"
 )
@@ -113,7 +116,7 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
-				if !ok || sess.LeaseState() != vision.LeaseAwaitingAuth || req.Method == http.MethodGet || req.Method == http.MethodDelete || strings.HasSuffix(req.URL.Path, "/auth/resolve") || strings.HasSuffix(req.URL.Path, "/auth/cancel") || strings.HasSuffix(req.URL.Path, "/captcha/solve") {
+				if !ok || sess.LeaseState() != vision.LeaseAwaitingAuth || req.Method == http.MethodGet || req.Method == http.MethodDelete || strings.HasSuffix(req.URL.Path, "/auth/resolve") || strings.HasSuffix(req.URL.Path, "/auth/cancel") || strings.HasSuffix(req.URL.Path, "/captcha/solve") || strings.HasSuffix(req.URL.Path, "/fill_otp") {
 					next.ServeHTTP(w, req)
 					return
 				}
@@ -770,6 +773,103 @@ func MountSessionRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionMana
 				return
 			}
 			writeSessionSnapshot(w, req, cfg, sess, snap, http.StatusOK, nil)
+		})
+
+		// Fill-time OTP resolution — POST /api/session/{sessionID}/fill_otp
+		// (#84): the code is resolved at the fill moment through the local
+		// two-factor custody point, never pre-fetched, and never echoed in
+		// any response, snapshot, error, or diagnostic channel.
+		r.Post("/fill_otp", func(w http.ResponseWriter, req *http.Request) {
+			sess, ok := sm.Get(chi.URLParam(req, "sessionID"))
+			if !ok {
+				writeJSON(w, 404, map[string]string{"error": "session not found"})
+				return
+			}
+			var body struct {
+				Selector string `json:"selector"`
+				Profile  string `json:"profile"`
+				FloorS   int    `json:"floor_s"`
+				Issuer   string `json:"issuer"`
+				Name     string `json:"name"`
+			}
+			json.NewDecoder(req.Body).Decode(&body)
+			if body.Selector == "" || body.Profile == "" {
+				writeJSON(w, 400, map[string]string{"error": "selector and profile are required", "code": "otp_request_invalid"})
+				return
+			}
+			svc := twofactor.New(cfg)
+			resolve := func() (twofactor.Response, error) {
+				return svc.Code(req.Context(), twofactor.Request{Profile: body.Profile, Issuer: body.Issuer, Name: body.Name})
+			}
+			resp, err := resolve()
+			if err != nil {
+				writeJSON(w, 400, map[string]string{"error": "otp_unavailable: " + err.Error(), "code": "otp_unavailable"})
+				return
+			}
+			floor := int64(5)
+			if body.FloorS > 0 {
+				floor = int64(body.FloorS)
+			}
+			if floor < 1 || floor > 30 {
+				writeJSON(w, 400, map[string]string{"error": "floor_s must be between 1 and 30 seconds", "code": "otp_floor_invalid"})
+				return
+			}
+			if resp.Period > 0 && floor >= int64(resp.Period) {
+				writeJSON(w, 400, map[string]string{"error": fmt.Sprintf("floor_s (%d) must be smaller than the code period (%d) or no window can satisfy it", floor, resp.Period), "code": "otp_floor_too_large"})
+				return
+			}
+			attempts := 1
+			// Expiry-aware wait: a code with less remaining validity than the
+			// floor is never filled stale - the fill waits for the next period
+			// window and re-resolves so the submitted code is as fresh as the
+			// window allows (#84 forced-boundary requirement).
+			if resp.ExpiresIn < floor && resp.Period > 0 {
+				wait := time.Duration(resp.ExpiresIn+1) * time.Second
+				if wait > time.Minute {
+					wait = time.Minute
+				}
+				select {
+				case <-time.After(wait):
+				case <-req.Context().Done():
+					writeJSON(w, 400, map[string]string{"error": "otp window wait cancelled", "code": "otp_wait_cancelled"})
+					return
+				}
+				resp, err = resolve()
+				if err != nil {
+					writeJSON(w, 400, map[string]string{"error": "otp_unavailable: " + err.Error(), "code": "otp_unavailable"})
+					return
+				}
+				attempts = 2
+				if resp.ExpiresIn < floor {
+					writeJSON(w, 400, map[string]string{"error": "otp code validity is still below the requested floor in a fresh window; refusing to fill a code that would expire before submit", "code": "otp_code_too_short_lived"})
+					return
+				}
+			}
+			resolvedSelector, resolveErr := sess.ResolveSelector(body.Selector)
+			if resolveErr != nil {
+				writeSessionError(w, 404, "selector_not_found", resolveErr, sess, map[string]any{"action": "fill_otp", "selector": body.Selector})
+				return
+			}
+			// The snapshot is deliberately discarded: the response carries
+			// metadata only so the resolved code never surfaces in a payload.
+			if _, err := sess.Fill(resolvedSelector, resp.Code); err != nil {
+				writeSessionError(w, 500, classifySessionError(err), err, sess, map[string]any{"action": "fill_otp", "selector": body.Selector, "resolved_selector": resolvedSelector})
+				return
+			}
+			// In-band resolution: a successful fill clears a pending
+			// otp_input challenge; the vision layer emits the audit event.
+			if challenge := sess.CurrentAuthChallenge(); challenge != nil && challenge.Class == "otp_input" {
+				_ = sess.ResolveAuthChallenge(challenge.ResumeToken)
+			}
+			writeJSON(w, 200, map[string]any{
+				"filled":     true,
+				"profile":    resp.Profile,
+				"provider":   resp.Provider,
+				"expires_in": resp.ExpiresIn,
+				"period":     resp.Period,
+				"digits":     resp.Digits,
+				"attempts":   attempts,
+			})
 		})
 
 		// Select — choose dropdown option by value or text
