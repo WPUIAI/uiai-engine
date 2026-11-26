@@ -118,6 +118,17 @@ func MountFPVRoutes(r chi.Router, cfg *config.Config, sm *vision.SessionManager)
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "authentication sessions cannot create public views", "error_class": "fpv_private_session"})
 			return
 		}
+		// #147: health-origin sessions default-deny public sharing; the
+		// probe fails closed like the auth and origin checks above it.
+		health, herr := sess.HealthContext(req.Context())
+		if herr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "session health context could not be verified", "error_class": "fpv_privacy_check_failed"})
+			return
+		}
+		if health {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "health-origin sessions default-deny public sharing", "error_class": "fpv_health_origin"})
+			return
+		}
 		origin, err := sess.CurrentOriginContext(req.Context())
 		if err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "session origin could not be verified", "error_class": "fpv_privacy_check_failed"})
