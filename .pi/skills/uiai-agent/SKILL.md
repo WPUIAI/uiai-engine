@@ -53,8 +53,12 @@ changing modes. This is the canonical decision card, not a second skill-owned
 matrix: choose by best use, cost, persistence and security, and follow its bounded
 state-routing hints/recipes. `registered_tools` is registration only, never proof
 of runtime readiness, credentials, control authority or evidence publication.
-External/unsupported attach, mesh, privileged transaction and full-context scrub
-routes remain explicitly limited; do not invent tools or SSH/CDP workarounds.
+Attach is now a first-class allow-listed tool (`browser_attach`, #143): it opens a
+tab in an operator-configured, already-running browser over CDP and inherits that
+owner profile's authenticated sessions — never connect to a caller-supplied
+debugger URL, and the engine never owns the attached browser's lifecycle. Mesh,
+privileged transaction and full-context scrub routes remain explicitly limited; do
+not invent tools or SSH/CDP workarounds for those.
 
 An `auth_challenge_pending` error's `next_mode` is guidance, not permission to
 resume. Require an approved private context, renewable broker/human resolution,

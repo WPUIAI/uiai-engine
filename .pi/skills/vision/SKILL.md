@@ -13,6 +13,8 @@ Take screenshots, interact with pages, and automate browser tasks via the UIAI E
 4. **Diagnostics** (`/api/session/{id}/diagnostics`) — get console errors, JS exceptions, network failures, failed requests, and summary counts without taking a screenshot.
 5. **Bounded async eval** (`/api/session/{id}/eval_async`) — await small async checks with `timeout_ms`; use direct actions for long UI workflows.
 6. **Focusa packet composer** (`/api/agent/research-packet`) — compose bounded `uiai.focusa_research_diagnostics_packet.v1` packets from existing UIAI search/read/snapshot/diagnostics/error/screenshot/share responses.
+7. **Attach to an authenticated owner browser** (`POST /api/attach`, `browser_attach`) — open a tab inside an operator-configured, already-running browser over CDP; the tab inherits the owner profile's cookies and logins, so already-authenticated surfaces are directly operable. Endpoints are allow-list names; the engine never owns the attached browser. **Best for logged-in Discord/SSO/dashboard work.**
+8. **Fill-time OTP resolution** (`POST /api/session/{id}/fill_otp`, `browser_fill_otp`) — resolve a one-time code at the fill moment through the engine's two-factor custody point; below-floor validity waits for the next window; the code is never echoed. An `otp_input` auth challenge resolves in-band. **Best for TOTP/2FA fields without stale codes.
 
 **Use when:** You need to see what a webpage looks like, verify a deployment, audit a site, check mobile layout, fill forms, test auth flows, or automate browser interactions.
 
