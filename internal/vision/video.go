@@ -2,6 +2,7 @@ package vision
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 )
@@ -74,29 +75,53 @@ func (s *Session) SampleVideoFrames(selector string, count int, startMs, endMs i
 		return nil, false, fmt.Errorf("video pause failed: %w", err)
 	}
 
-	// The seeked frame is drawn into an in-page canvas and exported as a JPEG
-	// data URL. This reads the decoded frame directly and never depends on
-	// headless compositor video painting, which can stay frozen on the first
-	// presented frame.
-	captureJS := `(ts) => new Promise((resolve, reject) => {
+	// Frame capture reads the decoded frame directly: the target frame is
+	// drawn into an in-page canvas and exported as a JPEG data URL, never
+	// depending on headless compositor video painting. Two strategies:
+	// a confirmed seek (fast, and the only option for rewinding), with a
+	// play-to-crossing fallback — Chrome headless variants exist that drop
+	// seek requests on a paused pipeline while the decoder still advances
+	// during playback, so capture-at-crossing reaches the same frames.
+	captureJS := `(tsMs) => new Promise(async (resolve, reject) => {
 		const v = this;
-		const finish = () => {
-			try {
-				const scale = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight));
-				const cw = Math.max(2, Math.round(v.videoWidth * scale));
-				const ch = Math.max(2, Math.round(v.videoHeight * scale));
-				const canvas = document.createElement('canvas');
-				canvas.width = cw; canvas.height = ch;
-				canvas.getContext('2d').drawImage(v, 0, 0, cw, ch);
-				const url = canvas.toDataURL('image/jpeg', 0.6);
-				resolve(url.substring(url.indexOf(',') + 1));
-			} catch (e) { reject(e); }
+		const ts = tsMs / 1000;
+		const draw = () => {
+			const scale = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight));
+			const cw = Math.max(2, Math.round(v.videoWidth * scale));
+			const ch = Math.max(2, Math.round(v.videoHeight * scale));
+			const canvas = document.createElement('canvas');
+			canvas.width = cw; canvas.height = ch;
+			canvas.getContext('2d').drawImage(v, 0, 0, cw, ch);
+			const url = canvas.toDataURL('image/jpeg', 0.6);
+			resolve(JSON.stringify({ t: Math.round(v.currentTime * 1000), b64: url.substring(url.indexOf(',') + 1) }));
 		};
-		if (Math.abs(v.currentTime - ts) < 0.001) { finish(); return; }
-		const timer = setTimeout(() => { v.removeEventListener('seeked', onseeked); reject(new Error('seek timeout')); }, 4000);
-		const onseeked = () => { clearTimeout(timer); finish(); };
-		v.addEventListener('seeked', onseeked, { once: true });
-		try { v.currentTime = ts; } catch (e) { clearTimeout(timer); reject(e); }
+		try {
+			if (Math.abs(v.currentTime - ts) < 0.005) { draw(); return; }
+			if (v.currentTime < ts - 0.25) {
+				// Confirmed seek: retry because the initial-load seeked can
+				// satisfy a listener before the requested seek lands.
+				for (let attempt = 0; attempt < 2; attempt++) {
+					await new Promise((resolve) => {
+						const timer = setTimeout(() => { v.removeEventListener('seeked', onseeked); resolve(); }, 2000);
+						const onseeked = () => { clearTimeout(timer); resolve(); };
+						v.addEventListener('seeked', onseeked, { once: true });
+						try { v.currentTime = ts; } catch (e) { clearTimeout(timer); resolve(); }
+					});
+					await new Promise(r => setTimeout(r, 60));
+					if (Math.abs(v.currentTime - ts) < 0.05) { draw(); return; }
+				}
+				// Play-to-crossing fallback for pipelines that drop seeks.
+				v.muted = true;
+				try { await v.play(); } catch (e) { reject(new Error('play refused for crossing capture')); return; }
+				const deadline = Date.now() + 8000;
+				while (v.currentTime < ts && !v.ended && Date.now() < deadline) {
+					await new Promise(r => setTimeout(r, 40));
+				}
+				v.pause();
+				if (v.currentTime < ts) { reject(new Error('playback never reached the target')); return; }
+			}
+			draw();
+		} catch (e) { reject(e); }
 	})`
 
 	frames := make([]VideoFrame, 0, count)
@@ -108,17 +133,29 @@ func (s *Session) SampleVideoFrames(selector string, count int, startMs, endMs i
 		if count == 1 {
 			ts = startMs
 		}
-		result, err := element.Eval(captureJS, float64(ts)/1000.0)
+		result, err := element.Eval(captureJS, ts)
 		if err != nil {
 			return frames, truncated, fmt.Errorf("frame capture at %dms failed: %w", ts, err)
 		}
 		if result == nil {
 			return frames, truncated, fmt.Errorf("frame capture at %dms returned no result", ts)
 		}
-		dataURLB64 := result.Value.Str()
+		var captured struct {
+			T   int64  `json:"t"`
+			B64 string `json:"b64"`
+		}
+		if err := json.Unmarshal([]byte(result.Value.Str()), &captured); err != nil || captured.B64 == "" {
+			return frames, truncated, fmt.Errorf("frame at %dms did not produce a decodable image", ts)
+		}
+		dataURLB64 := captured.B64
 		jpeg, err := base64.StdEncoding.DecodeString(dataURLB64)
 		if err != nil || len(jpeg) == 0 {
 			return frames, truncated, fmt.Errorf("frame at %dms did not produce a decodable image", ts)
+		}
+		// Record where the frame actually landed (crossing captures land
+		// slightly after the request).
+		if captured.T > 0 {
+			ts = captured.T
 		}
 		total += len(jpeg)
 		if total > maxVideoFramesBytes {
