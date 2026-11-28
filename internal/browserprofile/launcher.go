@@ -69,7 +69,8 @@ func Launch(ctx context.Context, profile ResolvedProfile) (*Runtime, error) {
 	}
 	browser := rod.New().ControlURL(u)
 	if err := browser.Connect(); err != nil {
-		l.Cleanup()
+		l.Kill()
+		cleanupProfileLauncher(l, profile.Launch.UserDataDir != "")
 		return nil, fmt.Errorf("connect browser profile %q: %w", profile.ID, err)
 	}
 	if boolValue(profile.Launch.IgnoreCertErrors, false) {
@@ -110,11 +111,11 @@ func BuildChromiumLauncher(profile ResolvedProfile) (*launcher.Launcher, error) 
 		l = l.Set("proxy-server", profile.Network.ProxyServer)
 	}
 	if profile.Launch.UserDataDir != "" {
-		dir, err := expandPath(profile.Launch.UserDataDir)
+		dir, err := canonicalProfileDir(profile.Launch.UserDataDir)
 		if err != nil {
 			return nil, err
 		}
-		l = l.Set("user-data-dir", dir)
+		l = l.UserDataDir(dir)
 	}
 	if boolValue(profile.Launch.BlockTrackers, false) {
 		l = l.Set("host-resolver-rules", trackerResolverRules)
@@ -129,6 +130,9 @@ func BuildChromiumLauncher(profile ResolvedProfile) (*launcher.Launcher, error) 
 		key, value := splitArg(raw)
 		if key == "" {
 			continue
+		}
+		if key == string(flags.UserDataDir) {
+			return nil, fmt.Errorf("configure user_data_dir through launch.user_data_dir, not extra_args")
 		}
 		flag := flags.Flag(key)
 		if value == "" {
@@ -297,11 +301,23 @@ func (r *Runtime) Close() {
 		r.sessionBrowser = nil
 	}
 	if r.Browser != nil {
-		_ = r.Browser.Close()
+		if err := r.Browser.Close(); err != nil && r.Launcher != nil {
+			r.Launcher.Kill()
+		}
 	}
 	if r.Launcher != nil {
-		r.Launcher.Cleanup()
+		cleanupProfileLauncher(r.Launcher, r.Profile.Launch.UserDataDir != "")
 	}
+}
+
+// Rod v0.116.2 Cleanup waits for process exit and then removes its current
+// UserDataDir flag. Keep operator-configured storage, but still wait for exit
+// before releasing the manager's exclusive directory reservation.
+func cleanupProfileLauncher(l *launcher.Launcher, retain bool) {
+	if retain {
+		l.Delete(flags.UserDataDir)
+	}
+	l.Cleanup()
 }
 
 func profileUsesEphemeralContext(profile ResolvedProfile) bool {
@@ -368,9 +384,25 @@ func boolValue(value *bool, fallback bool) bool {
 }
 
 func expandPath(path string) (string, error) {
-	path = os.ExpandEnv(path)
-	if path == "" || path[0] != '~' {
+	var missing string
+	path = os.Expand(path, func(key string) string {
+		value, ok := os.LookupEnv(key)
+		if !ok || value == "" {
+			missing = key
+		}
+		return value
+	})
+	if missing != "" {
+		return "", fmt.Errorf("user data directory environment variable %q is unset or empty", missing)
+	}
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("user data directory is empty")
+	}
+	if path[0] != '~' {
 		return path, nil
+	}
+	if path != "~" && !strings.HasPrefix(path, "~/") {
+		return "", fmt.Errorf("unsupported user data directory home syntax")
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -380,4 +412,43 @@ func expandPath(path string) (string, error) {
 		return home, nil
 	}
 	return filepath.Join(home, strings.TrimPrefix(path, "~/")), nil
+}
+
+// canonicalProfileDir makes equivalent paths share the same in-process lock,
+// including existing symlinked parents of a not-yet-created profile.
+func canonicalProfileDir(path string) (string, error) {
+	expanded, err := expandPath(path)
+	if err != nil {
+		return "", err
+	}
+	absolute, err := filepath.Abs(expanded)
+	if err != nil {
+		return "", fmt.Errorf("resolve user data directory: %w", err)
+	}
+	return resolveProfilePath(absolute)
+}
+
+func resolveProfilePath(path string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return resolved, nil
+	}
+	if !os.IsNotExist(err) {
+		return "", fmt.Errorf("resolve user data directory: %w", err)
+	}
+	// A dangling symlink is not a new directory and must not get a different lock.
+	if _, statErr := os.Lstat(path); statErr == nil {
+		return "", fmt.Errorf("user data directory contains an unresolved symlink: %w", err)
+	} else if !os.IsNotExist(statErr) {
+		return "", fmt.Errorf("inspect user data directory: %w", statErr)
+	}
+	parent := filepath.Dir(path)
+	if parent == path {
+		return "", fmt.Errorf("resolve user data directory: %w", err)
+	}
+	resolvedParent, err := resolveProfilePath(parent)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(resolvedParent, filepath.Base(path)), nil
 }
