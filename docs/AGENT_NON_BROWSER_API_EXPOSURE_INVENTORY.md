@@ -36,3 +36,7 @@ Before adding any omitted family to Pi, MCP, or CLI surfaces:
 4. Add route parity smoke for the new Pi/MCP/CLI tool.
 5. Update README, Session API, interoperability spec, release proof checklist, and this inventory.
 6. Live deploy and run the agent-surface release proof checklist.
+
+### Wirebot prototype crosswalk
+
+[Wirebot prototype runtime BOM](https://github.com/Startempire-Wire/agent-driven-life-business-os/blob/a21e1e9baa9819faa58317cc198f7d8694c8be53/docs/agent-os-golden-path/wirebot-prototype-runtime-bom.md#matrix-by-first-eligible-expression) — Owns Engine API inventory and browser execution; use a registered adapter and verify scope. WB-P05.
