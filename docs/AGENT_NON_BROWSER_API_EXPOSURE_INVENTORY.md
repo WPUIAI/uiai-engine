@@ -39,4 +39,4 @@ Before adding any omitted family to Pi, MCP, or CLI surfaces:
 
 ### Wirebot prototype crosswalk
 
-[Wirebot prototype runtime BOM](https://github.com/Startempire-Wire/agent-driven-life-business-os/blob/a21e1e9baa9819faa58317cc198f7d8694c8be53/docs/agent-os-golden-path/wirebot-prototype-runtime-bom.md#matrix-by-first-eligible-expression) — Owns Engine API inventory and browser execution; use a registered adapter and verify scope. WB-P05.
+[Wirebot prototype runtime BOM](https://github.com/Startempire-Wire/agent-driven-life-business-os/blob/main/docs/agent-os-golden-path/wirebot-prototype-runtime-bom.md#matrix-by-first-eligible-expression) — Owns Engine API inventory and browser execution; use a registered adapter and verify scope. WB-P05.
