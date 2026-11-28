@@ -56,6 +56,7 @@ type Pool struct {
 	// Lazy launch: Chrome starts on first request, auto-kills after IdleTimeout
 	idleTimer *time.Timer
 	keepAlive bool
+	launchSettings poolLaunchSettings
 	active    int // number of pages currently checked out
 	// Screenshot cache: avoids redundant Chrome renders
 	cache *screenshotCache
@@ -109,6 +110,9 @@ type PoolConfig struct {
 	MaxPages         int
 	AllowPrivateURLs bool // when true, disables SSRF private-IP blocking (for local dev/staging)
 	KeepAlive        bool // C-010-06: never idle-shutdown; prelaunch for warm first-action
+	Headless         *bool // nil preserves the existing headless default
+	WindowSize       string // optional actual Chromium window dimensions, WIDTH,HEIGHT
+	Locale           string // optional Chromium UI locale
 }
 
 func NewPool(maxPages int) (*Pool, error) {
@@ -124,7 +128,12 @@ func NewPoolWithConfig(cfg PoolConfig) (*Pool, error) {
 		cfg.KeepAlive = true
 	}
 
+	settings, err := resolvePoolLaunchSettings(cfg)
+	if err != nil {
+		return nil, err
+	}
 	p := &Pool{
+		launchSettings:   settings,
 		keepAlive:        cfg.KeepAlive,
 		pages:            make(chan *rod.Page, cfg.MaxPages),
 		maxPages:         cfg.MaxPages,
@@ -208,8 +217,7 @@ drained:
 	if err != nil {
 		return fmt.Errorf("create private browser profile: %w", err)
 	}
-	l := launcher.New().
-		Headless(true).
+	l := p.launchSettings.apply(launcher.New()).
 		UserDataDir(profileDir).
 		// Flags NOT in Rod defaults — add explicitly
 		Set("disable-gpu").
@@ -1232,6 +1240,9 @@ func (p *Pool) Stats() map[string]any {
 
 	stats := map[string]any{
 		"max_pages":        p.maxPages,
+		"headless":         !p.launchSettings.headed,
+		"window_size":      p.launchSettings.windowSize,
+		"locale":           p.launchSettings.locale,
 		"created_pages":    p.created,
 		"available_pages":  len(p.pages),
 		"active_pages":     p.active,
