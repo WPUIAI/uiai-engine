@@ -147,12 +147,16 @@ func (m *Manager) Open(ctx context.Context, request OpenRequest) (*ManagedSessio
 }
 
 func (m *Manager) reserveProfileLock(profile ResolvedProfile) (lockKey, placeholder string, err error) {
-	if !profile.Storage.ExclusiveLock {
-		return "", "", nil
-	}
-	lockKey = profile.Launch.UserDataDir
-	if lockKey == "" {
+	if profile.Launch.UserDataDir != "" {
+		dir, resolveErr := canonicalProfileDir(profile.Launch.UserDataDir)
+		if resolveErr != nil {
+			return "", "", resolveErr
+		}
+		lockKey = "dir:" + dir
+	} else if profile.Storage.ExclusiveLock {
 		lockKey = profile.Storage.IsolationKey
+	} else {
+		return "", "", nil
 	}
 	if lockKey == "" {
 		return "", "", fmt.Errorf("exclusive profile %q has no lock identity", profile.ID)
@@ -219,9 +223,6 @@ func (m *Manager) Close(id string) error {
 		return fmt.Errorf("profile session %q not found", id)
 	}
 	delete(m.sessions, id)
-	if session.lockKey != "" && m.locks[session.lockKey] == id {
-		delete(m.locks, session.lockKey)
-	}
 	m.mu.Unlock()
 
 	if session.page != nil {
@@ -230,6 +231,13 @@ func (m *Manager) Close(id string) error {
 	if session.runtime != nil {
 		session.runtime.Close()
 	}
+	// Chromium's profile lock remains in use until its process exits. Keep our
+	// reservation throughout shutdown instead of admitting a competing launch.
+	m.mu.Lock()
+	if session.lockKey != "" && m.locks[session.lockKey] == id {
+		delete(m.locks, session.lockKey)
+	}
+	m.mu.Unlock()
 	return nil
 }
 

@@ -270,6 +270,17 @@ func validateResolved(name string, p Profile) error {
 	if p.Engine == EngineCamoufox && p.Launch.ExecutablePath == "" && p.Launch.DriverEndpoint == "" {
 		return fmt.Errorf("profile %q uses camoufox but has no executable_path or driver_endpoint", name)
 	}
+	if p.Launch.Persistent || p.Storage.CookieMode == "persistent" || p.Storage.CacheMode == "persistent" || p.Storage.LocalStorageMode == "persistent" {
+		if p.Launch.UserDataDir == "" || !p.Storage.ExclusiveLock {
+			return fmt.Errorf("persistent profile %q requires launch.user_data_dir and storage.exclusive_lock", name)
+		}
+		if profileUsesEphemeralContext(ResolvedProfile{Profile: p}) {
+			return fmt.Errorf("persistent profile %q cannot mix persistent and ephemeral storage", name)
+		}
+	}
+	if p.Launch.UserDataDir != "" && (p.Engine == EngineCamoufox || p.Network.Route == "local_ip_pool") {
+		return fmt.Errorf("profile %q selects a runtime that does not honor launch.user_data_dir", name)
+	}
 	if p.Mode == ModeOperator {
 		if !p.Launch.Persistent || p.Launch.UserDataDir == "" {
 			return fmt.Errorf("operator profile %q requires persistent_context and user_data_dir", name)
