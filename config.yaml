@@ -42,6 +42,11 @@ ai:
       api_url: "https://api.minimax.io/v1"
 
 vision:
+  # Preserve the server-friendly default; false requires a working display.
+  headless: true
+  # Optional native window size and UI locale for operator-controlled layout tests.
+  # window_size: "1920,1080"
+  # locale: "en-US"
   pool_size: 2
   max_pool: 2
   idle_timeout: 300s

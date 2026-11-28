@@ -254,6 +254,9 @@ type TwoFactorProfile struct {
 }
 
 type VisionConfig struct {
+	Headless          *bool         `yaml:"headless,omitempty"`
+	WindowSize        string        `yaml:"window_size,omitempty"`
+	Locale            string        `yaml:"locale,omitempty"`
 	PoolSize          int           `yaml:"pool_size"`
 	MaxPool           int           `yaml:"max_pool"`
 	Browsers          int           `yaml:"browsers"`

@@ -98,6 +98,9 @@ func New(cfg *config.Config) *Engine {
 			p, err := vision.NewPoolWithConfig(vision.PoolConfig{
 				MaxPages:         pages,
 				AllowPrivateURLs: cfg.Vision.AllowPrivateURLs,
+				Headless:         cfg.Vision.Headless,
+				WindowSize:       cfg.Vision.WindowSize,
+				Locale:           cfg.Vision.Locale,
 			})
 			if err != nil {
 				log.Printf("[vision] WARNING: Pool init failed: %v (screenshot/share will return 503)", err)
@@ -107,7 +110,7 @@ func New(cfg *config.Config) *Engine {
 		} else {
 			cfgs := make([]vision.PoolConfig, 0, browsers)
 			for i := 0; i < browsers; i++ {
-				cfgs = append(cfgs, vision.PoolConfig{MaxPages: pages, AllowPrivateURLs: cfg.Vision.AllowPrivateURLs})
+				cfgs = append(cfgs, vision.PoolConfig{MaxPages: pages, AllowPrivateURLs: cfg.Vision.AllowPrivateURLs, Headless: cfg.Vision.Headless, WindowSize: cfg.Vision.WindowSize, Locale: cfg.Vision.Locale})
 			}
 			mp, err := vision.NewMultiPool(cfgs)
 			if err != nil {
